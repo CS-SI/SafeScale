@@ -392,7 +392,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 
 		// look 1st for primary gateway, if not found then for the secondary gateway
 		found := true
-		var nilErrNotFound *fail.ErrNotFound = nil
+		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		gw, xerr := subnetInstance.InspectGateway(true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil && xerr != nilErrNotFound {
@@ -426,7 +426,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		found := true
-		var nilErrNotFound *fail.ErrNotFound = nil
+		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		var gw resources.Host
 		svc := w.cluster.Service()
 		gw, xerr = LoadHost(svc, netCfg.GatewayID)

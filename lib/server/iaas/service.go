@@ -131,16 +131,16 @@ func NullService() *service { // nolint
 }
 
 // IsNull tells if the instance is null value
-func (self *service) IsNull() bool {
-	return self == nil || self.Provider == nil
+func (instance *service) IsNull() bool {
+	return instance == nil || instance.Provider == nil
 }
 
 // GetProviderName ...
-func (self service) GetProviderName() (string, fail.Error) {
-	if self.IsNull() {
+func (instance service) GetProviderName() (string, fail.Error) {
+	if instance.IsNull() {
 		return "", nil
 	}
-	svcName, xerr := self.GetName()
+	svcName, xerr := instance.GetName()
 	if xerr != nil {
 		return "", xerr
 	}
@@ -149,74 +149,74 @@ func (self service) GetProviderName() (string, fail.Error) {
 
 // GetName ...
 // Satisfies interface data.Identifiable
-func (self service) GetName() (string, fail.Error) {
-	if self.IsNull() {
+func (instance service) GetName() (string, fail.Error) {
+	if instance.IsNull() {
 		return "", nil
 	}
 
-	return self.tenantName, nil
+	return instance.tenantName, nil
 }
 
 // GetCache returns the data.Cache instance corresponding to the name passed as parameter
 // If the cache does not exist, create it
-func (self *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
-	if self.IsNull() {
+func (instance *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	self.cacheLock.Lock()
-	defer self.cacheLock.Unlock()
+	instance.cacheLock.Lock()
+	defer instance.cacheLock.Unlock()
 
-	if _, ok := self.cache.resources[name]; !ok {
+	if _, ok := instance.cache.resources[name]; !ok {
 		rc, xerr := NewResourceCache(name)
 		if xerr != nil {
 			return rc, xerr
 		}
 
-		self.cache.resources[name] = rc
+		instance.cache.resources[name] = rc
 	}
-	return self.cache.resources[name], nil
+	return instance.cache.resources[name], nil
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
-func (self service) GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error) {
-	if self.IsNull() {
+func (instance service) GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error) {
+	if instance.IsNull() {
 		return abstract.ObjectStorageBucket{}, nil
 	}
-	return self.metadataBucket, nil
+	return instance.metadataBucket, nil
 }
 
 // GetMetadataKey returns the key used to crypt data in metadata bucket
-func (self service) GetMetadataKey() (*crypt.Key, fail.Error) {
-	if self.IsNull() {
+func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if self.metadataKey == nil {
+	if instance.metadataKey == nil {
 		return nil, fail.NotFoundError("no crypt key defined for metadata content")
 	}
-	return self.metadataKey, nil
+	return instance.metadataKey, nil
 }
 
 // ChangeProvider allows to change provider interface of service object (mainly for test purposes)
-func (self *service) ChangeProvider(provider providers.Provider) fail.Error {
-	if self.IsNull() {
+func (instance *service) ChangeProvider(provider providers.Provider) fail.Error {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if provider == nil {
 		return fail.InvalidParameterCannotBeNilError("provider")
 	}
-	self.Provider = provider
+	instance.Provider = provider
 	return nil
 }
 
 // WaitHostState waits until a host achieves state 'state'
 // If host is in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
-func (self service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
-	if self.IsNull() {
+func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if hostID == "" {
@@ -248,7 +248,7 @@ func (self service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 			default:
 			}
 
-			host, rerr = self.InspectHost(host) // FIXME: all service functions should accept ctx in order to be canceled
+			host, rerr = instance.InspectHost(host) // FIXME: all service functions should accept ctx in order to be canceled
 			if rerr != nil {
 				errCh <- rerr
 				return
@@ -266,7 +266,7 @@ func (self service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 			case <-done: // only when it's closed
 				return
 			default:
-				time.Sleep(self.Timings().SmallDelay())
+				time.Sleep(instance.Timings().SmallDelay())
 			}
 		}
 	}()
@@ -286,10 +286,10 @@ func (self service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 
 // WaitVolumeState waits a host achieve state
 // If timeout is reached, returns utils.ErrTimeout
-func (self service) WaitVolumeState(
+func (instance service) WaitVolumeState(
 	volumeID string, state volumestate.Enum, timeout time.Duration,
 ) (*abstract.Volume, fail.Error) {
-	if self.IsNull() {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if volumeID == "" {
@@ -300,7 +300,7 @@ func (self service) WaitVolumeState(
 	next := make(chan bool)
 	vc := make(chan *abstract.Volume)
 
-	go pollVolume(self, volumeID, state, cout, next, vc)
+	go pollVolume(instance, volumeID, state, cout, next, vc)
 	for {
 		select {
 		case res := <-cout:
@@ -343,12 +343,12 @@ func pollVolume(
 
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (self service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if self.IsNull() {
+func (instance service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := self.Provider.ListTemplates(all)
+	allTemplates, err := instance.Provider.ListTemplates(all)
 	if err != nil {
 		return nil, err
 	}
@@ -357,16 +357,16 @@ func (self service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error
 		return allTemplates, nil
 	}
 
-	return self.reduceTemplates(allTemplates, self.whitelistTemplateREs, self.blacklistTemplateREs), nil
+	return instance.reduceTemplates(allTemplates, instance.whitelistTemplateREs, instance.blacklistTemplateREs), nil
 }
 
 // FindTemplateByName returns the template by its name
-func (self service) FindTemplateByName(name string) (*abstract.HostTemplate, fail.Error) {
-	if self.IsNull() {
+func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := self.Provider.ListTemplates(true)
+	allTemplates, err := instance.Provider.ListTemplates(true)
 	if err != nil {
 		return nil, err
 	}
@@ -380,9 +380,9 @@ func (self service) FindTemplateByName(name string) (*abstract.HostTemplate, fai
 }
 
 // FindTemplateBySizing returns an abstracted template corresponding to the Host Sizing Requirements
-func (self service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
+func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
 	useScannerDB := sizing.MinGPU > 0 || sizing.MinCPUFreq > 0
-	templates, xerr := self.ListTemplatesBySizing(sizing, useScannerDB)
+	templates, xerr := instance.ListTemplatesBySizing(sizing, useScannerDB)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
 	}
@@ -414,16 +414,16 @@ func (self service) FindTemplateBySizing(sizing abstract.HostSizingRequirements)
 }
 
 // reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
-func (self service) reduceTemplates(
+func (instance service) reduceTemplates(
 	tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
 ) []abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
-		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(self.whitelistTemplateREs))
+		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
 		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(whitelistREs))
 	}
 	if len(blacklistREs) > 0 {
-		//		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(self.blacklistTemplateREs))
+		//		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.blacklistTemplateREs))
 		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(blacklistREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
@@ -450,17 +450,17 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 
 // ListTemplatesBySizing select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (self service) ListTemplatesBySizing(
+func (instance service) ListTemplatesBySizing(
 	sizing abstract.HostSizingRequirements, force bool,
 ) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
-	if self.IsNull() {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true, "").Entering()
 	defer tracer.Exiting()
 
-	allTpls, rerr := self.ListTemplates(false)
+	allTpls, rerr := instance.ListTemplates(false)
 	if rerr != nil {
 		return nil, rerr
 	}
@@ -483,7 +483,7 @@ func (self service) ListTemplatesBySizing(
 				return nil, fail.NewError(noHostError)
 			}
 		} else {
-			authOpts, rerr := self.GetAuthenticationOptions()
+			authOpts, rerr := instance.GetAuthenticationOptions()
 			if rerr != nil {
 				return nil, rerr
 			}
@@ -493,7 +493,7 @@ func (self service) ListTemplatesBySizing(
 				return nil, fail.SyntaxError("region value unset")
 			}
 
-			svcName, xerr := self.GetName()
+			svcName, xerr := instance.GetName()
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -561,14 +561,14 @@ func (self service) ListTemplatesBySizing(
 		}
 	}
 
-	reducedTmpls := self.reduceTemplates(allTpls, self.whitelistTemplateREs, self.blacklistTemplateREs)
+	reducedTmpls := instance.reduceTemplates(allTpls, instance.whitelistTemplateREs, instance.blacklistTemplateREs)
 	if sizing.MinGPU < 1 {
 		// Force filtering of known templates with GPU from template list when sizing explicitly asks for no GPU
-		gpus, xerr := self.GetRegexpsOfTemplatesWithGPU()
+		gpus, xerr := instance.GetRegexpsOfTemplatesWithGPU()
 		if xerr != nil {
 			return nil, xerr
 		}
-		reducedTmpls = self.reduceTemplates(reducedTmpls, nil, gpus)
+		reducedTmpls = instance.reduceTemplates(reducedTmpls, nil, gpus)
 	}
 
 	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
@@ -666,16 +666,16 @@ func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
-func (self service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
-	if self.IsNull() {
+func (instance service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := self.ListImages(false)
+	imgs, err := instance.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
-	imgs = self.reduceImages(imgs)
+	imgs = instance.reduceImages(imgs)
 
 	if len(filter) == 0 {
 		return imgs, nil
@@ -707,13 +707,13 @@ func (self service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
 
 }
 
-func (self service) reduceImages(imgs []abstract.Image) []abstract.Image {
+func (instance service) reduceImages(imgs []abstract.Image) []abstract.Image {
 	var finalFilter *imagefilters.Filter
-	if len(self.whitelistImageREs) > 0 {
-		finalFilter = imagefilters.NewFilter(filterImagesByRegexSlice(self.whitelistImageREs))
+	if len(instance.whitelistImageREs) > 0 {
+		finalFilter = imagefilters.NewFilter(filterImagesByRegexSlice(instance.whitelistImageREs))
 	}
-	if len(self.blacklistImageREs) > 0 {
-		blackFilter := imagefilters.NewFilter(filterImagesByRegexSlice(self.blacklistImageREs))
+	if len(instance.blacklistImageREs) > 0 {
+		blackFilter := imagefilters.NewFilter(filterImagesByRegexSlice(instance.blacklistImageREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
 		} else {
@@ -740,28 +740,28 @@ func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 }
 
 // ListImages reduces the list of needed, if all bool is true, all images are returned, if not, images are filtered using blacklists and whitelists
-func (self service) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if self.IsNull() {
+func (instance service) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := self.Provider.ListImages(all)
+	imgs, err := instance.Provider.ListImages(all)
 	if err != nil {
 		return nil, err
 	}
-	return self.reduceImages(imgs), nil
+	return instance.reduceImages(imgs), nil
 }
 
 // SearchImage search an image corresponding to OS Name
-func (self service) SearchImage(osname string) (*abstract.Image, fail.Error) {
-	if self.IsNull() {
+func (instance service) SearchImage(osname string) (*abstract.Image, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if osname == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
 	}
 
-	imgs, xerr := self.ListImages(false)
+	imgs, xerr := instance.ListImages(false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -826,16 +826,16 @@ func addPadding(in string, maxLength int) string {
 }
 
 // CreateHostWithKeyPair creates a host
-func (self service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
-	if self.IsNull() {
+func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
+	if instance.IsNull() {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
 	found := true
 	ah := abstract.NewHostCore()
 	ah.Name = request.ResourceName
-	_, rerr := self.InspectHost(ah)
-	var nilErrNotFound *fail.ErrNotFound = nil
+	_, rerr := instance.InspectHost(ah)
+	var nilErrNotFound *fail.ErrNotFound = nil // nolint
 	if rerr != nil && rerr != nilErrNotFound {
 		if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
 			return nil, nil, nil, fail.ConvertError(rerr)
@@ -855,7 +855,7 @@ func (self service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstra
 	}
 
 	kpName := kpNameuuid.String()
-	kp, rerr := self.CreateKeyPair(kpName)
+	kp, rerr := instance.CreateKeyPair(kpName)
 	if rerr != nil {
 		return nil, nil, nil, rerr
 	}
@@ -874,7 +874,7 @@ func (self service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstra
 		// DefaultGateway: request.DefaultGateway,
 		TemplateID: request.TemplateID,
 	}
-	host, userData, rerr := self.CreateHost(hostReq)
+	host, userData, rerr := instance.CreateHost(hostReq)
 	if rerr != nil {
 		return nil, nil, nil, rerr
 	}
@@ -882,12 +882,12 @@ func (self service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstra
 }
 
 // ListHostsByName list hosts by name
-func (self service) ListHostsByName(details bool) (map[string]*abstract.HostFull, fail.Error) {
-	if self.IsNull() {
+func (instance service) ListHostsByName(details bool) (map[string]*abstract.HostFull, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	hosts, err := self.ListHosts(details)
+	hosts, err := instance.ListHosts(details)
 	if err != nil {
 		return nil, err
 	}
@@ -901,8 +901,8 @@ func (self service) ListHostsByName(details bool) (map[string]*abstract.HostFull
 // TenantCleanup removes everything related to SafeScale from tenant (mainly metadata)
 // if force equals false and there is metadata, returns an error
 // WARNING: !!! this will make SafeScale unable to handle the resources !!!
-func (self service) TenantCleanup(force bool) fail.Error {
-	if self.IsNull() {
+func (instance service) TenantCleanup(force bool) fail.Error {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -910,7 +910,7 @@ func (self service) TenantCleanup(force bool) fail.Error {
 }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
-func (self service) LookupRuleInSecurityGroup(
+func (instance service) LookupRuleInSecurityGroup(
 	asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
 ) (bool, fail.Error) {
 	if data.IsNil(asg) {
@@ -930,22 +930,22 @@ func (self service) LookupRuleInSecurityGroup(
 }
 
 // InspectHostByName hides the "complexity" of the way to get Host by name
-func (self service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
-	if self.IsNull() {
+func (instance service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	return self.InspectHost(abstract.NewHostCore().SetName(name))
+	return instance.InspectHost(abstract.NewHostCore().SetName(name))
 }
 
 // InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
-func (self service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
-	if self.IsNull() {
+func (instance service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	return self.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+	return instance.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
-func (self service) ObjectStorageConfiguration() objectstorage.Config {
-	return self.Location.Configuration()
+func (instance service) ObjectStorageConfiguration() objectstorage.Config {
+	return instance.Location.Configuration()
 }

@@ -38,49 +38,49 @@ func NewObjectStorageBucket() *ObjectStorageBucket {
 }
 
 // IsConsistent tells if host struct is consistent
-func (self ObjectStorageBucket) IsConsistent() bool {
+func (instance ObjectStorageBucket) IsConsistent() bool {
 	result := true
-	result = result && self.ID != ""
-	result = result && self.Name != ""
+	result = result && instance.ID != ""
+	result = result && instance.Name != ""
 	return result
 }
 
-func (self *ObjectStorageBucket) IsNull() bool {
-	return self == nil || self.Name == ""
+func (instance *ObjectStorageBucket) IsNull() bool {
+	return instance == nil || instance.Name == ""
 }
 
 // OK ...
-func (self ObjectStorageBucket) OK() bool {
-	return self.IsConsistent()
+func (instance ObjectStorageBucket) OK() bool {
+	return instance.IsConsistent()
 }
 
 // Clone does a deep-copy of the Host
 //
 // satisfies interface data.Clonable
-func (self ObjectStorageBucket) Clone() data.Clonable {
+func (instance ObjectStorageBucket) Clone() data.Clonable {
 	newB := NewObjectStorageBucket()
-	return newB.Replace(&self)
+	return newB.Replace(&instance)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
-func (self *ObjectStorageBucket) Replace(p data.Clonable) data.Clonable {
-	if self == nil || p == nil {
-		return self
+func (instance *ObjectStorageBucket) Replace(p data.Clonable) data.Clonable {
+	if instance == nil || p == nil {
+		return instance
 	}
 
-	*self = *p.(*ObjectStorageBucket)
-	return self
+	*instance = *p.(*ObjectStorageBucket)
+	return instance
 }
 
 // Serialize serializes Host instance into bytes (output json code)
-func (self *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
-	if self.IsNull() {
+func (instance *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	r, jserr := json.Marshal(self)
+	r, jserr := json.Marshal(instance)
 	if jserr != nil {
 		return nil, fail.NewError(jserr.Error())
 	}
@@ -88,9 +88,9 @@ func (self *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and instantiates an ObjectStorageItem
-func (self *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
-	// Note: Do not validate with .IsNull(), self may be a null value of ObjectStorageBucket when deserializing
-	if self == nil {
+func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
+	// Note: Do not validate with .IsNull(), instance may be a null value of ObjectStorageBucket when deserializing
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
@@ -102,7 +102,7 @@ func (self *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
 
-	if jserr := json.Unmarshal(buf, self); jserr != nil {
+	if jserr := json.Unmarshal(buf, instance); jserr != nil {
 		switch jserr.(type) {
 		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
@@ -115,20 +115,20 @@ func (self *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 
 // GetName name returns the name of the host
 // Satisfies interface data.Identifiable
-func (self ObjectStorageBucket) GetName() string {
-	if self.IsNull() {
+func (instance ObjectStorageBucket) GetName() string {
+	if instance.IsNull() {
 		return ""
 	}
-	return self.Name
+	return instance.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (self ObjectStorageBucket) GetID() string {
-	if self.IsNull() {
+func (instance ObjectStorageBucket) GetID() string {
+	if instance.IsNull() {
 		return ""
 	}
-	return self.ID
+	return instance.ID
 }
 
 // ObjectStorageItemMetadata ...

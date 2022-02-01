@@ -68,62 +68,62 @@ func NewClusterIdentity() *ClusterIdentity {
 }
 
 // IsNull ...
-func (self *ClusterIdentity) IsNull() bool {
-	return self == nil || self.Name == ""
+func (instance *ClusterIdentity) IsNull() bool {
+	return instance == nil || instance.Name == ""
 }
 
 // Clone makes a copy of the instance
 // satisfies interface data.Clonable
-func (self ClusterIdentity) Clone() data.Clonable {
-	return NewClusterIdentity().Replace(&self)
+func (instance ClusterIdentity) Clone() data.Clonable {
+	return NewClusterIdentity().Replace(&instance)
 }
 
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
-func (self *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
+func (instance *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
-	if self == nil || p == nil {
-		return self
+	if instance == nil || p == nil {
+		return instance
 	}
 
 	// FIXME, Replace should also return an error
 	src, _ := p.(*ClusterIdentity) // nolint
-	*self = *src
-	self.Keypair = nil
+	*instance = *src
+	instance.Keypair = nil
 	if src.Keypair != nil {
-		self.Keypair = &KeyPair{}
-		*self.Keypair = *src.Keypair
+		instance.Keypair = &KeyPair{}
+		*instance.Keypair = *src.Keypair
 	}
-	return self
+	return instance
 }
 
 // GetName returns the name of the cluster
 // Satisfies interface data.Identifiable
-func (self ClusterIdentity) GetName() string {
-	return self.Name
+func (instance ClusterIdentity) GetName() string {
+	return instance.Name
 }
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
-func (self ClusterIdentity) GetID() string {
-	return self.GetName()
+func (instance ClusterIdentity) GetID() string {
+	return instance.GetName()
 }
 
 // OK ...
-func (self ClusterIdentity) OK() bool {
+func (instance ClusterIdentity) OK() bool {
 	result := true
-	result = result && self.Name != ""
-	result = result && self.Flavor != 0
+	result = result && instance.Name != ""
+	result = result && instance.Flavor != 0
 	return result
 }
 
 // Serialize serializes ClusterIdentity instance into bytes (output json code)
-func (self *ClusterIdentity) Serialize() ([]byte, fail.Error) {
-	if self.IsNull() {
+func (instance *ClusterIdentity) Serialize() ([]byte, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	r, jserr := json.Marshal(self)
+	r, jserr := json.Marshal(instance)
 	if jserr != nil {
 		return nil, fail.NewError(jserr.Error())
 	}
@@ -131,15 +131,15 @@ func (self *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a ClusterIdentity
-func (self *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
-	// self cannot be nil, but can be null value (which will be filled by this method)
-	if self == nil {
+func (instance *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
+	// instance cannot be nil, but can be null value (which will be filled by this method)
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
 	defer fail.OnPanic(&xerr)
 
-	jserr := json.Unmarshal(buf, self)
+	jserr := json.Unmarshal(buf, instance)
 	if jserr != nil {
 		switch jserr.(type) {
 		case *stdjson.SyntaxError:

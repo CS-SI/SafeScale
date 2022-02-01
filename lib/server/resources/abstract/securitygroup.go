@@ -42,51 +42,51 @@ type SecurityGroupRule struct {
 }
 
 // IsNull tells if the Security Group Rule is a null value
-func (self *SecurityGroupRule) IsNull() bool {
-	return self == nil || (len(self.Sources) == 0 && len(self.Targets) == 0 /*&& self.Protocol == "" && self.PortFrom == 0*/)
+func (instance *SecurityGroupRule) IsNull() bool {
+	return instance == nil || (len(instance.Sources) == 0 && len(instance.Targets) == 0 /*&& instance.Protocol == "" && instance.PortFrom == 0*/)
 }
 
 // EqualTo is a strict equality tester between 2 rules
-func (self *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
-	if self == nil || in == nil {
+func (instance *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
+	if instance == nil || in == nil {
 		return false
 	}
 
-	if self.Description != in.Description {
+	if instance.Description != in.Description {
 		return false
 	}
-	if self.EtherType != in.EtherType {
+	if instance.EtherType != in.EtherType {
 		return false
 	}
-	if self.Direction != in.Direction {
+	if instance.Direction != in.Direction {
 		return false
 	}
-	if self.Protocol != in.Protocol {
+	if instance.Protocol != in.Protocol {
 		return false
 	}
-	if self.PortFrom != in.PortFrom {
+	if instance.PortFrom != in.PortFrom {
 		return false
 	}
-	if self.PortTo != in.PortTo {
+	if instance.PortTo != in.PortTo {
 		return false
 	}
-	if len(self.IDs) != len(in.IDs) {
+	if len(instance.IDs) != len(in.IDs) {
 		return false
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range self.IDs {
+	for k, v := range instance.IDs {
 		if in.IDs[k] != v {
 			return false
 		}
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range self.Sources {
+	for k, v := range instance.Sources {
 		if v != in.Sources[k] {
 			return false
 		}
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range self.Targets {
+	for k, v := range instance.Targets {
 		if v != in.Targets[k] {
 			return false
 		}
@@ -95,29 +95,29 @@ func (self *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 }
 
 // EquivalentTo compares 2 rules, except ID and Description, to tell if the target is comparable
-func (self *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
-	if self == nil || in == nil {
+func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
+	if instance == nil || in == nil {
 		return false
 	}
 
-	if self.Direction != in.Direction {
+	if instance.Direction != in.Direction {
 		return false
 	}
-	if self.EtherType != in.EtherType {
+	if instance.EtherType != in.EtherType {
 		return false
 	}
-	if self.Protocol != in.Protocol {
+	if instance.Protocol != in.Protocol {
 		return false
 	}
-	if self.PortFrom != in.PortFrom {
+	if instance.PortFrom != in.PortFrom {
 		return false
 	}
-	if self.PortTo != in.PortTo {
+	if instance.PortTo != in.PortTo {
 		return false
 	}
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for _, v := range self.Sources {
+	for _, v := range instance.Sources {
 		found := false
 		for _, w := range in.Sources {
 			if v == w {
@@ -131,7 +131,7 @@ func (self *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 	}
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for _, v := range self.Targets {
+	for _, v := range instance.Targets {
 		found := false
 		for _, w := range in.Targets {
 			if v == w {
@@ -149,20 +149,20 @@ func (self *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 
 // SourcesConcernGroups figures out if rule contains Security Group IDs as sources
 // By design, CIDR and SG ID cannot be mixed
-func (self *SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
-	if self.IsNull() {
+func (instance *SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
+	if instance.IsNull() {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
-	return concernsGroups(self.Sources)
+	return concernsGroups(instance.Sources)
 }
 
 // TargetsConcernGroups figures out if rule contains Security Group IDs as targets
 // By design, CIDR and SG ID cannot be mixed
-func (self *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
-	if self.IsNull() {
+func (instance *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
+	if instance.IsNull() {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
-	return concernsGroups(self.Targets)
+	return concernsGroups(instance.Targets)
 }
 
 func concernsGroups(in []string) (bool, fail.Error) {
@@ -184,39 +184,39 @@ func concernsGroups(in []string) (bool, fail.Error) {
 }
 
 // Validate returns an error if the content of the rule is incomplete
-func (self *SecurityGroupRule) Validate() fail.Error {
+func (instance *SecurityGroupRule) Validate() fail.Error {
 	// Note: DO NOT USE SecurityGroupRule.IsNull() here
-	if self == nil {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	switch self.EtherType {
+	switch instance.EtherType {
 	case ipversion.IPv4, ipversion.IPv6:
 		break
 	default:
 		return fail.InvalidRequestError("rule --type must be 'ipv4' or 'ipv6'")
 	}
 
-	switch self.Direction {
+	switch instance.Direction {
 	case securitygroupruledirection.Egress, securitygroupruledirection.Ingress:
 		break
 	default:
 		return fail.InvalidRequestError("rule --direction must be 'egress' or 'ingress'")
 	}
 
-	switch self.Protocol {
+	switch instance.Protocol {
 	case "icmp":
 		break
 	case "tcp", "udp":
-		if self.PortFrom <= 0 {
+		if instance.PortFrom <= 0 {
 			return fail.InvalidRequestError("rule --port-from must contain a positive integer")
 		}
-		if len(self.Sources) == 0 && len(self.Targets) == 0 {
+		if len(instance.Sources) == 0 && len(instance.Targets) == 0 {
 			return fail.InvalidRequestError("rule --cidr must be defined")
 		}
 	default:
 		// protocol may be empty, meaning allow everything, only if there are no ports defined
-		if self.PortFrom > 0 || self.PortTo > 0 {
+		if instance.PortFrom > 0 || instance.PortTo > 0 {
 			return fail.InvalidRequestError("rule --protocol must be 'tcp', 'udp' or 'icmp'")
 		}
 	}
@@ -242,28 +242,28 @@ func NewSecurityGroupRule() *SecurityGroupRule {
 // Clone does a deep-copy of the SecurityGroup
 //
 // satisfies interface data.Clonable
-func (self *SecurityGroupRule) Clone() data.Clonable {
-	return NewSecurityGroupRule().Replace(self)
+func (instance *SecurityGroupRule) Clone() data.Clonable {
+	return NewSecurityGroupRule().Replace(instance)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (self *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
+func (instance *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value
-	if self == nil || p == nil {
-		return self
+	if instance == nil || p == nil {
+		return instance
 	}
 
 	// FIXME: Replace should also return an error
 	src, _ := p.(*SecurityGroupRule) // nolint
-	*self = *src
-	self.IDs = make([]string, len(src.IDs))
-	copy(self.IDs, src.IDs)
-	self.Sources = make([]string, len(src.Sources))
-	copy(self.Sources, src.Sources)
-	self.Targets = make([]string, len(src.Targets))
-	copy(self.Targets, src.Targets)
-	return self
+	*instance = *src
+	instance.IDs = make([]string, len(src.IDs))
+	copy(instance.IDs, src.IDs)
+	instance.Sources = make([]string, len(src.Sources))
+	copy(instance.Sources, src.Sources)
+	instance.Targets = make([]string, len(src.Targets))
+	copy(instance.Targets, src.Targets)
+	return instance
 }
 
 // SecurityGroupRules ...
@@ -336,19 +336,19 @@ func (sgrs SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
 }
 
 // RemoveRuleByIndex removes a rule identified by its index and returns the corresponding SecurityGroupRules
-func (self *SecurityGroup) RemoveRuleByIndex(index int) fail.Error {
-	length := len(self.Rules)
+func (instance *SecurityGroup) RemoveRuleByIndex(index int) fail.Error {
+	length := len(instance.Rules)
 	if index < 0 || index >= length {
 		return fail.InvalidParameterError("ruleIdx", "cannot be equal or greater to length of 'rules'")
 	}
 	newRules := make(SecurityGroupRules, 0)
 	if index > 0 {
-		newRules = append(newRules, self.Rules[:index]...)
+		newRules = append(newRules, instance.Rules[:index]...)
 	}
 	if index < length-1 {
-		newRules = append(newRules, self.Rules[index+1:]...)
+		newRules = append(newRules, instance.Rules[index+1:]...)
 	}
-	self.Rules = newRules
+	instance.Rules = newRules
 	return nil
 }
 
@@ -365,45 +365,45 @@ type SecurityGroup struct {
 }
 
 // IsNull tells if the SecurityGroup is a null value
-func (self *SecurityGroup) IsNull() bool {
-	return self == nil || (self.Name == "" && self.ID == "")
+func (instance *SecurityGroup) IsNull() bool {
+	return instance == nil || (instance.Name == "" && instance.ID == "")
 }
 
 // IsConsistent tells if the content of the security group is consistent
-func (self SecurityGroup) IsConsistent() bool {
-	if self.ID == "" && (self.Name == "" || self.Network == "") {
+func (instance SecurityGroup) IsConsistent() bool {
+	if instance.ID == "" && (instance.Name == "" || instance.Network == "") {
 		return false
 	}
 	return true
 }
 
 // IsComplete tells if the content of the security group is complete
-func (self SecurityGroup) IsComplete() bool {
-	return self.ID != "" && self.Name != "" && self.Network != ""
+func (instance SecurityGroup) IsComplete() bool {
+	return instance.ID != "" && instance.Name != "" && instance.Network != ""
 }
 
 // SetID sets the value of field ID in sg
-func (self *SecurityGroup) SetID(id string) *SecurityGroup {
-	if self != nil {
-		self.ID = id
+func (instance *SecurityGroup) SetID(id string) *SecurityGroup {
+	if instance != nil {
+		instance.ID = id
 	}
-	return self
+	return instance
 }
 
 // SetName sets the value of field Name in sg
-func (self *SecurityGroup) SetName(name string) *SecurityGroup {
-	if self != nil {
-		self.Name = name
+func (instance *SecurityGroup) SetName(name string) *SecurityGroup {
+	if instance != nil {
+		instance.Name = name
 	}
-	return self
+	return instance
 }
 
 // SetNetworkID sets the value of field NetworkID in sg
-func (self *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
-	if self != nil {
-		self.Network = networkID
+func (instance *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
+	if instance != nil {
+		instance.Network = networkID
 	}
-	return self
+	return instance
 }
 
 // NewSecurityGroup ...
@@ -422,32 +422,32 @@ func NewSecurityGroup() *SecurityGroup {
 
 // Clone does a deep-copy of the SecurityGroup
 // satisfies interface data.Clonable
-func (self SecurityGroup) Clone() data.Clonable {
-	return NewSecurityGroup().Replace(&self)
+func (instance SecurityGroup) Clone() data.Clonable {
+	return NewSecurityGroup().Replace(&instance)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (self *SecurityGroup) Replace(p data.Clonable) data.Clonable {
+func (instance *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value
-	if self == nil || p == nil {
-		return self
+	if instance == nil || p == nil {
+		return instance
 	}
 
 	// FIXME: Replace should also return an error
 	src, _ := p.(*SecurityGroup) // nolint
-	*self = *src
-	self.Rules = src.Rules.Clone()
-	return self
+	*instance = *src
+	instance.Rules = src.Rules.Clone()
+	return instance
 }
 
 // Serialize serializes instance into bytes (output json code)
-func (self *SecurityGroup) Serialize() ([]byte, fail.Error) {
-	if self.IsNull() {
+func (instance *SecurityGroup) Serialize() ([]byte, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	r, jserr := json.Marshal(self)
+	r, jserr := json.Marshal(instance)
 	if jserr != nil {
 		return nil, fail.NewError(jserr.Error())
 	}
@@ -455,14 +455,14 @@ func (self *SecurityGroup) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a SecurityGroup
-func (self *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
+func (instance *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if self == nil {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	if jserr := json.Unmarshal(buf, self); jserr != nil {
+	if jserr := json.Unmarshal(buf, instance); jserr != nil {
 		switch jserr.(type) {
 		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
@@ -475,18 +475,18 @@ func (self *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 
 // GetName returns the name of the volume
 // Satisfies interface data.Identifiable
-func (self *SecurityGroup) GetName() string {
-	if self == nil {
+func (instance *SecurityGroup) GetName() string {
+	if instance == nil {
 		return ""
 	}
-	return self.Name
+	return instance.Name
 }
 
 // GetID returns the ID of the volume
 // Satisfies interface data.Identifiable
-func (self *SecurityGroup) GetID() string {
-	if self == nil {
+func (instance *SecurityGroup) GetID() string {
+	if instance == nil {
 		return ""
 	}
-	return self.ID
+	return instance.ID
 }
