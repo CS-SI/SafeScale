@@ -752,7 +752,7 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 				case response := <-ch:
 					try.Err = response
 				case <-desist:
-					try.Err = fail.TimeoutError(nil, timeout, "desist timeout")
+					return fail.TimeoutError(nil, timeout, "desist timeout")
 				}
 			}
 		}
