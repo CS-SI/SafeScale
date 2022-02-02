@@ -91,7 +91,7 @@ feature:
                         run: |
                             rm -rf ${SF_ETCDIR}/ansible/cluster.cfg ${SF_ETCDIR}/ansible/inventory/inventory.py ${SF_ETCDIR}/ansible/ansible.cfg
                             [ -r ${SF_ETCDIR}/ansible/ansible.cfg.host_only ] && mv ${SF_ETCDIR}/ansible/ansible.cfg.host_only ${SF_ETCDIR}/ansible/ansible.cfg 
-                            chown -R {{ .OperatorUsername }}:root ${SF_ETCDIR}/ansible
+                            chown -R {{ .Username }}:root ${SF_ETCDIR}/ansible
                             chmod -R ug+rwx,o+rx-w ${SF_ETCDIR}/ansible
                             find ${SF_ETCDIR}/ansible -type d -exec chmod a+x {} \;
                             sfExit
