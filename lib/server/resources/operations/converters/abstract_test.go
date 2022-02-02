@@ -335,7 +335,6 @@ func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 	ahf.Networking.PublicIPv6 = "Networking PublicIPv6"
 	ahf.Networking.IPv4Addresses = map[string]string{"ID1": "32.32.32.32/18", "ID2": "ipV4_2"}
 	ahf.Networking.IPv6Addresses = map[string]string{"ID1": "ipV6_1", "ID2": "ipV6_2"}
-
 	ahf.Description.Created = time.Now()
 	ahf.Description.Creator = "Description Creator"
 	ahf.Description.Updated = time.Now()
