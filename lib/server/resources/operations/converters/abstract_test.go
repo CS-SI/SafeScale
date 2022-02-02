@@ -17,6 +17,7 @@
 package converters
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
@@ -75,7 +77,7 @@ func Test_VolumeAttachmentFromAbstractToProtocol(t *testing.T) {
 
 }
 
-func Test_HostEffectiveSizingFromAbstractToProtocol(t *testing.T) {
+func Test_HostTemplateFromAbstractToProtocol(t *testing.T) {
 
 	ht := abstract.HostTemplate{
 		Cores:     4,
@@ -96,6 +98,31 @@ func Test_HostEffectiveSizingFromAbstractToProtocol(t *testing.T) {
 	require.EqualValues(t, ht.DiskSize, hd.Disk)
 	require.EqualValues(t, ht.GPUNumber, hd.GpuCount)
 	require.EqualValues(t, ht.GPUType, hd.GpuType)
+
+}
+
+func Test_HostEffectiveSizingFromAbstractToProtocol(t *testing.T) {
+
+	ahes := &abstract.HostEffectiveSizing{
+		Cores:       4,
+		RAMSize:     8192,
+		DiskSize:    512,
+		GPUNumber:   1,
+		GPUType:     "NVIDIA 1080 TI",
+		CPUFreq:     2133,
+		ImageID:     "HostTemplate ImageID",
+		Replaceable: false,
+	}
+	hd := HostEffectiveSizingFromAbstractToProtocol(ahes)
+
+	require.EqualValues(t, hd.ImageId, ahes.ImageID)
+	require.EqualValues(t, hd.Sizing.MinCpuCount, ahes.Cores)
+	require.EqualValues(t, hd.Sizing.MaxCpuCount, ahes.Cores)
+	require.EqualValues(t, hd.Sizing.MinRamSize, ahes.RAMSize)
+	require.EqualValues(t, hd.Sizing.MaxRamSize, ahes.RAMSize)
+	require.EqualValues(t, hd.Sizing.MinDiskSize, ahes.DiskSize)
+	require.EqualValues(t, hd.Sizing.GpuCount, ahes.GPUNumber)
+	require.EqualValues(t, hd.Sizing.MinCpuFreq, ahes.CPUFreq)
 
 }
 
@@ -288,6 +315,8 @@ func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 	ahf.Core.SSHPort = 42
 	ahf.Core.Password = "HostCore Password"
 	ahf.Core.LastState = hoststate.Any
+	ahf.Core.Tags["DeclaredInBucket"] = "I'm managed !"
+
 	ahf.Sizing.Cores = 4
 	ahf.Sizing.RAMSize = 8192
 	ahf.Sizing.DiskSize = 512
@@ -299,13 +328,14 @@ func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 	ahf.Networking.IsGateway = false
 	ahf.Networking.DefaultGatewayID = "Networking DefaultGatewayID"
 	ahf.Networking.DefaultGatewayPrivateIP = "Networking DefaultGatewayPrivateIP"
-	ahf.Networking.DefaultSubnetID = "Networking DefaultSubnetID"
+	ahf.Networking.DefaultSubnetID = "ID1"
 	ahf.Networking.SubnetsByID = map[string]string{"ID1": "SubnetID1", "ID2": "SubnetID2"}
 	ahf.Networking.SubnetsByName = map[string]string{"Name1": "SubnetID1", "Name2": "SubnetID2"}
 	ahf.Networking.PublicIPv4 = "Networking PublicIPv4"
 	ahf.Networking.PublicIPv6 = "Networking PublicIPv6"
-	ahf.Networking.IPv4Addresses = map[string]string{"ID1": "ipV4_1", "ID2": "ipV4_2"}
+	ahf.Networking.IPv4Addresses = map[string]string{"ID1": "32.32.32.32/18", "ID2": "ipV4_2"}
 	ahf.Networking.IPv6Addresses = map[string]string{"ID1": "ipV6_1", "ID2": "ipV6_2"}
+
 	ahf.Description.Created = time.Now()
 	ahf.Description.Creator = "Description Creator"
 	ahf.Description.Updated = time.Now()
@@ -452,7 +482,7 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 	gw2_scfg := system.SSHConfig{
 		Hostname:               "SSHConfig GW2 Hostname",
 		IPAddress:              "SSHConfig GW2 Hostname",
-		Port:                   44,
+		Port:                   0,
 		User:                   "SSHConfig GW2 Hostname",
 		PrivateKey:             "SSHConfig GW2 Hostname",
 		LocalPort:              45,
@@ -562,8 +592,43 @@ func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
 	require.EqualValues(t, asg.Description, psgr.Description)
 	require.EqualValues(t, SecurityGroupRulesFromAbstractToProtocol(asg.Rules), psgr.Rules)
 
+	asg = abstract.SecurityGroup{
+		ID:          "SecurityGroup ID",
+		Name:        "SecurityGroup Name",
+		Network:     "SecurityGroup Network",
+		Description: "SecurityGroup Description",
+		Rules: abstract.SecurityGroupRules{
+			{
+				IDs:         []string{"ID1", "ID2", "ID3"},
+				Description: "SecurityGroupRune Description",
+				EtherType:   ipversion.IPv4,
+				Direction:   securitygroupruledirection.Egress,
+				Protocol:    "tcp",
+				PortFrom:    42,
+				PortTo:      43,
+				Sources:     []string{"Source1", "Source2", "Source3"},
+				Targets:     []string{"Target1", "Target2", "Target3"},
+			},
+		},
+		DefaultForSubnet: "SecurityGroup DefaultForSubnet",
+		DefaultForHost:   "SecurityGroup DefaultForHost",
+	}
+
+	psgr = SecurityGroupFromAbstractToProtocol(asg)
+
+	require.EqualValues(t, asg.ID, psgr.Id)
+	require.EqualValues(t, asg.Name, psgr.Name)
+	require.EqualValues(t, asg.Description, psgr.Description)
+	require.EqualValues(t, SecurityGroupRulesFromAbstractToProtocol(asg.Rules), psgr.Rules)
+
 }
 
 func Test_ClusterStateFromAbstractToProtocol(t *testing.T) {
+
+	csr := ClusterStateFromAbstractToProtocol(clusterstate.Initializing)
+	if reflect.TypeOf(csr).String() != "*protocol.ClusterStateResponse" {
+		t.Error("Expect type *protocol.ClusterStateResponse")
+		t.Fail()
+	}
 
 }
