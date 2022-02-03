@@ -900,6 +900,11 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.M
 		}
 		params["Username"] = "cladm"
 		params["Password"] = identity.AdminPassword
+
+		// FIXME: Bug mitigations
+		params["GuacamolePort"] = 63011
+		params["TomcatPort"] = 9009
+
 		r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
