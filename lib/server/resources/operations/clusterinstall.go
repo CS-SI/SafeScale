@@ -531,7 +531,9 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	}
 
 	variables["Revision"] = system.REV
-	finalVariables := make(data.Map, len(variables)+len(bashLibraryVariables))
+
+	var fisize = uint64(len(variables) + len(bashLibraryVariables))
+	finalVariables := make(data.Map, fisize)
 	for k, v := range variables {
 		finalVariables[k] = v
 	}

@@ -47,17 +47,20 @@ import (
 type Feature struct {
 	displayName     string                           // is the name of the service
 	fileName        string                           // is the name of the specification file
-	displayFileName string                           // is the 'beautifulled' name of the specification file
+	displayFileName string                           // is the 'beautiful' name of the specification file
 	embedded        bool                             // tells if the Feature is embedded in deploy
 	installers      map[installmethod.Enum]Installer // defines the installers available for the Feature
 	specs           *viper.Viper                     // is the Viper instance containing Feature specification
-	// task            concurrency.Task                 // is theTask that will trigger all Feature operations
-	svc iaas.Service // is the iaas.Service to use to interact with Cloud Provider
+	svc             iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+}
+
+func newFeature(displayName string, fileName string, displayFileName string, embedded bool, installers map[installmethod.Enum]Installer, specs *viper.Viper, svc iaas.Service) *Feature {
+	return &Feature{displayName: displayName, fileName: fileName, displayFileName: displayFileName, embedded: embedded, installers: installers, specs: specs, svc: svc}
 }
 
 // FeatureNullValue returns a *Feature corresponding to a null value
 func FeatureNullValue() *Feature {
-	return &Feature{}
+	return newFeature("", "", "", false, make(map[installmethod.Enum]Installer), nil, nil)
 }
 
 // ListFeatures lists all features suitable for hosts or clusters
@@ -178,12 +181,7 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.E
 			return nil, fail.SyntaxError("failed to read the specification file of Feature called '%s': %s", name, err.Error())
 		}
 	} else if v.IsSet("feature") {
-		casted = &Feature{
-			fileName:        v.ConfigFileUsed(),
-			displayFileName: v.ConfigFileUsed(),
-			displayName:     name,
-			specs:           v,
-		}
+		casted = newFeature(name, v.ConfigFileUsed(), v.ConfigFileUsed(), false, make(map[installmethod.Enum]Installer), v, nil)
 	}
 
 	logrus.Tracef("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
@@ -246,7 +244,7 @@ func (instance *Feature) IsNull() bool {
 // Clone ...
 // satisfies interface data.Clonable
 func (instance *Feature) Clone() data.Clonable {
-	res := &Feature{}
+	res := FeatureNullValue()
 	return res.Replace(instance)
 }
 
@@ -284,6 +282,9 @@ func (instance *Feature) GetName() string {
 
 // GetID ...
 func (instance *Feature) GetID() string {
+	if instance.IsNull() {
+		return ""
+	}
 	return instance.GetName()
 }
 

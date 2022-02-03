@@ -3637,7 +3637,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return ph, xerr
+		return nil, xerr
 	}
 
 	ph = &protocol.Host{

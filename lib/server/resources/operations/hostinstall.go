@@ -99,10 +99,13 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 				return innerXErr
 			}
 
-			hostFeaturesV1.Installed[name] = &propertiesv1.HostInstalledFeature{
-				HostContext: true,
-				Requires:    requires,
+			nif := propertiesv1.NewHostInstalledFeature()
+			nif.HostContext = true
+			if requires != nil {
+				nif.Requires = requires
 			}
+
+			hostFeaturesV1.Installed[name] = nif
 			return nil
 		})
 	})
@@ -278,13 +281,24 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 				}
 
 				item = propertiesv1.NewHostInstalledFeature()
-				item.Requires = requirements
+				if requirements != nil {
+					item.Requires = requirements
+				}
 				item.HostContext = !clusterContext
+
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if rf, ok := requiredBy.(*Feature); ok && !rf.IsNull() {
-				item.RequiredBy[rf.GetName()] = struct{}{}
+			if item != nil {
+				if !data.IsNil(requiredBy) {
+					if item.RequiredBy != nil {
+						item.RequiredBy[requiredBy.GetName()] = struct{}{}
+					} else {
+						item.RequiredBy = make(map[string]struct{})
+						item.RequiredBy[requiredBy.GetName()] = struct{}{}
+					}
+				}
 			}
+
 			return nil
 		})
 	})
