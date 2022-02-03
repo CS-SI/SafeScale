@@ -766,7 +766,7 @@ func (instance service) SearchImage(osname string) (*abstract.Image, fail.Error)
 		return nil, xerr
 	}
 	if len(imgs) == 0 {
-		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
+		return nil, fail.NotFoundError("unable to find an image matching '%s', 0 results returned by the service listing images", osname)
 	}
 
 	reg := regexp.MustCompile("[^A-Z0-9]")

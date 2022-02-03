@@ -193,8 +193,7 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		// log the faulty data
-		logrus.Debugf("failure to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
-		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered values", name)
+		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
 		return "", xerr
 	}
 	content := buffer.String()
