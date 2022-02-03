@@ -19,7 +19,7 @@ feature:
             - docker
 
     suitableFor:
-        host: yes
+        host: no
         cluster: all
 
     parameters:
