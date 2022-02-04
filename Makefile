@@ -57,6 +57,9 @@ with-soft:
 ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
+rawci: logclean ground getdevdeps mod sdk generate lib cli
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
