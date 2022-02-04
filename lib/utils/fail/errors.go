@@ -19,6 +19,8 @@ package fail
 import (
 	"fmt"
 	"os/exec"
+	"reflect"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -109,7 +111,7 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		consequences = []error{}
 	}
 	r := errorCore{
-		message:             strprocess.FormatStrings(msg...),
+		message:             strings.TrimSpace(strprocess.FormatStrings(msg...)),
 		cause:               cause,
 		consequences:        consequences,
 		annotations:         make(data.Annotations),
@@ -152,7 +154,13 @@ func defaultCauseFormatter(e Error) string {
 
 	errCore, ok := e.(*errorCore)
 	if !ok {
-		return e.UnformattedError()
+		return NewError().UnformattedError()
+	}
+
+	state := reflect.ValueOf(errCore.lock).Elem().FieldByName("w").FieldByName("state")
+	if state.Int()&1 == 1 {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.defaultCauseFormatter", "mutex locked", 0))
+		return NewError().UnformattedError()
 	}
 
 	errCore.lock.RLock()
@@ -183,9 +191,11 @@ func defaultCauseFormatter(e Error) string {
 					msgFinal += "\n"
 				}
 			} else {
-				msgFinal += "- " + con.Error()
-				if uint(ind+1) < lenConseq {
-					msgFinal += "\n"
+				if con != nil {
+					msgFinal += "- " + con.Error()
+					if uint(ind+1) < lenConseq {
+						msgFinal += "\n"
+					}
 				}
 			}
 		}
@@ -213,6 +223,10 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 
 // Unwrap implements the Wrapper interface
 func (e errorCore) Unwrap() error {
+	if e.lock == nil {
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
+		return NewError()
+	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -221,6 +235,10 @@ func (e errorCore) Unwrap() error {
 
 // Cause is just an accessor for internal e.cause
 func (e errorCore) Cause() error {
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		return NewError()
+	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -229,6 +247,10 @@ func (e errorCore) Cause() error {
 
 // RootCause returns the initial error's cause
 func (e *errorCore) RootCause() error {
+	if e == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		return e
+	}
 	return RootCause(e)
 }
 
