@@ -19,6 +19,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 
@@ -344,6 +345,8 @@ func getAllowedSpeeds() string {
 		if i > 0 {
 			speeds += ", "
 		}
+		// this message is intended for final users, showing allowed values that didn't match allowed inputs wasn't a good idea
+		k = strings.TrimPrefix(k, "VS_")
 		speeds += k
 		i++
 	}

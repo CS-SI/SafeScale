@@ -98,7 +98,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 		AvailabilityZone: az,
 		Name:             request.Name,
 		Size:             request.Size,
-		VolumeType:       s.getVolumeType(request.Speed),
+		VolumeType:       strings.ToUpper(s.getVolumeType(request.Speed)),
 	}
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
