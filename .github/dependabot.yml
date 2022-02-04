@@ -10,7 +10,5 @@ updates:
     target-branch: "hotfixes"
     schedule:
       interval: daily
-    allow:
-      - dependency-name: "golang.org/x/*"
     labels:
       - "dependencies"
