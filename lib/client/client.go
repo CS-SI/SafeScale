@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -159,7 +160,7 @@ func (s *Session) Connect() {
 // dial returns a connection to GRPC server
 func dial(server string) *grpc.ClientConn {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	conn, err := grpc.Dial(server, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Fatalf("failed to connect to safescaled (%s): %v", server, err)
 	}
