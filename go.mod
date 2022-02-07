@@ -13,7 +13,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/daaku/go.zipexe v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
-	github.com/deckarep/golang-set v1.7.1
+	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/felixge/fgprof v0.9.2
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
@@ -31,7 +31,7 @@ require (
 	github.com/magiconair/properties v1.8.5
 	github.com/makholm/covertool v0.0.0-20210624102319-bb1c7c716204
 	github.com/mitchellh/copystructure v1.0.0 // indirect
-	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/nanobox-io/golang-scribble v0.0.0-20190309225732-aa3e7c118975
@@ -62,7 +62,7 @@ require (
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.44.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 )
 
