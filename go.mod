@@ -43,7 +43,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
-	github.com/urfave/cli/v2 v2.1.1
+	github.com/urfave/cli/v2 v2.3.0
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220126234351-aa10faf2a1f8
