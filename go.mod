@@ -29,7 +29,6 @@ require (
 	github.com/magiconair/properties v1.8.5
 	github.com/makholm/covertool v0.0.0-20210624102319-bb1c7c716204
 	github.com/mitchellh/copystructure v1.0.0 // indirect
-	github.com/mitchellh/mapstructure v1.4.3
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/nanobox-io/golang-scribble v0.0.0-20190309225732-aa3e7c118975
@@ -43,7 +42,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
-	github.com/urfave/cli/v2 v2.1.1
+	github.com/urfave/cli/v2 v2.3.0
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220126234351-aa10faf2a1f8
@@ -53,7 +52,6 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.67.0
 	google.golang.org/grpc v1.44.0
-	google.golang.org/protobuf v1.27.1
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
