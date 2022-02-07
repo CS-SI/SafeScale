@@ -9,8 +9,6 @@ updates:
     directory: "/"
     target-branch: "develop"
     schedule:
-      interval: weekly
-    allow:
-      - dependency-name: "golang.org/x/*"
+      interval: daily
     labels:
       - "dependencies"

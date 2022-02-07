@@ -15,7 +15,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/denisbrodbeck/machineid v1.0.1
-	github.com/felixge/fgprof v0.9.1
+	github.com/felixge/fgprof v0.9.2
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.10
@@ -25,10 +25,10 @@ require (
 	github.com/gregoryv/gocyclo v0.1.0
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
-	github.com/itchyny/gojq v0.12.4
+	github.com/itchyny/gojq v0.12.6
 	github.com/jcelliott/lumber v0.0.0-20160324203708-dd349441af25 // indirect
 	github.com/json-iterator/go v1.1.12
-	github.com/magiconair/properties v1.8.1
+	github.com/magiconair/properties v1.8.5
 	github.com/makholm/covertool v0.0.0-20210624102319-bb1c7c716204
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.3
@@ -39,9 +39,8 @@ require (
 	github.com/ovh/go-ovh v0.0.0-20181109152953-ba5adb4cf014
 	github.com/pelletier/go-toml v1.9.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
-	github.com/quasilyte/go-ruleguard/dsl v0.3.10 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/sanity-io/litter v1.3.0
+	github.com/sanity-io/litter v1.5.2
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/sethvargo/go-password v0.1.1
 	github.com/sirupsen/logrus v1.8.1
@@ -62,7 +61,7 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/grpc v1.41.0
+	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/ini.v1 v1.55.0 // indirect
 )
