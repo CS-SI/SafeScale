@@ -301,7 +301,7 @@ func filterOwners(s stack) []*ec2.Filter {
 		if !ok {
 			continue
 		}
-		matched, err := regexp.Match(`([0-9]){12}`, []byte(ao))
+		matched, err := regexp.Match(`([0-9]){12}`, []byte(ao)) // nolint
 		if err != nil {
 			continue
 		}
