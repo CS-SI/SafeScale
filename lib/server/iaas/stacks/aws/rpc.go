@@ -1221,19 +1221,12 @@ func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
 	if len(ids) > 0 {
 		request.ImageIds = ids
 	} else {
-		request.Filters = []*ec2.Filter{
-			{
-				Name:   aws.String("architecture"),
-				Values: []*string{aws.String("x86_64")},
-			},
-			{
-				Name:   aws.String("state"),
-				Values: []*string{aws.String("available")},
-			},
-		}
+		request.Filters = []*ec2.Filter{}
 
-		// Added filtering by owner-id
+		// Default filters
 		request.Filters = append(request.Filters, createFilters()...)
+		// Added filtering by owner-id
+		request.Filters = append(request.Filters, filterOwners(s)...)
 	}
 	var resp *ec2.DescribeImagesOutput
 	xerr := stacks.RetryableRemoteCall(
@@ -1526,6 +1519,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 		SpotPrice: price, // FIXME: Round up
 		Type:      aws.String("one-time"),
 	}
+
 	var resp *ec2.RequestSpotInstancesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {

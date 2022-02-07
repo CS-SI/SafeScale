@@ -24,7 +24,7 @@ import (
 
 // ExitOnErrorWithMessage informs cli to exit with message and error code
 func ExitOnErrorWithMessage(exitcode exitcode.Enum, msg string) error {
-	return cli.NewExitError(msg, int(exitcode))
+	return cli.Exit(msg, int(exitcode))
 }
 
 // ExitOnInvalidArgument ...

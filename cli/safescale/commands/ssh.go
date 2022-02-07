@@ -91,7 +91,7 @@ var sshRun = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
-			return cli.NewExitError("", retcode)
+			return cli.Exit("", retcode)
 		}
 		return nil
 	},

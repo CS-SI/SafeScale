@@ -141,7 +141,7 @@ func FailureResponse(err error) error {
 	r := newResponse()
 	_ = r.Failure(err)
 	if r.Error != nil {
-		return urfcli.NewExitError("", r.Error.ExitCode())
+		return urfcli.Exit("", r.Error.ExitCode())
 	}
 	return nil
 }

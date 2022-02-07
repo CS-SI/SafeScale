@@ -861,17 +861,17 @@ var clusterKubectlCommand = &cli.Command{
 						// Check for file
 						st, err := os.Stat(localFile)
 						if err != nil {
-							return cli.NewExitError(err.Error(), 1)
+							return cli.Exit(err.Error(), 1)
 						}
 						// If it's a link, get the target of it
 						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 							link, err := filepath.EvalSymlinks(localFile)
 							if err != nil {
-								return cli.NewExitError(err.Error(), 1)
+								return cli.Exit(err.Error(), 1)
 							}
 							_, err = os.Stat(link)
 							if err != nil {
-								return cli.NewExitError(err.Error(), 1)
+								return cli.Exit(err.Error(), 1)
 							}
 						}
 
@@ -942,7 +942,7 @@ var clusterHelmCommand = &cli.Command{
 			//	useTLS = ""
 			case "init":
 				if idx == 0 {
-					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
+					return cli.Exit("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
 			// case "search", "repo", "help", "install", "uninstall":
 			//	if idx == 0 {
@@ -966,17 +966,17 @@ var clusterHelmCommand = &cli.Command{
 						// Check for file
 						st, err := os.Stat(localFile)
 						if err != nil {
-							return cli.NewExitError(err.Error(), 1)
+							return cli.Exit(err.Error(), 1)
 						}
 						// If it's a link, get the target of it
 						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 							link, err := filepath.EvalSymlinks(localFile)
 							if err != nil {
-								return cli.NewExitError(err.Error(), 1)
+								return cli.Exit(err.Error(), 1)
 							}
 							_, err = os.Stat(link)
 							if err != nil {
-								return cli.NewExitError(err.Error(), 1)
+								return cli.Exit(err.Error(), 1)
 							}
 						}
 
@@ -1054,7 +1054,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		return cli.NewExitError("" /*msg*/, retcode)
+		return cli.Exit("" /*msg*/, retcode)
 	}
 	return nil
 }
@@ -1990,7 +1990,7 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 		}
 		if retcode != 0 {
-			return cli.NewExitError(stderr, retcode)
+			return cli.Exit(stderr, retcode)
 		}
 		return nil
 	},
@@ -2083,7 +2083,7 @@ var clusterAnsibleRunCommands = &cli.Command{
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 		}
 		if retcode != 0 {
-			return cli.NewExitError(stderr, retcode)
+			return cli.Exit(stderr, retcode)
 		}
 		return nil
 	},
