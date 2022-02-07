@@ -1415,11 +1415,11 @@ type ErrUnknown struct {
 	*errorCore
 }
 
-// UnknownError creates an ErrForbidden error
-func UnknownError(msg ...interface{}) *ErrForbidden {
+// UnknownError creates an ErrUnknown error
+func UnknownError(msg ...interface{}) *ErrUnknown {
 	r := newError(nil, nil, msg...)
-	r.grpcCode = codes.PermissionDenied
-	return &ErrForbidden{r}
+	r.grpcCode = codes.Unknown
+	return &ErrUnknown{r}
 }
 
 // IsNull tells if the instance is null
