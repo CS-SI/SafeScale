@@ -271,6 +271,10 @@ func defaultAnnotationFormatter(a data.Annotations) string {
 
 // Annotations ...
 func (e errorCore) Annotations() data.Annotations {
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		return data.Annotations{}
+	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -279,6 +283,10 @@ func (e errorCore) Annotations() data.Annotations {
 
 // Annotation ...
 func (e errorCore) Annotation(key string) (data.Annotation, bool) {
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		return nil, false
+	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -345,6 +353,10 @@ func (e *errorCore) AddConsequence(err error) Error {
 
 // Consequences returns the consequences of current error (detected teardown problems)
 func (e errorCore) Consequences() []error {
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'Consequences'", "on nil pointer *errorCore", 0))
+		return []error{}
+	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -354,6 +366,11 @@ func (e errorCore) Consequences() []error {
 // Error returns a human-friendly error explanation
 // satisfies interface error
 func (e *errorCore) Error() string {
+
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'Error'", "on nil pointer *errorCore", 0))
+		return ""
+	}
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -374,6 +391,12 @@ func (e *errorCore) Error() string {
 // UnformattedError returns a human-friendly error explanation
 // satisfies interface error
 func (e *errorCore) UnformattedError() string {
+
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'UnformattedError'", "on nil pointer *errorCore", 0))
+		return ""
+	}
+
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -395,6 +418,12 @@ func (e *errorCore) unsafeUnformattedError() string {
 
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e errorCore) GRPCCode() codes.Code {
+
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'GRPCCode'", "on nil pointer *errorCore", 0))
+		return codes.Unknown
+	}
+
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 	return e.grpcCode
@@ -402,6 +431,12 @@ func (e errorCore) GRPCCode() codes.Code {
 
 // ToGRPCStatus returns a grpcstatus struct from error
 func (e errorCore) ToGRPCStatus() error {
+
+	if e.lock == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'ToGRPCStatus'", "on nil pointer *errorCore", 0))
+		return grpcstatus.Errorf(codes.Unknown, "")
+	}
+
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
@@ -1434,10 +1469,10 @@ type ErrUnknown struct {
 }
 
 // UnknownError creates a ErrForbidden error
-func UnknownError(msg ...interface{}) *ErrForbidden {
+func UnknownError(msg ...interface{}) *ErrUnknown {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.PermissionDenied
-	return &ErrForbidden{r}
+	return &ErrUnknown{r}
 }
 
 // IsNull tells if the instance is null

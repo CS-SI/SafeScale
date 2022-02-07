@@ -27,6 +27,7 @@ import (
 func AddConsequence(err error, cons error) error {
 	if err != nil {
 		if conseq, ok := err.(consequencer); ok {
+
 			if cons != nil {
 				convErr := ConvertError(cons)
 				nerr := conseq.AddConsequence(convErr)

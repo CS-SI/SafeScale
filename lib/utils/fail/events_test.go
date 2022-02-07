@@ -17,17 +17,263 @@
 package fail
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
+func logrus_capture(routine func()) string {
+
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	logrus.SetOutput(w)
+
+	routine()
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+	return string(out)
+
+}
+
+func Test_OnExitLogErrorWithLevel(t *testing.T) {
+
+	log := logrus_capture(func() {
+		OnExitLogErrorWithLevel(nil, logrus.WarnLevel)
+	})
+	require.EqualValues(t, log, "")
+
+	log = logrus_capture(func() {
+		nerr := errors.New("Any message")
+		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
+	})
+	if !strings.Contains(log, "Any message") {
+		t.Fail()
+	}
+
+	log = logrus_capture(func() {
+		nerr := fmt.Errorf("Any message")
+		OnExitLogErrorWithLevel(&nerr, 42)
+	})
+	if !strings.Contains(log, "level=error") {
+		t.Fail()
+	}
+
+	errs := []Error{
+		WarningError(errors.New("math: can't divide by zero"), "Any message"),
+		TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message"),
+		AbortedError(errors.New("math: can't divide by zero"), "Any message"),
+		OverflowError(errors.New("math: can't divide by zero"), 30, "Any message"),
+		ExecutionError(errors.New("exit error"), "Any message"),
+		NewError("Any message"),
+	}
+
+	for i := range errs {
+		log = logrus_capture(func() {
+			err := func(in_err Error) (out_err error) {
+				defer OnExitLogErrorWithLevel(&in_err, logrus.WarnLevel)
+				return in_err
+			}(errs[i])
+			if err == nil {
+				t.Fail()
+			}
+
+		})
+		if !strings.Contains(log, "level=warning") {
+			t.Fail()
+		}
+		if !strings.Contains(log, "Any message") {
+			t.Fail()
+		}
+	}
+
+}
+
+func Test_OnExitLogError(t *testing.T) {
+
+	log := logrus_capture(func() {
+		OnExitLogError(nil, "test")
+	})
+	require.EqualValues(t, log, "")
+
+	log = logrus_capture(func() {
+		nerr := fmt.Errorf("Any message")
+		OnExitLogError(&nerr, "test")
+	})
+	if !strings.Contains(log, "Any message") {
+		t.Fail()
+	}
+
+	errs := []Error{
+		WarningError(errors.New("math: can't divide by zero"), "Any message"),
+		TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message"),
+		AbortedError(errors.New("math: can't divide by zero"), "Any message"),
+		OverflowError(errors.New("math: can't divide by zero"), 30, "Any message"),
+		ExecutionError(errors.New("exit error"), "Any message"),
+		NewError("Any message"),
+	}
+
+	for i := range errs {
+		log = logrus_capture(func() {
+			err := func(in_err Error) (out_err error) {
+				defer OnExitLogError(&in_err, "test")
+				return in_err
+			}(errs[i])
+			if err == nil {
+				t.Fail()
+			}
+
+		})
+		if !strings.Contains(log, "level=error") {
+			t.Fail()
+		}
+		if !strings.Contains(log, "Any message") {
+			t.Fail()
+		}
+	}
+
+}
+
+func Test_OnExitTraceError(t *testing.T) {
+
+	log := logrus_capture(func() {
+		OnExitTraceError(nil, "test")
+	})
+	require.EqualValues(t, log, "")
+
+	log = logrus_capture(func() {
+		nerr := fmt.Errorf("Any message")
+		OnExitTraceError(&nerr, "test")
+	})
+	require.EqualValues(t, log, "")
+
+	errs := []Error{
+		WarningError(errors.New("math: can't divide by zero"), "Any message"),
+		TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message"),
+		AbortedError(errors.New("math: can't divide by zero"), "Any message"),
+		OverflowError(errors.New("math: can't divide by zero"), 30, "Any message"),
+		ExecutionError(errors.New("exit error"), "Any message"),
+		NewError("Any message"),
+	}
+
+	for i := range errs {
+		log = logrus_capture(func() {
+			err := func(in_err Error) (out_err error) {
+				defer OnExitTraceError(&in_err, "test")
+				return in_err
+			}(errs[i])
+			if err == nil {
+				t.Fail()
+			}
+
+		})
+		require.EqualValues(t, log, "")
+	}
+
+}
+
+func Test_OnExitWrapError(t *testing.T) {
+
+	log := logrus_capture(func() {
+		OnExitWrapError(nil, "")
+	})
+	require.EqualValues(t, log, "")
+
+	log = logrus_capture(func() {
+		errv := NewError("Any message")
+		OnExitWrapError(&errv, "test")
+	})
+	if !strings.Contains(log, "OnExitWrapError only works when 'err' is a '*error'") {
+		t.Fail()
+	}
+	log = logrus_capture(func() {
+		errv := WarningError(errors.New("math: can't divide by zero"), "Any message")
+		OnExitWrapError(&errv, "test")
+	})
+	if !strings.Contains(log, "unexpected type '**fail.ErrWarning'") {
+		t.Fail()
+	}
+	log = logrus_capture(func() {
+		errv := errors.New("Any message")
+		OnExitWrapError(&errv, "test")
+	})
+	require.EqualValues(t, log, "")
+
+}
+
+func Test_OnExitConvertToGRPCStatus(t *testing.T) {
+
+	log := logrus_capture(func() {
+		errv := errors.New("Any message")
+		OnExitConvertToGRPCStatus(&errv)
+	})
+	require.EqualValues(t, log, "")
+
+}
+
+func Test_OnPanic(t *testing.T) {
+
+	err := func() (err error) {
+		spew.Dump(&err)
+		defer OnPanic(&err)
+		panic("mayday")
+	}()
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
+
+	log := logrus_capture(func() {
+		_ = func() (err *Error) {
+			err = nil
+			defer OnPanic(err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "intercepted panic but '*err' is nil"), true)
+
+	log = logrus_capture(func() {
+		_ = func() (err Error) {
+			err = NotFoundError("Any message")
+			defer OnPanic(&err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "fail.OnPanic"), true)
+
+	log = logrus_capture(func() {
+		_ = func() (err *error) {
+			err = nil
+			defer OnPanic(err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "intercepted panic but '*err' is nil"), true)
+
+	log = logrus_capture(func() {
+		_ = func() (err error) {
+			err = errors.New("Any message")
+			defer OnPanic(&err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "fail.OnPanic"), true)
+
+}
+
 // -------- tests for log helpers ---------
+func getNotFoundError() (err error) {
+	defer OnExitLogError(&err)
+	return NotFoundError("not there !!!")
+}
 
 func getNotFoundErrorWithLog() (err error) {
 	defer OnExitLogError(&err)

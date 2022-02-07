@@ -18,6 +18,7 @@ package fail
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -59,12 +60,18 @@ func TestErrorList_AddConsequence(t *testing.T) {
 		t.Fail()
 	}
 	errv := NewErrorList([]error{})
+	err = errv.AddConsequence(errv)
+	require.EqualValues(t, fmt.Sprintf("%p", errv), fmt.Sprintf("%p", err))
+
+	errv = NewErrorList([]error{})
 	err = errv.AddConsequence(errors.New("math: square root of negative number"))
 	if err == nil {
 		t.Error("Can't AddConsequence to empty ErrorList")
 		t.Fail()
 	}
-	err.AddConsequence(errors.New("can't resolve equation"))
+
+	errv = NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	err = errv.AddConsequence(errors.New("can't resolve equation"))
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrorList")
 
 }
