@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 )
 
 //goland:noinspection GoPreferNilSlice
@@ -112,6 +113,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return &provider{}, fail.SyntaxError("field 'Zone' in section 'compute' not found in tenants.toml")
 	}
 
+	var owners []string
+	if _, ok = computeCfg["Owners"]; ok {
+		ownerList, ok := computeCfg["Owners"].(string)
+		if !ok {
+			logrus.Debugf("error reading owners: %v", computeCfg["Owners"])
+		} else {
+			frag := strings.Split(ownerList, ",")
+			for _, item := range frag {
+				owners = append(owners, strings.TrimSpace(item))
+			}
+		}
+	}
+
 	awsConf := stacks.AWSConfiguration{
 		// S3Endpoint:  s3Endpoint,
 		Ec2Endpoint: fmt.Sprintf("https://ec2.%s.amazonaws.com", region),
@@ -119,6 +133,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:      region,
 		Zone:        zone,
 		NetworkName: networkName,
+		Owners:      owners,
 	}
 
 	username, ok := identityCfg["Username"].(string) // nolint

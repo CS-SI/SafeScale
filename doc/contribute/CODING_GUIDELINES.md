@@ -25,7 +25,7 @@ Do not use variable names identical to type names, to avoid confusion.
 
 ### `unsafe` prefix on function names
 
-You may find some function names prefixed with `unsafe`. In general, there is a counter-part without the prefix for public use (ie callable outside of the package):
+You may find some function names prefixed with `unsafe`. In general, there is a counter-part without the prefix for public use (ie callable outside the package):
 
   - Public function/method is in charge of parameter validation and needed locking to ensure concurrent accesses without data races
   - `unsafe` function/method does the real work without taking care of parameter validation (in most case) and concurrent accesses

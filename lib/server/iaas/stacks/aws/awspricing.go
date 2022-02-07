@@ -102,7 +102,7 @@ type OnDemand struct {
 	Cards map[string]Card
 }
 
-// Reserved reserved compute instance cards
+// Reserved represents compute instance cards
 type Reserved struct {
 	Cards map[string]Card `json:"cards,omitempty"`
 }
