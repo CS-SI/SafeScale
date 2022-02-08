@@ -332,11 +332,11 @@ func (e *errorCore) SetAnnotationFormatter(formatter func(data.Annotations) stri
 
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errorCore) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null value", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	if err != nil {
@@ -478,12 +478,12 @@ func (e *ErrWarning) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrWarning) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
 		return &ErrWarning{}
+	}
+	if e == err { // do nothing
+		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
@@ -587,11 +587,11 @@ func (e *ErrNotFound) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotFound) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -638,11 +638,11 @@ func (e *ErrNotAvailable) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotAvailable) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -689,11 +689,11 @@ func (e *ErrDuplicate) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrDuplicate) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -735,11 +735,11 @@ func (e *ErrInvalidRequest) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidRequest) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -787,11 +787,11 @@ func (e *ErrSyntax) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrSyntax) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -832,11 +832,11 @@ func (e *ErrNotAuthenticated) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -877,11 +877,11 @@ func (e *ErrForbidden) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrForbidden) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -929,11 +929,11 @@ func (e *ErrAborted) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrAborted) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -986,11 +986,11 @@ func (e *ErrOverflow) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrOverflow) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1031,11 +1031,11 @@ func (e *ErrOverload) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrOverload) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1083,11 +1083,11 @@ func NotImplementedErrorWithReason(what string, why string) Error {
 
 // AddConsequence ...
 func (e *ErrNotImplemented) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1130,11 +1130,11 @@ func (e *ErrRuntimePanic) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrRuntimePanic) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1177,11 +1177,11 @@ func (e *ErrInvalidInstance) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidInstance) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1238,11 +1238,11 @@ func (e *ErrInvalidParameter) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidParameter) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1285,11 +1285,11 @@ func (e *ErrInvalidInstanceContent) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1330,11 +1330,11 @@ func (e *ErrInconsistent) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInconsistent) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1392,11 +1392,11 @@ func (e *ErrExecution) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrExecution) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1437,11 +1437,11 @@ func (e *ErrAlteredNothing) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrAlteredNothing) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -1482,11 +1482,11 @@ func (e *ErrUnknown) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrUnknown) AddConsequence(err error) Error {
-	if e == err { // do nothing
-		return e
-	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.AddConsequence()", "from null instance", 0))
+		return e
+	}
+	if e == err { // do nothing
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
