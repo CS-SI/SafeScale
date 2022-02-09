@@ -24,6 +24,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -1216,29 +1218,109 @@ func (s stack) rpcDescribeRegions(names []*string) ([]*ec2.Region, fail.Error) {
 	return resp.Regions, nil
 }
 
-func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
-	var request ec2.DescribeImagesInput
+func rpcDescribeImagesByOwner(s stack, ids []*string, filters []*ec2.Filter) ([]*ec2.Image, fail.Error) {
+	var req ec2.DescribeImagesInput
 	if len(ids) > 0 {
-		request.ImageIds = ids
-	} else {
-		request.Filters = []*ec2.Filter{}
-
-		// Default filters
-		request.Filters = append(request.Filters, createFilters()...)
-		// Added filtering by owner-id
-		request.Filters = append(request.Filters, filterOwners(s)...)
+		req.ImageIds = ids
 	}
+	req.Filters = filters
+
+	countDecodingProblems := 0
+
 	var resp *ec2.DescribeImagesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeImages(&request)
-			return err
+			resp, err = s.EC2Service.DescribeImages(&req)
+			if err != nil {
+				if awe, ok := err.(awserr.Error); ok {
+					if awe.Code() == request.ErrCodeSerialization {
+						countDecodingProblems++
+						if countDecodingProblems > 1 {
+							return retry.StopRetryError(err, "too many decoding errors")
+						}
+					}
+				}
+
+				return err
+			}
+
+			return nil
 		},
 		normalizeError,
 	)
 	if xerr != nil {
 		return []*ec2.Image{}, xerr
 	}
+
+	return resp.Images, nil
+}
+
+func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
+	var request ec2.DescribeImagesInput
+	if len(ids) > 0 {
+		request.ImageIds = ids
+	}
+
+	request.Filters = []*ec2.Filter{}
+	// Default filters
+	request.Filters = append(request.Filters, createFilters()...)
+	// Added filtering by owner-id
+	request.Filters = append(request.Filters, filterOwners(s)...)
+
+	countDecodingProblems := 0
+	var decodingProblems bool
+
+	var resp *ec2.DescribeImagesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeImages(&request)
+			if err != nil {
+				if awe, ok := err.(awserr.Error); ok {
+					if awe.Code() == "SerializationError" {
+						decodingProblems = true
+						countDecodingProblems++
+						if countDecodingProblems > 1 {
+							return retry.StopRetryError(err, "too many decoding errors")
+						}
+					}
+				}
+
+				return err
+			}
+
+			// no error, forget about decoding problems
+			decodingProblems = false
+
+			return nil
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		if !decodingProblems {
+			return []*ec2.Image{}, xerr
+		}
+	}
+
+	// either we had decoding problems or everything is ok
+	if decodingProblems {
+		for _, owner := range filterOwners(s) {
+			var filters []*ec2.Filter
+			filters = append(filters, createFilters()...)
+			filters = append(filters, owner)
+			newImages, err := rpcDescribeImagesByOwner(s, ids, filters)
+			if err != nil {
+				continue
+			}
+
+			if len(newImages) > 0 {
+				resp.Images = append(resp.Images, newImages...)
+			}
+		}
+
+		return resp.Images, nil
+	}
+
+	// everything ok
 	return resp.Images, nil
 }
 
