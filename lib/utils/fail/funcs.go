@@ -139,7 +139,7 @@ func ToGRPCStatus(err error) error {
 		return grpcstatus.Errorf(codes.Unknown, "")
 	}
 	if casted, ok := err.(Error); ok {
-		return casted.ToGRPCStatus()
+		return grpcstatus.Errorf(casted.GRPCCode(), casted.Error())
 	}
 	return grpcstatus.Errorf(codes.Unknown, err.Error())
 

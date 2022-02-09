@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	gprcstatus "google.golang.org/grpc/status"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 func logrus_capture(routine func()) string {
@@ -304,11 +305,13 @@ func Test_OnExitWrapError(t *testing.T) {
 
 func Test_OnExitConvertToGRPCStatus(t *testing.T) {
 
-	log := logrus_capture(func() {
-		errv := errors.New("Any message")
-		OnExitConvertToGRPCStatus(&errv)
-	})
-	require.EqualValues(t, log, "")
+	err := grpcstatus.Error(codes.NotFound, "id was not found")
+	OnExitConvertToGRPCStatus(&err)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*status.Error")
+
+	errv := errors.New("Any message")
+	OnExitConvertToGRPCStatus(&errv)
+	require.EqualValues(t, reflect.TypeOf(errv).String(), "*status.Error")
 
 }
 

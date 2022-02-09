@@ -310,4 +310,93 @@ func Test_ToGRPCStatus(t *testing.T) {
 
 func Test_Wrap(t *testing.T) {
 
+	result := Wrap(nil, "any error")
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.errorCore")
+	require.EqualValues(t, result.Error(), "any error")
+
+	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	result = Wrap(errs, "any error")
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
+	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
+
+}
+
+func Test_lastUnwrapOrNil(t *testing.T) {
+
+	result := lastUnwrapOrNil(nil)
+	require.EqualValues(t, result, nil)
+
+	err := errors.New("any error")
+	result = lastUnwrapOrNil(err)
+	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
+
+	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	result = lastUnwrapOrNil(errs)
+	require.EqualValues(t, result, nil)
+
+}
+
+func Test_lastUnwrap(t *testing.T) {
+
+	result := lastUnwrap(nil)
+	require.EqualValues(t, result, nil)
+
+	err := errors.New("any error")
+	result = lastUnwrap(err)
+	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
+
+	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	result = lastUnwrap(errs)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
+	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
+
+}
+
+func Test_Cause(t *testing.T) {
+
+	result := Cause(nil)
+	require.EqualValues(t, result, nil)
+
+	err := errors.New("any error")
+	result = Cause(err)
+	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
+
+	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	result = Cause(errs)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
+	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
+
+	errCore := errorCore{
+		message:             "math: can't divide by zero",
+		cause:               errors.New("error cause"),
+		consequences:        []error{errors.New("can't resolve equation")},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.Unknown,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	result = Cause(&errCore)
+	require.EqualValues(t, result.Error(), "error cause")
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
+
+}
+
+func Test_ConvertError(t *testing.T) {
+
+	result := ConvertError(nil)
+	require.EqualValues(t, result, nil)
+
+	err := errors.New("any error")
+	result = ConvertError(err)
+
+	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrUnqualified")
+
 }
