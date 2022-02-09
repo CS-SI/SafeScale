@@ -40,7 +40,7 @@ func Test_NewErrorList(t *testing.T) {
 
 }
 
-func Test_ToGRPCStatus(t *testing.T) {
+func TestNewErrorList_ToGRPCStatus(t *testing.T) {
 
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
 	err := errs.ToGRPCStatus()

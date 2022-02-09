@@ -1027,6 +1027,40 @@ func TestErrWarning_UnformattedError(t *testing.T) {
 
 }
 
+func TestErrWarning_GRPCCode(t *testing.T) {
+
+	warning := &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := warning.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	warning = &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = warning.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_TimeoutError(t *testing.T) {
 
 	err := TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message")
@@ -1209,6 +1243,40 @@ func TestErrTimeout_UnformattedError(t *testing.T) {
 
 }
 
+func TestErrTimeout_GRPCCode(t *testing.T) {
+
+	timeout := &ErrTimeout{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := timeout.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	timeout = &ErrTimeout{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = timeout.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_ErrNotFound(t *testing.T) {
 
 	err := NotFoundError("Any message")
@@ -1359,6 +1427,40 @@ func TestErrNotFound_UnformattedError(t *testing.T) {
 	}
 	result = notfound.UnformattedError()
 	require.NotEqual(t, strings.Index(result, "math: can't divide by zero"), -1)
+
+}
+
+func TestErrNotFound_GRPCCode(t *testing.T) {
+
+	notfound := &ErrNotFound{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := notfound.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	notfound = &ErrNotFound{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = notfound.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -1546,6 +1648,40 @@ func TestErrNotAvailable_UnformattedError(t *testing.T) {
 	}
 	result = notavailable.UnformattedError()
 	require.NotEqual(t, strings.Index(result, "math: can't divide by zero"), -1)
+
+}
+
+func TestErrNotAvailable_GRPCCode(t *testing.T) {
+
+	notavailable := &ErrNotAvailable{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := notavailable.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	notavailable = &ErrNotAvailable{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = notavailable.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -1737,6 +1873,40 @@ func TestErrDuplicate_Annotate(t *testing.T) {
 
 }
 
+func TestErrDuplicate_GRPCCode(t *testing.T) {
+
+	duplicateerr := &ErrDuplicate{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := duplicateerr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	duplicateerr = &ErrDuplicate{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = duplicateerr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_InvalidRequestError(t *testing.T) {
 
 	err := InvalidRequestError("Any message")
@@ -1916,6 +2086,40 @@ func TestErrInvalidRequest_Annotate(t *testing.T) {
 	}
 	result = invalidreqerr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrInvalidRequest__GRPCCode(t *testing.T) {
+
+	invalidreqerr := &ErrInvalidRequest{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := invalidreqerr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	invalidreqerr = &ErrInvalidRequest{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = invalidreqerr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -2108,6 +2312,40 @@ func TestErrSyntax_Annotate(t *testing.T) {
 
 }
 
+func TestErrSyntax_GRPCCode(t *testing.T) {
+
+	syntaxerr := &ErrSyntax{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := syntaxerr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	syntaxerr = &ErrSyntax{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = syntaxerr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_NotAuthenticatedError(t *testing.T) {
 
 	err := NotAuthenticatedError("Any message")
@@ -2290,6 +2528,40 @@ func TestErrNotAuthenticated_Annotate(t *testing.T) {
 
 }
 
+func TestErrNotAuthenticated_GRPCCode(t *testing.T) {
+
+	autherr := &ErrNotAuthenticated{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := autherr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	autherr = &ErrNotAuthenticated{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = autherr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_ForbiddenError(t *testing.T) {
 
 	err := ForbiddenError("Any message")
@@ -2469,6 +2741,40 @@ func TestErrForbidden_Annotate(t *testing.T) {
 	}
 	result = forbiderr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrForbidden_GRPCCode(t *testing.T) {
+
+	forbiderr := &ErrForbidden{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := forbiderr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	forbiderr = &ErrForbidden{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = forbiderr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -2657,6 +2963,40 @@ func TestErrAborted_Annotate(t *testing.T) {
 
 }
 
+func TestErrAborted_GRPCCode(t *testing.T) {
+
+	aborterr := &ErrAborted{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := aborterr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	aborterr = &ErrAborted{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = aborterr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_OverflowError(t *testing.T) {
 
 	err := OverflowError(errors.New("math: can't divide by zero"), 30, "any error")
@@ -2839,6 +3179,40 @@ func TestErrOverflow_Annotate(t *testing.T) {
 
 }
 
+func TestErrOverflow_GRPCCode(t *testing.T) {
+
+	ovflowterr := &ErrOverflow{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := ovflowterr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	ovflowterr = &ErrOverflow{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = ovflowterr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_OverloadError(t *testing.T) {
 
 	err := OverloadError("any error")
@@ -3018,6 +3392,40 @@ func TestErrOverload_Annotate(t *testing.T) {
 	}
 	result = overloadErr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrOverload_GRPCCode(t *testing.T) {
+
+	overloadErr := &ErrOverload{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := overloadErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	overloadErr = &ErrOverload{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = overloadErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -3210,6 +3618,40 @@ func TestErrNotImplemented_Annotate(t *testing.T) {
 
 }
 
+func TestErrNotImplemented_GRPCCode(t *testing.T) {
+
+	notImplementedErr := &ErrNotImplemented{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := notImplementedErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	notImplementedErr = &ErrNotImplemented{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = notImplementedErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_RuntimePanicError(t *testing.T) {
 
 	err := RuntimePanicError("pattern %s", "any error")
@@ -3319,7 +3761,7 @@ func TestErrRuntimePanic_AddConsequence(t *testing.T) {
 
 func TestErrRuntimePanic_UnformattedError(t *testing.T) {
 
-	notImplementedErr := &ErrRuntimePanic{
+	runtimePanicErr := &ErrRuntimePanic{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3331,10 +3773,10 @@ func TestErrRuntimePanic_UnformattedError(t *testing.T) {
 			lock:                nil, //&sync.RWMutex{},
 		},
 	}
-	result := notImplementedErr.UnformattedError()
+	result := runtimePanicErr.UnformattedError()
 	require.EqualValues(t, result, "")
 
-	notImplementedErr = &ErrRuntimePanic{
+	runtimePanicErr = &ErrRuntimePanic{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3346,13 +3788,13 @@ func TestErrRuntimePanic_UnformattedError(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = notImplementedErr.UnformattedError()
+	result = runtimePanicErr.UnformattedError()
 	require.NotEqual(t, strings.Index(result, "math: can't divide by zero"), -1)
 
 }
 
 func TestErrRuntimePanic_Annotate(t *testing.T) {
-	notImplementedErr := &ErrRuntimePanic{
+	runtimePanicErr := &ErrRuntimePanic{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3372,10 +3814,10 @@ func TestErrRuntimePanic_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := notImplementedErr.Annotate("two", ann)
+	result := runtimePanicErr.Annotate("two", ann)
 	require.NotEqual(t, result.Annotations()["two"], ann)
 
-	notImplementedErr = &ErrRuntimePanic{
+	runtimePanicErr = &ErrRuntimePanic{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3387,8 +3829,42 @@ func TestErrRuntimePanic_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = notImplementedErr.Annotate("two", ann)
+	result = runtimePanicErr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrRuntimePanic_GRPCCode(t *testing.T) {
+
+	runtimePanicErr := &ErrRuntimePanic{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := runtimePanicErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	runtimePanicErr = &ErrRuntimePanic{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = runtimePanicErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -3574,6 +4050,40 @@ func TestErrInvalidInstance_Annotate(t *testing.T) {
 
 }
 
+func TestErrInvalidInstance_GRPCCode(t *testing.T) {
+
+	invalidInstanceErr := &ErrInvalidInstance{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := invalidInstanceErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	invalidInstanceErr = &ErrInvalidInstance{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = invalidInstanceErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_InvalidParameterError(t *testing.T) {
 
 	err := InvalidParameterError("what is it", "any error")
@@ -3697,7 +4207,7 @@ func TestErrInvalidParameter_AddConsequence(t *testing.T) {
 
 func TestErrInvalidParameter_UnformattedError(t *testing.T) {
 
-	invalidInstanceErr := &ErrInvalidParameter{
+	invalidParameterErr := &ErrInvalidParameter{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3709,10 +4219,10 @@ func TestErrInvalidParameter_UnformattedError(t *testing.T) {
 			lock:                nil, //&sync.RWMutex{},
 		},
 	}
-	result := invalidInstanceErr.UnformattedError()
+	result := invalidParameterErr.UnformattedError()
 	require.EqualValues(t, result, "")
 
-	invalidInstanceErr = &ErrInvalidParameter{
+	invalidParameterErr = &ErrInvalidParameter{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3724,13 +4234,13 @@ func TestErrInvalidParameter_UnformattedError(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = invalidInstanceErr.UnformattedError()
+	result = invalidParameterErr.UnformattedError()
 	require.NotEqual(t, strings.Index(result, "math: can't divide by zero"), -1)
 
 }
 
 func TestErrInvalidParameter_Annotate(t *testing.T) {
-	invalidInstanceErr := &ErrInvalidParameter{
+	invalidParameterErr := &ErrInvalidParameter{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3750,10 +4260,10 @@ func TestErrInvalidParameter_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := invalidInstanceErr.Annotate("two", ann)
+	result := invalidParameterErr.Annotate("two", ann)
 	require.NotEqual(t, result.Annotations()["two"], ann)
 
-	invalidInstanceErr = &ErrInvalidParameter{
+	invalidParameterErr = &ErrInvalidParameter{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3765,8 +4275,42 @@ func TestErrInvalidParameter_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = invalidInstanceErr.Annotate("two", ann)
+	result = invalidParameterErr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrInvalidParameter_GRPCCode(t *testing.T) {
+
+	invalidParameterErr := &ErrInvalidParameter{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := invalidParameterErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	invalidParameterErr = &ErrInvalidParameter{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = invalidParameterErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -3879,7 +4423,7 @@ func TestErrInvalidInstanceContent_AddConsequence(t *testing.T) {
 
 func TestErrInvalidInstanceContent_UnformattedError(t *testing.T) {
 
-	InvalidInstanceContentErr := &ErrInvalidInstanceContent{
+	invalidInstanceContentErr := &ErrInvalidInstanceContent{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3891,10 +4435,10 @@ func TestErrInvalidInstanceContent_UnformattedError(t *testing.T) {
 			lock:                nil, //&sync.RWMutex{},
 		},
 	}
-	result := InvalidInstanceContentErr.UnformattedError()
+	result := invalidInstanceContentErr.UnformattedError()
 	require.EqualValues(t, result, "")
 
-	InvalidInstanceContentErr = &ErrInvalidInstanceContent{
+	invalidInstanceContentErr = &ErrInvalidInstanceContent{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3906,13 +4450,13 @@ func TestErrInvalidInstanceContent_UnformattedError(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = InvalidInstanceContentErr.UnformattedError()
+	result = invalidInstanceContentErr.UnformattedError()
 	require.NotEqual(t, strings.Index(result, "math: can't divide by zero"), -1)
 
 }
 
 func TestErrInvalidInstanceContent_Annotate(t *testing.T) {
-	InvalidInstanceContentErr := &ErrInvalidInstanceContent{
+	invalidInstanceContentErr := &ErrInvalidInstanceContent{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3932,10 +4476,10 @@ func TestErrInvalidInstanceContent_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := InvalidInstanceContentErr.Annotate("two", ann)
+	result := invalidInstanceContentErr.Annotate("two", ann)
 	require.NotEqual(t, result.Annotations()["two"], ann)
 
-	InvalidInstanceContentErr = &ErrInvalidInstanceContent{
+	invalidInstanceContentErr = &ErrInvalidInstanceContent{
 		errorCore: &errorCore{
 			message:             "math: can't divide by zero",
 			cause:               errors.New("math: can't divide by zero"),
@@ -3947,8 +4491,42 @@ func TestErrInvalidInstanceContent_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = InvalidInstanceContentErr.Annotate("two", ann)
+	result = invalidInstanceContentErr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrInvalidInstanceContent_GRPCCode(t *testing.T) {
+
+	invalidInstanceContentErr := &ErrInvalidInstanceContent{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := invalidInstanceContentErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	invalidInstanceContentErr = &ErrInvalidInstanceContent{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = invalidInstanceContentErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -4131,6 +4709,40 @@ func TestErrInconsistent_Annotate(t *testing.T) {
 	}
 	result = inconsistentErr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrInconsistent_GRPCCode(t *testing.T) {
+
+	inconsistentErr := &ErrInconsistent{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := inconsistentErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	inconsistentErr = &ErrInconsistent{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = inconsistentErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }
 
@@ -4334,6 +4946,40 @@ func TestErrExecution_Annotate(t *testing.T) {
 
 }
 
+func TestErrExecution_GRPCCode(t *testing.T) {
+
+	executionErr := &ErrExecution{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := executionErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	executionErr = &ErrExecution{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = executionErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_AlteredNothingError(t *testing.T) {
 
 	err := AlteredNothingError("any error")
@@ -4516,6 +5162,40 @@ func TestErrAlteredNothing_Annotate(t *testing.T) {
 
 }
 
+func TestErrAlteredNothing_GRPCCode(t *testing.T) {
+
+	alteredNilErr := &ErrAlteredNothing{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := alteredNilErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	alteredNilErr = &ErrAlteredNothing{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = alteredNilErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
+
+}
+
 func Test_UnknownError(t *testing.T) {
 
 	err := UnknownError("any error")
@@ -4695,5 +5375,39 @@ func TestErrUnknown_Annotate(t *testing.T) {
 	}
 	result = unknownErr.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
+
+}
+
+func TestErrUnknown_GRPCCode(t *testing.T) {
+
+	unknownErr := &ErrUnknown{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                nil, //&sync.RWMutex{},
+		},
+	}
+	result := unknownErr.GRPCCode()
+	require.EqualValues(t, result, codes.Unknown)
+
+	unknownErr = &ErrUnknown{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = unknownErr.GRPCCode()
+	require.EqualValues(t, result, codes.OK)
 
 }

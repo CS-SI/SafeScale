@@ -70,7 +70,16 @@ func Annotate(err error, key string, content interface{}) Error {
 
 // IsGRPCTimeout tells if the err is a ImplTimeout kind
 func IsGRPCTimeout(err error) bool {
-	return grpcstatus.Code(err) == codes.DeadlineExceeded
+	if err == nil {
+		return false
+	}
+	code := codes.Unknown
+	if casted, ok := err.(Error); ok {
+		code = casted.(Error).GRPCCode()
+	} else {
+		code = grpcstatus.Code(err.(error))
+	}
+	return code == codes.DeadlineExceeded
 }
 
 // IsGRPCError tells if the err is of GRPC kind
@@ -125,11 +134,15 @@ func FromGRPCStatus(err error) Error {
 
 // ToGRPCStatus translates an error to a GRPC status
 func ToGRPCStatus(err error) error {
+
+	if err == nil {
+		return grpcstatus.Errorf(codes.Unknown, "")
+	}
 	if casted, ok := err.(Error); ok {
 		return casted.ToGRPCStatus()
 	}
-
 	return grpcstatus.Errorf(codes.Unknown, err.Error())
+
 }
 
 // Wrap creates a new error with a message 'msg' and a causer error 'cause'

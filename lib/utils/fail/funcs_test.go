@@ -18,6 +18,8 @@ package fail
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 func Test_AddConsequence(t *testing.T) {
@@ -93,5 +96,218 @@ func Test_Annotate(t *testing.T) {
 }
 
 func Test_IsGRPCTimeout(t *testing.T) {
+
+	require.EqualValues(t, IsGRPCTimeout(nil), false)
+
+	err := errors.New("any error")
+	require.EqualValues(t, IsGRPCTimeout(err), false)
+
+	errCore := &errorCore{
+		message:             "math: can't divide by zero",
+		cause:               errors.New("math: can't divide by zero"),
+		consequences:        []error{errors.New("can't resolve equation")},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.DeadlineExceeded,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	require.EqualValues(t, IsGRPCTimeout(errCore), true)
+
+	errCore = &errorCore{
+		message:             "math: can't divide by zero",
+		cause:               errors.New("math: can't divide by zero"),
+		consequences:        []error{errors.New("can't resolve equation")},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.OK,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	require.EqualValues(t, IsGRPCTimeout(errCore), false)
+
+	xerr := &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.DeadlineExceeded,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	require.EqualValues(t, IsGRPCTimeout(xerr), true)
+
+	xerr = &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.OK,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	require.EqualValues(t, IsGRPCTimeout(xerr), false)
+
+}
+
+func Test_IsGRPCError(t *testing.T) {
+
+	require.EqualValues(t, IsGRPCError(nil), false)
+
+	err := grpcstatus.Error(codes.NotFound, "id was not found")
+	require.EqualValues(t, IsGRPCError(err), true)
+
+	errCore := &errorCore{
+		message:             "math: can't divide by zero",
+		cause:               errors.New("math: can't divide by zero"),
+		consequences:        []error{errors.New("can't resolve equation")},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.DeadlineExceeded,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	require.EqualValues(t, IsGRPCError(errCore), false)
+
+	xerr := &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.DeadlineExceeded,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	require.EqualValues(t, IsGRPCError(xerr), false)
+
+}
+
+func Test_FromGRPCStatus(t *testing.T) {
+
+	result := FromGRPCStatus(nil)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.errorCore")
+
+	err := grpcstatus.Error(codes.NotFound, "id was not found")
+	result = FromGRPCStatus(err)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrNotFound")
+
+	errCore := &errorCore{
+		message:             "math: can't divide by zero",
+		cause:               errors.New("math: can't divide by zero"),
+		consequences:        []error{errors.New("can't resolve equation")},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.DeadlineExceeded,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	result = FromGRPCStatus(errCore)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.errorCore")
+
+	xerr := &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.DeadlineExceeded,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = FromGRPCStatus(xerr)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrWarning")
+
+	codes := map[codes.Code]string{
+		codes.DeadlineExceeded:   "*fail.ErrTimeout",
+		codes.Aborted:            "*fail.ErrAborted",
+		codes.FailedPrecondition: "*fail.ErrInvalidParameter",
+		codes.AlreadyExists:      "*fail.ErrDuplicate",
+		codes.InvalidArgument:    "*fail.ErrInvalidRequest",
+		codes.NotFound:           "*fail.ErrNotFound",
+		codes.PermissionDenied:   "*fail.ErrForbidden",
+		codes.ResourceExhausted:  "*fail.ErrOverload",
+		codes.OutOfRange:         "*fail.ErrOverflow",
+		codes.Unimplemented:      "*fail.ErrNotImplemented",
+		codes.Internal:           "*fail.ErrRuntimePanic",
+		codes.DataLoss:           "*fail.ErrInconsistent",
+		codes.Unauthenticated:    "*fail.ErrNotAuthenticated",
+	}
+	for k, v := range codes {
+		err = grpcstatus.Error(k, fmt.Sprintf("grpccode %d to %s", k, v))
+		result = FromGRPCStatus(err)
+		require.EqualValues(t, reflect.TypeOf(result).String(), v)
+	}
+
+}
+
+func Test_ToGRPCStatus(t *testing.T) {
+
+	result := ToGRPCStatus(nil)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
+	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "code = Unknown"), true)
+
+	err := grpcstatus.Error(codes.NotFound, "id was not found")
+	result = ToGRPCStatus(err)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
+	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "code = Unknown"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "desc = id was not found"), true)
+
+	errCore := &errorCore{
+		message:             "math: can't divide by zero",
+		cause:               errors.New("math: can't divide by zero"),
+		consequences:        []error{errors.New("can't resolve equation")},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.DeadlineExceeded,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	result = ToGRPCStatus(errCore)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
+	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "code = DeadlineExceeded"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "desc = math: can't divide by zero"), true)
+
+	xerr := &ErrWarning{
+		errorCore: &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.DeadlineExceeded,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
+	}
+	result = ToGRPCStatus(xerr)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
+	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "code = DeadlineExceeded"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "desc = math: can't divide by zero"), true)
+
+	err = errors.New("any error")
+	result = ToGRPCStatus(err)
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
+	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "code = Unknown"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "desc = any error"), true)
+
+}
+
+func Test_Wrap(t *testing.T) {
 
 }
