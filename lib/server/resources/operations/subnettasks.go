@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -109,28 +110,44 @@ func (instance *Subnet) taskCreateGateway(
 
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
-		if ferr != nil && !hostReq.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
+		if ferr != nil {
+			if !hostReq.KeepOnFailure {
+				// Disable abort signal during clean up
+				defer task.DisarmAbortSignal()()
 
-			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-			derr := rgw.Delete(task.Context())
-			if derr != nil {
-				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					// missing Host is considered as a successful deletion, continue
-					debug.IgnoreError(derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
-				default:
-					logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+				logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
+				derr := rgw.Delete(task.Context())
+				if derr != nil {
+					msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// missing Host is considered as a successful deletion, continue
+						debug.IgnoreError(derr)
+					case *fail.ErrTimeout:
+						logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
+					default:
+						logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+					}
+					_ = ferr.AddConsequence(derr)
+				} else {
+					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 				}
 				_ = ferr.AddConsequence(derr)
 			} else {
-				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
+				xerr = rgw.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.HostCore)
+					if !ok {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					as.LastState = hoststate.Failed
+					return nil
+				})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					logrus.Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+				}
 			}
-			_ = ferr.AddConsequence(derr)
 		}
 	}()
 

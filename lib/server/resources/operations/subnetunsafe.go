@@ -674,6 +674,24 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	return nil
 }
 
+func (instance *Subnet) unsafeUpdateSubnetStatus(target subnetstate.Enum) fail.Error {
+	xerr := instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		as.State = target
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return instance.updateCachedInformation()
+}
+
 func (instance *Subnet) unsafeFinalizeSubnetCreation() fail.Error {
 	xerr := instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)

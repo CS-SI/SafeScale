@@ -48,7 +48,7 @@ const (
 	curlPatch = "curl -kSsl -X PATCH --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
 
-var kongProxyCheckedCache cache.Cache
+var kongProxyCheckedCache cache.Cache // nolint
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
