@@ -1,14 +1,134 @@
 package net
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+type RetryableErrorInterface interface {
+	error
+	Timeout() bool
+	Temporary() bool
+}
+type RetryableError struct {
+	message string
+	RetryableErrorInterface
+}
+
+func (e *RetryableError) Timeout() bool {
+	return false
+}
+func (e *RetryableError) Temporary() bool {
+	return true
+}
+func (e *RetryableError) Error() string {
+	return e.message
+}
+func NewRetryableError(msg string) *RetryableError {
+	return &RetryableError{
+		message: msg,
+	}
+}
+
+func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
+
+	// no waitfor
+	var (
+		callback func() error = func() error {
+			return errors.New("Any error")
+		}
+		waitfor *retry.Officer = nil
+		timeout time.Duration  = 0 * time.Second
+		err     error
+	)
+
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter waitor"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+
+	// no timeout
+	waitfor = retry.Randomized(50*time.Millisecond, 500*time.Millisecond)
+	timeout = -1 * time.Second
+	callback = func() error {
+		return fail.TimeoutError(errors.New("Hard timeout"), 1*time.Second, "Any error")
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrTimeout")
+	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "Hard timeout"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+
+	// Success one
+	waitfor = retry.Linear(50 * time.Millisecond)
+	timeout = 5 * time.Second
+	callback = func() error {
+		return nil
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.EqualValues(t, err, nil)
+
+	// Multiple fail before success
+	waitfor = retry.Linear(10 * time.Millisecond)
+	timeout = 5 * time.Second
+	callback = func() error {
+		return nil
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.EqualValues(t, err, nil)
+
+	maxTries := 8
+	tries := 0
+	callback = func() error {
+		tries = tries + 1
+		if tries >= maxTries {
+			return nil
+		}
+		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxTries)
+
+	// Multiple fail before fail
+	waitfor = retry.Linear(10 * time.Millisecond)
+	timeout = 5 * time.Second
+	callback = func() error {
+		return nil
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.EqualValues(t, err, nil)
+
+	maxTries = 8
+	tries = 0
+	callback = func() error {
+		tries = tries + 1
+		if tries >= maxTries {
+			return retry.StopRetryError(errors.New("Too much tries"))
+		}
+		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
+	require.EqualValues(t, tries, maxTries)
+
+}
+
+//------------------------------------------------
 
 type MyError struct {
 	error

@@ -36,7 +36,14 @@ func Test_Marshal(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-
 	require.EqualValues(t, data, decoded)
+
+	formatted, err := json.MarshalIndent(data, "", "    ")
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	expected := "{\n    \"a\": \"1\",\n    \"b\": \"2\",\n    \"c\": \"3\"\n}"
+	require.EqualValues(t, string(formatted), expected)
 
 }

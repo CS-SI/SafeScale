@@ -28,6 +28,7 @@ import (
 
 type Test struct {
 	caller    func(string, string) fail.Error
+	checkName bool
 	errorType string
 }
 
@@ -40,7 +41,7 @@ func TestErrors_Global(t *testing.T) {
 		{caller: ResourceForbiddenError, errorType: "*fail.ErrForbidden"},
 	}
 	test := Test{}
-	ressourceNames := []string{"", "Ressource1", " A B C D E", ":ù*$,:!;,"}
+	ressourceNames := []string{"", "Ressource1", "A B C D E", ":ù*$,:!;,"}
 	ressourceName := ""
 	names := []string{"", "name1", ":ù*$,:!;,"}
 	name := ""
@@ -55,12 +56,12 @@ func TestErrors_Global(t *testing.T) {
 					t.Error("Wrong ErrorType Restitution, expect " + test.errorType)
 					t.Fail()
 				}
-				if ressourceName != "" && !strings.Contains(fmt.Sprintf("%s", err), ressourceName) {
-					t.Error("Wrong Message Restitution, error does not contains ressource name \"" + ressourceName + " \"")
+				if ressourceName != "" && !strings.Contains(err.Error(), ressourceName) {
+					t.Error(fmt.Sprintf("Wrong message restitution, error \"%s\" does not contains ressource name \"%s\", message was \"%s\"", reflect.TypeOf(err).String(), ressourceName, err.Error()))
 					t.Fail()
 				}
-				if name != "" && !strings.Contains(fmt.Sprintf("%s", err), name) {
-					t.Error("Wrong Message Restitution, error does not contains given name \"" + name + " \"")
+				if name != "" && !strings.Contains(err.Error(), name) {
+					t.Error(fmt.Sprintf("Wrong message restitution, error \"%s\" does not contains given name \"%s\", message was \"%s\"", reflect.TypeOf(err).String(), name, err.Error()))
 					t.Fail()
 				}
 			}

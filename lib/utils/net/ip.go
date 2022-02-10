@@ -42,12 +42,13 @@ func IPv4StringToUInt32(ip string) uint32 {
 
 // UInt32ToIPv4 converts uint32 to net.IP
 func UInt32ToIPv4(value uint32) net.IP {
-	return net.IP{
-		byte(value >> 24),
-		byte((value & 0x00FFFFFF) >> 16),
-		byte((value & 0x0000FFFF) >> 8),
-		byte(value & 0x000000FF),
-	}
+	// Care, net.IP is [16]byte for ip v6, use ipv4 constructor
+	return net.IPv4(
+		byte(value>>24),
+		byte((value&0x00FFFFFF)>>16),
+		byte((value&0x0000FFFF)>>8),
+		byte(value&0x000000FF),
+	)
 }
 
 // UInt32ToIPv4String converts uint32 to IP
