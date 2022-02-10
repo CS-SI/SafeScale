@@ -19,6 +19,8 @@
 
 {{.Header}}
 
+last_error=
+
 function print_error() {
   read -r line file <<< "$(caller)"
   echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
@@ -71,7 +73,7 @@ function install_keepalived() {
     ;;
 
   redhat | centos)
-    yum install -q -y keepalived || return 1
+    sfYum install -q -y keepalived || return 1
     ;;
   *)
     echo "Unsupported Linux distribution '$LINUX_KIND'!"

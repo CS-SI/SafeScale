@@ -200,7 +200,7 @@ func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
 	return instance.metadataKey, nil
 }
 
-// ChangeProvider allows to change provider interface of service object (mainly for test purposes)
+// ChangeProvider allows changing provider interface of service object (mainly for test purposes)
 func (instance *service) ChangeProvider(provider providers.Provider) fail.Error {
 	if instance.IsNull() {
 		return fail.InvalidInstanceError()
