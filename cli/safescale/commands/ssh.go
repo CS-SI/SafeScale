@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli/v2"
@@ -177,6 +179,17 @@ var sshConnect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
+		// Check host status 1st
+		resp, err := clientSession.Host.GetStatus(c.Args().Get(0), temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
+		}
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		if converted != hoststate.Started {
+			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("Host %s is not in 'Started' state, it's '%s'", c.Args().Get(0), converted.String())))
+		}
+
 		var (
 			username, shell string
 		)
@@ -186,7 +199,7 @@ var sshConnect = &cli.Command{
 		if c.IsSet("shell") {
 			shell = c.String("shell")
 		}
-		err := clientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
+		err = clientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))

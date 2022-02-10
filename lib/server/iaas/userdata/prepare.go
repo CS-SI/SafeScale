@@ -74,6 +74,7 @@ type Content struct {
 	GatewayHAKeepalivedPassword string                        // contains the password to use in keepalived configurations
 	ProviderName                string
 	BuildSubnetworks            bool
+	Debug                       bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -158,6 +159,7 @@ func (ud *Content) Prepare(
 		}
 	}
 
+	// FIXME: Enable debug through env variables
 	ud.BashLibraryDefinition = *bashLibraryDefinition
 	ud.Header = scriptHeader
 	ud.Revision = REV
@@ -182,7 +184,7 @@ func (ud *Content) Prepare(
 		ud.HostName = request.ResourceName
 	}
 
-	// Generate a keypair for first SSH connection, that will then be replace by FinalPxxxKey during phase2
+	// Generate a keypair for first SSH connection, that will then be replaced by FinalPxxxKey during phase2
 	kp, xerr := abstract.NewKeyPair("")
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create initial Keypair")

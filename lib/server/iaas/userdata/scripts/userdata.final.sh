@@ -19,6 +19,8 @@
 
 {{.Header}}
 
+last_error=
+
 function print_error() {
   read -r line file <<< "$(caller)"
   echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
@@ -101,10 +103,10 @@ function install_drivers_nvidia() {
       dracut --force
       rmmod nouveau
     fi
-    yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &> /dev/null || fail 206 "failure updating kernel"
+    sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &> /dev/null || fail 206 "failure updating kernel"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207 "failure downloading nvidia drivers"
     # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
-    if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
+    if [ $(uname -r) == $(sfYum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
       bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208 "failure installing nvidia"
     fi
     rm -f NVIDIA-Linux-x86_64-410.78.run
@@ -123,7 +125,7 @@ function install_python3() {
     sfApt -y install python3 python3-pip &> /dev/null || fail 210 "failure installing python3"
     ;;
   redhat | rhel | centos)
-    yum install -y python3 python3-pip || fail 210 "failure installing python3"
+    sfYum install -y python3 python3-pip || fail 210 "failure installing python3"
     ;;
   *)
     fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"

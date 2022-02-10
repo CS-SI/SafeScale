@@ -19,6 +19,8 @@
 
 {{.Header}}
 
+last_error=
+
 function print_error() {
   read -r line file <<< "$(caller)"
   echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
@@ -273,8 +275,12 @@ disable_cloudinit_network_autoconf
 disable_services
 disable_upgrades
 
-#unsafe_sshd
+{{- if .Debug }}
+unsafe_sshd
+{{- else }}
 secure_sshd
+{{- end }}
+
 create_user
 
 no_daily_update

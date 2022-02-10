@@ -19,6 +19,8 @@
 
 {{.Header}}
 
+last_error=
+
 function print_error() {
   read -r line file <<< "$(caller)"
   echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
