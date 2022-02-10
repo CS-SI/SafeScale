@@ -432,7 +432,6 @@ func (instance *Subnet) Carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Create creates a Subnet
-// FIXME: split up this function for readability
 func (instance *Subnet) Create(
 	ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements,
 ) (ferr fail.Error) {
@@ -482,11 +481,24 @@ func (instance *Subnet) Create(
 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
-		if ferr != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
-			} else {
-				logrus.Infof("the subnet '%s' should be gone by now", instance.GetID())
+		if ferr != nil {
+			if !req.KeepOnFailure {
+				if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
+				} else {
+					logrus.Infof("the subnet '%s' should be gone by now", instance.GetID())
+				}
+			}
+		}
+	}()
+
+	defer func() {
+		if ferr != nil {
+			if instance != nil {
+				derr := instance.unsafeUpdateSubnetStatus(subnetstate.Error)
+				if derr != nil {
+					_ = ferr.AddConsequence(derr)
+				}
 			}
 		}
 	}()

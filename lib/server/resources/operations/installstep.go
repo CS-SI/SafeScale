@@ -451,6 +451,16 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 		return nil, xerr
 	}
 
+	var sn resources.Subnet
+	sn, xerr = host.GetDefaultSubnet()
+	if xerr != nil {
+		return nil, xerr
+	}
+	clonedV["CIDR"], xerr = sn.GetCIDR()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	clonedV["Hostname"] = host.GetName() + domain
 	// logrus.Warningf("Checking variable substitution for: %s", spew.Sdump(clonedV))
 
