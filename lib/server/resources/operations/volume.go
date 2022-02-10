@@ -662,29 +662,37 @@ func (instance *volume) Attach(
 					}
 
 					path := mount.Path
-					if path != mountPoint {
-						return fail.InvalidRequestError("volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
+					if mountPoint != "" {
+						if path != mountPoint {
+							return fail.InvalidRequestError("volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
+						}
 					}
 					return nil
 				}
 
-				// Check if there is no other device mounted in the path (or in subpath)
-				for _, i := range hostMountsV1.LocalMountsByPath {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
+				if !doNotMount {
+					// Check if there is no other device mounted in the path (or in subpath)
+					for _, i := range hostMountsV1.LocalMountsByPath {
+						if task.Aborted() {
+							return fail.AbortedError(nil, "aborted")
+						}
 
-					if strings.Index(i.Path, mountPoint) == 0 {
-						return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+						if mountPoint != "" {
+							if strings.Index(i.Path, mountPoint) == 0 {
+								return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+							}
+						}
 					}
-				}
-				for _, i := range hostMountsV1.RemoteMountsByPath {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
+					for _, i := range hostMountsV1.RemoteMountsByPath {
+						if task.Aborted() {
+							return fail.AbortedError(nil, "aborted")
+						}
 
-					if strings.Index(i.Path, mountPoint) == 0 {
-						return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
+						if mountPoint != "" {
+							if strings.Index(i.Path, mountPoint) == 0 {
+								return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
+							}
+						}
 					}
 				}
 				return nil
@@ -811,7 +819,7 @@ func (instance *volume) Attach(
 
 				defer func() {
 					if ferr != nil {
-						// Disable abort signal during the clean up
+						// Disable abort signal during the cleanup
 						defer task.DisarmAbortSignal()()
 
 						if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
