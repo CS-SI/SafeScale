@@ -9,7 +9,7 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/antihax/optional v1.0.0
 	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496
-	github.com/aws/aws-sdk-go v1.42.49
+	github.com/aws/aws-sdk-go v1.42.50
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/daaku/go.zipexe v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
@@ -36,7 +36,6 @@ require (
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v0.0.0-20181109152953-ba5adb4cf014
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
-	github.com/quasilyte/go-ruleguard/dsl v0.3.10 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.5.2
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
@@ -52,7 +51,7 @@ require (
 	golang.org/x/net v0.0.0-20220127074510-2fabfed7e28f // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.67.0
+	google.golang.org/api v0.68.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 )
