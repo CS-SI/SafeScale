@@ -160,6 +160,13 @@ func (s *Subnet) GetID() string {
 	return s.ID
 }
 
+func (s *Subnet) GetCIDR() string {
+	if s == nil {
+		return ""
+	}
+	return s.CIDR
+}
+
 // VirtualIP is a structure containing information needed to manage VIP (virtual IP)
 type VirtualIP struct {
 	ID        string      `json:"id,omitempty"`
