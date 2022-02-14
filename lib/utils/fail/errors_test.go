@@ -32,6 +32,29 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+func DeadlockCheck(routine func(), timeout time.Duration) (nodeadlock bool) {
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		routine()
+	}()
+
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+
+}
+
 func Test_NewError(t *testing.T) {
 
 	o := struct{}{}
@@ -160,19 +183,28 @@ func Test_defaultCauseFormatter(t *testing.T) {
 	result = defaultCauseFormatter(err)
 	require.NotEqual(t, result, "")
 
-	err = &errorCore{
-		message:             "math: can't divide by zero",
-		cause:               errors.New("math: can't divide by zero"),
-		consequences:        []error{errors.New("can't resolve equation")},
-		annotations:         make(data.Annotations),
-		grpcCode:            codes.Unknown,
-		causeFormatter:      defaultCauseFormatter,
-		annotationFormatter: defaultAnnotationFormatter,
-		lock:                &sync.RWMutex{},
+	deadlock := DeadlockCheck(func() {
+
+		err = &errorCore{
+			message:             "math: can't divide by zero",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		}
+		err.lock.Lock()
+		result = defaultCauseFormatter(err)
+		require.EqualValues(t, result, "")
+
+	}, 1*time.Second)
+
+	if deadlock {
+		t.Error("A deadlock seems happens")
+		t.Fail()
 	}
-	err.lock.Lock() // Huhu makes a deadlock ?
-	result = defaultCauseFormatter(err)
-	require.EqualValues(t, result, "")
 
 	err = &errorCore{
 		message:             "math: can't divide by zero",

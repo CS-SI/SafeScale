@@ -507,10 +507,21 @@ func (e *ErrWarning) UnformattedError() string {
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrWarning) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrWarning) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrTimeout defines a ErrTimeout error
@@ -574,10 +585,21 @@ func (e *ErrTimeout) UnformattedError() string {
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrTimeout) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrTimeout) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrNotFound resource not found error
@@ -634,10 +656,21 @@ func (e *ErrNotFound) UnformattedError() string {
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotFound) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrNotFound) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrNotAvailable resource not available error
@@ -694,10 +727,21 @@ func (e *ErrNotAvailable) UnformattedError() string {
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotAvailable) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrNotAvailable) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrDuplicate already exists error
@@ -755,10 +799,21 @@ func (e *ErrDuplicate) Annotate(key string, value data.Annotation) data.Annotata
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrDuplicate) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrDuplicate) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrInvalidRequest ...
@@ -810,10 +865,21 @@ func (e *ErrInvalidRequest) Annotate(key string, value data.Annotation) data.Ann
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrInvalidRequest) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrInvalidRequest) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrSyntax ...
@@ -870,10 +936,21 @@ func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrSyntax) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrSyntax) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrNotAuthenticated when action is done without being authenticated first
@@ -924,10 +1001,21 @@ func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.A
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotAuthenticated) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrNotAuthenticated) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrForbidden when action is not allowed.
@@ -978,10 +1066,21 @@ func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotata
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrForbidden) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrForbidden) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrAborted is used to signal abortion
@@ -1039,10 +1138,21 @@ func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatabl
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrAborted) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrAborted) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrOverflow is used when a limit is reached
@@ -1105,10 +1215,21 @@ func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatab
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrOverflow) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrOverflow) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occurred in a given time).
@@ -1163,6 +1284,17 @@ func (e *ErrOverload) GRPCCode() codes.Code {
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrOverload) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrNotImplemented ...
@@ -1226,6 +1358,17 @@ func (e *ErrNotImplemented) GRPCCode() codes.Code {
 	return e.errorCore.GRPCCode()
 }
 
+// Cause is just an accessor for internal e.cause
+func (e *ErrNotImplemented) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
+}
+
 // ErrRuntimePanic ...
 type ErrRuntimePanic struct {
 	*errorCore
@@ -1282,6 +1425,17 @@ func (e *ErrRuntimePanic) GRPCCode() codes.Code {
 	return e.errorCore.GRPCCode()
 }
 
+// Cause is just an accessor for internal e.cause
+func (e *ErrRuntimePanic) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
+}
+
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
 type ErrInvalidInstance struct {
 	*errorCore
@@ -1336,6 +1490,17 @@ func (e *ErrInvalidInstance) GRPCCode() codes.Code {
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrInvalidInstance) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrInvalidParameter ...
@@ -1408,6 +1573,17 @@ func (e *ErrInvalidParameter) GRPCCode() codes.Code {
 	return e.errorCore.GRPCCode()
 }
 
+// Cause is just an accessor for internal e.cause
+func (e *ErrInvalidParameter) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
+}
+
 // ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
 type ErrInvalidInstanceContent struct {
 	*errorCore
@@ -1464,6 +1640,17 @@ func (e *ErrInvalidInstanceContent) GRPCCode() codes.Code {
 	return e.errorCore.GRPCCode()
 }
 
+// Cause is just an accessor for internal e.cause
+func (e *ErrInvalidInstanceContent) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
+}
+
 // ErrInconsistent is used when data used is ErrInconsistent
 type ErrInconsistent struct {
 	*errorCore
@@ -1516,6 +1703,17 @@ func (e *ErrInconsistent) GRPCCode() codes.Code {
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrInconsistent) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrExecution is used when code ErrExecution failed
@@ -1589,6 +1787,17 @@ func (e *ErrExecution) GRPCCode() codes.Code {
 	return e.errorCore.GRPCCode()
 }
 
+// Cause is just an accessor for internal e.cause
+func (e *ErrExecution) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
+}
+
 // ErrAlteredNothing is used when an Alter() call changed nothing
 type ErrAlteredNothing struct {
 	*errorCore
@@ -1643,6 +1852,17 @@ func (e *ErrAlteredNothing) GRPCCode() codes.Code {
 	return e.errorCore.GRPCCode()
 }
 
+// Cause is just an accessor for internal e.cause
+func (e *ErrAlteredNothing) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
+}
+
 // ErrUnknown is used when situation is unknown
 type ErrUnknown struct {
 	*errorCore
@@ -1695,4 +1915,15 @@ func (e *ErrUnknown) GRPCCode() codes.Code {
 		return codes.Unknown
 	}
 	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrUnknown) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }

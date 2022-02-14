@@ -3,9 +3,11 @@ package net
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -102,7 +104,7 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	require.EqualValues(t, err, nil)
 	require.EqualValues(t, tries, maxTries)
 
-	// Multiple fail before fail
+	// Multiple fail before fail (retry.StopRetryError)
 	waitfor = retry.Linear(10 * time.Millisecond)
 	timeout = 5 * time.Second
 	callback = func() error {
@@ -116,19 +118,290 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	callback = func() error {
 		tries = tries + 1
 		if tries >= maxTries {
-			return retry.StopRetryError(errors.New("Too much tries"))
+			return fail.AbortedError(errors.New("Too much tries"), "Stop trying")
 		}
 		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
+	// TODO: Here shoudl return fail.ErrAborted but return *fail.ErrorCore
+	//require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAborted")
+	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
+	require.EqualValues(t, tries, maxTries)
+
+	// Multiple fail before fail (retry.ErrTimeout)
+	waitfor = retry.Linear(10 * time.Millisecond)
+	timeout = 5 * time.Second
+	callback = func() error {
+		return nil
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.EqualValues(t, err, nil)
+
+	maxTries = 8
+	tries = 0
+	callback = func() error {
+		tries = tries + 1
+		if tries >= maxTries {
+			return fail.TimeoutError(errors.New("Too much tries"), 30*time.Second, "Stop trying")
+		}
+		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrTimeout")
+	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
+	require.EqualValues(t, tries, maxTries)
+
+	// Multiple fail before fail (any)
+	waitfor = retry.Linear(10 * time.Millisecond)
+	timeout = 5 * time.Second
+	callback = func() error {
+		return nil
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.EqualValues(t, err, nil)
+
+	maxTries = 8
+	tries = 0
+	callback = func() error {
+		tries = tries + 1
+		if tries >= maxTries {
+			return errors.New("Too much tries")
+		}
+		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
+	}
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.errorCore")
 	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
 	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
 	require.EqualValues(t, tries, maxTries)
 
 }
 
-//------------------------------------------------
+func Test_WhileCommunicationUnsuccessfulDelay1Second(t *testing.T) {
+
+	maxTries := 4
+	tries := 0
+	callback := func() error {
+		tries = tries + 1
+		if tries >= maxTries {
+			return nil
+		}
+		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
+	}
+	err := WhileCommunicationUnsuccessfulDelay1Second(callback, 5*time.Second)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxTries)
+
+}
+
+type normalizeErrorTest struct {
+	in  error
+	out string
+}
+
+type NetErrorTemporaryInterface interface {
+	net.Error
+	Timeout() bool
+	Temporary() bool
+}
+type NetErrorTemporary struct {
+	NetErrorTemporaryInterface
+}
+
+func (e *NetErrorTemporary) Timeout() bool {
+	return false
+}
+func (e *NetErrorTemporary) Temporary() bool {
+	return true
+}
+func NewNetErrorTemporary() *NetErrorTemporary {
+	return &NetErrorTemporary{}
+}
+
+func getLocalNetAddr() net.Addr {
+
+	var fallback net.Addr = nil
+	var selected net.Addr = nil
+
+	ifaces, _ := net.Interfaces()
+	for _, iface := range ifaces {
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			if fallback == nil {
+				fallback = addr
+			}
+			if !strings.Contains(addr.String(), "127.0.0.1") &&
+				!strings.Contains(addr.String(), "::1") &&
+				!strings.Contains(addr.String(), "172.17.0.1") &&
+				!strings.Contains(addr.String(), "::ffff:ac11:1") {
+				selected = addr
+				break
+			}
+		}
+		if selected != nil {
+			break
+		}
+	}
+	if selected != nil {
+		return selected
+	}
+	return fallback
+
+}
+
+func Test_normalizeErrorAndCheckIfRetriable2(t *testing.T) {
+
+	addr := getLocalNetAddr()
+
+	tests := []normalizeErrorTest{
+		{
+			in: &url.Error{
+				Op:  "read",
+				URL: "https://nowhere.com",
+				Err: NewRetryableError("URL Target does not exists"), // Temporary = true
+			},
+			out: "*url.Error",
+		},
+		{
+			in: &url.Error{
+				Op:  "read",
+				URL: "https://nowhere.com",
+				Err: errors.New("URL Target does not exists"), // Temporary = false
+			},
+			out: "*fail.ErrAborted",
+		},
+		{
+			in: &net.OpError{
+				Op:     "read",
+				Net:    "tcp",
+				Source: addr,
+				Addr:   addr,
+				Err:    net.Error(syscall.ECONNRESET), // IsConnectionReset = true
+			},
+			out: "*net.OpError",
+		},
+		{
+			in: &net.OpError{
+				Op:     "read",
+				Net:    "tcp",
+				Source: addr,
+				Addr:   addr,
+				Err:    NewRetryableError("URL Target does not exists"), // IsConnectionReset = false, Temporary = true
+			},
+			out: "*net.OpError",
+		},
+		{
+			in: &net.OpError{
+				Op:     "read",
+				Net:    "tcp",
+				Source: addr,
+				Addr:   addr,
+				Err:    errors.New("Any error"), // IsConnectionReset = false, Temporary = false
+			},
+			out: "*fail.ErrAborted",
+		},
+		{
+			in:  net.Error(NewRetryableError("Again buddy, try again !!!")), // Temporary = true
+			out: "*net.RetryableError",
+		},
+		{
+			in:  net.Error(syscall.ECONNRESET), // Temporary = true ? => @TODO: Should not it be consider as retrybable ?
+			out: "*fail.ErrAborted",
+		},
+		{
+			in:  net.Error(syscall.ECONNREFUSED), // Temporary = false
+			out: "*fail.ErrAborted",
+		},
+		{
+			in: fail.NotAvailableErrorWithCause(
+				&url.Error{
+					Op:  "read",
+					URL: "https://nowhere.com",
+					Err: NewRetryableError("URL Target does not exists"), // Temporary = true ? => @TODO: Should not it be consider as retrybable ?
+				},
+				"Any error",
+			),
+			out: "*fail.ErrInvalidRequest",
+		},
+		{
+			in: fail.NotAvailableErrorWithCause(
+				&url.Error{
+					Op:  "read",
+					URL: "https://nowhere.com",
+					Err: errors.New("Any error"), // Temporary = false
+				},
+				"Any error",
+			),
+			out: "*fail.ErrAborted",
+		},
+		{
+			in: fail.NotAvailableErrorWithCause(
+				NewNetErrorTemporary(), // as Net.Error with Temporary = true ? => @TODO: Should not it be consider as retrybable ?
+				nil,
+				"Any error",
+			),
+			out: "*fail.ErrNotAvailable",
+		},
+		{
+			in: fail.NotAvailableErrorWithCause(
+				net.Error(syscall.ECONNREFUSED), // Temporary = false
+				nil,
+				"Any error",
+			),
+			out: "*fail.ErrAborted",
+		},
+		{
+			in: fail.NotAvailableErrorWithCause(
+				fail.NotAvailableError("Any cause"), // Temporary = false
+				nil,
+				"Any error",
+			),
+			out: "*fail.ErrNotAvailable",
+		},
+		{
+			in: fail.NotAvailableErrorWithCause(
+				errors.New("Any cause"), // Temporary = false
+				nil,
+				"Any error",
+			),
+			out: "*fail.ErrAborted",
+		},
+		{
+			in:  errors.New("not found"),
+			out: "*fail.ErrNotFound",
+		},
+		{
+			in:  errors.New("dial tcp:"),
+			out: "*fail.ErrNotAvailable",
+		},
+		{
+			in:  errors.New("EOF"),
+			out: "*fail.ErrNotAvailable",
+		},
+		{
+			in:  errors.New("Any error"),
+			out: "*fail.ErrAborted",
+		},
+	}
+
+	for i := range tests {
+		test := tests[i]
+		result := normalizeErrorAndCheckIfRetriable(test.in)
+
+		if reflect.TypeOf(result).String() != test.out {
+			t.Error(fmt.Sprintf("Invalid normalizeErrorAndCheckIfRetriable convert:\n    expect %s => %s\n    has %s => %s", reflect.TypeOf(test.in).String(), test.out, reflect.TypeOf(test.in).String(), reflect.TypeOf(result).String()))
+			t.Fail()
+		}
+	}
+
+}
+
+//-------------------------------------------------------------------------------------------
 
 type MyError struct {
 	error

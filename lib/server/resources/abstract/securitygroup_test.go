@@ -31,7 +31,12 @@ import (
 )
 
 func TestSecurityGroupRule_IsNull(t *testing.T) {
-	sgr := SecurityGroupRule{}
+	var sgr SecurityGroupRule
+	if !sgr.IsNull() {
+		t.Error("SecurityGroupRule is null")
+		t.Fail()
+	}
+	sgr = SecurityGroupRule{}
 	if !sgr.IsNull() {
 		t.Error("SecurityGroupRule is null")
 		t.Fail()
