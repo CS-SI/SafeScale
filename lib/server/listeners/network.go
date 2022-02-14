@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 )
@@ -57,14 +56,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	networkName := in.GetName()
@@ -181,14 +172,6 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/networks/list")
 	if xerr != nil {
 		return nil, xerr
@@ -234,14 +217,6 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -281,14 +256,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref, refLabel := srvutils.GetReference(in)

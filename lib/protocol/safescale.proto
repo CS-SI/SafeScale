@@ -375,6 +375,9 @@ enum HostState {
 	HS_ERROR = 4; 			// host is in error state
 	HS_TERMINATED = 5; 	// host is terminated (in AWS, it's like DELETED)
 	HS_UNKNOWN = 6; 		// status is unknown
+	HS_ANY = 7; 		// status is unknown
+	HS_FAILED = 8; 		// status is unknown
+	HS_DELETED = 9; 		// status is unknown
 }
 
 message Host {

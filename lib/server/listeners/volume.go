@@ -28,7 +28,6 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -60,14 +59,6 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/volumes/list")
@@ -116,14 +107,6 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/create", name))
 	if xerr != nil {
@@ -160,14 +143,6 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -226,14 +201,6 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
@@ -282,14 +249,6 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -326,14 +285,6 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/inspect", ref))

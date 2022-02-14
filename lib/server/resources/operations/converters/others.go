@@ -258,6 +258,9 @@ func newSizingToken() *sizingToken {
 
 // Push sets an item of the token based on its current content
 func (t *sizingToken) Push(item string) fail.Error {
+	if t == nil {
+		return fail.InconsistentError("sizingToken is nil")
+	}
 	if t.IsFull() {
 		return fail.NotAvailableError("token is full")
 	}
@@ -270,7 +273,7 @@ func (t *sizingToken) Push(item string) fail.Error {
 
 // IsFull tells if the token is full
 func (t *sizingToken) IsFull() bool {
-	return t.pos >= 3
+	return t != nil && t.pos >= 3
 }
 
 // GetKeyword returns the keyword member of the token (pos == 0)
@@ -283,7 +286,7 @@ func (t *sizingToken) GetKeyword() (string, fail.Error) {
 
 // GetOperator returns the operator member of the token (pos == 1)
 func (t *sizingToken) GetOperator() (string, fail.Error) {
-	if t.pos > 1 {
+	if t != nil && t.pos > 1 {
 		return t.members[1], nil
 	}
 	return "", fail.InvalidRequestError("operator is not set in token")
@@ -299,6 +302,9 @@ func (t *sizingToken) GetValue() (string, fail.Error) {
 
 // String returns a string representing the token
 func (t *sizingToken) String() string {
+	if t == nil {
+		return ""
+	}
 	return strings.Join(t.members, " ")
 }
 

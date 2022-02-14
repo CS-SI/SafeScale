@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -53,14 +52,6 @@ func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/clusters/list")
@@ -94,14 +85,6 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -159,14 +142,6 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/state", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -205,14 +180,6 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref, _ := srvutils.GetReference(in)
@@ -256,14 +223,6 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -303,14 +262,6 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -344,14 +295,6 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref := in.GetName()
@@ -391,14 +334,6 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref := in.GetName()
@@ -466,14 +401,6 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -533,14 +460,6 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -593,14 +512,6 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	clusterName := in.GetName()
@@ -666,14 +577,6 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -726,14 +629,6 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	clusterName := in.GetName()
@@ -798,14 +693,6 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -866,14 +753,6 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	clusterName := in.GetName()
@@ -942,14 +821,6 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	clusterName, _ := srvutils.GetReference(in)
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -997,14 +868,6 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	clusterName, _ := srvutils.GetReference(in)
@@ -1055,14 +918,6 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	clusterName := in.GetName()
@@ -1132,14 +987,6 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return empty, fail.InvalidRequestError("cluster name is missing")
@@ -1203,14 +1050,6 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -1271,14 +1110,6 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	clusterName := in.GetName()
