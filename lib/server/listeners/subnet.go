@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -65,14 +64,6 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
@@ -162,14 +153,6 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "/subnets/list")
 	if xerr != nil {
 		return nil, xerr
@@ -234,14 +217,6 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
@@ -283,14 +258,6 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -382,14 +349,6 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
@@ -457,14 +416,6 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -541,14 +492,6 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
@@ -610,14 +553,6 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
@@ -676,14 +611,6 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())

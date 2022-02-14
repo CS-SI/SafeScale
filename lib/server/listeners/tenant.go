@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -49,14 +48,6 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -86,14 +77,6 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -132,14 +115,6 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	defer fail.OnExitLogError(&err)
 
 	xerr := operations.SetCurrentTenant(in.GetName())
@@ -164,14 +139,6 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -245,14 +212,6 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
 	if xerr != nil {
@@ -286,14 +245,6 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()

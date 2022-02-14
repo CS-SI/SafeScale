@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -60,14 +59,6 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	shareName := in.GetName()
@@ -131,14 +122,6 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	shareName := in.GetName()
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/share/%s/delete", shareName))
 	if xerr != nil {
@@ -175,14 +158,6 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/shares/list")
@@ -227,14 +202,6 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
@@ -274,14 +241,6 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
@@ -317,14 +276,6 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	shareRef, _ := srvutils.GetReference(in)

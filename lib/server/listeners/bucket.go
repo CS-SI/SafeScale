@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -53,14 +52,6 @@ func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListReques
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, "", "/buckets/list")
@@ -98,14 +89,6 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.BucketRequest)
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	bucketName := in.GetName()
 	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/create", bucketName))
 	if xerr != nil {
@@ -141,14 +124,6 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.BucketRequest)
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	bucketName := in.GetName()
 	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/delete", bucketName))
 	if xerr != nil {
@@ -176,14 +151,6 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.BucketRequest
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -227,14 +194,6 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountRequ
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
 	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
@@ -264,14 +223,6 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountRe
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetBucket()

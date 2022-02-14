@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -93,14 +92,6 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -147,14 +138,6 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -198,14 +181,6 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host%s/reboot", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -242,14 +217,6 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/hosts/list")
@@ -293,14 +260,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -445,14 +404,6 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/resize", name))
 	if xerr != nil {
@@ -532,14 +483,6 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
@@ -598,14 +541,6 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -660,14 +595,6 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
@@ -714,14 +641,6 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -762,14 +681,6 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -839,14 +750,6 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
@@ -901,14 +804,6 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -969,14 +864,6 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -1057,14 +944,6 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())

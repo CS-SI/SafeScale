@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 )
 
 // safescale image list --all=false
@@ -47,14 +46,6 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/images/list")

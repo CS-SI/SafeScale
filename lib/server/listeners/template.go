@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/asaskevich/govalidator"
 	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/sirupsen/logrus"
 
@@ -50,14 +49,6 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/templates/list")
@@ -161,14 +152,6 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/template/match")
 	if xerr != nil {
 		return nil, xerr
@@ -211,14 +194,6 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref, _ := srvutils.GetReference(in.GetTemplate())

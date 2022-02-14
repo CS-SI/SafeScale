@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -110,14 +109,6 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	uuid := in.Uuid
 	if in.Uuid == "" {
 		return empty, fail.InvalidRequestError("cannot stop job: job id not set")
@@ -159,14 +150,6 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	task, xerr := concurrency.NewTaskWithContext(ctx)

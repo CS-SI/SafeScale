@@ -23,7 +23,6 @@ import (
 
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -52,14 +51,6 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, "", "/securitygroups/list")
@@ -100,14 +91,6 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -166,14 +149,6 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	// FIXME: networkRef is missing to locate security group if name is provided
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -222,14 +197,6 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -276,14 +243,6 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	// FIXME: networkRef missing if security group is provided by name
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -324,14 +283,6 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	// FIXME: networkRef missing if security group is provided by name
@@ -377,14 +328,6 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	sgRef, sgRefLabel := srvutils.GetReference(in.Group)
@@ -436,14 +379,6 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref, refLabel := srvutils.GetReference(in.GetGroup())
@@ -498,14 +433,6 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -538,14 +465,6 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, verr := govalidator.ValidateStruct(in)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref, refLabel := srvutils.GetReference(in.GetTarget())
