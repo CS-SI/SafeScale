@@ -1433,7 +1433,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// 2nd, check host status every 5 seconds until check failed.
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error is not 'not found', retry
-			var state hoststate.Enum = hoststate.Unknown
+			var state = hoststate.Unknown
 			innerXErr := retry.WhileUnsuccessful(
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
@@ -1497,7 +1497,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
-	// Removes ports freed from host
+	// Remove ports freed from host
 	var errors []error
 	for _, v := range portList {
 		if derr := s.rpcDeletePort(v.ID); derr != nil {

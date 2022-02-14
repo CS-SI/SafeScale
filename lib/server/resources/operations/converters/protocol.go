@@ -254,6 +254,14 @@ func HostStateFromProtocolToEnum(in protocol.HostState) hoststate.Enum {
 		return hoststate.Error
 	case protocol.HostState_HS_TERMINATED:
 		return hoststate.Terminated
+	case protocol.HostState_HS_UNKNOWN:
+		return hoststate.Unknown
+	case protocol.HostState_HS_ANY:
+		return hoststate.Any
+	case protocol.HostState_HS_FAILED:
+		return hoststate.Failed
+	case protocol.HostState_HS_DELETED:
+		return hoststate.Deleted
 	}
 	return hoststate.Unknown
 }
