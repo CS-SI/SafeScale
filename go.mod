@@ -1,4 +1,4 @@
-module github.com/CS-SI/SafeScale
+module github.com/CS-SI/SafeScale/v21
 
 go 1.16
 
