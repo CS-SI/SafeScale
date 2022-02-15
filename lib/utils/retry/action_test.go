@@ -17,7 +17,10 @@
 package retry
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -30,6 +33,321 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
+
+func logrus_capture(routine func()) string {
+
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	logrus.SetOutput(w)
+
+	routine()
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+	return string(out)
+
+}
+
+func Test_Action(t *testing.T) {
+
+	var (
+		run func() error = func() (nested error) {
+			return nil
+		}
+		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
+		first   func() error = func() (nested error) {
+			return nil
+		}
+		last func() error = func() (nested error) {
+			return nil
+		}
+		notify Notify
+	)
+
+	err := Action(nil, arbiter, officer, first, last, notify)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter run"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+
+	err = Action(run, nil, officer, first, last, notify)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter arbiter"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+
+	err = Action(run, arbiter, nil, first, last, notify)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter officer"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+
+	err = Action(run, arbiter, officer, first, last, notify)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_TimeoutSelector(t *testing.T) {
+
+	f := TimeoutSelector(false)
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	f = TimeoutSelector(true)
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+}
+
+func Test_DefaultTimeoutSelector(t *testing.T) {
+
+	f := DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Hard")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Soft")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Banana!")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+}
+
+func Test_BackoffSelector(t *testing.T) {
+
+	backoff := BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Constant")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Incremental")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Linear")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Exponential")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Fibonacci")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Banana!")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+}
+
+func Test_WhileUnsuccessful(t *testing.T) {
+
+	// no waitfor
+	maxtries := 5
+	tries := 0
+	err := WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+	maxtries = 5
+	tries = 0
+	err = WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+}
+
+func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
+
+	log := logrus_capture(func() {
+		err := WhileUnsuccessfulWithLimitedRetries(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			3,
+		)
+		require.EqualValues(t, err, nil)
+	})
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		3,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		3,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		0,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		3,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		0,
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
+
+	log := logrus_capture(func() {
+		err := WhileUnsuccessfulWithHardTimeout(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+		)
+		require.EqualValues(t, err, nil)
+	})
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithHardTimeout(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Second,
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
+
+	var notify Notify = DefaultNotifier()
+
+	log := logrus_capture(func() {
+		err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			notify,
+		)
+		require.EqualValues(t, err, nil)
+	})
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		notify,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		notify,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		notify,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		notify,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		notify,
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+// --------------------------------------------------------------------------------------------------------
 
 func quickSleepy() error {
 	fmt.Println("Quick OK")
