@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pengux/check"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -408,7 +409,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 		return nullAS, fail.DuplicateError("subnet '%s' already exists", req.Name)
 	}
 
-	if ok, xerr := validateNetworkName(req.NetworkID); !ok {
+	if ok, xerr := validateNetwork(req); !ok {
 		return nullAS, fail.Wrap(xerr, "network name '%s' invalid", req.Name)
 	}
 
@@ -459,27 +460,16 @@ func (s stack) validateCIDR(req *abstract.SubnetRequest, network *abstract.Netwo
 	return nil
 }
 
-// validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
-func validateNetworkName(name string) (bool, fail.Error) {
-	type checker struct{ Name string }
-	s := check.Struct{
-		"Name": check.Composite{
-			check.NonEmpty{},
-			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{Constraint: 64},
-		},
+// validateNetwork validates the name of a Network based on known FlexibleEngine requirements
+func validateNetwork(req abstract.SubnetRequest) (bool, fail.Error) {
+	err := validation.ValidateStruct(&req,
+		validation.Field(&req.Name, validation.Required, validation.Length(1, 64)),
+		validation.Field(&req.Name, validation.Required, validation.Match(regexp.MustCompile(`^[a-zA-Z0-9_-]+$`))),
+	)
+	if err != nil {
+		return false, fail.Wrap(err, "validation issue")
 	}
 
-	c := checker{Name: name}
-	e := s.Validate(c)
-	if e.HasErrors() {
-		errors, _ := e.GetErrorsByKey("Name")
-		var errs []string
-		for _, msg := range errors {
-			errs = append(errs, msg.Error())
-		}
-		return false, fail.NewError(strings.Join(errs, "; "))
-	}
 	return true, nil
 }
 

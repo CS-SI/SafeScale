@@ -14,26 +14,34 @@
  * limitations under the License.
  */
 
-package template
+package valid
 
 import (
-	txttmpl "text/template"
+	"net"
+	"regexp"
+	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/Masterminds/sprig/v3"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
-// Parse returns a text template with default funcs declared
-func Parse(title, content string) (*txttmpl.Template, fail.Error) {
-	if title == "" {
-		return nil, fail.InvalidParameterError("title", "cannot be empty string")
-	}
-	if content == "" {
-		return nil, fail.InvalidParameterError("content", "cannot be empty string")
-	}
-	r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Parse(content)
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
-	return r, nil
+func IsIP(data string) bool {
+	return net.ParseIP(data) != nil
+}
+
+func IsIPv4(data string) bool {
+	ip := net.ParseIP(data)
+	return ip != nil && strings.Contains(data, ".")
+}
+
+func IsIPv6(data string) bool {
+	ip := net.ParseIP(data)
+	return ip != nil && strings.Contains(data, ":")
+}
+
+func IsAlphanumericWithDashesAndUnderscores(data string) bool {
+	err := validation.Validate(data,
+		validation.Required.Error("is required"),
+		validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$")),
+	)
+	return err == nil
 }
