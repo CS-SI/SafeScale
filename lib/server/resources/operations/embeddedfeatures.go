@@ -21,13 +21,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 //go:generate rice embed-go

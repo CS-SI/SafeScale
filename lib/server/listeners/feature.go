@@ -22,20 +22,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	// "github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
-	featurefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/feature"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
+	featurefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/feature"
+	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // FeatureListener feature service server grpc

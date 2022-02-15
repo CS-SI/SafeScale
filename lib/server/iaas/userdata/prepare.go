@@ -31,14 +31,14 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -266,7 +266,6 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 			return nil, fail.NewError("error loading template for phase %s", phase)
 		}
 	} else {
-
 		box, err = rice.FindBox("../userdata/scripts")
 		if err != nil {
 			return nil, fail.ConvertError(err)

@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Shielded allows to store data with controlled access to it

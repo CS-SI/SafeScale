@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
 )
 
 func TestDefaults_Clone(t *testing.T) {

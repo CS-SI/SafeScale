@@ -31,8 +31,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit. In et nulla eros. Ut pharetra, arcu at bibendum ullamcorper, leo magna condimentum leo, at rhoncus dui turpis vel ante. Curabitur ac leo vel massa pretium maximus. In sed gravida felis. Etiam lacinia, sem at sollicitudin tempus, tortor dolor porta leo, ut suscipit ex mi eget eros. Praesent id ultricies metus. Morbi condimentum placerat elementum. Morbi et sem ligula.

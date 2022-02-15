@@ -26,7 +26,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 // tracer ...

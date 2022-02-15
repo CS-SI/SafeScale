@@ -20,7 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
 // ErrorList ...

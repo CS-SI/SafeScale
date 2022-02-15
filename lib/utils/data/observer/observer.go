@@ -17,7 +17,7 @@
 package observer
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/lib/utils/data/observer.Observer -o ../mocks/mock_observer.go

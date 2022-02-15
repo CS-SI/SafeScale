@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"os"
 
-	datadef "github.com/CS-SI/SafeScale/lib/utils/data"
+	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 // HostParameter can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull

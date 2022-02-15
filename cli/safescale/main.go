@@ -29,20 +29,20 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
-	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-	app2 "github.com/CS-SI/SafeScale/lib/utils/app"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/client"
+	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
-	_ "github.com/CS-SI/SafeScale/lib/server"
+	_ "github.com/CS-SI/SafeScale/v21/lib/server"
 )
 
 var profileCloseFunc = func() {}

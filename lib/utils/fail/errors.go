@@ -27,10 +27,10 @@ import (
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 // consequencer is the interface exposing the methods manipulating consequences

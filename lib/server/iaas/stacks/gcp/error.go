@@ -25,8 +25,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 
 	"google.golang.org/api/googleapi"
 )

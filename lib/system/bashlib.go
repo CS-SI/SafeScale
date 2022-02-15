@@ -24,9 +24,9 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
