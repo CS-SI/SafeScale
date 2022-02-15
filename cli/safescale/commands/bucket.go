@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,8 @@ var bucketList = &cli.Command{
 			Usage:   "List all Buckets on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -77,7 +78,8 @@ var bucketCreate = &cli.Command{
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -89,7 +91,7 @@ var bucketCreate = &cli.Command{
 			return clitools.FailureResponse(xerr)
 		}
 
-		err := clientSession.Bucket.Create(c.Args().Get(0), temporal.GetExecutionTimeout())
+		err := clientSession.Bucket.Create(c.Args().Get(0), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of bucket", true).Error())))
@@ -103,7 +105,8 @@ var bucketDelete = &cli.Command{
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Remove a bucket",
 	ArgsUsage: "BUCKET_NAME [BUCKET_NAME...]",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -119,7 +122,7 @@ var bucketDelete = &cli.Command{
 			return clitools.FailureResponse(xerr)
 		}
 
-		err := clientSession.Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
+		err := clientSession.Bucket.Delete(bucketList, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
@@ -133,7 +136,8 @@ var bucketInspect = &cli.Command{
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -145,7 +149,7 @@ var bucketInspect = &cli.Command{
 			return clitools.FailureResponse(xerr)
 		}
 
-		resp, err := clientSession.Bucket.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
+		resp, err := clientSession.Bucket.Inspect(c.Args().Get(0), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
@@ -165,7 +169,8 @@ var bucketMount = &cli.Command{
 			Usage: "Mount point of the bucket",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		switch c.NArg() {
 		case 0:
@@ -182,7 +187,7 @@ var bucketMount = &cli.Command{
 			return clitools.FailureResponse(xerr)
 		}
 
-		err := clientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout())
+		err := clientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "mount of bucket", true).Error())))
@@ -196,7 +201,8 @@ var bucketUnmount = &cli.Command{
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a Bucket from the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		switch c.NArg() {
 		case 0:
@@ -213,7 +219,7 @@ var bucketUnmount = &cli.Command{
 			return clitools.FailureResponse(xerr)
 		}
 
-		err := clientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
+		err := clientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unmount of bucket", true).Error())))

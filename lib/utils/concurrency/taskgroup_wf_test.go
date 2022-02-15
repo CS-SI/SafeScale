@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -681,7 +681,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 
-	cause := fail.RootCause(err) // FIXME: DATA RACE
+	cause := fail.RootCause(err)
 	if cause == nil {
 		t.FailNow()
 	}
@@ -1076,10 +1076,10 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		require.NotNil(t, xerr)
 		end := time.Since(begin)
 
-		if end >= (time.Millisecond * 200) { // this is 4x the maximum time...
+		if end >= (time.Millisecond * 300) { // this is 6x the maximum time...
 			t.Logf("Abort() lasted %v\n", end)
 			t.Logf("Wait() lasted %v\n", end)
-			t.Errorf("It should have finished near 200 ms but it didn't!!")
+			t.Errorf("It should have finished near 300 ms but it didn't!!")
 			t.FailNow()
 		}
 	}

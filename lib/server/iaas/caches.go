@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -72,7 +72,7 @@ func NewResourceCache(name string) (*ResourceCache, fail.Error) {
 
 	cacheInstance, xerr := cache.NewCache(name)
 	if xerr != nil {
-		return &ResourceCache{}, nil
+		return &ResourceCache{}, xerr
 	}
 
 	rc := &ResourceCache{
@@ -113,13 +113,13 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				var ok bool
 				onMissFunc, ok = v.Value().(func() (cache.Cacheable, fail.Error))
 				if !ok {
-					logrus.Warnf("unable to set onMissFunc because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+					return nil, fail.InconsistentError("unable to set onMissFunc because of wrong cast: %v", v.Value())
 				}
 			case cacheOptionOnMissTimeoutKeyword:
 				var ok bool
 				onMissTimeout, ok = v.Value().(time.Duration)
 				if !ok {
-					logrus.Warnf("unable to set onMissTimeout because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+					return nil, fail.InconsistentError("unable to set onMissTimeout because of wrong cast: %v", v.Value())
 				}
 			default:
 			}
@@ -135,7 +135,13 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// Search in the cache by ID
-					if ce, xerr = instance.byID.Entry(key); xerr == nil {
+					var nilErrNotFound *fail.ErrNotFound = nil // nolint
+					ce, xerr = instance.byID.Entry(key)
+					if xerr != nil && xerr != nilErrNotFound {
+						if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
+							return nil, xerr
+						}
+					} else {
 						return ce, nil
 					}
 
@@ -145,10 +151,12 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 					if id, ok := instance.byName[key]; ok {
 						ce, xerr = instance.byID.Entry(id)
-						if xerr == nil {
-							return ce, nil
+						if xerr != nil {
+							return nil, xerr
 						}
+						return ce, nil
 					}
+
 					return nil, xerr
 				default:
 					return nil, xerr
@@ -156,15 +164,22 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 			}
 
 			var content cache.Cacheable
-			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = instance.CommitEntry(key, content)
-			}
+			content, xerr = onMissFunc()
 			if xerr != nil {
 				if derr := instance.FreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
 			}
+
+			ce, xerr = instance.CommitEntry(key, content)
+			if xerr != nil {
+				if derr := instance.FreeEntry(key); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
+				}
+				return nil, xerr
+			}
+
 			return ce, nil
 		}
 	}
@@ -180,12 +195,16 @@ func (instance *ResourceCache) loadEntry(key string) (*cache.Entry, bool) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if ce, xerr := instance.byID.Entry(key); xerr == nil {
+	if ce, xerr := instance.byID.Entry(key); xerr != nil {
+		debug.IgnoreError(xerr)
+	} else {
 		return ce, true
 	}
 
 	if id, ok := instance.byName[key]; ok {
-		if ce, xerr := instance.byID.Entry(id); xerr == nil {
+		if ce, xerr := instance.byID.Entry(id); xerr != nil {
+			debug.IgnoreError(xerr)
+		} else {
 			return ce, true
 		}
 	}

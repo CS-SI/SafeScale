@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -36,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
@@ -79,7 +79,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(host.Service().Timings())
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		return xerr
@@ -135,15 +135,15 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 	xerr = retry.Action(
 		func() (innerXErr error) {
-			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetBigDelay())
+			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().ExecutionTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetContextTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(host.Service().Timings().ContextTimeout(), host.Service().Timings().ConnectionTimeout()+host.Service().Timings().ExecutionTimeout()))),
+		retry.Constant(host.Service().Timings().NormalDelay()),
 		nil, nil, nil,
 	)
 	if xerr != nil {
@@ -193,15 +193,16 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		// log the faulty data
-		logrus.Debugf("failure to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
-		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered values", name)
+		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
 		return "", xerr
 	}
 	content := buffer.String()
 	return content, nil
 }
 
-func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host resources.Host) (string, fail.Error) {
+func uploadContentToFile(
+	ctx context.Context, content, name, owner, rights string, host resources.Host,
+) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
 	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
@@ -215,10 +216,11 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	}()
 
 	// TODO: This is not Windows friendly
+	svc := host.Service()
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, temporal.GetOperationTimeout())
+			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, svc.Timings().OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")
 			}
@@ -230,8 +232,8 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostTimeout(),
+		svc.Timings().NormalDelay(),
+		svc.Timings().HostOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

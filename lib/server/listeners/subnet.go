@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -67,12 +66,6 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
@@ -160,13 +153,6 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "/subnets/list")
 	if xerr != nil {
 		return nil, xerr
@@ -175,7 +161,7 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%v, %v)", in.Network, in.All).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	var networkID string
 	networkRef, _ := srvutils.GetReference(in.Network)
@@ -186,9 +172,10 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		}
 		if withDefaultNetwork {
 			an, xerr := job.Service().GetDefaultNetwork()
-			if xerr == nil {
-				networkID = an.ID
+			if xerr != nil {
+				return nil, xerr
 			}
+			networkID = an.ID
 		}
 	} else {
 		networkInstance, xerr := networkfactory.Load(job.Service(), networkRef)
@@ -228,13 +215,6 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -280,13 +260,6 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
@@ -310,20 +283,39 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		subnetID        string
 	)
 	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
-	if xerr == nil {
-		subnetID = subnetInstance.GetID()
-		networkInstance, xerr = subnetInstance.InspectNetwork()
-		if xerr == nil {
-			xerr = subnetInstance.Delete(job.Context())
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider a Subnet not found as a job done
+			debug.IgnoreError(xerr)
+			return empty, nil
+		default:
+			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
 	}
+	clean := true
+	subnetID = subnetInstance.GetID()
+	networkInstance, xerr = subnetInstance.InspectNetwork()
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Subnet not found as a successful deletion
 			debug.IgnoreError(xerr)
+			clean = false
 		default:
 			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		}
+	}
+	if clean {
+		xerr = subnetInstance.Delete(job.Context())
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// consider a Subnet not found as a job done
+				debug.IgnoreError(xerr)
+			default:
+				return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			}
 		}
 	}
 
@@ -355,10 +347,6 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -430,11 +418,6 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Networking")
@@ -470,10 +453,6 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 
 	var subnetInstance resources.Subnet
 	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
-	if xerr == nil {
-		defer subnetInstance.Released()
-		xerr = subnetInstance.UnbindSecurityGroup(job.Context(), sgInstance)
-	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -486,6 +465,13 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 			return empty, xerr
 		}
 	}
+
+	defer subnetInstance.Released()
+	xerr = subnetInstance.UnbindSecurityGroup(job.Context(), sgInstance)
+	if xerr != nil {
+		return empty, xerr
+	}
+
 	return empty, nil
 }
 
@@ -504,10 +490,6 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -571,11 +553,6 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
@@ -634,11 +611,6 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -172,17 +172,19 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		return nil, fail.ConvertError(err)
 	}
 
+	// Note: if timings have to be tuned, update stack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "outscale",
+		FullStack: stack,
+		Name:      "outscale",
 	}
 
 	p.Stack = wrapped
 	p.tenantParameters = opt
 
 	wp := providers.ProviderProxy{
-		InnerProvider: p,
-		Name:          wrapped.Name,
+		Provider: p,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -281,7 +283,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice, nil
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -291,7 +293,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

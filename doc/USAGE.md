@@ -36,7 +36,7 @@ SafeScale is composed of 2 parts:
 
 ## <a name="safescaled">safescaled</a>
 
-`safescaled` is a daemon and you only need to launch it on your own computer.
+`safescaled` is the daemon you need to launch on your own computer.
 The purpose of this daemon is to execute requests ordered by `safescale` client on the providers.
 <br>
 It is composed internally of 2 layers:

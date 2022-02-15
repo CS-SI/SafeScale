@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
@@ -38,6 +39,8 @@ type stack struct {
 	ComputeService *compute.Service
 
 	selfLinkPrefix string
+
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -96,5 +99,19 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
+	gcpStack.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+
 	return gcpStack, nil
+}
+
+// Timings returns the instance containing current timing (timeouts, delays) settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

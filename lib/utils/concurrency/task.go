@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ type TaskResult interface{}
 // TaskAction defines the type of the function that can be started by a Task.
 // NOTE: you have to check if task is aborted inside this function using method t.ErrAborted(),
 //       to be able to stop the process when task is aborted (no matter what
-//       the abort reason is), and permit to end properly. Otherwise this may lead to goroutine leak
+//       the abort reason is), and permit ending properly. Otherwise, this may lead to goroutine leak
 //       (there is no good way to stop forcibly a goroutine).
 // Example:
 // task.Start(func(task concurrency.Task, p TaskParameters) (concurrency.TaskResult, fail.Error) {
@@ -311,7 +311,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	return instance, nil
 }
 
-// IsNull ...
+// IsNull checks if task is not initialized
 func (instance *task) IsNull() bool {
 	if instance == nil {
 		return true
@@ -458,7 +458,7 @@ func (instance *task) Start(action TaskAction, params TaskParameters, options ..
 
 // StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
 // If timeout happens, error returned will be '*fail.ErrTimeout'
-func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, _ ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -482,6 +482,14 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 			instance.lock.Unlock() // nolint
 
 			go func() {
+				var crash error
+				defer func() {
+					if crash != nil { // if instance.controller panics
+						instance.err = fail.Wrap(crash, "panic running controller method")
+					}
+				}()
+				defer fail.OnPanic(&crash)
+
 				ctrlErr := instance.controller(action, params, timeout)
 
 				instance.lock.Lock()
@@ -527,7 +535,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 	instance.stats.controllerBegin = time.Now()
 	instance.lock.Unlock() // nolint
 
-	go func() { // FIXME: this goroutine is isolated from the rest, what happens if run PANICS ?
+	go func() {
 		var failure error
 		defer fail.OnPanic(&failure) // this prevents the os.Exit, but we lack communication outside the func -> the task will be unaware
 
@@ -819,8 +827,6 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			fallthrough
 		case DONE:
 			// do nothing
-			break
-
 		case READY: // abnormal status if controller is running
 			fallthrough
 		case UNKNOWN: // by definition, this status is invalid
@@ -833,7 +839,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 }
 
 // processTerminated operates when go routine terminates
-func (instance *task) processTerminated(traceR *tracer) {
+func (instance *task) processTerminated(_ *tracer) {
 	instance.lock.Lock()
 	instance.stats.controllerDuration = time.Since(instance.stats.controllerBegin)
 	instance.controllerTerminated = true
@@ -844,7 +850,7 @@ func (instance *task) processTerminated(traceR *tracer) {
 }
 
 // processAbort operates when Abort has been requested
-func (instance *task) processAbort(traceR *tracer) fail.Error {
+func (instance *task) processAbort(_ *tracer) fail.Error {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
@@ -1079,8 +1085,10 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				//goland:noinspection GoDeferInLoop
 				defer instance.lock.Unlock() // Note: we can defer here, we will abort the loop
 
-				if instance.ctx.Err() != nil && instance.err == nil {
-					instance.err = fail.AbortedError(instance.ctx.Err())
+				if instance.ctx.Err() != nil {
+					if instance.err == nil {
+						instance.err = fail.AbortedError(instance.ctx.Err())
+					}
 				}
 				return instance.result, instance.err
 			}
@@ -1225,8 +1233,8 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 
 			select {
 			case <-doneWaitingCh:
-				result, xerr := instance.Wait()
-				return true, result, xerr
+				result, iwerr := instance.Wait()
+				return true, result, iwerr
 
 			case <-time.After(duration):
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
@@ -1347,7 +1355,6 @@ func (instance *task) forceAbort() {
 	case UNKNOWN:
 		fallthrough
 	default:
-		break
 	}
 }
 

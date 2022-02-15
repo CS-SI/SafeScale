@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // safescale ssh connect host2
@@ -56,11 +52,6 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	hostRef := in.GetHost().GetName()
@@ -92,7 +83,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	defer hostInstance.Released()
 
 	retcode, stdout, stderr, xerr := hostInstance.Run(
-		job.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
+		job.Context(), command, outputs.COLLECT, job.Service().Timings().ConnectionTimeout(), job.Service().Timings().ExecutionTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -118,11 +109,6 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	var (
@@ -180,11 +166,11 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	if pull {
 		retcode, stdout, stderr, xerr = hostInstance.Pull(
-			job.Context(), hostPath, localPath, temporal.GetLongOperationTimeout(),
+			job.Context(), hostPath, localPath, job.Service().Timings().HostLongOperationTimeout(),
 		)
 	} else {
 		retcode, stdout, stderr, xerr = hostInstance.Push(
-			job.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout(),
+			job.Context(), localPath, hostPath, in.Owner, in.Mode, job.Service().Timings().HostLongOperationTimeout(),
 		)
 	}
 	if xerr != nil {

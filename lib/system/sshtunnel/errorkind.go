@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ func lastUnwrap(in error) (err error) {
 
 func convertErrorToTunnelError(inErr error) (err error) {
 	if inErr == nil {
-		return inErr
+		return nil
 	}
 
 	if _, ok := inErr.(tunnelError); ok {

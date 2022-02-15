@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ func Annotate(err error, key string, content interface{}) Error {
 	return nil
 }
 
-// IsGRPCTimeout tells if the err is a ImplTimeout kind
+// IsGRPCTimeout tells if 'err' is a ImplTimeout kind
 func IsGRPCTimeout(err error) bool {
 	if err == nil {
 		return false
@@ -82,13 +82,14 @@ func IsGRPCTimeout(err error) bool {
 	return code == codes.DeadlineExceeded
 }
 
-// IsGRPCError tells if the err is of GRPC kind
+// IsGRPCError tells if 'err' is of GRPC kind
 func IsGRPCError(err error) bool {
-	if err == nil {
-		return false
+	if err != nil {
+		_, ok := grpcstatus.FromError(err)
+		return ok
 	}
-	_, ok := grpcstatus.FromError(err)
-	return ok
+
+	return false
 }
 
 // FromGRPCStatus translates GRPC status to error
@@ -226,6 +227,18 @@ func Cause(err error) (resp error) {
 
 		return err
 	}
+
+	if u, ok := err.(interface {
+		Unwrap() error
+	}); ok {
+		cau := u.Unwrap()
+		if cau != nil {
+			return cau
+		}
+
+		return err
+	}
+
 	return err
 }
 
@@ -235,7 +248,7 @@ func ConvertError(err error) Error {
 		if casted, ok := err.(Error); ok {
 			return casted
 		}
-		return NewErrorWithCause(err, err.Error())
+		return NewErrorWithCause(Cause(err), err.Error())
 	}
 	return nil
 }

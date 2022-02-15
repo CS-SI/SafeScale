@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,8 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -53,10 +52,6 @@ func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/clusters/list")
@@ -92,10 +87,6 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/create", name))
 	if xerr != nil {
@@ -107,7 +98,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.New(job.Service())
+	instance, xerr := clusterfactory.New(job.Context(), job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -151,10 +142,6 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/state", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -165,7 +152,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -195,10 +182,6 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -214,7 +197,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -240,10 +223,6 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -254,7 +233,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -263,7 +242,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	return empty, instance.Start(job.Context())
 }
 
-// Stop shutdowns a entire cluster (including the gateways)
+// Stop shutdowns an entire cluster (including the gateways)
 func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop cluster")
@@ -283,10 +262,6 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -297,7 +272,7 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -322,9 +297,6 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
 	ref := in.GetName()
 	if ref == "" {
 		return empty, fail.InvalidRequestError("cluster name is missing")
@@ -340,7 +312,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -362,10 +334,6 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	ref := in.GetName()
@@ -392,13 +360,14 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		sizing.Image = in.GetImageId()
 	}
 
-	instance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer instance.Released()
 
-	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, in.GetKeepOnFailure())
+	// Instructs to add nodes
+	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, operations.ExtractFeatureParameters(in.GetParameters()), in.GetKeepOnFailure())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -432,10 +401,6 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -451,7 +416,7 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -495,10 +460,6 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -514,7 +475,7 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -553,10 +514,6 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -579,7 +536,7 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -620,10 +577,6 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -642,7 +595,7 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -678,10 +631,6 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return empty, fail.InvalidRequestError("cluster name is missing")
@@ -703,7 +652,7 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -744,10 +693,6 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -769,7 +714,7 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -810,10 +755,6 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -835,7 +776,7 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -880,10 +821,6 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName, _ := srvutils.GetReference(in)
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -899,7 +836,7 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -933,10 +870,6 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName, _ := srvutils.GetReference(in)
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -952,7 +885,7 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -987,10 +920,6 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -1012,7 +941,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1058,10 +987,6 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return empty, fail.InvalidRequestError("cluster name is missing")
@@ -1083,7 +1008,7 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -1125,10 +1050,6 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -1150,7 +1071,7 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -1191,10 +1112,6 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	clusterName := in.GetName()
 	if clusterName == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
@@ -1216,7 +1133,7 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}

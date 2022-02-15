@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import (
 
 	// "github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	// propsv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 )
 
@@ -100,8 +99,8 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetDefaultDelay(),
+			s.Timings().SmallDelay(),
+			s.Timings().OperationTimeout(),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -410,17 +409,17 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 	if IsOperation(resp, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
-				resp, innerXErr := s.rpcDescribeSubnetByID(resp.SubnetId)
+				descr, innerXErr := s.rpcDescribeSubnetByID(resp.SubnetId)
 				if innerXErr != nil {
 					return innerXErr
 				}
-				if aws.StringValue(resp.State) != "available" {
-					return fail.NewError("not ready (state = '%s')", resp.State)
+				if aws.StringValue(descr.State) != "available" {
+					return fail.NewError("not ready (state = '%s')", descr.State)
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetDefaultDelay(),
+			s.Timings().SmallDelay(),
+			s.Timings().OperationTimeout(),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -524,7 +523,7 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 			resp, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		s.Timings().CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -567,7 +566,7 @@ func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fai
 			subnets, innerErr = s.EC2Service.DescribeSubnets(query)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		s.Timings().CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -628,7 +627,7 @@ func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error)
 			subnets, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		s.Timings().CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr

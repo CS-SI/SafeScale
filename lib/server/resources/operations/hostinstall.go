@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.GetService(), name)
+	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -99,10 +99,13 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 				return innerXErr
 			}
 
-			hostFeaturesV1.Installed[name] = &propertiesv1.HostInstalledFeature{
-				HostContext: true,
-				Requires:    requires,
+			nif := propertiesv1.NewHostInstalledFeature()
+			nif.HostContext = true
+			if requires != nil {
+				nif.Requires = requires
 			}
+
+			hostFeaturesV1.Installed[name] = nif
 			return nil
 		})
 	})
@@ -148,7 +151,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.GetService(), name)
+	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -192,7 +195,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 	tracer := debug.NewTracer(task, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.GetService(), name)
+	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -234,7 +237,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 	return featuretargettype.Host
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
 func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 	// FIXME: Return error
@@ -278,13 +281,24 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 				}
 
 				item = propertiesv1.NewHostInstalledFeature()
-				item.Requires = requirements
+				if requirements != nil {
+					item.Requires = requirements
+				}
 				item.HostContext = !clusterContext
+
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if rf, ok := requiredBy.(*Feature); ok && !rf.IsNull() {
-				item.RequiredBy[rf.GetName()] = struct{}{}
+			if item != nil {
+				if !data.IsNil(requiredBy) {
+					if item.RequiredBy != nil {
+						item.RequiredBy[requiredBy.GetName()] = struct{}{}
+					} else {
+						item.RequiredBy = make(map[string]struct{})
+						item.RequiredBy[requiredBy.GetName()] = struct{}{}
+					}
+				}
 			}
+
 			return nil
 		})
 	})
@@ -317,8 +331,94 @@ func (instance *Host) UnregisterFeature(feat string) (xerr fail.Error) {
 	})
 }
 
-// InstalledFeatures returns a list of installed features
-// satisfies interface install.Targetable
+// ListEligibleFeatures returns a slice of features eligible to Cluster
+func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	var emptySlice []resources.Feature
+	if instance == nil || instance.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	// var list map[string]*propertiesv1.ClusterInstalledFeature
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		list = featuresV1.Installed
+	// 		return nil
+	// 	})
+	// })
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+	//
+	// out := make([]resources.Feature, 0, len(list))
+	// for k := range list {
+	// 	item, xerr := NewFeature(instance.Service(), k)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		return emptySlice, xerr
+	// 	}
+	//
+	// 	out = append(out, item)
+	// }
+	// return out, nil
+	return nil, fail.NotImplementedError()
+}
+
+// ListInstalledFeatures returns a slice of installed features
+func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	var emptySlice []resources.Feature
+	if instance == nil || instance.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	list := instance.InstalledFeatures()
+	// var list map[string]*propertiesv1.ClusterInstalledFeature
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		list = featuresV1.Installed
+	// 		return nil
+	// 	})
+	// })
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+
+	out := make([]resources.Feature, 0, len(list))
+	for _, v := range list {
+		item, xerr := NewFeature(instance.Service(), v)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// InstalledFeatures returns a slice of installed features
+// satisfies interface resources.Targetable
 func (instance *Host) InstalledFeatures() []string {
 	if instance == nil {
 		return []string{}
@@ -343,7 +443,6 @@ func (instance *Host) InstalledFeatures() []string {
 		return []string{}
 	}
 	return out
-
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
@@ -385,7 +484,7 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	v["PublicIP"] = instance.publicIP
 
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.GetService().GetConfigurationOptions()
+		config, xerr := instance.Service().GetConfigurationOptions()
 		if xerr != nil {
 			return xerr
 		}

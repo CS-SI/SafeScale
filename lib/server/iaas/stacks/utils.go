@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	datadef "github.com/CS-SI/SafeScale/lib/utils/data"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -43,7 +44,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 		ahf.Core.ID = hostParam
 		hostLabel = hostParam
 	case *abstract.HostCore:
-		if hostParam.IsNull() {
+		if datadef.IsNil(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostCore null value")
 		}
 		ahf.Core = hostParam
@@ -53,7 +54,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 			hostLabel = ahf.Core.ID
 		}
 	case *abstract.HostFull:
-		if hostParam.IsNull() {
+		if datadef.IsNil(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostFull null value")
 		}
 		ahf = hostParam

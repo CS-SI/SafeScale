@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // RouterRequest represents a router request
@@ -529,12 +528,17 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 
 	var resp []subnets.Subnet
 	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
+		func() error {
 			var allPages pagination.Page
-			if allPages, innerErr = subnets.List(s.NetworkClient, listOpts).AllPages(); innerErr == nil {
-				resp, innerErr = subnets.ExtractSubnets(allPages)
+			var innerErr error
+			if allPages, innerErr = subnets.List(s.NetworkClient, listOpts).AllPages(); innerErr != nil {
+				return innerErr
 			}
-			return innerErr
+			resp, innerErr = subnets.ExtractSubnets(allPages)
+			if innerErr != nil {
+				return innerErr
+			}
+			return nil
 		},
 		NormalizeError,
 	)
@@ -662,8 +666,8 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetContextTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().ContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

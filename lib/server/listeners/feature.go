@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
-
 	// "github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
@@ -62,10 +60,6 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	targetType := in.GetTargetType()
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
@@ -90,29 +84,29 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		// FIXME: Host.ListInstalledFeatures() not implemented
-		// hostInstance, xerr := hostfactory.Load(job.Service(), targetRef)
-		// if xerr != nil {
-		// 	return empty, xerr
-		// }
-		//
-		// defer hostInstance.Released()
-		//
-		// list, xerr := hostInstance.ListInstalledFeatures(job.Context())
-		// if xerr != nil {
-		// 	return empty, xerr
-		// }
-		//
-		// return converters.FeatureSliceFromResourceToProtocol(list), nil
+		// FIXME: Host.ListFeatures() not implemented
+		hostInstance, xerr := hostfactory.Load(job.Service(), targetRef)
+		if xerr != nil {
+			return empty, xerr
+		}
+
+		defer hostInstance.Released()
+
+		return empty, fail.NotImplementedError()
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
 		defer clusterInstance.Released()
 
-		list, xerr := clusterInstance.ListInstalledFeatures(job.Context())
+		var list []resources.Feature
+		if in.GetInstalledOnly() {
+			list, xerr = clusterInstance.ListInstalledFeatures(job.Context())
+		} else {
+			list, xerr = clusterInstance.ListEligibleFeatures(job.Context())
+		}
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -124,7 +118,164 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	return empty, fail.Wrap(fail.InconsistentError("reached theoretically unreachable point"), "cannot list features")
 }
 
-// Check ...
+// Inspect ...
+func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureDetailResponse, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	targetType := in.GetTargetType()
+	switch targetType {
+	case protocol.FeatureTargetType_FT_HOST:
+	case protocol.FeatureTargetType_FT_CLUSTER:
+	default:
+		return nil, fail.InvalidParameterError("in.TargetType", "invalid value (%d)", targetType)
+	}
+	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
+	if targetRef == "" {
+		return nil, fail.InvalidRequestError("target reference is missing")
+	}
+	featureName := in.GetName()
+
+	job, err := PrepareJob(ctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer func() {
+		if ferr != nil {
+			switch ferr.(type) {
+			case *fail.ErrNotFound:
+			default:
+				fail.OnExitLogError(ferr, tracer.TraceMessage())
+			}
+		}
+	}()
+
+	feat, xerr := featurefactory.New(job.Service(), featureName)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if data.IsNil(feat) {
+		return nil, fail.InconsistentError("invalid feature %s", featureName)
+	}
+
+	switch targetType {
+	case protocol.FeatureTargetType_FT_HOST:
+		hostInstance, xerr := hostfactory.Load(job.Service(), targetRef)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		defer hostInstance.Released()
+
+		return nil, fail.NotImplementedError()
+
+	case protocol.FeatureTargetType_FT_CLUSTER:
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		defer clusterInstance.Released()
+
+		return nil, fail.NotImplementedError()
+	}
+
+	// Should not reach this
+	return nil, fail.Wrap(fail.InconsistentError("reached theoretically unreachable point"), "cannot inspect feature")
+}
+
+// Export exports the content of the feature file
+func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureExportResponse, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	targetType := in.GetTargetType()
+	switch targetType {
+	case protocol.FeatureTargetType_FT_HOST:
+	case protocol.FeatureTargetType_FT_CLUSTER:
+	default:
+		return nil, fail.InvalidParameterError("in.TargetType", "invalid value (%d)", targetType)
+	}
+	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
+	if targetRef == "" {
+		return nil, fail.InvalidRequestError("target reference is missing")
+	}
+	featureName := in.GetName()
+
+	job, xerr := PrepareJob(ctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer func() {
+		if ferr != nil {
+			switch ferr.(type) {
+			case *fail.ErrNotFound:
+			default:
+				fail.OnExitLogError(ferr, tracer.TraceMessage())
+			}
+		}
+	}()
+
+	var feat resources.Feature
+	if in.GetEmbedded() {
+		feat, xerr = featurefactory.NewEmbedded(job.Service(), featureName)
+	} else {
+		feat, xerr = featurefactory.New(job.Service(), featureName)
+	}
+	if xerr != nil {
+		return nil, xerr
+	}
+	if data.IsNil(feat) {
+		return nil, fail.InconsistentError("invalid feature: %s", featureName)
+	}
+
+	switch targetType {
+	case protocol.FeatureTargetType_FT_HOST:
+		hostInstance, xerr := hostfactory.Load(job.Service(), targetRef)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		defer hostInstance.Released()
+
+		return nil, fail.NotImplementedError()
+
+	case protocol.FeatureTargetType_FT_CLUSTER:
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		defer clusterInstance.Released()
+
+		return nil, fail.NotImplementedError()
+	}
+
+	// Should not reach this
+	return nil, fail.Wrap(fail.InconsistentError("reached theoretically unreachable point"), "cannot check feature")
+}
+
+// Check checks if a feature installed on target
 func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 
@@ -135,9 +286,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
+
 	targetType := in.GetTargetType()
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
@@ -198,7 +347,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		return empty, fail.NotFoundError("feature '%s' not found on Host '%s'", featureName, hostInstance.GetName())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -245,9 +394,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
+
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
@@ -294,7 +441,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		return empty, fail.ExecutionError(nil, "failed to add feature '%s' to Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -326,9 +473,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
+
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
@@ -375,7 +520,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		return empty, fail.ExecutionError(nil, "failed to remove feature '%s' from Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}

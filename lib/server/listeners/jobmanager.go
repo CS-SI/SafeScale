@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,14 +27,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -111,10 +109,6 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	uuid := in.Uuid
 	if in.Uuid == "" {
 		return empty, fail.InvalidRequestError("cannot stop job: job id not set")
@@ -158,10 +152,6 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
@@ -171,7 +161,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := JobManagerHandler(tenant.GetService)
+	// handler := JobManagerHandler(tenant.Service)
 	jobMap := server.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {

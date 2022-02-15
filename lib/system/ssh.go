@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -160,15 +159,31 @@ func (stun *SSHTunnel) Close() fail.Error {
 
 	// Kills remaining processes if there are some
 	bytesCmd, err := exec.Command("pgrep", "-f", stun.cmdString).Output()
-	if err == nil {
-		portStr := strings.Trim(string(bytesCmd), "\n")
-		if _, err = strconv.Atoi(portStr); err == nil {
-			if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
-				logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
+	if err != nil {
+		_, code, problem := utils.ExtractRetCode(err)
+		if problem != nil {
+			return fail.Wrap(err, "unable to close tunnel, running pgrep")
 		}
+		if code == 1 { // no process found
+			debug.IgnoreError(err)
+			return nil
+		}
+		if code == 127 { // pgrep not installed
+			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
+			return nil
+		}
+		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
 	}
+
+	portStr := strings.Trim(string(bytesCmd), "\n")
+	if _, err = strconv.Atoi(portStr); err != nil {
+		return fail.Wrap(err, "unable to close tunnel")
+	}
+
+	if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
+		return fail.Wrap(err, "unable to close tunnel: %s", fmt.Sprintf("kill -9 failed: %s", reflect.TypeOf(err).String()))
+	}
+
 	return nil
 }
 
@@ -256,10 +271,7 @@ func getFreePort() (int, fail.Error) {
 
 // CreateTempFileFromString creates a temporary file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
-	defaultTmpDir := "/tmp"
-	if runtime.GOOS == "windows" {
-		defaultTmpDir = ""
-	}
+	defaultTmpDir := os.TempDir()
 
 	f, err := ioutil.TempFile(defaultTmpDir, "")
 	if err != nil {
@@ -532,7 +544,9 @@ func (scmd *SSHCommand) Start() fail.Error {
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
-func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (scmd *SSHCommand) RunWithTimeout(
+	ctx context.Context, outs outputs.Enum, timeout time.Duration,
+) (int, string, string, fail.Error) {
 	const invalid = -1
 	if scmd == nil {
 		return invalid, "", "", fail.InvalidInstanceError()
@@ -614,7 +628,9 @@ type taskExecuteParameters struct {
 	collectOutputs bool
 }
 
-func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (scmd *SSHCommand) taskExecute(
+	task concurrency.Task, p concurrency.TaskParameters,
+) (concurrency.TaskResult, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -700,18 +716,11 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	_ = stdoutPipe.Close()
 	_ = stderrPipe.Close()
 
-	if runErr == nil {
-		result["retcode"] = 0
-		if params.collectOutputs {
-			result["stdout"] = string(msgOut)
-			result["stderr"] = string(msgErr)
-		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-			logrus.Error(pbcErr.Error())
-		}
-	} else {
+	if runErr != nil {
 		xerr = fail.ExecutionError(runErr)
 		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
 		var (
+			rc     int
 			note   data.Annotation
 			stderr string
 			ok     bool
@@ -723,7 +732,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 				}
 			}
 			return result, xerr
-		} else if rc, ok := note.(int); ok && rc == -1 {
+		} else if rc, ok = note.(int); ok && rc == -1 {
 			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -752,6 +761,14 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		} else {
 			result["stdout"] = string(msgOut)
 			result["stderr"] = fmt.Sprint(string(msgErr), stderr)
+		}
+	} else {
+		result["retcode"] = 0
+		if params.collectOutputs {
+			result["stdout"] = string(msgOut)
+			result["stderr"] = string(msgErr)
+		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+			logrus.Error(pbcErr.Error())
 		}
 	}
 
@@ -820,8 +837,8 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 					*tunnels = append(SSHTunnels{tunnel}, *tunnels...)
 					return nil
 				},
-				temporal.GetDefaultDelay(),
-				temporal.GetOperationTimeout(),
+				temporal.DefaultDelay(),
+				temporal.OperationTimeout(),
 			)
 			if xerr != nil {
 				switch xerr.(type) { // nolint
@@ -869,7 +886,9 @@ func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail
 	return tunnels, &sshConfig, nil
 }
 
-func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, fail.Error) {
+func createSSHCommand(
+	sconf *SSHConfig, cmdString, username, shell string, withTty, withSudo bool,
+) (string, *os.File, fail.Error) {
 	f, err := CreateTempFileFromString(sconf.PrivateKey, 0400)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "unable to create temporary key file")
@@ -928,7 +947,9 @@ func (sconf *SSHConfig) NewSudoCommand(ctx context.Context, cmdString string) (*
 	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
-func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
+func (sconf *SSHConfig) newCommand(
+	ctx context.Context, cmdString string, withTty, withSudo bool,
+) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -981,7 +1002,9 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 }
 
 // newCopyCommand does the same thing as newCommand for SCP actions
-func (sconf *SSHConfig) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*SSHCommand, fail.Error) {
+func (sconf *SSHConfig) newCopyCommand(
+	ctx context.Context, localPath, remotePath string, isUpload bool,
+) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1056,7 +1079,9 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, ferr fail.Error) {
+func (sconf *SSHConfig) WaitServerReady(
+	ctx context.Context, phase string, timeout time.Duration,
+) (out string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if sconf == nil {
@@ -1109,11 +1134,11 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		derr := cmd.Close()
 		if derr != nil {
 			if deferErr != nil {
-				if *deferErr == nil {
-					*deferErr = derr
-				} else {
+				if *deferErr != nil {
 					*deferErr = fail.ConvertError(*deferErr)
 					_ = (*deferErr).AddConsequence(derr)
+				} else {
+					*deferErr = derr
 				}
 			}
 		}
@@ -1170,7 +1195,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
+		temporal.DefaultDelay(),
 		timeout+time.Minute,
 	)
 	if retryErr != nil {
@@ -1235,10 +1260,10 @@ func (sconf *SSHConfig) copy(
 	defer func() {
 		derr := sshCommand.Close()
 		if derr != nil {
-			if ferr == nil {
-				ferr = derr
-			} else {
+			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+			} else {
+				ferr = derr
 			}
 		}
 	}()
@@ -1265,10 +1290,10 @@ func (sconf *SSHConfig) Enter(username, shell string) (ferr fail.Error) {
 	defer func() {
 		derr := tunnels.Close()
 		if derr != nil {
-			if ferr == nil {
-				ferr = derr
-			} else {
+			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+			} else {
+				ferr = derr
 			}
 		}
 	}()

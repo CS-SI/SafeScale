@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 )
 
 //goland:noinspection GoPreferNilSlice
@@ -112,6 +113,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return &provider{}, fail.SyntaxError("field 'Zone' in section 'compute' not found in tenants.toml")
 	}
 
+	var owners []string
+	if _, ok = computeCfg["Owners"]; ok {
+		ownerList, ok := computeCfg["Owners"].(string)
+		if !ok {
+			logrus.Debugf("error reading owners: %v", computeCfg["Owners"])
+		} else {
+			frag := strings.Split(ownerList, ",")
+			for _, item := range frag {
+				owners = append(owners, strings.TrimSpace(item))
+			}
+		}
+	}
+
 	awsConf := stacks.AWSConfiguration{
 		// S3Endpoint:  s3Endpoint,
 		Ec2Endpoint: fmt.Sprintf("https://ec2.%s.amazonaws.com", region),
@@ -119,6 +133,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:      region,
 		Zone:        zone,
 		NetworkName: networkName,
+		Owners:      owners,
 	}
 
 	username, ok := identityCfg["Username"].(string) // nolint
@@ -219,9 +234,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.ConvertError(err)
 	}
 
+	// Note: if timings have to be tuned, update awsStack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: awsStack,
-		Name:       "amazon",
+		FullStack: awsStack,
+		Name:      "amazon",
 	}
 
 	newP := &provider{
@@ -230,8 +247,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: newP,
-		Name:          wrapped.Name,
+		Provider: newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -325,7 +342,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice, nil
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -335,7 +352,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

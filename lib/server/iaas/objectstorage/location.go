@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,35 +135,35 @@ func NewLocation(conf Config) (_ *location, xerr fail.Error) { // nolint
 }
 
 // IsNull tells if the instance should be considered as a null value
-func (l *location) IsNull() bool {
-	return l == nil || l.stowLocation == nil
+func (instance *location) IsNull() bool {
+	return instance == nil || instance.stowLocation == nil
 }
 
 // Connect connects to an Object Storage location
-func (l *location) connect() fail.Error {
+func (instance *location) connect() fail.Error {
 	// FIXME: GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
 	var config stow.ConfigMap
 
-	if l.config.Type == "google" {
+	if instance.config.Type == "google" {
 		config = stow.ConfigMap{
-			"json":       l.config.Credentials,
-			"project_id": l.config.ProjectID,
+			"json":       instance.config.Credentials,
+			"project_id": instance.config.ProjectID,
 		}
 	} else {
 		config = stow.ConfigMap{
-			"access_key_id":   l.config.User,
-			"secret_key":      l.config.SecretKey,
-			"username":        l.config.User,
-			"key":             l.config.SecretKey,
-			"endpoint":        l.config.Endpoint,
-			"tenant_name":     l.config.Tenant,
-			"tenant_auth_url": l.config.AuthURL,
-			"region":          l.config.Region,
-			"domain":          l.config.TenantDomain,
-			"kind":            l.config.Type,
+			"access_key_id":   instance.config.User,
+			"secret_key":      instance.config.SecretKey,
+			"username":        instance.config.User,
+			"key":             instance.config.SecretKey,
+			"endpoint":        instance.config.Endpoint,
+			"tenant_name":     instance.config.Tenant,
+			"tenant_auth_url": instance.config.AuthURL,
+			"region":          instance.config.Region,
+			"domain":          instance.config.TenantDomain,
+			"kind":            instance.config.Type,
 		}
 	}
-	kind := l.config.Type
+	kind := instance.config.Type
 
 	// Check config stowLocation
 	err := stow.Validate(kind, config)
@@ -171,7 +171,7 @@ func (l *location) connect() fail.Error {
 		logrus.Debugf("invalid config: %v", err)
 		return fail.ConvertError(err)
 	}
-	l.stowLocation, err = stow.Dial(kind, config)
+	instance.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
 		logrus.Debugf("failed dialing stowLocation (error type=%s): %v", reflect.TypeOf(err).String(), err)
 	}
@@ -179,28 +179,28 @@ func (l *location) connect() fail.Error {
 }
 
 // Protocol returns the type of ObjectStorage
-func (l location) Protocol() string {
-	if l.IsNull() {
+func (instance location) Protocol() string {
+	if instance.IsNull() {
 		return ""
 	}
-	return l.config.Type
+	return instance.config.Type
 }
 
 // Configuration returns the configuration used to create Location
-func (l location) Configuration() Config {
-	if l.IsNull() {
+func (instance location) Configuration() Config {
+	if instance.IsNull() {
 		return Config{}
 	}
-	return l.config
+	return instance.config
 }
 
-func (l location) estimateSize(prefix string) (int, error) {
+func (instance location) estimateSize(prefix string) (int, error) {
 	containerSet := make(map[string]bool) // New empty set
 	currentPageSize := 10
 
 	for {
 		err := stow.WalkContainers(
-			l.stowLocation, prefix, currentPageSize,
+			instance.stowLocation, prefix, currentPageSize,
 			func(c stow.Container, err error) error {
 				if err != nil {
 					return err
@@ -228,10 +228,10 @@ func (l location) estimateSize(prefix string) (int, error) {
 }
 
 // ListBuckets ...
-func (l location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
+func (instance location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if l.IsNull() {
+	if instance.IsNull() {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
@@ -239,12 +239,12 @@ func (l location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
 
 	var list []string
 
-	estimatedPageSize, err := l.estimateSize(prefix)
+	estimatedPageSize, err := instance.estimateSize(prefix)
 	if err != nil {
 		return list, fail.ConvertError(err)
 	}
 
-	err = stow.WalkContainers(l.stowLocation, stow.NoPrefix, estimatedPageSize,
+	err = stow.WalkContainers(instance.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				return err
@@ -262,10 +262,10 @@ func (l location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
 }
 
 // FindBucket returns true if a bucket with the name exists in stowLocation
-func (l location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
+func (instance location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if l.IsNull() {
+	if instance.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -276,12 +276,12 @@ func (l location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
 
 	found := false
 
-	estimatedPageSize, err := l.estimateSize(stow.NoPrefix)
+	estimatedPageSize, err := instance.estimateSize(stow.NoPrefix)
 	if err != nil {
 		return false, fail.ConvertError(err)
 	}
 
-	err = stow.WalkContainers(l.stowLocation, stow.NoPrefix, estimatedPageSize,
+	err = stow.WalkContainers(instance.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				logrus.Debugf("%v", err)
@@ -301,10 +301,10 @@ func (l location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
 }
 
 // InspectBucket ...
-func (l location) InspectBucket(bucketName string) (_ abstract.ObjectStorageBucket, xerr fail.Error) {
+func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStorageBucket, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if l.IsNull() {
+	if instance.IsNull() {
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -313,7 +313,7 @@ func (l location) InspectBucket(bucketName string) (_ abstract.ObjectStorageBuck
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return abstract.ObjectStorageBucket{}, err
 	}
@@ -325,22 +325,22 @@ func (l location) InspectBucket(bucketName string) (_ abstract.ObjectStorageBuck
 }
 
 // inspectBucket ...
-func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
-	if l.IsNull() {
+func (instance location) inspectBucket(bucketName string) (bucket, fail.Error) {
+	if instance.IsNull() {
 		return bucket{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
 		return bucket{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	b, xerr := newBucket(l.stowLocation)
+	b, xerr := newBucket(instance.stowLocation)
 	if xerr != nil {
 		return bucket{}, xerr
 	}
 
 	b.name = bucketName
 	var err error
-	b.stowContainer, err = l.stowLocation.Container(bucketName)
+	b.stowContainer, err = instance.stowLocation.Container(bucketName)
 	if err != nil {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
 		return bucket{}, fail.ConvertError(err)
@@ -350,11 +350,11 @@ func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
 }
 
 // CreateBucket ...
-func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBucket, xerr fail.Error) {
+func (instance location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBucket, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	aosb = abstract.ObjectStorageBucket{}
-	if l.IsNull() {
+	if instance.IsNull() {
 		return aosb, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -363,7 +363,7 @@ func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBu
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
 
-	c, err := l.stowLocation.CreateContainer(bucketName)
+	c, err := instance.stowLocation.CreateContainer(bucketName)
 	if err != nil {
 		return aosb, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
 	}
@@ -375,9 +375,9 @@ func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBu
 }
 
 // DeleteBucket removes a bucket from Object Storage
-func (l location) DeleteBucket(bucketName string) (xerr fail.Error) {
+func (instance location) DeleteBucket(bucketName string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if l.IsNull() {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -386,7 +386,7 @@ func (l location) DeleteBucket(bucketName string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
 
-	err := l.stowLocation.RemoveContainer(bucketName)
+	err := instance.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
@@ -394,10 +394,10 @@ func (l location) DeleteBucket(bucketName string) (xerr fail.Error) {
 }
 
 // InspectObject ...
-func (l location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
+func (instance location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
-	if l.IsNull() {
+	if instance.IsNull() {
 		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -409,7 +409,7 @@ func (l location) InspectObject(bucketName string, objectName string) (aosi abst
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return aosi, err
 	}
@@ -433,9 +433,9 @@ func (l location) InspectObject(bucketName string, objectName string) (aosi abst
 }
 
 // DeleteObject ...
-func (l location) DeleteObject(bucketName, objectName string) (xerr fail.Error) {
+func (instance location) DeleteObject(bucketName, objectName string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if l.IsNull() {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -447,7 +447,7 @@ func (l location) DeleteObject(bucketName, objectName string) (xerr fail.Error) 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -455,9 +455,9 @@ func (l location) DeleteObject(bucketName, objectName string) (xerr fail.Error) 
 }
 
 // ListObjects lists the objects in a GetBucket
-func (l location) ListObjects(bucketName string, path, prefix string) (_ []string, xerr fail.Error) {
+func (instance location) ListObjects(bucketName string, path, prefix string) (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if l.IsNull() {
+	if instance.IsNull() {
 		return []string{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -466,7 +466,7 @@ func (l location) ListObjects(bucketName string, path, prefix string) (_ []strin
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return nil, err
 	}
@@ -474,9 +474,9 @@ func (l location) ListObjects(bucketName string, path, prefix string) (_ []strin
 }
 
 // BrowseBucket walks through the objects in a GetBucket and apply callback to each object
-func (l location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) (xerr fail.Error) {
+func (instance location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if l.IsNull() {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -485,7 +485,7 @@ func (l location) BrowseBucket(bucketName string, path, prefix string, callback 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -493,9 +493,9 @@ func (l location) BrowseBucket(bucketName string, path, prefix string, callback 
 }
 
 // ClearBucket ...
-func (l location) ClearBucket(bucketName string, path, prefix string) (xerr fail.Error) {
+func (instance location) ClearBucket(bucketName string, path, prefix string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if l.IsNull() {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -504,7 +504,7 @@ func (l location) ClearBucket(bucketName string, path, prefix string) (xerr fail
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -512,9 +512,9 @@ func (l location) ClearBucket(bucketName string, path, prefix string) (xerr fail
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (l location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) (xerr fail.Error) {
+func (instance location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if l.IsNull() {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -526,7 +526,7 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -545,14 +545,14 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 }
 
 // WriteObject writes the content of reader in the Object
-func (l location) WriteObject(
+func (instance location) WriteObject(
 	bucketName string, objectName string,
 	source io.Reader, size int64,
 	metadata abstract.ObjectStorageItemMetadata,
 ) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
-	if l.IsNull() {
+	if instance.IsNull() {
 		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -567,9 +567,9 @@ func (l location) WriteObject(
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
-		if err.Error() == "not found" {
+		if err.Error() == NotFound {
 			return aosi, fail.NotFoundError("failed to find bucket '%s'", bucketName)
 		}
 		return aosi, err
@@ -591,7 +591,7 @@ func (l location) WriteObject(
 
 // WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (l location) WriteMultiPartObject(
+func (instance location) WriteMultiPartObject(
 	bucketName string, objectName string,
 	source io.Reader, sourceSize int64,
 	chunkSize int,
@@ -599,7 +599,7 @@ func (l location) WriteMultiPartObject(
 ) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
-	if l.IsNull() {
+	if instance.IsNull() {
 		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -612,7 +612,7 @@ func (l location) WriteMultiPartObject(
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering()
 	defer tracer.Exiting()
 
-	b, err := l.inspectBucket(bucketName)
+	b, err := instance.inspectBucket(bucketName)
 	if err != nil {
 		return aosi, err
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,8 @@ var templateList = &cli.Command{
 			Usage:   "Display only templates with scanned information",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -66,7 +67,7 @@ var templateList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), temporal.GetExecutionTimeout())
+		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -79,7 +80,8 @@ var templateMatch = &cli.Command{
 	Name:      "match",
 	Usage:     "List templates that match the SIZING",
 	ArgsUsage: "SIZING",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -90,7 +92,7 @@ var templateMatch = &cli.Command{
 		sizing = append(sizing, c.Args().First())
 		sizing = append(sizing, c.Args().Tail()...)
 		sizingAsString := strings.Join(sizing, ",")
-		templates, err := clientSession.Template.Match(sizingAsString, temporal.GetExecutionTimeout())
+		templates, err := clientSession.Template.Match(sizingAsString, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -104,7 +106,8 @@ var templateInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Display available template information",
 	ArgsUsage: "NAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -112,7 +115,7 @@ var templateInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		template, err := clientSession.Template.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		template, err := clientSession.Template.Inspect(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))

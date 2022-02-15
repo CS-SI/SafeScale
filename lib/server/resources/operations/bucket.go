@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/bucketproperty"
@@ -39,7 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -55,7 +56,7 @@ type bucket struct {
 	lock sync.RWMutex
 }
 
-// NewBucket intanciates bucket struct
+// NewBucket instantiates bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -90,7 +91,7 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 
 	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onBucketCacheMiss(svc, name) },
-		temporal.GetMetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := bucketCache.Get(name, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -155,13 +156,13 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -250,99 +251,99 @@ func (instance *bucket) Browse(
 	)
 }
 
-// // GetHost ...
-// func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error) {
-// 	if instance == nil || instance.IsNull() {
-// 		return "", fail.InvalidInstanceError()
-// 	}
-// 	if ctx == nil {
-// 		return "", fail.InvalidParameterCannotBeNilError("ctx")
-// 	}
-//
-// 	task, xerr := concurrency.TaskFromContext(ctx)
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		switch xerr.(type) {
-// 		case *fail.ErrNotAvailable:
-// 			task, xerr = concurrency.VoidTask()
-// 			if xerr != nil {
-// 				return "", xerr
-// 			}
-// 		default:
-// 			return "", xerr
-// 		}
-// 	}
-//
-// 	if task.Aborted() {
-// 		return "", fail.AbortedError(nil, "aborted")
-// 	}
-//
-// 	instance.lock.RLock()
-// 	defer instance.lock.RUnlock()
-//
-// 	var res string
-// 	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-// 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
-// 		if !ok {
-// 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 		}
-//
-// 		res = ab.Host
-// 		return nil
-// 	})
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		return res, xerr
-// 	}
-//
-// 	return res, nil
-// }
-//
-// // GetMountPoint ...
-// func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
-// 	if instance == nil || instance.IsNull() {
-// 		return "", fail.InvalidInstanceError()
-// 	}
-// 	if ctx == nil {
-// 		return "", fail.InvalidParameterCannotBeNilError("ctx")
-// 	}
-//
-// 	task, xerr := concurrency.TaskFromContext(ctx)
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		switch xerr.(type) {
-// 		case *fail.ErrNotAvailable:
-// 			task, xerr = concurrency.VoidTask()
-// 			if xerr != nil {
-// 				return "", xerr
-// 			}
-// 		default:
-// 			return "", xerr
-// 		}
-// 	}
-//
-// 	if task.Aborted() {
-// 		return "", fail.AbortedError(nil, "aborted")
-// 	}
-//
-// 	instance.lock.RLock()
-// 	defer instance.lock.RUnlock()
-//
-// 	var res string
-// 	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-// 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
-// 		if !ok {
-// 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 		}
-// 		res = ab.MountPoint
-// 		return nil
-// 	})
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		logrus.Errorf(xerr.Error())
-// 	}
-// 	return res, nil
-// }
+// GetHost ...
+func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error) {
+	if instance == nil || instance.IsNull() {
+		return "", fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
+		default:
+			return "", xerr
+		}
+	}
+
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	var res string
+	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ab, ok := clonable.(*abstract.ObjectStorageBucket)
+		if !ok {
+			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		res = ab.Host
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return res, xerr
+	}
+
+	return res, nil
+}
+
+// GetMountPoint ...
+func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
+	if instance == nil || instance.IsNull() {
+		return "", fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
+		default:
+			return "", xerr
+		}
+	}
+
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	var res string
+	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ab, ok := clonable.(*abstract.ObjectStorageBucket)
+		if !ok {
+			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		res = ab.MountPoint
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		logrus.Errorf(xerr.Error())
+	}
+	return res, nil
+}
 
 // Create a bucket
 func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {
@@ -391,7 +392,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	// -- check if bucket already exist in SafeScale
 	bucketInstance, xerr := LoadBucket(svc, name)
@@ -417,14 +418,14 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 		default:
-			if strings.Contains(xerr.Error(), "not found") {
+			if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 				debug.IgnoreError(xerr)
 				break
 			}
 			return xerr
 		}
 	}
-	if !ab.IsNull() {
+	if !data.IsNil(ab) {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
@@ -486,9 +487,9 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// -- delete Bucket
-	xerr = instance.GetService().DeleteBucket(instance.GetName())
+	xerr = instance.Service().DeleteBucket(instance.GetName())
 	if xerr != nil {
-		if strings.Contains(xerr.Error(), "not found") {
+		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
 		}
 		return xerr
@@ -545,7 +546,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	hostInstance, xerr := LoadHost(instance.GetService(), hostName)
+	svc := instance.Service()
+	hostInstance, xerr := LoadHost(svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
@@ -579,7 +581,6 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 		return xerr
 	}
 
-	svc := instance.GetService()
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {
 		return xerr
@@ -706,8 +707,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
-
+	svc := instance.Service()
 	hostInstance, xerr := LoadHost(svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -783,13 +783,13 @@ func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 	}
 
 	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		svc := instance.GetService()
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
+			svc := instance.Service()
 			out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))
 			for k, v := range mountsV1.ByHostID {
 				hostInstance, xerr := LoadHost(svc, k)

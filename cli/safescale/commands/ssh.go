@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli/v2"
@@ -66,7 +68,8 @@ var sshRun = &cli.Command{
 			Value: "5",
 			Usage: "timeout in minutes",
 		}},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -82,15 +85,15 @@ var sshRun = &cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
-			timeout = temporal.GetHostTimeout()
+			timeout = temporal.HostOperationTimeout()
 		}
-		retcode, _, _, err := clientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := clientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
-			return cli.NewExitError("", retcode)
+			return cli.Exit("", retcode)
 		}
 		return nil
 	},
@@ -114,7 +117,8 @@ var sshCopy = &cli.Command{
 			Value: "5",
 			Usage: "timeout in minutes",
 		}},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -130,9 +134,9 @@ var sshCopy = &cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
-			timeout = temporal.GetHostTimeout()
+			timeout = temporal.HostOperationTimeout()
 		}
-		retcode, _, _, err := clientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
+		retcode, _, _, err := clientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
@@ -162,7 +166,8 @@ var sshConnect = &cli.Command{
 			Usage:   "Shell to use (default: bash)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -174,6 +179,17 @@ var sshConnect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
+		// Check host status 1st
+		resp, err := clientSession.Host.GetStatus(c.Args().Get(0), temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
+		}
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		if converted != hoststate.Started {
+			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("Host %s is not in 'Started' state, it's '%s'", c.Args().Get(0), converted.String())))
+		}
+
 		var (
 			username, shell string
 		)
@@ -183,7 +199,7 @@ var sshConnect = &cli.Command{
 		if c.IsSet("shell") {
 			shell = c.String("shell")
 		}
-		err := clientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
+		err = clientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))
@@ -214,7 +230,8 @@ var sshTunnel = &cli.Command{
 			Usage:   "timeout in minutes",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -270,7 +287,8 @@ var sshClose = &cli.Command{
 			Usage:   "timeout in minutes",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)

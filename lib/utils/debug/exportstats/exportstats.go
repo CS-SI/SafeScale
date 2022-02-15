@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package exportstats
 
 import (
@@ -11,21 +27,7 @@ import (
 
 var stats *expvar.Map
 
-// Example:
-//  NewStatCount("stats")
-//  ..
-//  Increment("active_ws_users")
-//  defer Decrement("active_ws_users")
-//  doWebSocket()
-
-// Recommend using expvarmon (see https://github.com/divan/expvarmon )
-//   expvarmon  -ports="http://localhost:9000" -i=1s \
-//   -vars="goroutines,stats.auth_failures,stats.open_ws,stats.rabbit_messages_rx,stats.rabbit_reconnections, \
-//   mem:memstats.Alloc,mem:memstats.Sys,mem:memstats.HeapAlloc,mem:memstats.HeapInuse"
-
 // NewStatCount sets up a stat counter
-// See http://go-talks.appspot.com/github.com/sajari/talks/201610/simplifying-storage/storage.slide#36 for more
-// or http://www.mikeperham.com/2014/12/17/expvar-metrics-for-golang/ or http://blog.ralch.com/tutorial/golang-metrics-with-expvar/
 func NewStatCount(statName string) {
 	stats = expvar.NewMap(statName)
 

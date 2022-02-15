@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -421,8 +421,10 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		localTarget := targetTemplate
 
 		fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + tenantName + "#" + localTarget.Name + ".json")
-		if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
-			break
+		if _, err := os.Stat(fileCandidate); err != nil {
+			if !os.IsNotExist(err) {
+				break
+			}
 		}
 
 		go func(innerTemplate abstract.HostTemplate) {
@@ -507,7 +509,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 5*temporal.GetContextTimeout())
+	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}

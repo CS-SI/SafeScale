@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ func sanitize(in string) (string, fail.Error) { // nolint
 
 // Create a share on host
 func (handler *shareHandler) Create(
-	shareName, hostName, path string, options string, /*securityModes []string,
+	shareName, hostName, apath string, options string, /*securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (share resources.Share, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -84,7 +84,7 @@ func (handler *shareHandler) Create(
 	if hostName == "" {
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty")
 	}
-	if path == "" {
+	if apath == "" {
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
@@ -103,7 +103,7 @@ func (handler *shareHandler) Create(
 		return nil, xerr
 	}
 
-	return objs, objs.Create(task.Context(), shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
+	return objs, objs.Create(task.Context(), shareName, objh, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 
 // Delete a share from host

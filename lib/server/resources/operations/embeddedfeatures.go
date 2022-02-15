@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,6 +159,22 @@ func ntpClientFeature() *Feature {
 // ansibleFeature from official repos ...
 func ansibleFeature() *Feature {
 	name := "ansible"
+	filename, specs, err := loadSpecFile(name)
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// ansibleForClusterFeature  ...
+func ansibleForClusterFeature() *Feature {
+	name := "ansible-for-cluster"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {

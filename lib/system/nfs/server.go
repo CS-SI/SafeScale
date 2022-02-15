@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package nfs
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -27,16 +28,18 @@ import (
 
 // Server getServer structure
 type Server struct {
+	svc       iaas.Service
 	SSHConfig *system.SSHConfig
 }
 
 // NewServer instantiates a new nfs.getServer struct
-func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
+func NewServer(svc iaas.Service, sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
 	server := Server{
+		svc:       svc,
 		SSHConfig: sshconfig,
 	}
 	return &server, nil
@@ -48,7 +51,7 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	stdout, xerr := executeScript(ctx, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	stdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install nfs server")
@@ -102,7 +105,7 @@ func (s *Server) AddShare(
 
 	// share.AddACL(acl)
 
-	return share.Add(ctx)
+	return share.Add(ctx, s.svc)
 }
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
@@ -111,7 +114,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 		"Path": path,
 	}
 
-	stdout, xerr := executeScript(ctx, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	stdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
@@ -133,14 +136,14 @@ func (s *Server) MountBlockDevice(
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		istdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
+		istdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
 			return fail.Wrap(xerr, "error executing script to mount block device")
 		}
 		stdout = istdout
 		return nil // we are done, break the retry
-	}, temporal.GetMinDelay(), 0, 4) // 4 retries and that's it
+	}, temporal.MinDelay(), 0, 4) // 4 retries and that's it
 	if rerr != nil {
 		return "", fail.Wrap(rerr, "error executing script to mount block device")
 	}
@@ -157,13 +160,13 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
+		stdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")
 		}
 		return nil
-	}, temporal.GetMinDelay(), 0, 4) // 4 retries and that's it
+	}, temporal.MinDelay(), 0, 4) // 4 retries and that's it
 	if rerr != nil {
 		return fail.Wrap(rerr, "error executing script to unmount block device")
 	}

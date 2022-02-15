@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
@@ -43,7 +44,6 @@ import (
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // VPCRequest defines a request to create a VPC
@@ -137,7 +137,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("POST", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			defer closer(hr)
 			return innerErr
 		},
 		normalizeError,
@@ -245,9 +247,13 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	var vpc *VPC
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			if _, innerErr = s.Driver.Request("GET", url, &opts); innerErr == nil {
-				vpc, innerErr = r.Extract()
+			var hr *http.Response
+			hr, innerErr = s.Driver.Request("GET", url, &opts) // nolint
+			defer closer(hr)
+			if innerErr != nil {
+				return innerErr
 			}
+			vpc, innerErr = r.Extract()
 			return innerErr
 		},
 		normalizeError,
@@ -316,7 +322,9 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("GET", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("GET", url, &opts) // nolint
+			defer closer(hr)
 			return innerErr
 		},
 		normalizeError,
@@ -330,24 +338,20 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 		for _, v := range vpcs {
 			item, ok := v.(map[string]interface{})
 			if !ok {
-				logrus.Warnf("vpc should be a map[string]interface{}")
-				continue
+				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
 			}
 			an := abstract.NewNetwork()
 			an.Name, ok = item["name"].(string)
 			if !ok {
-				logrus.Warnf("name should NOT be empty")
-				continue
+				return emptySlice, fail.InconsistentError("name should NOT be empty")
 			}
 			an.ID, ok = item["id"].(string)
 			if !ok {
-				logrus.Warnf("id should NOT be empty")
-				continue
+				return emptySlice, fail.InconsistentError("id should NOT be empty")
 			}
 			an.CIDR, ok = item["cidr"].(string)
 			if !ok {
-				logrus.Warnf("cidr should NOT be empty")
-				continue
+				return emptySlice, fail.InconsistentError("cidr should NOT be empty")
 			}
 			// FIXME: Missing validation, all previous fields should be NOT empty
 			list = append(list, an)
@@ -374,8 +378,8 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var r *http.Response
-			r, innerErr = s.Driver.Request("DELETE", url, &opts)
-			_ = r
+			r, innerErr = s.Driver.Request("DELETE", url, &opts) // nolint
+			defer closer(r)
 			return innerErr
 		},
 		normalizeError,
@@ -493,9 +497,11 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 	r := networks.GetResult{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.NetworkClient.Get(s.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
+			var hr *http.Response
+			hr, r.Err = s.NetworkClient.Get(s.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{ // nolint
 				OkCodes: []int{200, 203},
 			})
+			defer closer(hr)
 			return r.Err
 		},
 		normalizeError,
@@ -519,13 +525,11 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			var ok bool
 			entry, ok = s.(map[string]interface{})
 			if !ok {
-				logrus.Warnf("subnet should be a map[string]interface{}")
-				continue
+				return nullAS, fail.InconsistentError("subnet should be a map[string]interface{}")
 			}
 			id, ok = entry["id"].(string)
 			if !ok {
-				logrus.Warnf("id should be a string")
-				continue
+				return nullAS, fail.InconsistentError("id should be a string")
 			}
 		}
 		return s.inspectOpenstackSubnet(id)
@@ -552,7 +556,9 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	var resp *subnetEx
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("GET", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("GET", url, &opts) // nolint
+			defer closer(hr)
 			r.Err = innerErr
 			resp, innerErr = r.Extract()
 			return innerErr
@@ -685,24 +691,26 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		func() error {
 			return stacks.RetryableRemoteCall(
 				func() error {
-					_, innerErr := s.Driver.Request("DELETE", url, &opts)
+					var hr *http.Response
+					hr, innerErr := s.Driver.Request("DELETE", url, &opts) // nolint
+					defer closer(hr)
 					return innerErr
 				},
 				normalizeError,
 			)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostCleanupTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(s.Timings().HostCleanupTimeout(), s.Timings().CommunicationTimeout()))),
+		retry.Constant(s.Timings().NormalDelay()),
 		nil,
 		nil,
 		func(t retry.Try, verdict verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					logrus.Debugf("Subnet still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
+					logrus.Debugf("Subnet still owns host(s), retrying in %s...", s.Timings().NormalDelay())
 				default:
 					logrus.Warnf("unexpected error: %s", spew.Sdump(t.Err))
-					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
+					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), s.Timings().NormalDelay())
 				}
 			}
 		},
@@ -798,7 +806,9 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("POST", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			defer closer(hr)
 			return innerErr
 		},
 		normalizeError,
@@ -821,21 +831,27 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
-					_, innerErr := s.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
+					var hr *http.Response
+					hr, innerErr := s.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts) // nolint
+					defer closer(hr)
 					return innerErr
 				},
 				normalizeError,
 			)
-			if innerXErr == nil {
-				subnet, err = respGet.Extract()
-				if err == nil && subnet.Status == "ACTIVE" {
-					return nil
-				}
+			if innerXErr != nil {
+				return normalizeError(err)
 			}
-			return normalizeError(err)
+			subnet, err = respGet.Extract()
+			if err != nil {
+				return normalizeError(err)
+			}
+			if subnet.Status != "ACTIVE" {
+				return fmt.Errorf("not active yet")
+			}
+			return nil
 		},
-		temporal.GetMinDelay(),
-		temporal.GetContextTimeout(),
+		s.Timings().SmallDelay(),
+		s.Timings().ContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
 				logrus.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", req.Name)

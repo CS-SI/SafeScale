@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,20 +27,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),
-// or some fail.Error that are considered retryable: asking "waitor" to wait between each try, with a duration limit of 'timeout'.
-func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
-	if waitor == nil {
-		return fail.InvalidParameterCannotBeNilError("waitor")
+// or some fail.Error that are considered retryable: asking "waiter" to wait between each try, with a duration limit of 'timeout'.
+func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer, timeout time.Duration, options ...retry.Option) fail.Error {
+	if waiter == nil {
+		return fail.InvalidParameterCannotBeNilError("waiter")
 	}
 
 	var arbiter retry.Arbiter
@@ -50,16 +51,9 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		arbiter = retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout))
 	}
 
-	xerr := retry.Action(
-		func() (nested error) {
-			defer fail.OnPanic(&nested)
-			callbackErr := callback()
-			actionErr := normalizeErrorAndCheckIfRetriable(callbackErr)
-			return actionErr
-		},
+	preparedAction := retry.NewAction(
+		waiter,
 		arbiter,
-		waitor,
-		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
 			switch v {
@@ -68,6 +62,37 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 			default:
 			}
 		},
+		0,
+	)
+
+	for _, opt := range options { // this should change preparedAction.Other if needed
+		err := opt(preparedAction)
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+	}
+
+	strict := false
+	if val, ok := preparedAction.Other["strict"]; ok {
+		if itis, ok := val.(bool); ok {
+			strict = itis
+		}
+	}
+
+	preparedAction.Run = func() (nested error) {
+		defer fail.OnPanic(&nested)
+		callbackErr := callback()
+		actionErr := normalizeErrorAndCheckIfRetriable(strict, callbackErr)
+		return actionErr
+	}
+
+	xerr := retry.Action(
+		preparedAction.Run,
+		preparedAction.Arbiter,
+		preparedAction.Officer,
+		nil,
+		nil,
+		preparedAction.Notify,
 	)
 	if xerr != nil {
 		switch realErr := xerr.(type) {
@@ -85,13 +110,13 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.GetMinDelay()), timeout)
+	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.MinDelay()), timeout)
 }
 
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
 // If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
-func normalizeErrorAndCheckIfRetriable(in error) (err error) {
+func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // nolint
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
@@ -130,12 +155,21 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 			cause := fail.Cause(realErr)
 			switch thecause := cause.(type) {
 			case *url.Error:
-				return normalizeURLError(thecause)
+				if thecause.Temporary() {
+					return realErr
+				}
+				if strict {
+					return normalizeURLError(thecause)
+				}
+				return realErr
 			case net.Error:
 				if thecause.Temporary() {
 					return realErr
 				}
-				return retry.StopRetryError(realErr)
+				if strict {
+					return retry.StopRetryError(realErr)
+				}
+				return realErr
 			case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
 				return realErr
 			default:
@@ -147,8 +181,8 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
-			case "not found": // stow may return that error message if it does not find something
-				return fail.NotFoundError("not found")
+			case objectstorage.NotFound: // stow may return that error message if it does not find something
+				return fail.NotFoundError(objectstorage.NotFound)
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
 				if strings.Contains(str, "dial tcp:") {
 					return fail.NotAvailableError(str)
@@ -220,8 +254,8 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
-			case "not found": // stow may return that error message if it does not find something
-				return fail.NotFoundError("not found")
+			case objectstorage.NotFound: // stow may return that error message if it does not find something
+				return fail.NotFoundError(objectstorage.NotFound)
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
 				if strings.Contains(str, "dial tcp:") {
 					logrus.Tracef("encountered 'dial tcp' error")
@@ -240,31 +274,30 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 }
 
 func normalizeURLError(err *url.Error) fail.Error {
-	if err == nil {
-		return nil
-	}
+	if err != nil {
+		isTemporary := err.Temporary()
 
-	isTemporary := err.Temporary()
-
-	if err.Err != nil {
-		switch commErr := err.Err.(type) {
-		case *net.DNSError:
-			if isTemporary {
-				return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
-			}
-			return retry.StopRetryError(commErr, "failed to resolve by DNS")
-		default:
-			if isTemporary {
-				if commErr != nil {
-					return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+		if err.Err != nil {
+			switch commErr := err.Err.(type) {
+			case *net.DNSError:
+				if isTemporary {
+					return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
 				}
-				return fail.InvalidRequestError("failed to communicate: %v", commErr)
+				return retry.StopRetryError(commErr, "failed to resolve by DNS")
+			default:
+				if isTemporary {
+					if commErr != nil {
+						return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+					}
+					return fail.InvalidRequestError("failed to communicate: %v", commErr)
+				}
+				return retry.StopRetryError(err)
 			}
-			return retry.StopRetryError(err)
 		}
-	}
 
-	return retry.StopRetryError(err)
+		return retry.StopRetryError(err)
+	}
+	return nil
 }
 
 func erz(v error) uintptr {
@@ -277,14 +310,14 @@ func erz(v error) uintptr {
 // IsConnectionReset returns true if given err is a "reset by peer" error
 func IsConnectionReset(err error) bool {
 	if runtime.GOOS == "windows" {
-		const WSAECONNABORTED = 10053
-		const WSAECONNRESET = 10054
+		const cWSAECONNABORTED = 10053
+		const cWSAECONNRESET = 10054
 
 		if oe, ok := err.(*net.OpError); ok {
 			if oe.Op == "read" {
 				if se, ok := oe.Err.(*os.SyscallError); ok {
 					if se.Syscall == "wsarecv" {
-						if n := erz(se.Err); n == WSAECONNRESET || n == WSAECONNABORTED {
+						if n := erz(se.Err); n == cWSAECONNRESET || n == cWSAECONNABORTED {
 							return true
 						}
 					}

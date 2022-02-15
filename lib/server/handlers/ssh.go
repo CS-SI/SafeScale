@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const protocolSeparator = ":"
@@ -341,17 +340,18 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return invalid, "", "", xerr
 	}
 
+	timings := handler.job.Service().Timings()
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			if handler.job.Aborted() {
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
+			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
 			return xerr
 		},
-		temporal.GetMinDelay(),
-		temporal.GetHostTimeout(),
+		timings.SmallDelay(),
+		timings.HostOperationTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
@@ -374,11 +374,11 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	defer func() {
 		derr := sshCmd.Close()
 		if derr != nil {
-			if xerr == nil {
-				xerr = derr
+			if xerr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 				return
 			}
-			_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+			xerr = derr
 		}
 	}()
 
@@ -510,9 +510,10 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		stdout, stderr string
 	)
 	retcode := -1
+	timings := handler.job.Service().Timings()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, temporal.GetLongOperationTimeout())
+			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -542,9 +543,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					return fail.WarningError(finnerXerr, "cannot create md5 command")
 				}
 
-				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-					crcCtx, outputs.COLLECT, temporal.GetLongOperationTimeout(),
-				)
+				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, timings.HostLongOperationTimeout())
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -560,10 +559,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					return fail.WarningError(finnerXerr, "unexpected return code of md5 command")
 				}
 				if !strings.Contains(fstdout, md5hash) {
-					logrus.Warnf(
-						"WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
-						fstdout, fstderr, md5hash,
-					)
+					logrus.Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
 					return fail.NewError("wrong md5 of '%s'", remotePath)
 				}
 				return nil
@@ -582,8 +578,8 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		2*temporal.GetLongOperationTimeout(),
+		timings.NormalDelay(),
+		2*timings.HostLongOperationTimeout(),
 	)
 	return retcode, stdout, stderr, xerr
 }

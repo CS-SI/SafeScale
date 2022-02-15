@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,12 +48,15 @@ import (
 var profileCloseFunc = func() {}
 
 func cleanup(clientSession *client.Session, onAbort *uint32) {
+	var crash error
+	defer fail.OnPanic(&crash) // nolint
+
 	if atomic.CompareAndSwapUint32(onAbort, 0, 0) {
 		profileCloseFunc()
-		os.Exit(0)
+		os.Exit(0) // nolint
 	}
 
-	fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
+	fmt.Println("\nBe careful: stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible.")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
@@ -62,7 +65,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
 		if err != nil {
 			fmt.Printf("failed to stop the process %v\n", err)
 		}
@@ -140,7 +143,8 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		// Define trace settings of the application (what to trace if trace is wanted)
 		// TODO: is it the good behavior ? Shouldn't we fail ?
 		// If trace settings cannot be registered, report it but do not fail
@@ -197,7 +201,8 @@ func main() {
 		return nil
 	}
 
-	app.After = func(c *cli.Context) error {
+	app.After = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		cleanup(clientSession, &onAbort)
 		return nil
 	}

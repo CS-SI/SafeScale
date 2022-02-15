@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 		AvailabilityZone: az,
 		Name:             request.Name,
 		Size:             request.Size,
-		VolumeType:       s.getVolumeType(request.Speed),
+		VolumeType:       strings.ToUpper(s.getVolumeType(request.Speed)),
 	}
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(

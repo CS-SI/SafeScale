@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,6 @@ package data
 
 // Identifiable proposes methods to identify a struct
 type Identifiable interface {
-	GetName() string // Returns the name of the instance
-	GetID() string   // Returns the ID of the instance
+	GetName() string // GetName Returns the name of the instance
+	GetID() string   // GetID Returns the ID of the instance
 }

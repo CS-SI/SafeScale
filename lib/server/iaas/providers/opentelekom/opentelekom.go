@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -121,9 +121,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return rxp.Match([]byte(str))
 	}
 
-	_, err := govalidator.ValidateStruct(authOptions)
-	if err != nil {
-		return nil, fail.ConvertError(err)
+	ok, verr := govalidator.ValidateStruct(authOptions)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", authOptions)
 	}
 
 	providerName := "huaweicloud"
@@ -132,7 +135,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
-	customDNS, _ := compute["DNS"].(string) //. nolint
+	customDNS, _ := compute["DNS"].(string) // . nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")
@@ -172,9 +175,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	// Note: if timings have to be tuned, update stack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "opentelekomm",
+		FullStack: stack,
+		Name:      "opentelekomm",
 	}
 
 	newP := provider{
@@ -183,8 +188,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: &newP,
-		Name:          wrapped.Name,
+		Provider: &newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -279,7 +284,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice, nil
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -288,7 +293,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,8 @@ const (
 	// NetworkV1 contains optional additional info about network of the cluster
 	// Deprecated by NetworkV2 (but kept for compatibility)
 	NetworkV1 = "8"
-	// DefaultsV2 contains optional additional info about network of the cluster
+	// DefaultsV2 contains optional additional info about default settings of the cluster
+	// Deprecated by DefaultV3 (but kept for compatibility)
 	DefaultsV2 = "9"
 	// NetworkV2 contains optional additional info about network of the cluster
 	// Deprecated by NetworkV3 (but kept for compatibility)
@@ -52,4 +53,6 @@ const (
 	NetworkV3 = "13"
 	// NodesV3 contains optional additional info about network of the cluster
 	NodesV3 = "14"
+	// DefaultsV3 contains optional additional info about default settings of the cluster
+	DefaultsV3 = "15"
 )

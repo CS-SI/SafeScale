@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,6 @@ import (
 type Cacheable interface {
 	observer.Observable
 
-	Released()  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
-	Destroyed() // tells cache handler the instance has been deleted and MUST be removed from cache
+	Released()  // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
+	Destroyed() // Destroyed tells cache handler the instance has been deleted and MUST be removed from cache
 }

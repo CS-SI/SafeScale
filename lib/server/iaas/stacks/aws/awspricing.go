@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ type OnDemand struct {
 	Cards map[string]Card
 }
 
-// Reserved reserved compute instance cards
+// Reserved represents compute instance cards
 type Reserved struct {
 	Cards map[string]Card `json:"cards,omitempty"`
 }
@@ -204,9 +204,9 @@ func (p Price) parseStorage(str string) float64 {
 
 // parseNumber ...
 func (p Price) parseInt(str string, failureValue int) int {
-	result := failureValue
-	if okValue, err := strconv.Atoi(str); err == nil {
-		result = okValue
+	okValue, err := strconv.Atoi(str)
+	if err != nil {
+		return failureValue
 	}
-	return result
+	return okValue
 }

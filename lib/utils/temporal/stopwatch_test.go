@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,12 +52,12 @@ func TestStartStopDuration(t *testing.T) {
 	stowa := NewStopwatch()
 
 	stowa.Start()
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(80 * time.Millisecond)
 	stowa.Stop()
 
 	res := FormatDuration(stowa.GetDuration())
-	if !strings.Contains(res, "0.01") {
-		t.Errorf("This should be 10 ms and it isn't: %s", res)
+	if !strings.Contains(res, "0.08") && !strings.Contains(res, "0.09") {
+		t.Errorf("This should be 80 ms and it isn't: %s", res)
 	}
 }
 
@@ -74,7 +74,7 @@ func TestStartStopDurationAgain(t *testing.T) {
 	stowa.Stop()
 
 	res := FormatDuration(stowa.GetDuration())
-	if !strings.Contains(res, "0.01") {
+	if !strings.Contains(res, "0.01") && !strings.Contains(res, "0.02") {
 		t.Errorf("This should be near 10 ms and it isn't: %s", res)
 	}
 }
@@ -134,6 +134,10 @@ func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
 
 	text := fmt.Sprintf("This is %s", stowa)
 	if !(strings.Contains(text, "0.03") || strings.Contains(text, "0.04")) {
+		t.Logf("This should be near 30 ms and it isn't: %s", text)
+	}
+
+	if stowa.GetDuration() > 80*time.Millisecond {
 		t.Errorf("This should be near 30 ms and it isn't: %s", text)
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 
 // ExitOnErrorWithMessage informs cli to exit with message and error code
 func ExitOnErrorWithMessage(exitcode exitcode.Enum, msg string) error {
-	return cli.NewExitError(msg, int(exitcode))
+	return cli.Exit(msg, int(exitcode))
 }
 
 // ExitOnInvalidArgument ...

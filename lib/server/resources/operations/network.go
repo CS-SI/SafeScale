@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -96,7 +95,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
-		temporal.GetMetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := networkCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -203,7 +202,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	defer instance.lock.Unlock()
 
 	// Check if subnet already exists and is managed by SafeScale
-	svc := instance.GetService()
+	svc := instance.Service()
 	existing, xerr := LoadNetwork(svc, req.Name)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -295,13 +294,13 @@ func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -372,7 +371,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 	defer instance.lock.Unlock()
 
 	// Check if Network already exists and is managed by SafeScale
-	svc := instance.GetService()
+	svc := instance.Service()
 	existing, xerr := LoadNetwork(svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -527,7 +526,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		svc := instance.GetService()
+		svc := instance.Service()
 
 		var subnets map[string]string
 		innerXErr := props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -646,8 +645,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 							return fail.Wrap(recErr, "another kind of error")
 						},
-						temporal.GetMinDelay(),
-						temporal.GetContextTimeout(),
+						svc.Timings().SmallDelay(),
+						svc.Timings().ContextTimeout(),
 					)
 					if errWaitMore != nil {
 						_ = innerXErr.AddConsequence(errWaitMore)
@@ -674,7 +673,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
-				time.Sleep(temporal.GetDefaultDelay())
+				time.Sleep(svc.Timings().NormalDelay())
 			}
 		}
 		return nil
@@ -769,7 +768,7 @@ func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fai
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return LoadSubnet(instance.GetService(), instance.GetID(), ref)
+	return LoadSubnet(instance.Service(), instance.GetID(), ref)
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -185,7 +185,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		}
 	}
 	if t, ok := tokens["disk"]; ok {
-		min, _, xerr := t.Validate()
+		min, max, xerr := t.Validate()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
@@ -195,7 +195,15 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 			out.MinDiskSize, err = strconv.Atoi(min)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return nil, 0, fail.SyntaxError("invalid value '%s' for 'disk'", min)
+				return nil, 0, fail.SyntaxError("invalid min value '%s' for 'disk'", min)
+			}
+		}
+
+		if max != "" {
+			out.MaxDiskSize, err = strconv.Atoi(max)
+			err = debug.InjectPlannedError(err)
+			if err != nil {
+				return nil, 0, fail.SyntaxError("invalid max value '%s' for 'disk'", max)
 			}
 		}
 	}

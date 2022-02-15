@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,7 +177,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 
 		// delete SecurityGroup resource
-		return deleteProviderSecurityGroup(instance.GetService(), abstractSG)
+		return deleteProviderSecurityGroup(instance.Service(), abstractSG)
 	})
 	if xerr != nil {
 		return xerr
@@ -200,7 +200,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 // updateNetworkMetadataOnRemoval removes the reference to instance in Network metadata
 func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(networkID string) fail.Error {
 	// -- update Security Groups in Network metadata
-	networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
+	networkInstance, xerr := LoadNetwork(instance.Service(), networkID)
 	if xerr != nil {
 		return xerr
 	}
@@ -228,7 +228,7 @@ func (instance *SecurityGroup) unsafeClear() fail.Error {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.GetService().ClearSecurityGroup(asg)
+		_, innerXErr := instance.Service().ClearSecurityGroup(asg)
 		return innerXErr
 	})
 }
@@ -248,7 +248,7 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.GetService().AddRuleToSecurityGroup(asg, rule)
+		_, innerXErr := instance.Service().AddRuleToSecurityGroup(asg, rule)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -301,7 +301,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.GetService().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
+			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -470,7 +470,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := instance.GetService().BindSecurityGroupToHost(instance.GetID(), hostID)
+				xerr := instance.Service().BindSecurityGroupToHost(instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -483,7 +483,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				xerr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
+				xerr := instance.Service().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,13 +96,24 @@ func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *p
 	return &out
 }
 
-// ClusterDefaultsFromPropertyToProtocol does what the name says
-func ClusterDefaultsFromPropertyToProtocol(in propertiesv2.ClusterDefaults) *protocol.ClusterDefaults {
+// ClusterDefaultsFromPropertyV2ToProtocol does what the name says
+func ClusterDefaultsFromPropertyV2ToProtocol(in propertiesv2.ClusterDefaults) *protocol.ClusterDefaults {
 	return &protocol.ClusterDefaults{
 		GatewaySizing: HostSizingRequirementsFromPropertyToProtocol(in.GatewaySizing),
 		MasterSizing:  HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
 		NodeSizing:    HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
 		Image:         in.Image,
+	}
+}
+
+// ClusterDefaultsFromPropertyV3ToProtocol does what the name says
+func ClusterDefaultsFromPropertyV3ToProtocol(in propertiesv3.ClusterDefaults) *protocol.ClusterDefaults {
+	return &protocol.ClusterDefaults{
+		GatewaySizing:     HostSizingRequirementsFromPropertyToProtocol(in.GatewaySizing),
+		MasterSizing:      HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
+		NodeSizing:        HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
+		Image:             in.Image,
+		FeatureParameters: in.FeatureParameters,
 	}
 }
 

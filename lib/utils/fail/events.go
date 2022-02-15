@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,32 +37,30 @@ const (
 
 // OnExitLogErrorWithLevel logs error with the log level wanted
 func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interface{}) {
-	if err == nil {
-		return
-	}
-
-	logLevelFn, ok := commonlog.LogLevelFnMap[level]
-	if !ok {
-		logLevelFn = logrus.Error
-	}
-
-	switch v := err.(type) {
-	case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
-		// These errors are systematically logged, no need to log them twice
-	case *Error:
-		if *v != nil {
-			logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
+	if err != nil {
+		logLevelFn, ok := commonlog.LogLevelFnMap[level]
+		if !ok {
+			logLevelFn = logrus.Error
 		}
-	case *error:
-		if *v != nil {
-			if IsGRPCError(*v) {
-				logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), grpcstatus.Convert(*v).Message()))
-			} else {
+
+		switch v := err.(type) {
+		case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
+			// These errors are systematically logged, no need to log them twice
+		case *Error:
+			if *v != nil {
 				logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
 			}
+		case *error:
+			if *v != nil {
+				if IsGRPCError(*v) {
+					logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), grpcstatus.Convert(*v).Message()))
+				} else {
+					logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
+				}
+			}
+		default:
+			logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 		}
-	default:
-		logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 	}
 }
 

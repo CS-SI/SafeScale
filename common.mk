@@ -59,6 +59,7 @@ BROWSER?=firefox
 GREP?=grep
 EGREP?=egrep
 CAT?=cat
+TAIL?=tail
 CUT?=cut
 AWK?=awk
 SED?=sed
