@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
@@ -561,7 +561,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 				subnetsByID[port.FixedIPs[0].SubnetID] = ""
 			} else {
 				for _, ip := range port.FixedIPs {
-					if govalidator.IsIPv6(ip.IPAddress) {
+					if valid.IsIPv6(ip.IPAddress) {
 						ipv6 = ip.IPAddress
 					} else {
 						ipv4 = ip.IPAddress
@@ -587,7 +587,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 			port := hostPorts[k]
 			for _, ip := range port.FixedIPs {
 				subnetID := ip.SubnetID
-				if govalidator.IsIPv6(ip.IPAddress) {
+				if valid.IsIPv6(ip.IPAddress) {
 					ipv6Addresses[subnetID] = ip.IPAddress
 				} else {
 					ipv4Addresses[subnetID] = ip.IPAddress

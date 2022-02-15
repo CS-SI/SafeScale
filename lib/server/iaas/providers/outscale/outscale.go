@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/lib/utils/valid"
 )
 
 const (
@@ -116,13 +116,13 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
@@ -253,7 +253,7 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 // GetTenantParameters returns the tenant parameters as-is
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 	if p.IsNull() {
-		return map[string]interface{}{}, nil
+		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
 }
