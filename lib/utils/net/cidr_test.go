@@ -315,6 +315,13 @@ func TestCIDRString_IntersectsWith(t *testing.T) {
 		},
 		{
 			cidr1:               "192.168.0.1/24",
+			cidr2:               "192.168.0.1/28",
+			expectError:         false,
+			expectErrorFragment: "",
+			result:              true,
+		},
+		{
+			cidr1:               "192.168.0.1/28",
 			cidr2:               "192.168.0.1/24",
 			expectError:         false,
 			expectErrorFragment: "",

@@ -170,6 +170,7 @@ func Test_ClusterCompositeFromPropertyToProtocol(t *testing.T) {
 
 }
 
+/*
 func Test_ClusterDefaultsFromPropertyToProtocol(t *testing.T) {
 
 	cc := ClusterDefaultsFromPropertyToProtocol(propertiesv2.ClusterDefaults{
@@ -215,6 +216,7 @@ func Test_ClusterDefaultsFromPropertyToProtocol(t *testing.T) {
 	}
 
 }
+*/
 
 func Test_ClusterNetworkFromPropertyToProtocol(t *testing.T) {
 
@@ -264,20 +266,20 @@ func Test_ClusterFeaturesFromPropertyToProtocol(t *testing.T) {
 				FileName:   "ansible.yml",
 				RequiredBy: map[string]struct{}{},
 				Requires: map[string]struct{}{
-					"Python3": struct{}{},
+					"Python3": {},
 				},
 			},
 			"Python3": {
 				Name:     "Python3",
 				FileName: "python3.yml",
 				RequiredBy: map[string]struct{}{
-					"Ansible": struct{}{},
+					"Ansible": {},
 				},
 				Requires: map[string]struct{}{},
 			},
 		},
 		Disabled: map[string]struct{}{
-			"Ansible": struct{}{},
+			"Ansible": {},
 		},
 	})
 	if reflect.TypeOf(featList).String() != "*protocol.FeatureListResponse" {

@@ -72,7 +72,7 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter waitor"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter waiter"), true)
 	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
 
 	// no timeout
@@ -341,7 +341,7 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 				},
 				"Any error",
 			),
-			out: "*fail.ErrInvalidRequest",
+			out: "*fail.ErrNotAvailable",
 		},
 		{
 			in: fail.NotAvailableErrorWithCause(
@@ -406,7 +406,7 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 
 	for i := range tests {
 		test := tests[i]
-		result := normalizeErrorAndCheckIfRetriable(test.in)
+		result := normalizeErrorAndCheckIfRetriable(true, test.in)
 
 		if reflect.TypeOf(result).String() != test.out {
 			t.Error(fmt.Sprintf("Invalid normalizeErrorAndCheckIfRetriable convert:\n    expect %s => %s\n    has %s => %s", reflect.TypeOf(test.in).String(), test.out, reflect.TypeOf(test.in).String(), reflect.TypeOf(result).String()))
