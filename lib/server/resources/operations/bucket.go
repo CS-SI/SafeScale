@@ -592,7 +592,10 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 	}
 
 	// -- assemble parameters for mount description
-	osConfig := svc.ObjectStorageConfiguration()
+	osConfig, xerr := svc.ObjectStorageConfiguration()
+	if xerr != nil {
+		return xerr
+	}
 
 	mountPoint := path
 	if path == abstract.DefaultBucketMountPoint {

@@ -194,7 +194,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
 		if isGateway {
-			if host.GetState() != hoststate.Started {
+			hs, err := host.GetState()
+			if err != nil {
+				return nil, fail.Wrap(err, "cannot retrieve host properties")
+			}
+			if hs != hoststate.Started {
 				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
 			}
 		}
@@ -343,7 +347,11 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	timings := handler.job.Service().Timings()
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			if handler.job.Aborted() {
+			isAborted, err := handler.job.Aborted()
+			if err != nil {
+				return err
+			}
+			if isAborted {
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 

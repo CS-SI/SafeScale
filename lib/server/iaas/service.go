@@ -64,7 +64,7 @@ type Service interface {
 	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
-	ObjectStorageConfiguration() objectstorage.Config
+	ObjectStorageConfiguration() (objectstorage.Config, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
@@ -947,6 +947,9 @@ func (instance service) InspectSecurityGroupByName(networkID, name string) (*abs
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
-func (instance service) ObjectStorageConfiguration() objectstorage.Config {
-	return instance.Location.Configuration()
+func (instance service) ObjectStorageConfiguration() (objectstorage.Config, fail.Error) {
+	if instance.IsNull() {
+		return objectstorage.Config{}, fail.InvalidInstanceError()
+	}
+	return instance.Location.Configuration(), nil
 }

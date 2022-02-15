@@ -780,16 +780,16 @@ func (instance *Host) Reload() (xerr fail.Error) {
 }
 
 // GetState returns the last known state of the Host, without forced inspect
-func (instance *Host) GetState() (state hoststate.Enum) {
-	state = hoststate.Unknown
+func (instance *Host) GetState() (hoststate.Enum, fail.Error) {
+	state := hoststate.Unknown
 	if instance == nil || instance.IsNull() {
-		return state
+		return state, fail.InvalidInstanceError()
 	}
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	_ = instance.Review(
+	xerr := instance.Review(
 		func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
 			if !ok {
@@ -802,7 +802,11 @@ func (instance *Host) GetState() (state hoststate.Enum) {
 			return nil
 		},
 	)
-	return state
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+
+	return state, nil
 }
 
 // Create creates a new Host and its metadata
