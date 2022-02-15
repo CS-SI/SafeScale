@@ -15,6 +15,7 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/felixge/fgprof v0.9.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/gophercloud/gophercloud v0.24.0
@@ -31,7 +32,6 @@ require (
 	github.com/ovh/go-ovh v1.1.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.5.2
-	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1

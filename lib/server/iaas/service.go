@@ -28,8 +28,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/valid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/xrash/smetrics"
 

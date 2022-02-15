@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	uuidpkg "github.com/satori/go.uuid"
+	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )

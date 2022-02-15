@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
