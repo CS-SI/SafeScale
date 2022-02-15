@@ -29,16 +29,16 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/cli/safescale/commands"
+	"github.com/CS-SI/SafeScale/v21/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
+	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
@@ -162,18 +162,18 @@ func main() {
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
-			app2.Verbose = true
+			appwide.Verbose = true
 		} else {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
 		// Defines trace level wanted by user
-		if app2.Verbose = c.Bool("verbose"); app2.Verbose {
+		if appwide.Verbose = c.Bool("verbose"); appwide.Verbose {
 			logrus.SetLevel(logrus.InfoLevel)
-			app2.Verbose = true
+			appwide.Verbose = true
 		}
-		if app2.Debug = c.Bool("debug"); app2.Debug {
-			if app2.Verbose {
+		if appwide.Debug = c.Bool("debug"); appwide.Debug {
+			if appwide.Verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)

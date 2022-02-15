@@ -16,6 +16,8 @@
 
 package cache
 
+//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/cache.cache
+
 import (
 	"fmt"
 	"reflect"

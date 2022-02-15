@@ -41,4 +41,3 @@ gensrc:
 clean:
 	@(cd bucketfs && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
-	@$(RM) rice-box.go || true

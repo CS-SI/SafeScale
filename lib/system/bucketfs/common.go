@@ -19,16 +19,15 @@ package bucketfs
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
@@ -37,24 +36,11 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
-//go:generate rice embed-go
-
-// templateProvider is the instance of TemplateProvider used by package bucketfs
-var tmplBox *rice.Box
-
-// getTemplateProvider returns the instance of TemplateProvider
-func getTemplateBox() (*rice.Box, fail.Error) {
-	if tmplBox == nil {
-		var err error
-		tmplBox, err = rice.FindBox("../bucketfs/scripts")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-	}
-	return tmplBox, nil
-}
+//go:embed scripts/*
+var bucketfsScripts embed.FS
 
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
@@ -175,31 +161,22 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 }
 
 func realizeTemplate(name string, data interface{}) (string, fail.Error) {
-	tmplBox, xerr := getTemplateBox()
-	if xerr != nil {
-		xerr = fail.ExecutionError(xerr, "failure retrieving embedded blobs")
-		return "", xerr
-	}
-
 	// get file content as string
-	tmplContent, err := tmplBox.String(name)
+	tmplContent, err := bucketfsScripts.ReadFile(name)
 	if err != nil {
-		xerr = fail.ExecutionError(err, "failure retrieving embedded box '%s'", name)
-		return "", xerr
+		return "", fail.ExecutionError(err, "failure retrieving embedded box '%s'", name)
 	}
 
 	// Prepare the template for execution
-	tmplPrepared, err := template.Parse(name, tmplContent)
+	tmplPrepared, err := template.Parse(name, string(tmplContent))
 	if err != nil {
-		xerr = fail.ExecutionError(err, "failure parsing template '%s'", name)
-		return "", xerr
+		return "", fail.ExecutionError(err, "failure parsing template '%s'", name)
 	}
 
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		// log the faulty data
-		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
-		return "", xerr
+		return "", fail.ExecutionError(err, "failed to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
 	}
 	content := buffer.String()
 	return content, nil
