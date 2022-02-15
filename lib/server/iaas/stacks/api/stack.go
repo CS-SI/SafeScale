@@ -165,7 +165,7 @@ type Stack interface {
 	Migrate(operation string, params map[string]interface{}) fail.Error
 
 	// Timings ...
-	Timings() temporal.Timings
+	Timings() (temporal.Timings, fail.Error)
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally

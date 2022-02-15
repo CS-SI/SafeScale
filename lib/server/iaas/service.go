@@ -28,8 +28,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/valid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/xrash/smetrics"
 
@@ -64,7 +64,7 @@ type Service interface {
 	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
-	ObjectStorageConfiguration() objectstorage.Config
+	ObjectStorageConfiguration() (objectstorage.Config, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
@@ -267,7 +267,8 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 			case <-done: // only when it's closed
 				return
 			default:
-				time.Sleep(instance.Timings().SmallDelay())
+				timings, _ := instance.Timings()
+				time.Sleep(timings.SmallDelay())
 			}
 		}
 	}()
@@ -947,6 +948,9 @@ func (instance service) InspectSecurityGroupByName(networkID, name string) (*abs
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
-func (instance service) ObjectStorageConfiguration() objectstorage.Config {
+func (instance service) ObjectStorageConfiguration() (objectstorage.Config, fail.Error) {
+	if instance.IsNull() {
+		return objectstorage.Config{}, fail.InvalidInstanceError()
+	}
 	return instance.Location.Configuration()
 }

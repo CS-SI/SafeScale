@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/sanity-io/litter"
-	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/ssh"
 )
 

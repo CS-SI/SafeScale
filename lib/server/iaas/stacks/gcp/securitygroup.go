@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 

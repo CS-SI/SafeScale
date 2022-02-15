@@ -43,7 +43,7 @@ import (
 type Object interface {
 	//	data.Identifiable
 
-	Stored() bool
+	Stored() (bool, fail.Error)
 
 	Read(io.Writer, int64, int64) fail.Error
 	Write(io.Reader, int64) fail.Error
@@ -118,11 +118,11 @@ func newObjectFromStow(b *bucket, item stow.Item) object {
 }
 
 // Stored return true if the object exists in Object Storage
-func (instance object) Stored() bool {
+func (instance object) Stored() (bool, fail.Error) {
 	if instance.IsNull() {
-		return false
+		return false, fail.InvalidInstanceError()
 	}
-	return instance.item != nil
+	return instance.item != nil, nil
 }
 
 // Reload reloads the data of the Object from the Object Storage

@@ -126,6 +126,11 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	sgCache, xerr := svc.GetCache(securityGroupKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -134,7 +139,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := sgCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -526,8 +531,13 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fai
 
 // deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
 func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// FIXME: communication failure handled at service level, not necessary anymore to retry here
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := svc.DeleteSecurityGroup(abstractSG); innerXErr != nil {
 				switch innerXErr.(type) {
@@ -539,7 +549,7 @@ func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.Security
 			}
 			return nil
 		},
-		svc.Timings().CommunicationTimeout(),
+		timings.CommunicationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

@@ -517,8 +517,12 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		return invalid, "", "", fail.ConvertError(err)
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	// Configures reserved_BashLibrary template var
-	timings := instance.Service().Timings()
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -615,6 +619,11 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		return xerr
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {
 		tp, xerr := instance.Service().GetTenantParameters()
@@ -699,7 +708,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, instance.Service().Timings().ConnectionTimeout(), 2*instance.Service().Timings().HostLongOperationTimeout())
+			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), 2*timings.HostLongOperationTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())

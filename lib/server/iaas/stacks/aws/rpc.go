@@ -1823,6 +1823,11 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	var nics []*string
 	for _, v := range instance.NetworkInterfaces {
 		// Detach and release Elastic IP from the network interface if needed
@@ -1860,7 +1865,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		InstanceIds: []*string{instance.InstanceId},
 	}
 	var resp *ec2.TerminateInstancesOutput
-	xerr := stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.TerminateInstances(&request)
 			return innerErr
@@ -1907,8 +1912,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostCleanupTimeout(),
+		timings.NormalDelay(),
+		timings.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1916,7 +1921,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, s.Timings().HostCleanupTimeout(),
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	// "github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
