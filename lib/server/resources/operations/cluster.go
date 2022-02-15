@@ -169,9 +169,14 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 		return nil, xerr
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := clusterCache.Get(name, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -286,7 +291,12 @@ func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -598,8 +608,8 @@ func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 }
 
 // Start starts the Cluster
-func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -628,6 +638,11 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 
 	// make sure no other parallel actions interferes
 	instance.lock.Lock()
@@ -660,8 +675,8 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 				return fail.NewError("current state of Cluster is '%s'", state.String())
 			},
-			instance.Service().Timings().NormalDelay(),
-			instance.Service().Timings().ExecutionTimeout(),
+			timings.NormalDelay(),
+			timings.ExecutionTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -874,8 +889,8 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 }
 
 // Stop stops the Cluster
-func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -904,6 +919,11 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 
 	// make sure no other parallel actions interferes
 	instance.lock.Lock()
@@ -939,8 +959,8 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 
 				return nil
 			},
-			instance.Service().Timings().NormalDelay(),
-			instance.Service().Timings().ExecutionTimeout(),
+			timings.NormalDelay(),
+			timings.ExecutionTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1224,7 +1244,12 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		nodes  []*propertiesv3.ClusterNode
 	)
 
-	timeout := 2 * svc.Timings().HostCreationTimeout() // More than enough
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	timeout := 2 * timings.HostCreationTimeout() // More than enough
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(
 		task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)),
@@ -2702,7 +2727,12 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	svc := instance.Service()
+	svc := instance.Service() // FIXME: This might FAIL, IT CAN be nil
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	if subnetInstance != nil && !subnetInstance.IsNull() {
 		subnetName := subnetInstance.GetName()
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
@@ -2719,8 +2749,8 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 				}
 				return nil
 			},
-			svc.Timings().NormalDelay(),
-			svc.Timings().HostOperationTimeout(),
+			timings.NormalDelay(),
+			timings.HostOperationTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -2762,8 +2792,8 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 				}
 				return nil
 			},
-			svc.Timings().NormalDelay(),
-			svc.Timings().HostOperationTimeout(),
+			timings.NormalDelay(),
+			timings.HostOperationTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

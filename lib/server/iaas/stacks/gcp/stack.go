@@ -106,12 +106,12 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 }
 
 // Timings returns the instance containing current timing (timeouts, delays) settings
-func (s *stack) Timings() temporal.Timings {
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
-		return temporal.NewTimings()
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

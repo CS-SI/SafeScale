@@ -126,6 +126,11 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostCache, xerr := svc.GetCache(hostKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -146,7 +151,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 
 	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref, updateCachedInformation) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	ce, xerr := hostCache.Get(ref, cacheOptions...)
 	if xerr != nil {
@@ -422,7 +427,12 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), svc.Timings().MetadataTimeout())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -859,6 +869,11 @@ func (instance *Host) Create(
 
 	svc := instance.Service()
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Check if Host exists and is managed bySafeScale
 	hostInstance, xerr := LoadHost(svc, hostReq.ResourceName)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1156,7 +1171,7 @@ func (instance *Host) Create(
 	// claiming Host is created
 	logrus.Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
 
-	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, svc.Timings().HostCreationTimeout())
+	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, timings.HostCreationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1241,15 +1256,20 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 		imageRef = cfg.GetString("DefaultImage")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return "", "", xerr
+	}
+
 	var img *abstract.Image
-	xerr := retry.WhileUnsuccessful(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
 			img, innerXErr = svc.SearchImage(imageRef)
 			return innerXErr
 		},
-		svc.Timings().SmallDelay(),
-		svc.Timings().OperationTimeout(),
+		timings.SmallDelay(),
+		timings.OperationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1749,8 +1769,13 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 		fmt.Sprintf("Finish Waiting install phase %s on '%s'...", phase, instance.GetName()),
 	)()
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return "", xerr
+	}
+
 	givenTimeout := int(timeout.Minutes())
-	sshDefaultTimeout := int(instance.Service().Timings().HostOperationTimeout().Minutes())
+	sshDefaultTimeout := int(timings.HostOperationTimeout().Minutes())
 	if givenTimeout > sshDefaultTimeout {
 		sshDefaultTimeout = givenTimeout
 	}
@@ -1986,8 +2011,13 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
-	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, svc.Timings().HostOperationTimeout())
+	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, timings.HostOperationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2014,7 +2044,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
-	waitingTime := temporal.MaxTimeout(4*time.Minute, svc.Timings().HostCreationTimeout())
+	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
 	// If the script doesn't reboot, we force a reboot
 	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
 		logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
@@ -2074,7 +2104,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			return xerr
 		}
 
-		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, svc.Timings().HostOperationTimeout())
+		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timings.HostOperationTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) { // nolint
@@ -2381,6 +2411,11 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	}
 
 	svc := instance.Service()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	var shares map[string]*propertiesv1.HostShare
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Do not remove a Host having shares that are currently remotely mounted
@@ -2669,8 +2704,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				}
 				return nil
 			},
-			instance.Service().Timings().SmallDelay(),
-			instance.Service().Timings().HostCleanupTimeout(),
+			timings.SmallDelay(),
+			timings.HostCleanupTimeout(),
 		)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
@@ -2703,8 +2738,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					}
 					return nil
 				},
-				instance.Service().Timings().NormalDelay(),
-				instance.Service().Timings().OperationTimeout(),
+				timings.NormalDelay(),
+				timings.OperationTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -2840,6 +2875,11 @@ func (instance *Host) Pull(
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("source")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2890,7 +2930,7 @@ func (instance *Host) Pull(
 
 			return nil
 		},
-		instance.Service().Timings().NormalDelay(),
+		timings.NormalDelay(),
 		2*timeout,
 	)
 	if xerr != nil {
@@ -3055,6 +3095,11 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 	hostID := instance.GetID()
 
 	svc := instance.Service()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	hostCache, xerr := svc.GetCache(hostKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3076,10 +3121,10 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.Started, svc.Timings().HostOperationTimeout())
+			return svc.WaitHostState(hostID, hoststate.Started, timings.HostOperationTimeout())
 		},
-		svc.Timings().NormalDelay(),
-		svc.Timings().ExecutionTimeout(),
+		timings.NormalDelay(),
+		timings.ExecutionTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3150,6 +3195,11 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Invalidate Cache
 	_ = hostCache.FreeEntry(hostID)
 
@@ -3166,10 +3216,10 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.Stopped, svc.Timings().HostOperationTimeout())
+			return svc.WaitHostState(hostID, hoststate.Stopped, timings.HostOperationTimeout())
 		},
-		svc.Timings().NormalDelay(),
-		svc.Timings().ExecutionTimeout(),
+		timings.NormalDelay(),
+		timings.ExecutionTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3227,16 +3277,21 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	waitingTime := 4 * time.Minute // FIXME: Hardcoded
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Reboot Host
 	logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
 	command := `echo "sleep 4 ; sync ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr := instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
+	_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
-	time.Sleep(instance.Service().Timings().NormalDelay())
+	time.Sleep(timings.NormalDelay())
 	return nil
 }
 

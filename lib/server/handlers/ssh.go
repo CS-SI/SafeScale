@@ -309,8 +309,8 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
 	if handler == nil {
@@ -329,7 +329,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
@@ -344,7 +344,11 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return invalid, "", "", xerr
 	}
 
-	timings := handler.job.Service().Timings()
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			isAborted, err := handler.job.Aborted()
@@ -439,8 +443,8 @@ func getMD5Hash(text string) string {
 }
 
 // Copy copies file/directory from/to remote host
-func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if handler == nil {
@@ -459,7 +463,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	hostName := ""
 	var upload bool
@@ -518,7 +522,11 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		stdout, stderr string
 	)
 	retcode := -1
-	timings := handler.job.Service().Timings()
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())

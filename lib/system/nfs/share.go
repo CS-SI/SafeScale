@@ -76,13 +76,18 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 
 // Add configures and exports the share
 func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	data := map[string]interface{}{
 		"Path": s.Path,
 		// "AccessRights": strings.TrimSpace(acls),
 		"Options": s.Options,
 	}
 
-	if _, xerr := executeScript(ctx, svc.Timings(), *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
+	if _, xerr := executeScript(ctx, timings, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
 		return fail.Wrap(xerr, "failed to export a shared directory")
 	}
 	return nil

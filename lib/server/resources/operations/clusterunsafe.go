@@ -287,6 +287,11 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 		return nil, xerr
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	var lastError fail.Error
 	lastError = fail.NotFoundError("no master found")
 	master = nil
@@ -301,7 +306,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			return nil, xerr
 		}
 
-		_, xerr = master.WaitSSHReady(ctx, instance.Service().Timings().SSHConnectionTimeout())
+		_, xerr = master.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -424,6 +429,11 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		}
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -459,7 +469,7 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 			hostInstance.Released()
 		}(node)
 
-		_, xerr = node.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
+		_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

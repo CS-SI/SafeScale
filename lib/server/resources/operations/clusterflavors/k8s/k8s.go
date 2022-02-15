@@ -146,7 +146,10 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	// Drain pods from node
 	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
-	timings := clusterInstance.Service().Timings()
+	timings, xerr := clusterInstance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())

@@ -552,9 +552,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// --- prepares data structures for Provider usage ---
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", s.Timings()); xerr != nil {
+	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
 		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -694,7 +699,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			ahf.Core.Name = server.Name
 
 			// Wait until Host is ready, not just until the build is started
-			if _, innerXErr = s.WaitHostReady(ahf, s.Timings().HostLongOperationTimeout()); innerXErr != nil {
+			if _, innerXErr = s.WaitHostReady(ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
 				if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 				}
@@ -703,8 +708,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1173,6 +1178,11 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr f
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	if xerr = s.rpcStopInstances([]*string{aws.String(ahf.Core.ID)}, aws.Bool(gracefully)); xerr != nil {
 		return xerr
 	}
@@ -1191,8 +1201,8 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr f
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostCleanupTimeout(),
+		timings.NormalDelay(),
+		timings.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1201,7 +1211,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr f
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
-				s.Timings().HostCleanupTimeout(),
+				timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1224,6 +1234,11 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	xerr = s.rpcStartInstances([]*string{aws.String(ahf.Core.ID)})
 	if xerr != nil {
 		return xerr
@@ -1241,8 +1256,8 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostCleanupTimeout(),
+		timings.NormalDelay(),
+		timings.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1251,7 +1266,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get information of host '%s' after %v", hostRef,
-				s.Timings().HostCleanupTimeout(),
+				timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1267,6 +1282,11 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := s.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -1290,8 +1310,8 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		2*s.Timings().HostCleanupTimeout(),
+		timings.NormalDelay(),
+		2*timings.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1300,7 +1320,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
-				s.Timings().HostCleanupTimeout(),
+				timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

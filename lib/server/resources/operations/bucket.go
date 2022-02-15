@@ -89,9 +89,14 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 		return nil, xerr
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onBucketCacheMiss(svc, name) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := bucketCache.Get(name, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -156,13 +161,18 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -602,9 +612,14 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 		mountPoint = abstract.DefaultBucketMountPoint + instance.GetName()
 	}
 
+	fsProtocol, err := svc.Protocol()
+	if err != nil {
+		return err
+	}
+
 	desc := bucketfs.Description{
 		BucketName: instance.GetName(),
-		Protocol:   svc.Protocol(),
+		Protocol:   fsProtocol,
 		MountPoint: mountPoint,
 	}
 	if anon, ok := authOpts.Config("AuthURL"); ok {

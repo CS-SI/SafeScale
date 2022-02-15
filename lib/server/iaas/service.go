@@ -267,7 +267,8 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 			case <-done: // only when it's closed
 				return
 			default:
-				time.Sleep(instance.Timings().SmallDelay())
+				timings, _ := instance.Timings()
+				time.Sleep(timings.SmallDelay())
 			}
 		}
 	}()
@@ -951,5 +952,5 @@ func (instance service) ObjectStorageConfiguration() (objectstorage.Config, fail
 	if instance.IsNull() {
 		return objectstorage.Config{}, fail.InvalidInstanceError()
 	}
-	return instance.Location.Configuration(), nil
+	return instance.Location.Configuration()
 }

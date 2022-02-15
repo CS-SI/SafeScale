@@ -626,6 +626,12 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
@@ -666,8 +672,8 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().ContextTimeout(),
+		timings.NormalDelay(),
+		timings.ContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
