@@ -67,7 +67,7 @@ func (m *Memoria) Replace(clonable data.Clonable) data.Clonable {
 }
 */
 
-// This test, if it succeeds, means the Replace implementation is defective
+// This test, if it succeeds, means the 'Replace' implementation is defective
 func TestDefectiveCloneableImplementation(t *testing.T) {
 	a := NewStructWithPointersAndDefectiveReplace()
 	a.Rumba = 9

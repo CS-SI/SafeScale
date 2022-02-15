@@ -22,6 +22,9 @@ func IsNull(something interface{}) bool {
 	}
 
 	if casted, ok := something.(NullValue); ok {
+		if casted == nil {
+			return true
+		}
 		return casted.IsNull()
 	}
 
@@ -34,6 +37,9 @@ func IsNil(something interface{}) bool {
 	}
 
 	if casted, ok := something.(NullValue); ok {
+		if casted == nil {
+			return true
+		}
 		return casted.IsNull()
 	}
 
