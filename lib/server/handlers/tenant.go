@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	scribble "github.com/nanobox-io/golang-scribble"
+	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"

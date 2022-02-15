@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -723,9 +724,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 		}()
 
-		if govalidator.IsIPv4(fip.PublicIPAddress) {
+		if valid.IsIPv4(fip.PublicIPAddress) {
 			host.Networking.PublicIPv4 = fip.PublicIPAddress
-		} else if govalidator.IsIPv6(fip.PublicIPAddress) {
+		} else if valid.IsIPv6(fip.PublicIPAddress) {
 			host.Networking.PublicIPv6 = fip.PublicIPAddress
 		}
 		userData.PublicIP = fip.PublicIPAddress
@@ -744,23 +745,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 // validateHostname validates the name of a host based on known FlexibleEngine requirements
 func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
-	s := check.Struct{
-		"ResourceName": check.Composite{
-			check.NonEmpty{},
-			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{Constraint: 64},
-		},
+	err := validation.ValidateStruct(&req,
+		validation.Field(&req.ResourceName, validation.Required, validation.Length(1, 64)),
+		validation.Field(&req.ResourceName, validation.Required, validation.Match(regexp.MustCompile(`^[a-zA-Z0-9_-]+$`))),
+	)
+	if err != nil {
+		return false, fail.Wrap(err, "validation issue")
 	}
 
-	e := s.Validate(req)
-	if e.HasErrors() {
-		errorList, _ := e.GetErrorsByKey("ResourceName")
-		var errs []error
-		for _, msg := range errorList {
-			errs = append(errs, msg)
-		}
-		return false, fail.NewErrorList(errs)
-	}
 	return true, nil
 }
 
