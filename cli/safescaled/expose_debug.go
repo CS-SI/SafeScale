@@ -26,7 +26,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/exportstats"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/exportstats"
 	"github.com/felixge/fgprof"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"

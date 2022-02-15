@@ -16,7 +16,7 @@
 
 package serialize
 
-import "github.com/CS-SI/SafeScale/lib/utils/fail"
+import "github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 
 //go:generate minimock -o ../mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/lib/utils/serialize.Serializable
 

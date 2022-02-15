@@ -19,9 +19,9 @@ package operations
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 //go:generate minimock -o ../mocks/mock_installer.go -i github.com/CS-SI/SafeScale/lib/server/resources/operations.Installer

@@ -18,7 +18,7 @@
 package aws
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/aws/aws-sdk-go/service/s3"
 
 	"fmt"
@@ -31,7 +31,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/pricing"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
 )
 
 type stack struct {

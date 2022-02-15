@@ -19,7 +19,7 @@ package cli
 import (
 	"github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 )
 
 // ExitOnErrorWithMessage informs cli to exit with message and error code

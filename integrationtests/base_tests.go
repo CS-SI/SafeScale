@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 
 	"github.com/stretchr/testify/require"
 

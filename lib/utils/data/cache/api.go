@@ -21,8 +21,8 @@ package cache
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Cache interface describing what a struct must implement to be considered as a cache
