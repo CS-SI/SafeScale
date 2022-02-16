@@ -434,7 +434,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 			return xerr
 		}
 	}
-	if !data.IsNil(ab) {
+	if !data.IsNil(&ab) {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
