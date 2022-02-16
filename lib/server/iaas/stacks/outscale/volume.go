@@ -130,6 +130,11 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	return retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			vol, innerErr := s.InspectVolume(volumeID)
@@ -141,8 +146,8 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostOperationTimeout(),
 	)
 }
 

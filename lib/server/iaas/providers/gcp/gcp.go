@@ -21,16 +21,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/gcp"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/valid"
 )
 
 const (
@@ -150,13 +150,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
@@ -264,7 +264,7 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 
 // ListImages ...
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
@@ -272,7 +272,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 
 // ListTemplates ...
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
@@ -293,7 +293,7 @@ func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

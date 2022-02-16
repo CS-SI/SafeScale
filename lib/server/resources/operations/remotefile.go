@@ -58,6 +58,11 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 	}
 
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Check the local file exists first
 	if _, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
@@ -88,7 +93,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			iterations++
-			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, host.Service().Timings().ExecutionTimeout())
+			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, timings.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				xerr.Annotate("iterations", iterations)
@@ -112,8 +117,8 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 			}
 			return nil
 		},
-		host.Service().Timings().NormalDelay(),
-		host.Service().Timings().ConnectionTimeout()+2*host.Service().Timings().ExecutionTimeout(),
+		timings.NormalDelay(),
+		timings.ConnectionTimeout()+2*timings.ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
@@ -154,8 +159,13 @@ func (rfc Item) RemoveRemote(ctx context.Context, host resources.Host) fail.Erro
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().ExecutionTimeout())
+	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil || retcode != 0 {
 		return fail.NewError("failed to remove file '%s:%s'", host.GetName(), rfc.Remote)

@@ -73,7 +73,7 @@ func TestInjectAndExtractFromContext(t *testing.T) {
 	require.Nil(t, err)
 
 	ctx := context.Background()
-	ctxv := context.WithValue(ctx, KeyForTaskInContext, ta)
+	ctxv := context.WithValue(ctx, KeyForTaskInContext, ta) // nolint
 
 	nt, err := TaskFromContext(ctxv)
 	require.Nil(t, err)
@@ -81,7 +81,7 @@ func TestInjectAndExtractFromContext(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "hold", rid)
 
-	ctxv2 := context.WithValue(ctx, KeyForTaskInContext, "wrong")
+	ctxv2 := context.WithValue(ctx, KeyForTaskInContext, "wrong") // nolint
 	nt, err = TaskFromContext(ctxv2)
 	require.Nil(t, nt)
 	require.NotNil(t, err)

@@ -415,8 +415,8 @@ func (myself *MetadataCore) Read(ref string) (xerr fail.Error) {
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (myself *MetadataCore) ReadByID(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) ReadByID(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: do not test with .IsNull() here, it may be null value on first read
 	if myself == nil {
@@ -427,6 +427,11 @@ func (myself *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 	}
 	if myself.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
+	}
+
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
 	}
 
 	myself.lock.Lock()
@@ -445,8 +450,8 @@ func (myself *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			myself.Service().Timings().SmallDelay(),
-			myself.Service().Timings().ContextTimeout(),
+			timings.SmallDelay(),
+			timings.ContextTimeout(),
 		)
 	} else {
 		xerr = retry.WhileUnsuccessful(
@@ -461,8 +466,8 @@ func (myself *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			myself.Service().Timings().SmallDelay(),
-			myself.Service().Timings().ContextTimeout(),
+			timings.SmallDelay(),
+			timings.ContextTimeout(),
 		)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
@@ -504,9 +509,14 @@ func (myself *MetadataCore) readByID(id string) fail.Error {
 
 // readByReference gets the data from Object Storage
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
-func (myself *MetadataCore) readByReference(ref string) (xerr fail.Error) {
-	timeout := myself.Service().Timings().CommunicationTimeout()
-	delay := myself.Service().Timings().SmallDelay()
+func (myself *MetadataCore) readByReference(ref string) (ferr fail.Error) {
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	timeout := timings.CommunicationTimeout()
+	delay := timings.SmallDelay()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			if innerXErr := myself.readByID(ref); innerXErr != nil {
@@ -624,8 +634,13 @@ func (myself *MetadataCore) Reload() (xerr fail.Error) {
 
 // reload reloads the content from the Object Storage
 // Note: must be called after locking the instance
-func (myself *MetadataCore) reload() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) reload() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 
 	if myself.loaded && !myself.committed {
 		return fail.InconsistentError("cannot reload a not committed data")
@@ -649,8 +664,8 @@ func (myself *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			myself.Service().Timings().SmallDelay(),
-			2*myself.Service().Timings().MetadataTimeout(),
+			timings.SmallDelay(),
+			2*timings.MetadataTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -684,8 +699,8 @@ func (myself *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			myself.Service().Timings().SmallDelay(),
-			myself.Service().Timings().ContextTimeout(),
+			timings.SmallDelay(),
+			timings.ContextTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -940,7 +955,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		err := json.Unmarshal(buf, &mapped)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxErrorWithCause(err, "unmarshalling JSON to map failed")
+			return fail.SyntaxErrorWithCause(err, nil, "unmarshalling JSON to map failed")
 		}
 		if props, ok = mapped["properties"].(map[string]interface{}); ok {
 			delete(mapped, "properties")
@@ -950,7 +965,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 	jsoned, err := json.Marshal(mapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return fail.SyntaxErrorWithCause(err, "failed to marshal MetadataCore to JSON")
+		return fail.SyntaxErrorWithCause(err, nil, "failed to marshal MetadataCore to JSON")
 	}
 
 	xerr = myself.shielded.Deserialize(jsoned)
@@ -963,7 +978,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		jsoned, err = json.Marshal(props)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxErrorWithCause(err, "failed to marshal properties to JSON")
+			return fail.SyntaxErrorWithCause(err, nil, "failed to marshal properties to JSON")
 		}
 
 		xerr = myself.properties.Deserialize(jsoned)

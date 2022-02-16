@@ -229,9 +229,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// --- prepares data structures for Provider usage ---
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHF, nullUD, xerr
+	}
+
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", s.Timings()); xerr != nil {
+	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return nullAHF, nullUD, xerr
@@ -334,7 +339,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			}()
 
 			// Wait that Host is ready, not just that the build is started
-			if _, innerXErr = s.WaitHostReady(ahf.GetID(), s.Timings().HostLongOperationTimeout()); innerXErr != nil {
+			if _, innerXErr = s.WaitHostReady(ahf.GetID(), timings.HostLongOperationTimeout()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrInvalidRequest:
 					return retry.StopRetryError(innerXErr)
@@ -344,8 +349,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -386,6 +391,11 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHC, xerr
+	}
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			hostComplete, innerErr := s.InspectHost(ahf)
@@ -400,7 +410,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
+		timings.NormalDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -653,6 +663,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	if xerr := s.rpcDeleteInstance(ahf.Core.ID); xerr != nil {
 		return xerr
 	}
@@ -663,8 +678,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			_, innerXErr := s.rpcGetInstance(ahf.Core.ID)
 			return innerXErr
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().ContextTimeout(),
+		timings.NormalDelay(),
+		timings.ContextTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

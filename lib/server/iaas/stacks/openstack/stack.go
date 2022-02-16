@@ -256,12 +256,12 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // Timings returns the instance containing current timeout settings
-func (s *stack) Timings() temporal.Timings {
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
-		return temporal.NewTimings()
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

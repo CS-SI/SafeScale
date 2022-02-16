@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"

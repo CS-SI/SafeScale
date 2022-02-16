@@ -125,10 +125,10 @@ func Test_normalizeErrorImprovedAndCheckIfRetriable(t *testing.T) {
 			"not avail ptr", args{in: *fail.NotAvailableError("nice try"), out: fmt.Errorf("nice try")}, true,
 		},
 		{
-			"not avail with cause", args{in: fail.NotAvailableErrorWithCause(fmt.Errorf("out of time"), "nice try"), out: retry.StopRetryError(fmt.Errorf("nice try: out of time"))}, true,
+			"not avail with cause", args{in: fail.NotAvailableErrorWithCause(fmt.Errorf("out of time"), nil, "nice try"), out: retry.StopRetryError(fmt.Errorf("nice try: out of time"))}, true,
 		},
 		{
-			"not avail ptr with cause", args{in: *fail.NotAvailableErrorWithCause(fmt.Errorf("out of time"), "nice try"), out: retry.StopRetryError(fmt.Errorf("nice try: out of time"))}, true,
+			"not avail ptr with cause", args{in: *fail.NotAvailableErrorWithCause(fmt.Errorf("out of time"), nil, "nice try"), out: retry.StopRetryError(fmt.Errorf("nice try: out of time"))}, true,
 		},
 		{
 			"overflow", args{in: fail.OverflowError(nil, 0, "nice try"), out: fmt.Errorf("nice try")}, true,

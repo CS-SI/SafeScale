@@ -557,7 +557,12 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		outerr  string
 	)
 	svc := p.Host.Service()
-	connTimeout := svc.Timings().ConnectionTimeout()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	connTimeout := timings.ConnectionTimeout()
 	for {
 		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, connTimeout, is.WallTime)
 		if retcode == 126 {
@@ -597,7 +602,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		rounds--
-		time.Sleep(svc.Timings().SmallDelay())
+		time.Sleep(timings.SmallDelay())
 	}
 
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil

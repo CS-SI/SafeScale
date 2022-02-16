@@ -466,9 +466,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// --- prepares data structures for Provider usage ---
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "bad timings")
+	}
+
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", s.Timings())
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -641,7 +646,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, s.Timings().HostOperationTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -658,8 +663,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -805,7 +810,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHF, xerr
+	}
+
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -1201,6 +1211,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Try to remove host for 3 minutes
 	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
@@ -1250,8 +1265,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 					},
-					s.Timings().NormalDelay(),
-					s.Timings().HostCleanupTimeout(),
+					timings.NormalDelay(),
+					timings.HostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
@@ -1270,7 +1285,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		2*s.Timings().HostCleanupTimeout(), // inner retry already has HostCleanupTimeout, so here we need more
+		2*timings.HostCleanupTimeout(), // inner retry already has HostCleanupTimeout, so here we need more
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
@@ -1352,6 +1367,11 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 		portID *string
 	)
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
@@ -1365,8 +1385,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().OperationTimeout(),
+		timings.NormalDelay(),
+		timings.OperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

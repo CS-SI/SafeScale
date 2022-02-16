@@ -55,6 +55,11 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}()
 
 	svc := host.Service()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	svcConf, xerr := svc.GetConfigurationOptions()
 	if xerr != nil {
 		return xerr
@@ -70,7 +75,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 	owner := desc.OperatorUsername + ":" + desc.OperatorUsername
 	target := desc.FilePath()
-	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", svc.Timings().ExecutionTimeout())
+	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to upload rclone configuration file")
 	}

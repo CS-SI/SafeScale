@@ -20,11 +20,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/utils/valid"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -759,7 +760,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	nullServer := &servers.Server{}
 	if s.IsNull() {
 		return nullServer, fail.InvalidInstanceError()
@@ -772,6 +773,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullServer, xerr
+	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
@@ -830,7 +836,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				)
 			}
 		},
-		s.Timings().SmallDelay(),
+		timings.SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -955,7 +961,12 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = s.Timings().OperationTimeout()
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	timeout := timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -972,7 +983,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		s.Timings().NormalDelay(),
+		timings.NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -1160,12 +1171,12 @@ func (s *stack) initVPC() fail.Error {
 }
 
 // Timings returns the instance containing current timeout settings
-func (s *stack) Timings() temporal.Timings {
-	if s == nil {
-		return temporal.NewTimings()
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
+	if valid.IsNull(s) {
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

@@ -93,9 +93,14 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		return nil, xerr
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := networkCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -294,13 +299,18 @@ func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -483,6 +493,11 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		networkAbstract, ok := clonable.(*abstract.Network)
 		if !ok {
@@ -645,8 +660,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 							return fail.Wrap(recErr, "another kind of error")
 						},
-						svc.Timings().SmallDelay(),
-						svc.Timings().ContextTimeout(),
+						timings.SmallDelay(),
+						timings.ContextTimeout(),
 					)
 					if errWaitMore != nil {
 						_ = innerXErr.AddConsequence(errWaitMore)
@@ -673,7 +688,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
-				time.Sleep(svc.Timings().NormalDelay())
+				time.Sleep(timings.NormalDelay())
 			}
 		}
 		return nil

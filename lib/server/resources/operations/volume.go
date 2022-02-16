@@ -95,6 +95,11 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 		return VolumeNullValue(), fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	volumeCache, xerr := svc.GetCache(volumeKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -103,7 +108,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := volumeCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -183,13 +188,18 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -558,6 +568,11 @@ func (instance *volume) Attach(
 		return fail.InvalidParameterError("format", "cannot be empty string")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -763,8 +778,8 @@ func (instance *volume) Attach(
 			}
 			return nil
 		},
-		instance.Service().Timings().SmallDelay(),
-		instance.Service().Timings().CommunicationTimeout(),
+		timings.SmallDelay(),
+		timings.CommunicationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -972,6 +987,12 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	}
 
 	svc := host.Service()
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostName := host.GetName()
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessful(
@@ -980,7 +1001,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return retry.StopRetryError(fmt.Errorf("aborted"))
 			}
 
-			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, svc.Timings().ConnectionTimeout(), svc.Timings().ExecutionTimeout())
+			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -995,8 +1016,8 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 			return nil
 		},
-		svc.Timings().SmallDelay(),
-		svc.Timings().ExecutionTimeout(),
+		timings.SmallDelay(),
+		timings.ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

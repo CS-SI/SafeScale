@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	uuid "github.com/satori/go.uuid"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 

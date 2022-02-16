@@ -100,11 +100,7 @@ func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Erro
 		return nil, xerr
 	}
 
-	reg, err := regexp.Compile("[^A-Z0-9.]")
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
-
+	reg := regexp.MustCompile("[^A-Z0-9.]")
 	var maxLength int
 	for _, img := range imgs {
 		length := len(img.Name)

@@ -674,6 +674,11 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		OkCodes: []int{204},
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// FlexibleEngine has the curious behavior to be able to tell us all Hosts are deleted, but
 	// cannot delete the subnet because there is still at least one host...
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
@@ -689,18 +694,18 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				normalizeError,
 			)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(s.Timings().HostCleanupTimeout(), s.Timings().CommunicationTimeout()))),
-		retry.Constant(s.Timings().NormalDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(timings.HostCleanupTimeout(), timings.CommunicationTimeout()))),
+		retry.Constant(timings.NormalDelay()),
 		nil,
 		nil,
 		func(t retry.Try, verdict verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					logrus.Debugf("Subnet still owns host(s), retrying in %s...", s.Timings().NormalDelay())
+					logrus.Debugf("Subnet still owns host(s), retrying in %s...", timings.NormalDelay())
 				default:
 					logrus.Warnf("unexpected error: %s", spew.Sdump(t.Err))
-					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), s.Timings().NormalDelay())
+					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), timings.NormalDelay())
 				}
 			}
 		},
@@ -817,6 +822,11 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	opts.JSONResponse = &respGet.Body
 	opts.JSONBody = nil
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -840,8 +850,8 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 			return nil
 		},
-		s.Timings().SmallDelay(),
-		s.Timings().ContextTimeout(),
+		timings.SmallDelay(),
+		timings.ContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
 				logrus.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", req.Name)

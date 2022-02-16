@@ -16,7 +16,7 @@
 
 package cache
 
-//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cache
+//go:generate minimock -o ../mocks/mock_cache.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cache
 
 import (
 	"time"

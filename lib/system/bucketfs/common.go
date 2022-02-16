@@ -61,6 +61,11 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -79,7 +84,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(host.Service().Timings())
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		return xerr
@@ -135,15 +140,15 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 	xerr = retry.Action(
 		func() (innerXErr error) {
-			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().ExecutionTimeout())
+			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(host.Service().Timings().ContextTimeout(), host.Service().Timings().ConnectionTimeout()+host.Service().Timings().ExecutionTimeout()))),
-		retry.Constant(host.Service().Timings().NormalDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(timings.ContextTimeout(), timings.ConnectionTimeout()+timings.ExecutionTimeout()))),
+		retry.Constant(timings.NormalDelay()),
 		nil, nil, nil,
 	)
 	if xerr != nil {
@@ -217,10 +222,16 @@ func uploadContentToFile(
 
 	// TODO: This is not Windows friendly
 	svc := host.Service()
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return "", xerr
+	}
+
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, svc.Timings().OperationTimeout())
+			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")
 			}
@@ -232,8 +243,8 @@ func uploadContentToFile(
 
 			return nil
 		},
-		svc.Timings().NormalDelay(),
-		svc.Timings().HostOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

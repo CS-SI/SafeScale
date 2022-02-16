@@ -67,8 +67,8 @@ type Config struct {
 // Location ...
 type Location interface {
 	// Protocol returns the name of the Object Storage protocol corresponding used by the location
-	Protocol() string
-	Configuration() Config // returns the configuration used to create Location
+	Protocol() (string, fail.Error)
+	Configuration() (Config, fail.Error) // returns the configuration used to create Location
 	// ListBuckets returns all bucket prefixed by a string given as a parameter
 	ListBuckets(string) ([]string, fail.Error)
 	// FindBucket returns true of bucket exists in stowLocation
@@ -179,19 +179,19 @@ func (instance *location) connect() fail.Error {
 }
 
 // Protocol returns the type of ObjectStorage
-func (instance location) Protocol() string {
+func (instance location) Protocol() (string, fail.Error) {
 	if instance.IsNull() {
-		return ""
+		return "", fail.InvalidInstanceError()
 	}
-	return instance.config.Type
+	return instance.config.Type, nil
 }
 
 // Configuration returns the configuration used to create Location
-func (instance location) Configuration() Config {
+func (instance location) Configuration() (Config, fail.Error) {
 	if instance.IsNull() {
-		return Config{}
+		return Config{}, fail.InvalidInstanceError()
 	}
-	return instance.config
+	return instance.config, nil
 }
 
 func (instance location) estimateSize(prefix string) (int, error) {

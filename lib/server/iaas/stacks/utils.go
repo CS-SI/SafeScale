@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	uuid "github.com/satori/go.uuid"
+	datadef "github.com/CS-SI/SafeScale/lib/utils/data"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"

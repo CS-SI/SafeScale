@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -155,6 +155,11 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 		return ShareNullValue(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	shareCache, xerr := svc.GetCache(shareKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -163,7 +168,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -242,13 +247,18 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

@@ -382,6 +382,11 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		return w.availableGateway, nil
 	}
 
+	timings, xerr := w.service.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Not in cluster context
 	if w.cluster == nil {
 		subnetInstance, xerr := w.host.GetDefaultSubnet()
@@ -410,7 +415,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		// if either primary o 2ary found, then wait for ssh to be ready
-		_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
+		_, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "unable to connect to gateway")
@@ -447,7 +452,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 			}
 		}
 
-		_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
+		_, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "unable to connect to gateway")
@@ -491,6 +496,11 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 		rs   resources.Subnet
 	)
 
+	timings, xerr := w.service.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
 		netCfg, xerr = w.cluster.GetNetworkConfig()
@@ -517,7 +527,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	if xerr != nil {
 		debug.IgnoreError(xerr)
 	} else {
-		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr != nil {
+		if _, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout()); xerr != nil {
 			debug.IgnoreError(xerr)
 		} else {
 			list = append(list, gw)
@@ -527,7 +537,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	if gw, xerr = rs.InspectGateway(false); xerr != nil {
 		debug.IgnoreError(xerr)
 	} else {
-		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr != nil {
+		if _, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout()); xerr != nil {
 			debug.IgnoreError(xerr)
 		} else {
 			list = append(list, gw)
@@ -819,6 +829,11 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		logrus.DebugLevel,
 	)
 
+	timings, xerr := w.service.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	var (
 		runContent string
 		// stepT      = stepTargets{}
@@ -885,7 +900,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
 	}
 
-	wallTime := w.service.Timings().HostLongOperationTimeout()
+	wallTime := timings.HostLongOperationTimeout()
 	if anon, ok = p.stepMap[yamlTimeoutKeyword]; ok {
 		if _, ok = anon.(int); ok {
 			wallTime = time.Duration(anon.(int)) * time.Minute
@@ -899,7 +914,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, xerr := normalizeScript(w.service.Timings(), &p.variables, data.Map{
+	templateCommand, xerr := normalizeScript(timings, &p.variables, data.Map{
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
