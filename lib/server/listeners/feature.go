@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"

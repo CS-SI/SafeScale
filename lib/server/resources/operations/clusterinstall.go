@@ -488,6 +488,11 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	// Configures reserved_BashLibrary template var
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	xerr = debug.InjectPlannedFail(xerr)

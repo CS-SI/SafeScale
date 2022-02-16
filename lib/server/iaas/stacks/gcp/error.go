@@ -23,12 +23,12 @@ import (
 	"reflect"
 
 	"github.com/sirupsen/logrus"
+
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-
-	"google.golang.org/api/googleapi"
 )
 
 func normalizeOperationError(oe *compute.OperationError) fail.Error {
