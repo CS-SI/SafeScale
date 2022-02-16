@@ -12,4 +12,4 @@ generate:
 	@$(GO) generate -run rice
 
 clean:
-	@$(RM) rice-box.go enums/*/enum_string.go || true
+	@$(RM) enums/*/enum_string.go || true

@@ -23,12 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
 )
 
 func Test_Command(t *testing.T) {

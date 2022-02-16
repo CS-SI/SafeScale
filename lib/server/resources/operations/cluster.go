@@ -19,6 +19,7 @@ package operations
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	mrand "math/rand"
@@ -26,53 +27,46 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/boh"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/k8s"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusternodetype"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/clusterflavors"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/clusterflavors/boh"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/clusterflavors/k8s"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
 	clusterKind        = "cluster"
 	clustersFolderName = "clusters" // path to use to reach Cluster Definitions/Metadata
 
-)
-
-var (
-	// templateBox is the rice box to use in this package
-	ansibleTemplateBox atomic.Value
 )
 
 // Cluster is the implementation of resources.Cluster interface
@@ -2965,18 +2959,14 @@ func (instance *Cluster) determineRequiredNodes() (uint, uint, uint, fail.Error)
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func realizeTemplate(box *rice.Box, tmplName string, adata map[string]interface{}, fileName string) (string, string, fail.Error) {
-	if box == nil {
-		return "", "", fail.InvalidParameterError("box", "cannot be nil!")
-	}
-
-	tmplString, err := box.String(tmplName)
+func realizeTemplate(tmplName string, adata map[string]interface{}, fileName string) (string, string, fail.Error) {
+	tmplString, err := clusterFlavorScripts.ReadFile(tmplName)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to load template")
 	}
 
-	tmplCmd, err := template.Parse(fileName, tmplString)
+	tmplCmd, err := template.Parse(fileName, string(tmplString))
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to parse template")
@@ -2994,6 +2984,9 @@ func realizeTemplate(box *rice.Box, tmplName string, adata map[string]interface{
 
 	return cmd, remotePath, nil
 }
+
+//go:embed scripts/*
+var ansibleScripts embed.FS
 
 // Regenerate ansible inventory
 func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.Error {
@@ -3178,37 +3171,18 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		return nil
 	}
 
-	// --------- Load template box --------------
-	anon := ansibleTemplateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err := rice.FindBox("../operations/scripts/")
-		if err != nil {
-			return fail.Wrap(err, "%s failed to load template directory", prerr)
-		}
-
-		ansibleTemplateBox.Store(b)
-		logrus.Tracef("%s loaded feature \"ansible\" inventory.py template", prerr)
-		anon = ansibleTemplateBox.Load()
-		if anon == nil {
-			return fail.InconsistentError("%s ansible inventory template is nil", prerr)
-		}
-	}
-	box, ok := anon.(*rice.Box)
-	if !ok {
-		return fail.InconsistentError("%s fail to load template directory", prerr)
-	}
-	tmplString, err := box.String("ansible_inventory.py")
+	tmplString, err := ansibleScripts.ReadFile("scripts/ansible_inventory.py")
 	if err != nil {
 		return fail.Wrap(err, "%s failed to load template 'ansible_inventory.py'", prerr)
 	}
 
 	// --------- Build ansible inventory --------------
 	fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
-	tmplCmd, err := template.Parse(fileName, tmplString)
+	tmplCmd, err := template.Parse(fileName, string(tmplString))
 	if err != nil {
 		return fail.Wrap(err, "%s failed to parse template 'ansible_inventory.py'", prerr)
 	}
+
 	dataBuffer := bytes.NewBufferString("")
 	ferr := tmplCmd.Execute(dataBuffer, params)
 	if ferr != nil {

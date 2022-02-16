@@ -22,7 +22,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/commonlog"
 )
 
 // Stopwatch interface to expose methods available for a stopwatch
