@@ -29,19 +29,19 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
@@ -71,8 +71,13 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	connTimeout := temporal.MaxTimeout(connectionTimeout, instance.Service().Timings().SSHConnectionTimeout())
-	execTimeout := temporal.MaxTimeout(executionTimeout, instance.Service().Timings().ExecutionTimeout())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	connTimeout := temporal.MaxTimeout(connectionTimeout, timings.SSHConnectionTimeout())
+	execTimeout := temporal.MaxTimeout(executionTimeout, timings.ExecutionTimeout())
 
 	var (
 		stdOut, stdErr string
@@ -211,7 +216,12 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	timeout = temporal.MaxTimeout(timeout, instance.Service().Timings().HostOperationTimeout())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	timeout = temporal.MaxTimeout(timeout, timings.HostOperationTimeout())
 
 	md5hash := ""
 	if source != "" {
@@ -289,7 +299,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 			return nil
 		},
-		instance.Service().Timings().NormalDelay(),
+		timings.NormalDelay(),
 		2*timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -399,8 +409,8 @@ func (instance *Host) unsafePushStringToFile(ctx context.Context, content string
 }
 
 // unsafePushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
-func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance.sshProfile == nil {
 		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
@@ -430,6 +440,11 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	hostName := instance.GetName()
 	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
@@ -440,7 +455,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, instance.Service().Timings().ExecutionTimeout())
+			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, timings.ExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -457,8 +472,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 			}
 			return nil
 		},
-		instance.Service().Timings().SmallDelay(),
-		2*temporal.MaxTimeout(instance.Service().Timings().ConnectionTimeout(), instance.Service().Timings().ExecutionTimeout()),
+		timings.SmallDelay(),
+		2*temporal.MaxTimeout(timings.ConnectionTimeout(), timings.ExecutionTimeout()),
 	)
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
@@ -486,7 +501,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	if cmd != "" {
 		retryErr = retry.WhileUnsuccessful(
 			func() error {
-				retcode, stdout, stderr, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, instance.Service().Timings().ConnectionTimeout(), instance.Service().Timings().ExecutionTimeout())
+				retcode, stdout, stderr, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrAborted:
@@ -503,8 +518,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 				}
 				return nil
 			},
-			instance.Service().Timings().SmallDelay(),
-			2*temporal.MaxTimeout(instance.Service().Timings().ConnectionTimeout(), instance.Service().Timings().ExecutionTimeout()),
+			timings.SmallDelay(),
+			2*temporal.MaxTimeout(timings.ConnectionTimeout(), timings.ExecutionTimeout()),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {

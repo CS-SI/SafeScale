@@ -22,23 +22,23 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-type JunkErrorlike interface {
+type junkErrorlike interface {
 	error
 	IsError()
 }
 
-type JunkError struct {
-	JunkErrorlike
+type junkError struct {
+	junkErrorlike
 	message string
 }
 
-func (e *JunkError) IsError() bool {
+func (e *junkError) IsError() bool {
 	return false
 }
 
@@ -53,7 +53,7 @@ func Test_IsError(t *testing.T) {
 	result := IsError(err)
 	require.EqualValues(t, result, true)
 
-	err = &JunkError{
+	err = &junkError{
 		message: "any error",
 	}
 	result = IsError(err)
@@ -88,7 +88,7 @@ func Test_IsError(t *testing.T) {
 		{
 			err: &ErrWarning{
 				errorCore: &errorCore{
-					message:             "math: can't divide by zero",
+					message:             "houston, we have a problem",
 					cause:               errors.New("math: can't divide by zero"),
 					consequences:        []error{errors.New("can't resolve equation")},
 					annotations:         make(data.Annotations),
@@ -103,7 +103,7 @@ func Test_IsError(t *testing.T) {
 		{
 			err: &ErrTimeout{
 				errorCore: &errorCore{
-					message:             "math: can't divide by zero",
+					message:             "houston, we have a problem",
 					cause:               errors.New("math: can't divide by zero"),
 					consequences:        []error{errors.New("can't resolve equation")},
 					annotations:         make(data.Annotations),
@@ -118,7 +118,7 @@ func Test_IsError(t *testing.T) {
 		{
 			err: &ErrNotFound{
 				errorCore: &errorCore{
-					message:             "math: can't divide by zero",
+					message:             "houston, we have a problem",
 					cause:               errors.New("math: can't divide by zero"),
 					consequences:        []error{errors.New("can't resolve equation")},
 					annotations:         make(data.Annotations),

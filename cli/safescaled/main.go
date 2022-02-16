@@ -27,21 +27,21 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/heartbeat"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
 	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	_ "github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/listeners"
-	app2 "github.com/CS-SI/SafeScale/lib/utils/app"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	_ "github.com/CS-SI/SafeScale/v21/lib/server"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/listeners"
+	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 )
 
 var profileCloseFunc = func() {}

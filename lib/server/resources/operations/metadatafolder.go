@@ -21,20 +21,20 @@ import (
 	"strings"
 	"time"
 
-	datadef "github.com/CS-SI/SafeScale/lib/utils/data"
+	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // MetadataFolder describes a metadata MetadataFolder
@@ -207,8 +207,13 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	var buffer bytes.Buffer
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			bucket, iErr := instance.getBucket()
 			if iErr != nil {
@@ -216,7 +221,7 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 			}
 			return instance.service.ReadObject(bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
 		},
-		instance.service.Timings().CommunicationTimeout(),
+		timings.CommunicationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -282,6 +287,11 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	doCrypt := instance.crypt
 	for _, v := range options {
 		switch v.Key() {
@@ -309,7 +319,7 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 
 	bucketName := bucket.Name
 	absolutePath := instance.absolutePath(path, name)
-	timeout := instance.service.Timings().MetadataReadAfterWriteTimeout()
+	timeout := timings.MetadataReadAfterWriteTimeout()
 
 	// Outer retry will write the metadata at most 3 times
 	xerr = retry.Action(
@@ -339,7 +349,7 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(instance.service.Timings().SmallDelay()),
+				retry.Fibonacci(timings.SmallDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -362,7 +372,7 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(instance.service.Timings().SmallDelay()),
+		retry.Constant(timings.SmallDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {

@@ -17,18 +17,18 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 const defaultSecurityGroupName = "default"
@@ -90,7 +90,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
-			return nullASG, fail.DuplicateErrorWithCause(xerr, "more than one Security Group named '%s' found", name)
+			return nullASG, fail.DuplicateErrorWithCause(xerr, nil, "more than one Security Group named '%s' found", name)
 		default:
 			return nullASG, xerr
 		}

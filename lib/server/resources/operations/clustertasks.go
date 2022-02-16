@@ -27,28 +27,28 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusternodetype"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/consts"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
@@ -190,6 +190,11 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		}
 	}()
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// FIXME: At some point clusterIdentity has to change...
 
 	// Creates and configures hosts
@@ -255,7 +260,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 				}
 
 				// FIXME: WaitGroupFor NEEDS more UT
-				_, _, tgerr = tg.WaitGroupFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, tgerr = tg.WaitGroupFor(timings.HostLongOperationTimeout())
 				tgerr = debug.InjectPlannedFail(tgerr)
 				if tgerr != nil {
 					cleanFailure = true
@@ -884,6 +889,11 @@ func (instance *Cluster) createHostResources(
 	ctx := task.Context()
 	var startedTasks []concurrency.Task
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	defer func() {
 		if ferr != nil {
 			// Disable abort signal during the cleanup
@@ -915,7 +925,7 @@ func (instance *Cluster) createHostResources(
 			}
 
 			// we have to wait for completion of aborted Tasks/TaskGroups, not get out before
-			timeout := instance.Service().Timings().HostLongOperationTimeout()
+			timeout := timings.HostLongOperationTimeout()
 			for _, v := range startedTasks {
 				_, _, werr := v.WaitFor(timeout)
 				if werr != nil {
@@ -955,14 +965,14 @@ func (instance *Cluster) createHostResources(
 		}
 	}
 
-	_, xerr = primaryGateway.WaitSSHReady(ctx, instance.Service().Timings().ExecutionTimeout())
+	_, xerr = primaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
 	if haveSecondaryGateway {
-		_, xerr = secondaryGateway.WaitSSHReady(ctx, instance.Service().Timings().ExecutionTimeout())
+		_, xerr = secondaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
@@ -1082,7 +1092,7 @@ func (instance *Cluster) createHostResources(
 						}
 					}
 				}
-				_, _, derr := tg.WaitGroupFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, derr := tg.WaitGroupFor(timings.HostLongOperationTimeout())
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(
@@ -1168,7 +1178,7 @@ func (instance *Cluster) createHostResources(
 						}
 					}
 				}
-				_, _, derr := tg.WaitGroupFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, derr := tg.WaitGroupFor(timings.HostLongOperationTimeout())
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for node deletions"))
@@ -1400,6 +1410,12 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 	}
 
 	svc := instance.Service()
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	xerr = svc.StartHost(id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1421,7 +1437,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.WaitSSHReady(task.Context(), svc.Timings().HostOperationTimeout())
+	_, xerr = hostInstance.WaitSSHReady(task.Context(), timings.HostOperationTimeout())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1518,9 +1534,14 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
-	_, xerr = p.host.WaitSSHReady(task.Context(), instance.Service().Timings().HostOperationTimeout())
+	_, xerr = p.host.WaitSSHReady(task.Context(), timings.HostOperationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1645,9 +1666,14 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 		return nil, nil
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	logrus.Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
-	timeout := 2 * instance.Service().Timings().HostCreationTimeout()
+	timeout := 2 * timings.HostCreationTimeout()
 	var collectedErs []error
 
 	for i := uint(1); i <= p.count; i++ {
@@ -2232,6 +2258,11 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	clusterName := instance.GetName()
 
 	if p.count == 0 {
@@ -2246,7 +2277,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		return nil, xerr
 	}
 
-	timeout := 2 * instance.Service().Timings().HostCreationTimeout()
+	timeout := 2 * timings.HostCreationTimeout()
 	for i := uint(1); i <= p.count; i++ {
 		captured := i
 		_, xerr := tg.StartWithTimeout(
@@ -3036,6 +3067,10 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task,
 
 // updateClusterInventoryMaster updates a Host (master) ansible inventory
 func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, master resources.Host, inventoryData string) (xerr fail.Error) {
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 
 	rfcItem := Item{
 		Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
@@ -3064,8 +3099,8 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	// Remove possible junks
 	cmd := fmt.Sprintf("[ -f %s ] && sudo rm -f %s || exit 0", rfcItem.Remote, rfcItem.Remote)
-	connTimeout := instance.Service().Timings().ConnectionTimeout()
-	delay := instance.Service().Timings().NormalDelay()
+	connTimeout := timings.ConnectionTimeout()
+	delay := timings.NormalDelay()
 	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, connTimeout, delay)
 	if xerr != nil {
 		return fail.Wrap(xerr, "%sfail to clean previous temporaries", prerr)

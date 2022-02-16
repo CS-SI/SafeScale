@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/bucketproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/bucketproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 )
 
 // // BucketMount stores information about the mount of a Bucket

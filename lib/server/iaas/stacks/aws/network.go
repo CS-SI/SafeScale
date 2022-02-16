@@ -20,23 +20,23 @@ import (
 	"net"
 	"reflect"
 
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	// "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	// "github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 
-	// "github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	// propsv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	// "github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	// propsv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 )
 
 const (
@@ -66,8 +66,12 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAN, xerr
+	}
+
 	// Check if network already there
-	var xerr fail.Error
 	if _, xerr = s.rpcDescribeVpcByName(aws.String(req.Name)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -99,8 +103,8 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 				}
 				return nil
 			},
-			s.Timings().SmallDelay(),
-			s.Timings().OperationTimeout(),
+			timings.SmallDelay(),
+			timings.OperationTimeout(),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -389,6 +393,11 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
 		return nullAS, fail.Wrap(err, "error parsing requested CIDR")
 	}
@@ -418,8 +427,8 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 				}
 				return nil
 			},
-			s.Timings().SmallDelay(),
-			s.Timings().OperationTimeout(),
+			timings.SmallDelay(),
+			timings.OperationTimeout(),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -498,7 +507,7 @@ func toAbstractSubnet(in *ec2.Subnet) (*abstract.Subnet, fail.Error) {
 }
 
 // InspectSubnetByName ...
-func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -508,6 +517,11 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s', '%s')", networkRef, subnetName).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAS, xerr
+	}
 
 	req, xerr := s.initEC2DescribeSubnetsInput(networkRef)
 	if xerr != nil {
@@ -523,7 +537,7 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 			resp, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
-		s.Timings().CommunicationTimeout(),
+		timings.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -547,13 +561,18 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 }
 
 // ListSubnets ...
-func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fail.Error) {
+func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, ferr fail.Error) {
 	var emptySlice []*abstract.Subnet
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	query, xerr := s.initEC2DescribeSubnetsInput(networkRef)
 	if xerr != nil {
@@ -566,7 +585,7 @@ func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fai
 			subnets, innerErr = s.EC2Service.DescribeSubnets(query)
 			return normalizeError(innerErr)
 		},
-		s.Timings().CommunicationTimeout(),
+		timings.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -613,8 +632,13 @@ func (s stack) initEC2DescribeSubnetsInput(networkRef string) (*ec2.DescribeSubn
 }
 
 // listSubnetIDs ...
-func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error) { // nolint
+func (s stack) listSubnetIDs(networkRef string) (list []string, ferr fail.Error) { // nolint
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	req, xerr := s.initEC2DescribeSubnetsInput(networkRef)
 	if xerr != nil {
@@ -627,7 +651,7 @@ func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error)
 			subnets, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
-		s.Timings().CommunicationTimeout(),
+		timings.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr

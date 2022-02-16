@@ -25,31 +25,31 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v21/lib/server"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
 )
 
 const protocolSeparator = ":"
 
-//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.SSHHandler
+//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.SSHHandler
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
@@ -194,7 +194,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
 		if isGateway {
-			if host.GetState() != hoststate.Started {
+			hs, err := host.GetState()
+			if err != nil {
+				return nil, fail.Wrap(err, "cannot retrieve host properties")
+			}
+			if hs != hoststate.Started {
 				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
 			}
 		}
@@ -305,8 +309,8 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
 	if handler == nil {
@@ -325,7 +329,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
@@ -340,10 +344,18 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return invalid, "", "", xerr
 	}
 
-	timings := handler.job.Service().Timings()
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			if handler.job.Aborted() {
+			isAborted, err := handler.job.Aborted()
+			if err != nil {
+				return err
+			}
+			if isAborted {
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
@@ -431,8 +443,8 @@ func getMD5Hash(text string) string {
 }
 
 // Copy copies file/directory from/to remote host
-func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if handler == nil {
@@ -451,7 +463,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	hostName := ""
 	var upload bool
@@ -510,7 +522,11 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		stdout, stderr string
 	)
 	retcode := -1
-	timings := handler.job.Service().Timings()
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())

@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 )
 
 func TestClusterState_IsNull(t *testing.T) {

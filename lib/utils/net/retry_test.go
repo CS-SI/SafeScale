@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -339,6 +339,7 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 					URL: "https://nowhere.com",
 					Err: NewRetryableError("URL Target does not exists"), // Temporary = true ? => @TODO: Should not it be consider as retrybable ?
 				},
+				[]error{},
 				"Any error",
 			),
 			out: "*fail.ErrNotAvailable",
@@ -350,6 +351,7 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 					URL: "https://nowhere.com",
 					Err: errors.New("Any error"), // Temporary = false
 				},
+				[]error{},
 				"Any error",
 			),
 			out: "*fail.ErrAborted",
@@ -486,6 +488,7 @@ func Test_oldNormalizeErrorAndCheckIfRetriable(t *testing.T) {
 					URL: "https://nowhere.com",
 					Err: NewRetryableError("URL Target does not exists"), // Temporary = true ? => @TODO: Should not it be consider as retrybable ?
 				},
+				[]error{},
 				"Any error",
 			),
 			out: "*fail.ErrInvalidRequest",
@@ -497,6 +500,7 @@ func Test_oldNormalizeErrorAndCheckIfRetriable(t *testing.T) {
 					URL: "https://nowhere.com",
 					Err: errors.New("Any error"), // Temporary = false
 				},
+				[]error{},
 				"Any error",
 			),
 			out: "*fail.ErrAborted",
@@ -504,6 +508,7 @@ func Test_oldNormalizeErrorAndCheckIfRetriable(t *testing.T) {
 		{
 			in: fail.NotAvailableErrorWithCause(
 				nil,
+				[]error{},
 				"Any error",
 			),
 			out: "*fail.ErrNotAvailable",
@@ -511,6 +516,7 @@ func Test_oldNormalizeErrorAndCheckIfRetriable(t *testing.T) {
 		{
 			in: fail.NotFoundErrorWithCause(
 				nil,
+				[]error{},
 				"Any error",
 			),
 			out: "*fail.ErrAborted",

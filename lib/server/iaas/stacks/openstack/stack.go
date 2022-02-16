@@ -22,11 +22,11 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // stack contains the needs to operate on stack OpenStack
@@ -256,12 +256,12 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // Timings returns the instance containing current timeout settings
-func (s *stack) Timings() temporal.Timings {
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
-		return temporal.NewTimings()
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

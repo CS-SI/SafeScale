@@ -20,18 +20,18 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Host links Object Storage folder and Host
@@ -57,7 +57,7 @@ type Host interface {
 	GetShare(shareRef string) (*propertiesv1.HostShare, fail.Error)                                                                              // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares() (*propertiesv1.HostShares, fail.Error)                                                                                           // returns the shares hosted on the host
 	GetSSHConfig() (*system.SSHConfig, fail.Error)                                                                                               // loads SSH configuration for host from metadata
-	GetState() hoststate.Enum                                                                                                                    // returns the current state of the host, with error handling
+	GetState() (hoststate.Enum, fail.Error)                                                                                                      // returns the current state of the host, with error handling
 	GetVolumes() (*propertiesv1.HostVolumes, fail.Error)                                                                                         // returns the volumes attached to the host
 	IsClusterMember() (bool, fail.Error)                                                                                                         // returns true if the host is member of a cluster
 	IsFeatureInstalled(f string) (bool, fail.Error)                                                                                              // tells if a feature is installed on Host, using only metadata
@@ -69,7 +69,7 @@ type Host interface {
 	PushStringToFile(ctx context.Context, content string, filename string) fail.Error                                                            // creates a file 'filename' on remote 'host' with the content 'content'
 	PushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) fail.Error                           // creates a file 'filename' on remote 'host' with the content 'content' and apply ownership to it
 	Reboot(ctx context.Context, soft bool) fail.Error                                                                                            // reboots the host
-	Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) fail.Error                                                             // resize the host (probably not yet implemented on some proviers if not all)
+	Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) fail.Error                                                             // resize the host (probably not yet implemented on some providers if not all)
 	Run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
 	Start(ctx context.Context) fail.Error                                                                                                        // starts the host
 	Stop(ctx context.Context) fail.Error                                                                                                         // stops the host

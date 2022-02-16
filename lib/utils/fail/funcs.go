@@ -17,7 +17,6 @@
 package fail
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -68,20 +67,6 @@ func Annotate(err error, key string, content interface{}) Error {
 	return nil
 }
 
-// IsGRPCTimeout tells if 'err' is a ImplTimeout kind
-func IsGRPCTimeout(err error) bool {
-	if err == nil {
-		return false
-	}
-	code := codes.Unknown
-	if casted, ok := err.(Error); ok {
-		code = casted.(Error).GRPCCode()
-	} else {
-		code = grpcstatus.Code(err.(error))
-	}
-	return code == codes.DeadlineExceeded
-}
-
 // IsGRPCError tells if 'err' is of GRPC kind
 func IsGRPCError(err error) bool {
 	if err != nil {
@@ -94,6 +79,10 @@ func IsGRPCError(err error) bool {
 
 // FromGRPCStatus translates GRPC status to error
 func FromGRPCStatus(err error) Error {
+	if err == nil {
+		return InvalidParameterCannotBeNilError("err")
+	}
+
 	if _, ok := err.(Error); ok {
 		return err.(Error)
 	}
@@ -108,7 +97,9 @@ func FromGRPCStatus(err error) Error {
 	case codes.Aborted:
 		return &ErrAborted{common}
 	case codes.FailedPrecondition:
-		return &ErrInvalidParameter{common}
+		return &ErrInvalidParameter{
+			errorCore: common,
+		}
 	case codes.AlreadyExists:
 		return &ErrDuplicate{common}
 	case codes.InvalidArgument:
@@ -135,10 +126,10 @@ func FromGRPCStatus(err error) Error {
 
 // ToGRPCStatus translates an error to a GRPC status
 func ToGRPCStatus(err error) error {
-
 	if err == nil {
-		return grpcstatus.Errorf(codes.Unknown, "")
+		return InvalidParameterCannotBeNilError("err")
 	}
+
 	if casted, ok := err.(Error); ok {
 		return grpcstatus.Errorf(casted.GRPCCode(), casted.Error())
 	}
@@ -154,13 +145,56 @@ func Wrap(cause error, msg ...interface{}) Error {
 
 	switch rerr := cause.(type) {
 	case *ErrorList:
-		rerr.prependToMessage(strprocess.FormatStrings(msg...))
-		return rerr
-
+		return NewErrorListComplete(rerr.ToErrorSlice(), rerr.Cause(), rerr.Consequences(), msg...)
+	case *ErrUnqualified:
+		return newError(cause, rerr.Consequences(), msg...)
+	case *ErrWarning:
+		return WarningErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
+	case *ErrTimeout:
+		return TimeoutErrorWithCauseAndConsequences(cause, rerr.dur, rerr.Consequences(), msg...)
+	case *ErrNotFound:
+		return NotFoundErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrAborted:
+		return AbortedErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
+	case *ErrRuntimePanic:
+		var wrapArgs []interface{}
+		wrapArgs = append(wrapArgs, rerr.UnformattedError())
+		wrapArgs = append(wrapArgs, msg...)
+		return RuntimePanicErrorWithCauseAndConsequences(cause, rerr.Consequences(), false, wrapArgs)
+	case *ErrNotAvailable:
+		return NotAvailableErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrDuplicate:
+		return DuplicateErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrInvalidRequest:
+		return InvalidRequestErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrSyntax:
+		return SyntaxErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrNotAuthenticated:
+		return NotAuthenticatedErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrForbidden:
+		return ForbiddenErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrOverflow:
+		return OverflowErrorWithCause(cause, rerr.limit, rerr.Consequences(), msg...)
+	case *ErrOverload:
+		return OverloadErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrNotImplemented:
+		return NotImplementedErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
+	case *ErrInvalidInstance:
+		return InvalidInstanceErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrInvalidParameter:
+		return InvalidParameterErrorWithCauseAndConsequences(cause, rerr.Consequences(), rerr.what, rerr.skip, msg...)
+	case *ErrInvalidInstanceContent:
+		return InvalidInstanceContentErrorWithCause(cause, rerr.Consequences(), rerr.what, rerr.why, msg...)
+	case *ErrInconsistent:
+		return InconsistentErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrExecution:
+		return ExecutionErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrAlteredNothing:
+		return AlteredNothingErrorWithCause(cause, rerr.Consequences(), msg...)
+	case *ErrUnknown:
+		return UnknownErrorWithCause(cause, rerr.Consequences(), msg...)
 	case Error:
-		rerr.prependToMessage(strprocess.FormatStrings(msg...))
-		return rerr
-
+		return newError(cause, rerr.Consequences(), msg...)
 	default:
 		return newError(cause, nil, msg...)
 	}

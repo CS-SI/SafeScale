@@ -15,7 +15,6 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 
 # Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
-RICE := github.com/GeertJohan/go.rice
 PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
@@ -217,11 +216,6 @@ coverdeps: begin ground
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dependencies. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n"; \
-		$(GO) get $(RICE)@v1.0.2 &>/dev/null; \
-		$(GO) install $(RICE)/rice@v1.0.2 &>/dev/null; \
-	fi
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \
@@ -467,7 +461,7 @@ style: begin
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) style_results.log || true
-	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) style_results.log
+	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | awk 'NF' | $(TEE) style_results.log
 	@if [ -s ./style_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) style FAILED, look at style_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

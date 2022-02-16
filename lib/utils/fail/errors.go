@@ -20,19 +20,21 @@ import (
 	"fmt"
 	"os/exec"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 // consequencer is the interface exposing the methods manipulating consequences
@@ -43,9 +45,8 @@ type consequencer interface {
 
 // causer is the interface exposing the methods manipulating cause
 type causer interface {
-	CauseFormatter(func(Error) string) // defines a function used to format a causer output to string
-	Cause() error                      // returns the first immediate cause of an error
-	RootCause() error                  // returns the root cause of an error
+	Cause() error     // returns the first immediate cause of an error
+	RootCause() error // returns the root cause of an error
 }
 
 // Error defines the interface of a SafeScale error
@@ -54,17 +55,11 @@ type Error interface {
 	causer
 	consequencer
 	error
+	data.NullValue
+	data.Validatable
 
 	UnformattedError() string
-
-	SetAnnotationFormatter(func(data.Annotations) string)
-
-	GRPCCode() codes.Code
 	ToGRPCStatus() error
-
-	IsNull() bool
-
-	prependToMessage(string)
 }
 
 // errorCore is the implementation of interface Error
@@ -73,10 +68,25 @@ type errorCore struct {
 	cause               error
 	causeFormatter      func(Error) string
 	annotations         data.Annotations
-	annotationFormatter func(data.Annotations) string
+	annotationFormatter func(data.Annotations) (string, error)
 	consequences        []error
 	grpcCode            codes.Code
 	lock                *sync.RWMutex
+}
+
+// Valid errorCore struct should be always created via newError constructor, if it doesn't we might miss e.lock initialization
+func (e errorCore) Valid() bool {
+	err := validation.ValidateStruct(&e,
+		// grpcCode max value is 17
+		validation.Field(&e.grpcCode, validation.Required, validation.Max(uint32(17))),
+		// Lock cannot be nil
+		validation.Field(&e.lock, validation.Required, validation.NotNil),
+	)
+	if err != nil {
+		logrus.Errorf("validation error: %v", err)
+		return false
+	}
+	return true
 }
 
 // ErrUnqualified is a generic Error type that has no particular signification
@@ -145,12 +155,11 @@ func (e *errorCore) IsNull() bool {
 
 // defaultCauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
 func defaultCauseFormatter(e Error) string {
-	if e == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter()", "from nil", 0))
+	msgFinal := ""
+
+	if e == nil || data.IsNil(e) {
 		return ""
 	}
-
-	msgFinal := ""
 
 	errCore, ok := e.(*errorCore)
 	if !ok {
@@ -168,7 +177,7 @@ func defaultCauseFormatter(e Error) string {
 		switch cerr := errCore.cause.(type) {
 		case Error:
 			errCore.lock.RUnlock() // nolint
-			raw := cerr.UnformattedError()
+			raw := cerr.Error()
 			errCore.lock.RLock()
 			if raw != "" {
 				msgFinal += ": " + raw
@@ -185,13 +194,13 @@ func defaultCauseFormatter(e Error) string {
 	if lenConseq > 0 {
 		msgFinal += fmt.Sprintf("\nwith consequence%s:\n", strprocess.Plural(lenConseq))
 		for ind, con := range errCore.consequences {
-			if _, ok := con.(Error); ok {
-				msgFinal += "- " + con.(Error).UnformattedError()
-				if uint(ind+1) < lenConseq {
-					msgFinal += "\n"
-				}
-			} else {
-				if con != nil {
+			if con != nil {
+				if _, ok := con.(Error); ok {
+					msgFinal += "- " + con.(Error).Error()
+					if uint(ind+1) < lenConseq {
+						msgFinal += "\n"
+					}
+				} else {
 					msgFinal += "- " + con.Error()
 					if uint(ind+1) < lenConseq {
 						msgFinal += "\n"
@@ -204,21 +213,20 @@ func defaultCauseFormatter(e Error) string {
 	return msgFinal
 }
 
-// CauseFormatter defines the func uses to format cause into a string
-func (e *errorCore) CauseFormatter(formatter func(Error) string) {
+// setCauseFormatter defines the func uses to format cause into a string
+func (e *errorCore) setCauseFormatter(formatter func(Error) string) error {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from null value", 0))
-		return
+		return fmt.Errorf(callstack.DecorateWith("invalid call:", "errorCore.setCauseFormatter", "from null value", 0))
 	}
 	if formatter == nil {
-		logrus.Errorf("invalid nil pointer for parameter 'formatter'")
-		return
+		return fmt.Errorf("invalid nil pointer for parameter 'formatter'")
 	}
 
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	e.causeFormatter = formatter
+	return nil
 }
 
 // Unwrap implements the Wrapper interface
@@ -246,27 +254,22 @@ func (e errorCore) Cause() error {
 }
 
 // RootCause returns the initial error's cause
-func (e *errorCore) RootCause() error {
-	if e == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
-		return e
-	}
-	return RootCause(e)
+func (e errorCore) RootCause() error {
+	return RootCause(&e)
 }
 
 // defaultAnnotationFormatter ...
-func defaultAnnotationFormatter(a data.Annotations) string {
+func defaultAnnotationFormatter(a data.Annotations) (string, error) {
 	if a == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid parameter: ", "'a'", "cannot be nil", 0))
-		return ""
+		return "", fmt.Errorf(callstack.DecorateWith("invalid parameter: ", "'a'", "cannot be nil", 0))
 	}
 	j, err := json.Marshal(a)
 
 	if err != nil {
-		return ""
+		return "", err
 	}
 
-	return string(j)
+	return string(j), nil
 }
 
 // Annotations ...
@@ -297,11 +300,6 @@ func (e errorCore) Annotation(key string) (data.Annotation, bool) {
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 // satisfies interface data.Annotatable
 func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotate()", "from null value", 0))
-		return e
-	}
-
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
@@ -314,29 +312,24 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 }
 
 // SetAnnotationFormatter defines the func to use to format annotations
-func (e *errorCore) SetAnnotationFormatter(formatter func(data.Annotations) string) {
+func (e *errorCore) setAnnotationFormatter(formatter func(data.Annotations) (string, error)) error {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.SetAnnotationFormatter()", "from null value", 0))
-		return
+		return fmt.Errorf(callstack.DecorateWith("invalid call:", "errorCore.setAnnotationFormatter()", "from null value", 0))
 	}
 	if formatter == nil {
-		logrus.Errorf("invalid nil value for parameter 'formatter'")
-		return
+		return fmt.Errorf("invalid nil value for parameter 'formatter'")
 	}
 
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	e.annotationFormatter = formatter
+	return nil
 }
 
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errorCore) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
-		return e
-	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null value", 0))
 		return e
 	}
 	if err != nil {
@@ -364,7 +357,6 @@ func (e errorCore) Consequences() []error {
 }
 
 // Error returns a human-friendly error explanation
-// satisfies interface error
 func (e *errorCore) Error() string {
 
 	if e.lock == nil {
@@ -377,12 +369,24 @@ func (e *errorCore) Error() string {
 	msgFinal := e.message
 
 	if e.causeFormatter != nil {
-		msgFinal += e.causeFormatter(e)
+		sta := string(debug.Stack())
+		num := strings.Count(sta, "(*errorCore).Error") // protection against recursive calls infinite loop
+		if num < 32 {
+			msgFinal += e.causeFormatter(e)
+		}
 	}
 
 	if len(e.annotations) > 0 {
-		msgFinal += "\nWith annotations: "
-		msgFinal += e.annotationFormatter(e.annotations)
+		sta := string(debug.Stack())
+		num := strings.Count(sta, "(*errorCore).Error") // protection against recursive calls infinite loop
+		if num < 32 {
+			msgFinal += "\nWith annotations: "
+			more, fmtErr := e.annotationFormatter(e.annotations)
+			if fmtErr != nil {
+				return msgFinal
+			}
+			msgFinal += more
+		}
 	}
 
 	return msgFinal
@@ -410,20 +414,18 @@ func (e *errorCore) unsafeUnformattedError() string {
 
 	if len(e.annotations) > 0 {
 		msgFinal += "\nWith annotations: "
-		msgFinal += e.annotationFormatter(e.annotations)
+		more, fmtErr := e.annotationFormatter(e.annotations)
+		if fmtErr != nil {
+			return msgFinal
+		}
+		msgFinal += more
 	}
 
 	return msgFinal
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *errorCore) GRPCCode() codes.Code {
-
-	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'GRPCCode'", "on nil pointer *errorCore", 0))
-		return codes.Unknown
-	}
-
+func (e *errorCore) getGRPCCode() codes.Code {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 	return e.grpcCode
@@ -440,21 +442,7 @@ func (e errorCore) ToGRPCStatus() error {
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
-	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
-}
-
-// prependToMessage adds 'msg' as prefix to current message of 'e'
-// Note: do not call prependTomessage with an already set lock, it will deadlock
-func (e *errorCore) prependToMessage(msg string) {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.prependToMessage() from null instance")
-		return
-	}
-
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	e.message = msg + ": " + e.message
+	return grpcstatus.Errorf(e.getGRPCCode(), e.Error())
 }
 
 // ErrWarning defines an ErrWarning error
@@ -471,6 +459,15 @@ func WarningError(cause error, msg ...interface{}) *ErrWarning { // nolint
 	}
 }
 
+// WarningErrorWithCauseAndConsequences return an ErrWarning instance
+func WarningErrorWithCauseAndConsequences(cause error, consequences []error, msg ...interface{}) *ErrWarning { // nolint
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.Unknown
+	return &ErrWarning{
+		errorCore: r,
+	}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrWarning) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -481,47 +478,24 @@ func (e *ErrWarning) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
-		return &ErrWarning{}
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrWarning) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrWarning) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrWarning) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrWarning) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrTimeout defines a ErrTimeout error
@@ -549,6 +523,17 @@ func TimeoutError(cause error, dur time.Duration, msg ...interface{}) *ErrTimeou
 	}
 }
 
+// TimeoutErrorWithCauseAndConsequences returns an ErrTimeout instance
+func TimeoutErrorWithCauseAndConsequences(cause error, dur time.Duration, consequences []error, msg ...interface{}) *ErrTimeout {
+	message := strprocess.FormatStrings(msg...)
+	r := newError(cause, consequences, message)
+	r.grpcCode = codes.DeadlineExceeded
+	return &ErrTimeout{
+		errorCore: r,
+		dur:       dur,
+	}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrTimeout) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -559,27 +544,24 @@ func (e *ErrTimeout) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) { // do nothing
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
-		return &ErrTimeout{}
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrTimeout) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
+}
+
+// GRPCCode returns the appropriate error code to use with gRPC
+func (e *ErrTimeout) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
@@ -615,8 +597,8 @@ func NotFoundError(msg ...interface{}) *ErrNotFound {
 }
 
 // NotFoundErrorWithCause creates an ErrNotFound error initialized with cause 'cause'
-func NotFoundErrorWithCause(cause error, msg ...interface{}) *ErrNotFound {
-	r := newError(cause, nil, msg...)
+func NotFoundErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrNotFound {
+	r := newError(cause, consequences, msg...)
 	r.grpcCode = codes.NotFound
 	return &ErrNotFound{r}
 }
@@ -629,10 +611,6 @@ func (e *ErrNotFound) IsNull() bool {
 // AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrNotFound) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
-		return e
-	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.AddConsequence()", "from null instance", 0))
 		return e
 	}
 	_ = e.errorCore.AddConsequence(err)
@@ -651,7 +629,12 @@ func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatab
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotFound) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
+}
+
+// GRPCCode returns the appropriate error code to use with gRPC
+func (e *ErrNotFound) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
@@ -687,8 +670,8 @@ func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 }
 
 // NotAvailableErrorWithCause creates an ErrNotAvailable error initialized with a cause 'cause'
-func NotAvailableErrorWithCause(cause error, msg ...interface{}) *ErrNotAvailable {
-	r := newError(cause, nil, msg...)
+func NotAvailableErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrNotAvailable {
+	r := newError(cause, consequences, msg...)
 	r.grpcCode = codes.Unavailable
 	return &ErrNotAvailable{r}
 }
@@ -703,27 +686,24 @@ func (e *ErrNotAvailable) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAvailable) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
+}
+
+// GRPCCode returns the appropriate error code to use with gRPC
+func (e *ErrNotAvailable) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
@@ -759,8 +739,8 @@ func DuplicateError(msg ...interface{}) *ErrDuplicate {
 }
 
 // DuplicateErrorWithCause creates an ErrDuplicate error initialized with cause 'cause'
-func DuplicateErrorWithCause(cause error, msg ...interface{}) *ErrDuplicate {
-	r := newError(cause, nil, msg...)
+func DuplicateErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrDuplicate {
+	r := newError(cause, consequences, msg...)
 	r.grpcCode = codes.AlreadyExists
 	return &ErrDuplicate{r}
 }
@@ -775,48 +755,25 @@ func (e *ErrDuplicate) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrDuplicate) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 // satisfies interface data.Annotatable
 func (e *ErrDuplicate) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrDuplicate) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrDuplicate) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrDuplicate) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrInvalidRequest ...
@@ -831,6 +788,13 @@ func InvalidRequestError(msg ...interface{}) Error {
 	return &ErrInvalidRequest{r}
 }
 
+// InvalidRequestErrorWithCause creates an ErrInvalidRequest error
+func InvalidRequestErrorWithCause(cause error, consequences []error, msg ...interface{}) Error {
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.InvalidArgument
+	return &ErrInvalidRequest{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrInvalidRequest) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -841,48 +805,25 @@ func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidRequest) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate overloads errorCore.Annotate() to make sure the type returned is the same as the caller
 // satisfies interface data.Annotatable
 func (e *ErrInvalidRequest) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidRequest) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrInvalidRequest) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrInvalidRequest) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrSyntax ...
@@ -898,8 +839,8 @@ func SyntaxError(msg ...interface{}) *ErrSyntax {
 }
 
 // SyntaxErrorWithCause creates an ErrSyntax error initialized with cause 'cause'
-func SyntaxErrorWithCause(cause error, msg ...interface{}) *ErrSyntax {
-	r := newError(cause, nil, msg...)
+func SyntaxErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrSyntax {
+	r := newError(cause, consequences, msg...)
 	r.grpcCode = codes.Internal
 	return &ErrSyntax{r}
 }
@@ -914,47 +855,31 @@ func (e *ErrSyntax) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrSyntax) UnformattedError() string {
-	return e.Error()
+	if e.IsNull() {
+		return ""
+	}
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrSyntax) GRPCCode() codes.Code {
+func (e *ErrSyntax) getGRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.getGRPCCode()", "from null instance", 0))
+		return codes.InvalidArgument
 	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrSyntax) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrNotAuthenticated when action is done without being authenticated first
@@ -969,6 +894,13 @@ func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
 	return &ErrNotAuthenticated{r}
 }
 
+// NotAuthenticatedErrorWithCause creates an ErrNotAuthenticated error
+func NotAuthenticatedErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrNotAuthenticated {
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.Unauthenticated
+	return &ErrNotAuthenticated{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrNotAuthenticated) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -979,47 +911,27 @@ func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAuthenticated) UnformattedError() string {
-	return e.Error()
+	if e.IsNull() {
+		return ""
+	}
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrNotAuthenticated) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrNotAuthenticated) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrNotAuthenticated) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrForbidden when action is not allowed.
@@ -1034,6 +946,13 @@ func ForbiddenError(msg ...interface{}) *ErrForbidden {
 	return &ErrForbidden{r}
 }
 
+// ForbiddenErrorWithCause creates an ErrForbidden error
+func ForbiddenErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrForbidden {
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.PermissionDenied
+	return &ErrForbidden{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrForbidden) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1044,47 +963,27 @@ func (e *ErrForbidden) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrForbidden) UnformattedError() string {
-	return e.Error()
+	if e.IsNull() {
+		return ""
+	}
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrForbidden) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrForbidden) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrForbidden) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrAborted is used to signal abortion
@@ -1106,6 +1005,19 @@ func AbortedError(err error, msg ...interface{}) *ErrAborted {
 	return &ErrAborted{r}
 }
 
+// AbortedErrorWithCauseAndConsequences creates an ErrAborted error
+func AbortedErrorWithCauseAndConsequences(err error, consequences []error, msg ...interface{}) *ErrAborted {
+	var message string
+	if len(msg) == 0 {
+		message = "aborted"
+	} else {
+		message = strprocess.FormatStrings(msg...)
+	}
+	r := newError(err, consequences, message)
+	r.grpcCode = codes.Aborted
+	return &ErrAborted{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrAborted) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1116,47 +1028,27 @@ func (e *ErrAborted) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAborted) UnformattedError() string {
-	return e.Error()
+	if e.IsNull() {
+		return ""
+	}
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrAborted) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrAborted) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrAborted) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrOverflow is used when a limit is reached
@@ -1183,6 +1075,24 @@ func OverflowError(err error, limit uint, msg ...interface{}) *ErrOverflow {
 	}
 }
 
+// OverflowErrorWithCause creates an ErrOverflow error
+func OverflowErrorWithCause(err error, limit uint, consequences []error, msg ...interface{}) *ErrOverflow {
+	message := strprocess.FormatStrings(msg...)
+	if limit > 0 {
+		limitMsg := fmt.Sprintf("(limit: %d)", limit)
+		if message != "" {
+			message += " "
+		}
+		message += limitMsg
+	}
+	r := newError(err, consequences, message)
+	r.grpcCode = codes.OutOfRange
+	return &ErrOverflow{
+		errorCore: r,
+		limit:     limit,
+	}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrOverflow) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1193,47 +1103,27 @@ func (e *ErrOverflow) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverflow) UnformattedError() string {
-	return e.Error()
+	if e.IsNull() {
+		return ""
+	}
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrOverflow) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrOverflow) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrOverflow) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occurred in a given time).
@@ -1248,6 +1138,13 @@ func OverloadError(msg ...interface{}) *ErrOverload {
 	return &ErrOverload{r}
 }
 
+// OverloadErrorWithCause creates an ErrOverload error
+func OverloadErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrOverload {
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.ResourceExhausted
+	return &ErrOverload{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrOverload) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1258,47 +1155,24 @@ func (e *ErrOverload) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverload) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrOverload) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrOverload) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrOverload) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrOverload) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrNotImplemented ...
@@ -1318,9 +1192,9 @@ func (e *ErrNotImplemented) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// NotImplementedErrorWithReason creates an ErrNotImplemented report
-func NotImplementedErrorWithReason(what string, why string) Error {
-	r := newError(nil, nil, callstack.DecorateWith("not implemented yet:", what, why, 0))
+// NotImplementedErrorWithCauseAndConsequences creates an ErrNotImplemented report
+func NotImplementedErrorWithCauseAndConsequences(cause error, consequences []error, msg ...interface{}) Error {
+	r := newError(cause, consequences, callstack.DecorateWith("not implemented yet:", strprocess.FormatStrings(msg...), "", 0))
 	r.grpcCode = codes.Unimplemented
 	return &ErrNotImplemented{r}
 }
@@ -1330,47 +1204,27 @@ func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotImplemented) UnformattedError() string {
-	return e.Error()
+	if e.IsNull() {
+		return ""
+	}
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrNotImplemented) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrNotImplemented) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrNotImplemented) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrRuntimePanic ...
@@ -1387,6 +1241,23 @@ func RuntimePanicError(pattern string, msg ...interface{}) *ErrRuntimePanic {
 	return &ErrRuntimePanic{r}
 }
 
+// RuntimePanicErrorWithCauseAndConsequences creates an ErrRuntimePanic error
+func RuntimePanicErrorWithCauseAndConsequences(cause error, consequences []error, overwrite bool, msg ...interface{}) *ErrRuntimePanic {
+	var r *errorCore
+	if overwrite {
+		point := callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0)
+		r = newError(cause, consequences, point)
+		r.grpcCode = codes.Internal
+		// This error is systematically logged
+		logrus.Error(r.Error())
+	} else {
+		r = newError(cause, consequences, msg...)
+		r.grpcCode = codes.Internal
+	}
+
+	return &ErrRuntimePanic{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrRuntimePanic) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1397,47 +1268,24 @@ func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrRuntimePanic) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrRuntimePanic) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrRuntimePanic) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrRuntimePanic) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrRuntimePanic) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
@@ -1454,6 +1302,13 @@ func InvalidInstanceError() *ErrInvalidInstance {
 	return &ErrInvalidInstance{r}
 }
 
+// InvalidInstanceErrorWithCause creates an ErrInvalidInstance error
+func InvalidInstanceErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrInvalidInstance {
+	r := newError(cause, consequences, callstack.DecorateWith("invalid instance:", "", "calling method from a nil pointer", 0))
+	r.grpcCode = codes.FailedPrecondition
+	return &ErrInvalidInstance{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrInvalidInstance) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1464,65 +1319,58 @@ func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidInstance) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInvalidInstance) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidInstance) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrInvalidInstance) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrInvalidInstance) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrInvalidParameter ...
 type ErrInvalidParameter struct {
 	*errorCore
+	what string
+	skip uint
 }
 
-// InvalidParameterError ...
+// InvalidParameterError creates an ErrInvalidParameter error
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
 	return invalidParameterError(what, 3, why...)
 }
 
 func invalidParameterError(what string, skip uint, why ...interface{}) *ErrInvalidParameter {
 	r := newError(nil, nil, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), skip))
-	r.grpcCode = codes.FailedPrecondition
+	r.grpcCode = codes.InvalidArgument
 	// Systematically log this kind of error
 	logrus.Error(r.Error())
-	return &ErrInvalidParameter{r}
+	return &ErrInvalidParameter{
+		errorCore: r,
+		what:      what,
+		skip:      skip,
+	}
+}
+
+// InvalidParameterErrorWithCauseAndConsequences creates an ErrInvalidParameter error
+func InvalidParameterErrorWithCauseAndConsequences(cause error, consequences []error, what string, skip uint, why ...interface{}) *ErrInvalidParameter {
+	r := newError(cause, consequences, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), skip))
+	r.grpcCode = codes.InvalidArgument
+	return &ErrInvalidParameter{errorCore: r,
+		what: what,
+		skip: skip,
+	}
 }
 
 // InvalidParameterCannotBeNilError is a specialized *ErrInvalidParameter with message "cannot be nil"
@@ -1545,52 +1393,31 @@ func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidParameter) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInvalidParameter) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidParameter) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrInvalidParameter) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrInvalidParameter) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
 type ErrInvalidInstanceContent struct {
 	*errorCore
+	what string
+	why  string
 }
 
 // InvalidInstanceContentError returns an instance of ErrInvalidInstanceContent.
@@ -1599,7 +1426,22 @@ func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())
-	return &ErrInvalidInstanceContent{r}
+	return &ErrInvalidInstanceContent{
+		errorCore: r,
+		what:      what,
+		why:       why,
+	}
+}
+
+// InvalidInstanceContentErrorWithCause returns an instance of ErrInvalidInstanceContent.
+func InvalidInstanceContentErrorWithCause(cause error, consequences []error, what, why string, msg ...interface{}) *ErrInvalidInstanceContent {
+	r := newError(cause, consequences, callstack.DecorateWith("invalid instance content:", what, why, 0))
+	r.grpcCode = codes.FailedPrecondition
+	return &ErrInvalidInstanceContent{
+		errorCore: r,
+		what:      what,
+		why:       why,
+	}
 }
 
 // IsNull tells if the instance is null
@@ -1612,47 +1454,24 @@ func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidInstanceContent) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInvalidInstanceContent) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidInstanceContent) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrInvalidInstanceContent) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrInvalidInstanceContent) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrInconsistent is used when data used is ErrInconsistent
@@ -1667,6 +1486,13 @@ func InconsistentError(msg ...interface{}) *ErrInconsistent {
 	return &ErrInconsistent{r}
 }
 
+// InconsistentErrorWithCause creates an ErrInconsistent error
+func InconsistentErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrInconsistent {
+	r := newError(cause, consequences, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
+	r.grpcCode = codes.DataLoss
+	return &ErrInconsistent{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrInconsistent) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1677,47 +1503,24 @@ func (e *ErrInconsistent) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInconsistent) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInconsistent) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInconsistent) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrInconsistent) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrInconsistent) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrExecution is used when code ErrExecution failed
@@ -1728,6 +1531,24 @@ type ErrExecution struct {
 // ExecutionError creates an ErrExecution error
 func ExecutionError(exitError error, msg ...interface{}) *ErrExecution {
 	r := newError(exitError, nil, msg...)
+	r.grpcCode = codes.Internal
+
+	retcode := -1
+	stderr := ""
+	if ee, ok := exitError.(*exec.ExitError); ok {
+		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+			retcode = status.ExitStatus()
+		}
+		stderr = string(ee.Stderr)
+	}
+	outErr := &ErrExecution{errorCore: r}
+	_ = outErr.Annotate("retcode", retcode).Annotate("stderr", stderr)
+	return outErr
+}
+
+// ExecutionErrorWithCause creates an ErrExecution error
+func ExecutionErrorWithCause(exitError error, consequences []error, msg ...interface{}) *ErrExecution {
+	r := newError(exitError, consequences, msg...)
 	r.grpcCode = codes.Internal
 
 	retcode := -1
@@ -1759,47 +1580,24 @@ func (e *ErrExecution) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrExecution) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrExecution) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrExecution) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrExecution) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrAlteredNothing is used when an Alter() call changed nothing
@@ -1814,6 +1612,13 @@ func AlteredNothingError(msg ...interface{}) *ErrAlteredNothing {
 	return &ErrAlteredNothing{r}
 }
 
+// AlteredNothingError creates an ErrAlteredNothing error
+func AlteredNothingErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrAlteredNothing {
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.PermissionDenied
+	return &ErrAlteredNothing{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrAlteredNothing) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1824,47 +1629,24 @@ func (e *ErrAlteredNothing) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAlteredNothing) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrAlteredNothing) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrAlteredNothing) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrAlteredNothing) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrAlteredNothing) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }
 
 // ErrUnknown is used when situation is unknown
@@ -1879,6 +1661,13 @@ func UnknownError(msg ...interface{}) *ErrUnknown {
 	return &ErrUnknown{r}
 }
 
+// UnknownErrorWithCause creates an ErrUnknown error
+func UnknownErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrUnknown {
+	r := newError(cause, consequences, msg...)
+	r.grpcCode = codes.Unknown
+	return &ErrUnknown{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrUnknown) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -1889,45 +1678,22 @@ func (e *ErrUnknown) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
 	}
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.AddConsequence()", "from null instance", 0))
-		return e
-	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrUnknown) UnformattedError() string {
-	return e.Error()
+	return e.unsafeUnformattedError()
 }
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrUnknown) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.Annotate()", "from null instance", 0))
-		return e
-	}
 	e.errorCore.Annotate(key, value)
 	return e
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrUnknown) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.GRPCCode()", "from null instance", 0))
-		return codes.Unknown
-	}
-	return e.errorCore.GRPCCode()
-}
-
-// Cause is just an accessor for internal e.cause
-func (e *ErrUnknown) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.Cause()", "from null instance", 0))
-		return NewError()
-	}
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.errorCore.cause
+func (e *ErrUnknown) getGRPCCode() codes.Code {
+	return e.errorCore.getGRPCCode()
 }

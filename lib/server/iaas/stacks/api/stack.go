@@ -19,15 +19,15 @@ package api
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
-//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api.Stack
+//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api.Stack
 
 // Stack is the interface to cloud stack
 type Stack interface {
@@ -165,7 +165,7 @@ type Stack interface {
 	Migrate(operation string, params map[string]interface{}) fail.Error
 
 	// Timings ...
-	Timings() temporal.Timings
+	Timings() (temporal.Timings, fail.Error)
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally

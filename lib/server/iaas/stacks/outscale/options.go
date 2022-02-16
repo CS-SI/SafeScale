@@ -17,8 +17,8 @@
 package outscale
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // GetRawConfigurationOptions ...

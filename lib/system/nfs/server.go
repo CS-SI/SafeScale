@@ -19,11 +19,11 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Server getServer structure
@@ -51,7 +51,12 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	stdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	timings, xerr := s.svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install nfs server")
@@ -110,11 +115,16 @@ func (s *Server) AddShare(
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
 func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
+	timings, xerr := s.svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	data := map[string]interface{}{
 		"Path": path,
 	}
 
-	stdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
@@ -133,10 +143,15 @@ func (s *Server) MountBlockDevice(
 		"DoNotFormat": doNotFormat,
 	}
 
+	timings, xerr := s.svc.Timings()
+	if xerr != nil {
+		return "", xerr
+	}
+
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		istdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "block_device_mount.sh", data)
+		istdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
 			return fail.Wrap(xerr, "error executing script to mount block device")
@@ -154,13 +169,18 @@ func (s *Server) MountBlockDevice(
 
 // UnmountBlockDevice unmounts a local block device on the remote system
 func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail.Error {
+	timings, xerr := s.svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	data := map[string]interface{}{
 		"UUID": volumeUUID,
 	}
 
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		stdout, xerr := executeScript(ctx, s.svc.Timings(), *s.SSHConfig, "block_device_unmount.sh", data)
+		stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")

@@ -26,26 +26,26 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
@@ -126,6 +126,11 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	sgCache, xerr := svc.GetCache(securityGroupKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -134,7 +139,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) },
-		svc.Timings().MetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := sgCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -526,8 +531,13 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fai
 
 // deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
 func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// FIXME: communication failure handled at service level, not necessary anymore to retry here
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := svc.DeleteSecurityGroup(abstractSG); innerXErr != nil {
 				switch innerXErr.(type) {
@@ -539,7 +549,7 @@ func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.Security
 			}
 			return nil
 		},
-		svc.Timings().CommunicationTimeout(),
+		timings.CommunicationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

@@ -26,28 +26,29 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	scribble "github.com/nanobox-io/golang-scribble"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
+	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 	"github.com/xrash/smetrics"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	imagefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
-//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/lib/server/iaas.Service
+//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
 
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
@@ -63,7 +64,7 @@ type Service interface {
 	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
-	ObjectStorageConfiguration() objectstorage.Config
+	ObjectStorageConfiguration() (objectstorage.Config, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
@@ -137,8 +138,8 @@ func (instance *service) IsNull() bool {
 
 // GetProviderName ...
 func (instance service) GetProviderName() (string, fail.Error) {
-	if instance.IsNull() {
-		return "", nil
+	if valid.IsNil(instance) {
+		return "", fail.InvalidInstanceError()
 	}
 	svcName, xerr := instance.GetName()
 	if xerr != nil {
@@ -150,8 +151,8 @@ func (instance service) GetProviderName() (string, fail.Error) {
 // GetName ...
 // Satisfies interface data.Identifiable
 func (instance service) GetName() (string, fail.Error) {
-	if instance.IsNull() {
-		return "", nil
+	if valid.IsNil(instance) {
+		return "", fail.InconsistentError()
 	}
 
 	return instance.tenantName, nil
@@ -160,7 +161,7 @@ func (instance service) GetName() (string, fail.Error) {
 // GetCache returns the data.Cache instance corresponding to the name passed as parameter
 // If the cache does not exist, create it
 func (instance *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -183,15 +184,15 @@ func (instance *service) GetCache(name string) (_ *ResourceCache, xerr fail.Erro
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
 func (instance service) GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error) {
-	if instance.IsNull() {
-		return abstract.ObjectStorageBucket{}, nil
+	if valid.IsNil(instance) {
+		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 	return instance.metadataBucket, nil
 }
 
 // GetMetadataKey returns the key used to crypt data in metadata bucket
 func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if instance.metadataKey == nil {
@@ -202,7 +203,7 @@ func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
 
 // ChangeProvider allows changing provider interface of service object (mainly for test purposes)
 func (instance *service) ChangeProvider(provider providers.Provider) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if provider == nil {
@@ -216,7 +217,7 @@ func (instance *service) ChangeProvider(provider providers.Provider) fail.Error 
 // If host is in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
 func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if hostID == "" {
@@ -266,7 +267,8 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 			case <-done: // only when it's closed
 				return
 			default:
-				time.Sleep(instance.Timings().SmallDelay())
+				timings, _ := instance.Timings()
+				time.Sleep(timings.SmallDelay())
 			}
 		}
 	}()
@@ -289,7 +291,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 func (instance service) WaitVolumeState(
 	volumeID string, state volumestate.Enum, timeout time.Duration,
 ) (*abstract.Volume, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if volumeID == "" {
@@ -344,7 +346,7 @@ func pollVolume(
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (instance service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -362,7 +364,7 @@ func (instance service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.E
 
 // FindTemplateByName returns the template by its name
 func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -453,7 +455,7 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 func (instance service) ListTemplatesBySizing(
 	sizing abstract.HostSizingRequirements, force bool,
 ) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -667,7 +669,7 @@ func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
 func (instance service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -741,7 +743,7 @@ func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 
 // ListImages reduces the list of needed, if all bool is true, all images are returned, if not, images are filtered using blacklists and whitelists
 func (instance service) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -754,7 +756,7 @@ func (instance service) ListImages(all bool) ([]abstract.Image, fail.Error) {
 
 // SearchImage search an image corresponding to OS Name
 func (instance service) SearchImage(osname string) (*abstract.Image, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if osname == "" {
@@ -946,6 +948,9 @@ func (instance service) InspectSecurityGroupByName(networkID, name string) (*abs
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
-func (instance service) ObjectStorageConfiguration() objectstorage.Config {
+func (instance service) ObjectStorageConfiguration() (objectstorage.Config, fail.Error) {
+	if instance.IsNull() {
+		return objectstorage.Config{}, fail.InvalidInstanceError()
+	}
 	return instance.Location.Configuration()
 }

@@ -27,19 +27,19 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installaction"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
@@ -557,7 +557,12 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		outerr  string
 	)
 	svc := p.Host.Service()
-	connTimeout := svc.Timings().ConnectionTimeout()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	connTimeout := timings.ConnectionTimeout()
 	for {
 		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, connTimeout, is.WallTime)
 		if retcode == 126 {
@@ -597,7 +602,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		rounds--
-		time.Sleep(svc.Timings().SmallDelay())
+		time.Sleep(timings.SmallDelay())
 	}
 
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
@@ -38,17 +38,17 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // ListRegions ...
@@ -465,7 +465,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHF, xerr
+	}
+
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -561,7 +566,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 				subnetsByID[port.FixedIPs[0].SubnetID] = ""
 			} else {
 				for _, ip := range port.FixedIPs {
-					if govalidator.IsIPv6(ip.IPAddress) {
+					if valid.IsIPv6(ip.IPAddress) {
 						ipv6 = ip.IPAddress
 					} else {
 						ipv4 = ip.IPAddress
@@ -587,7 +592,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 			port := hostPorts[k]
 			for _, ip := range port.FixedIPs {
 				subnetID := ip.SubnetID
-				if govalidator.IsIPv6(ip.IPAddress) {
+				if valid.IsIPv6(ip.IPAddress) {
 					ipv6Addresses[subnetID] = ip.IPAddress
 				} else {
 					ipv4Addresses[subnetID] = ip.IPAddress
@@ -692,7 +697,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", s.Timings())
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -866,7 +876,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 
 			// Wait that host is ready, not just that the build is started
-			timeout := s.Timings().HostOperationTimeout()
+			timings, innerXErr := s.Timings()
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			timeout := timings.HostOperationTimeout()
 			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
 				logrus.Errorf(
@@ -882,8 +897,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1181,6 +1196,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullServer, xerr
+	}
+
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
 			if ahf.Core.ID != "" {
@@ -1238,7 +1258,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				)
 			}
 		},
-		s.Timings().SmallDelay(),
+		timings.SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -1416,6 +1436,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Try to remove host for 3 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -1451,8 +1476,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
 				},
-				s.Timings().NormalDelay(),
-				s.Timings().ContextTimeout(),
+				timings.NormalDelay(),
+				timings.ContextTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1470,7 +1495,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return nil
 		},
 		0,
-		s.Timings().HostCleanupTimeout(),
+		timings.HostCleanupTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

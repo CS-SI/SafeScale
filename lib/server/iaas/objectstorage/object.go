@@ -31,19 +31,19 @@ import (
 	_ "gomodules.xyz/stow/s3"
 	_ "gomodules.xyz/stow/swift"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Object
+//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Object
 
 // Object interface
 type Object interface {
 	//	data.Identifiable
 
-	Stored() bool
+	Stored() (bool, fail.Error)
 
 	Read(io.Writer, int64, int64) fail.Error
 	Write(io.Reader, int64) fail.Error
@@ -118,11 +118,11 @@ func newObjectFromStow(b *bucket, item stow.Item) object {
 }
 
 // Stored return true if the object exists in Object Storage
-func (instance object) Stored() bool {
+func (instance object) Stored() (bool, fail.Error) {
 	if instance.IsNull() {
-		return false
+		return false, fail.InvalidInstanceError()
 	}
-	return instance.item != nil
+	return instance.item != nil, nil
 }
 
 // Reload reloads the data of the Object from the Object Storage

@@ -21,20 +21,20 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
@@ -287,6 +287,11 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 		return nil, xerr
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	var lastError fail.Error
 	lastError = fail.NotFoundError("no master found")
 	master = nil
@@ -301,7 +306,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			return nil, xerr
 		}
 
-		_, xerr = master.WaitSSHReady(ctx, instance.Service().Timings().SSHConnectionTimeout())
+		_, xerr = master.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -424,6 +429,11 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		}
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -459,7 +469,7 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 			hostInstance.Released()
 		}(node)
 
-		_, xerr = node.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
+		_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

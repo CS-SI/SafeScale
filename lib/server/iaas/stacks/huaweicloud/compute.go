@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -39,16 +40,16 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 )
 
 type blockDevice struct {
@@ -465,9 +466,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// --- prepares data structures for Provider usage ---
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "bad timings")
+	}
+
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", s.Timings())
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -640,7 +646,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, s.Timings().HostOperationTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -657,8 +663,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -723,9 +729,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 		}()
 
-		if govalidator.IsIPv4(fip.PublicIPAddress) {
+		if valid.IsIPv4(fip.PublicIPAddress) {
 			host.Networking.PublicIPv4 = fip.PublicIPAddress
-		} else if govalidator.IsIPv6(fip.PublicIPAddress) {
+		} else if valid.IsIPv6(fip.PublicIPAddress) {
 			host.Networking.PublicIPv6 = fip.PublicIPAddress
 		}
 		userData.PublicIP = fip.PublicIPAddress
@@ -744,23 +750,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 // validateHostname validates the name of a host based on known FlexibleEngine requirements
 func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
-	s := check.Struct{
-		"ResourceName": check.Composite{
-			check.NonEmpty{},
-			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{Constraint: 64},
-		},
+	err := validation.ValidateStruct(&req,
+		validation.Field(&req.ResourceName, validation.Required, validation.Length(1, 64)),
+		validation.Field(&req.ResourceName, validation.Required, validation.Match(regexp.MustCompile(`^[a-zA-Z0-9_-]+$`))),
+	)
+	if err != nil {
+		return false, fail.Wrap(err, "validation issue")
 	}
 
-	e := s.Validate(req)
-	if e.HasErrors() {
-		errorList, _ := e.GetErrorsByKey("ResourceName")
-		var errs []error
-		for _, msg := range errorList {
-			errs = append(errs, msg)
-		}
-		return false, fail.NewErrorList(errs)
-	}
 	return true, nil
 }
 
@@ -813,7 +810,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHF, xerr
+	}
+
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -1209,6 +1211,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Try to remove host for 3 minutes
 	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
@@ -1258,8 +1265,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 					},
-					s.Timings().NormalDelay(),
-					s.Timings().HostCleanupTimeout(),
+					timings.NormalDelay(),
+					timings.HostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
@@ -1278,7 +1285,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		2*s.Timings().HostCleanupTimeout(), // inner retry already has HostCleanupTimeout, so here we need more
+		2*timings.HostCleanupTimeout(), // inner retry already has HostCleanupTimeout, so here we need more
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
@@ -1360,6 +1367,11 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 		portID *string
 	)
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
@@ -1373,8 +1385,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().OperationTimeout(),
+		timings.NormalDelay(),
+		timings.OperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

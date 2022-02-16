@@ -22,13 +22,13 @@ import (
 
 	"github.com/outscale/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Credentials outscale credentials
@@ -255,12 +255,12 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 }
 
 // Timings returns the instance containing current timeout settings
-func (s *stack) Timings() temporal.Timings {
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
-		return temporal.NewTimings()
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

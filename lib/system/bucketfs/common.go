@@ -19,48 +19,39 @@ package bucketfs
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
-//go:generate rice embed-go
-
-// templateProvider is the instance of TemplateProvider used by package bucketfs
-var tmplBox *rice.Box
-
-// getTemplateProvider returns the instance of TemplateProvider
-func getTemplateBox() (*rice.Box, fail.Error) {
-	if tmplBox == nil {
-		var err error
-		tmplBox, err = rice.FindBox("../bucketfs/scripts")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-	}
-	return tmplBox, nil
-}
+//go:embed scripts/*
+var bucketfsScripts embed.FS
 
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -79,7 +70,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(host.Service().Timings())
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		return xerr
@@ -135,15 +126,15 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 	xerr = retry.Action(
 		func() (innerXErr error) {
-			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().ExecutionTimeout())
+			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(host.Service().Timings().ContextTimeout(), host.Service().Timings().ConnectionTimeout()+host.Service().Timings().ExecutionTimeout()))),
-		retry.Constant(host.Service().Timings().NormalDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(timings.ContextTimeout(), timings.ConnectionTimeout()+timings.ExecutionTimeout()))),
+		retry.Constant(timings.NormalDelay()),
 		nil, nil, nil,
 	)
 	if xerr != nil {
@@ -170,31 +161,22 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 }
 
 func realizeTemplate(name string, data interface{}) (string, fail.Error) {
-	tmplBox, xerr := getTemplateBox()
-	if xerr != nil {
-		xerr = fail.ExecutionError(xerr, "failure retrieving embedded blobs")
-		return "", xerr
-	}
-
 	// get file content as string
-	tmplContent, err := tmplBox.String(name)
+	tmplContent, err := bucketfsScripts.ReadFile("scripts/" + name)
 	if err != nil {
-		xerr = fail.ExecutionError(err, "failure retrieving embedded box '%s'", name)
-		return "", xerr
+		return "", fail.ExecutionError(err, "failure retrieving embedded box '%s'", name)
 	}
 
 	// Prepare the template for execution
-	tmplPrepared, err := template.Parse(name, tmplContent)
+	tmplPrepared, err := template.Parse(name, string(tmplContent))
 	if err != nil {
-		xerr = fail.ExecutionError(err, "failure parsing template '%s'", name)
-		return "", xerr
+		return "", fail.ExecutionError(err, "failure parsing template '%s'", name)
 	}
 
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		// log the faulty data
-		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
-		return "", xerr
+		return "", fail.ExecutionError(err, "failed to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
 	}
 	content := buffer.String()
 	return content, nil
@@ -217,10 +199,16 @@ func uploadContentToFile(
 
 	// TODO: This is not Windows friendly
 	svc := host.Service()
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return "", xerr
+	}
+
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, svc.Timings().OperationTimeout())
+			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")
 			}
@@ -232,8 +220,8 @@ func uploadContentToFile(
 
 			return nil
 		},
-		svc.Timings().NormalDelay(),
-		svc.Timings().HostOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

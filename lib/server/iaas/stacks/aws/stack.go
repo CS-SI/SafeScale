@@ -29,9 +29,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 type stack struct {
@@ -135,12 +135,12 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 }
 
 // Timings returns the instance containing current timeout/delay settings
-func (s *stack) Timings() temporal.Timings {
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
-		return temporal.NewTimings()
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

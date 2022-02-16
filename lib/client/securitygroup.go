@@ -21,12 +21,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 )
 
 // var sshCfgCache = cache.NewMapCache()

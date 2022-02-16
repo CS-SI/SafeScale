@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // safescale ssh connect host2
@@ -39,7 +39,7 @@ type SSHListener struct {
 	protocol.UnimplementedSshServiceServer
 }
 
-// Run executes an ssh command an a host
+// Run executes an ssh command on a host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot run by ssh")
@@ -75,6 +75,11 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	timings, xerr := job.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
@@ -83,7 +88,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	defer hostInstance.Released()
 
 	retcode, stdout, stderr, xerr := hostInstance.Run(
-		job.Context(), command, outputs.COLLECT, job.Service().Timings().ConnectionTimeout(), job.Service().Timings().ExecutionTimeout(),
+		job.Context(), command, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -157,6 +162,11 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	timings, xerr := job.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
@@ -166,11 +176,11 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	if pull {
 		retcode, stdout, stderr, xerr = hostInstance.Pull(
-			job.Context(), hostPath, localPath, job.Service().Timings().HostLongOperationTimeout(),
+			job.Context(), hostPath, localPath, timings.HostLongOperationTimeout(),
 		)
 	} else {
 		retcode, stdout, stderr, xerr = hostInstance.Push(
-			job.Context(), localPath, hostPath, in.Owner, in.Mode, job.Service().Timings().HostLongOperationTimeout(),
+			job.Context(), localPath, hostPath, in.Owner, in.Mode, timings.HostLongOperationTimeout(),
 		)
 	}
 	if xerr != nil {

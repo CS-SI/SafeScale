@@ -29,15 +29,15 @@ import (
 
 	"github.com/outscale/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 const maxMemorySize int = 1039
@@ -392,13 +392,18 @@ func (s stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.E
 }
 
 func (s stack) prepareUserData(request abstract.HostRequest, ud *userdata.Content) fail.Error {
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	cidr := func() string {
 		if len(request.Subnets) == 0 {
 			return ""
 		}
 		return request.Subnets[0].CIDR
 	}()
-	if xerr := ud.Prepare(*s.configurationOptions, request, cidr, "", s.Timings()); xerr != nil {
+	if xerr := ud.Prepare(*s.configurationOptions, request, cidr, "", timings); xerr != nil {
 		msg := "failed to prepare user data content"
 		logrus.Debugf(strprocess.Capitalize(msg + ": " + xerr.Error()))
 		return fail.Wrap(xerr, msg)
@@ -519,6 +524,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		hostLabel, state.String(), timeout).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHC, xerr
+	}
+
 	xerr = retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			st, innerXErr := s.hostState(ahf.Core.ID)
@@ -546,7 +556,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				return fail.NewError("wrong state: %s", st)
 			}
 		},
-		s.Timings().NormalDelay(),
+		timings.NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -947,6 +957,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		},
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
 	var vm osc.Vm
 	xerr = retry.WhileUnsuccessful(
 		func() (ferr error) {
@@ -980,11 +995,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				}
 			}()
 
-			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.Started, s.Timings().HostOperationTimeout())
+			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.Started, timings.HostOperationTimeout())
 			return innerXErr
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().HostLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1038,7 +1053,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	_, xerr = s.WaitHostState(vm.VmId, hoststate.Started, s.Timings().HostOperationTimeout())
+	_, xerr = s.WaitHostState(vm.VmId, hoststate.Started, timings.HostOperationTimeout())
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -1075,10 +1090,15 @@ func (s stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Er
 }
 
 func (s stack) deleteHost(id string) fail.Error {
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	if xerr := s.rpcDeleteVms([]string{id}); xerr != nil {
 		return xerr
 	}
-	_, xerr := s.WaitHostState(id, hoststate.Terminated, s.Timings().HostCreationTimeout())
+	_, xerr = s.WaitHostState(id, hoststate.Terminated, timings.HostCreationTimeout())
 	return xerr
 }
 

@@ -20,7 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
 // ErrorList ...
@@ -41,9 +41,22 @@ func NewErrorList(errors []error) Error {
 	}
 }
 
+func NewErrorListComplete(errors []error, cause error, consequences []error, msg ...interface{}) Error {
+	if len(errors) == 0 {
+		return &ErrorList{
+			errorCore: newError(cause, consequences, msg...),
+		}
+	}
+
+	return &ErrorList{
+		errorCore: newError(cause, consequences, msg...),
+		errors:    errors,
+	}
+}
+
 // ToGRPCStatus returns a grpcstatus struct from ErrorList
 func (el ErrorList) ToGRPCStatus() error {
-	return grpcstatus.Errorf(el.GRPCCode(), el.Error())
+	return grpcstatus.Errorf(el.getGRPCCode(), el.Error())
 }
 
 // AddConsequence ...
@@ -107,7 +120,7 @@ func (el *ErrorList) UnformattedError() string {
 // ToErrorSlice transforms ErrorList to []error
 func (el *ErrorList) ToErrorSlice() []error {
 	if el == nil {
-		logrus.Errorf("invalid call of EErrorList.ToErrorSlice() from nil instance")
+		logrus.Errorf("invalid call of ErrorList.ToErrorSlice() from nil instance")
 		return []error{}
 	}
 	if el.IsNull() {

@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pengux/check"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -36,14 +37,14 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
 )
 
 // VPCRequest defines a request to create a VPC
@@ -408,7 +409,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 		return nullAS, fail.DuplicateError("subnet '%s' already exists", req.Name)
 	}
 
-	if ok, xerr := validateNetworkName(req.NetworkID); !ok {
+	if ok, xerr := validateNetwork(req); !ok {
 		return nullAS, fail.Wrap(xerr, "network name '%s' invalid", req.Name)
 	}
 
@@ -459,27 +460,16 @@ func (s stack) validateCIDR(req *abstract.SubnetRequest, network *abstract.Netwo
 	return nil
 }
 
-// validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
-func validateNetworkName(name string) (bool, fail.Error) {
-	type checker struct{ Name string }
-	s := check.Struct{
-		"Name": check.Composite{
-			check.NonEmpty{},
-			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{Constraint: 64},
-		},
+// validateNetwork validates the name of a Network based on known FlexibleEngine requirements
+func validateNetwork(req abstract.SubnetRequest) (bool, fail.Error) {
+	err := validation.ValidateStruct(&req,
+		validation.Field(&req.Name, validation.Required, validation.Length(1, 64)),
+		validation.Field(&req.Name, validation.Required, validation.Match(regexp.MustCompile(`^[a-zA-Z0-9_-]+$`))),
+	)
+	if err != nil {
+		return false, fail.Wrap(err, "validation issue")
 	}
 
-	c := checker{Name: name}
-	e := s.Validate(c)
-	if e.HasErrors() {
-		errors, _ := e.GetErrorsByKey("Name")
-		var errs []string
-		for _, msg := range errors {
-			errs = append(errs, msg.Error())
-		}
-		return false, fail.NewError(strings.Join(errs, "; "))
-	}
 	return true, nil
 }
 
@@ -684,6 +674,11 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		OkCodes: []int{204},
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// FlexibleEngine has the curious behavior to be able to tell us all Hosts are deleted, but
 	// cannot delete the subnet because there is still at least one host...
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
@@ -699,18 +694,18 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				normalizeError,
 			)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(s.Timings().HostCleanupTimeout(), s.Timings().CommunicationTimeout()))),
-		retry.Constant(s.Timings().NormalDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(timings.HostCleanupTimeout(), timings.CommunicationTimeout()))),
+		retry.Constant(timings.NormalDelay()),
 		nil,
 		nil,
 		func(t retry.Try, verdict verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					logrus.Debugf("Subnet still owns host(s), retrying in %s...", s.Timings().NormalDelay())
+					logrus.Debugf("Subnet still owns host(s), retrying in %s...", timings.NormalDelay())
 				default:
 					logrus.Warnf("unexpected error: %s", spew.Sdump(t.Err))
-					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), s.Timings().NormalDelay())
+					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), timings.NormalDelay())
 				}
 			}
 		},
@@ -827,6 +822,11 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	opts.JSONResponse = &respGet.Body
 	opts.JSONBody = nil
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -850,8 +850,8 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 			return nil
 		},
-		s.Timings().SmallDelay(),
-		s.Timings().ContextTimeout(),
+		timings.SmallDelay(),
+		timings.ContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
 				logrus.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", req.Name)

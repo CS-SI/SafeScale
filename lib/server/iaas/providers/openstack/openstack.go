@@ -21,20 +21,20 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 const (
@@ -106,13 +106,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}

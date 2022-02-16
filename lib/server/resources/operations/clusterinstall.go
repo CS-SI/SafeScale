@@ -18,61 +18,35 @@ package operations
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusternodetype"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
-
-var (
-	// templateBox is the rice box to use in this package
-	clusterTemplateBox atomic.Value
-)
-
-// getTemplateBox
-func getTemplateBox() (*rice.Box, error) {
-	var (
-		b   *rice.Box
-		err error
-	)
-	anon := clusterTemplateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err = rice.FindBox("../operations/clusterflavors/scripts")
-		err = debug.InjectPlannedError(err)
-		if err != nil {
-			return nil, err
-		}
-		clusterTemplateBox.Store(b)
-		anon = clusterTemplateBox.Load()
-	}
-	return anon.(*rice.Box), nil
-}
 
 // TargetType returns the type of the target
 //
@@ -478,6 +452,9 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 	return feat.Remove(ctx, instance, vars, settings)
 }
 
+//go:embed clusterflavors/scripts/*
+var clusterFlavorScripts embed.FS
+
 // ExecuteScript executes the script template with the parameters on target Host
 func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -511,14 +488,12 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	box, err := getTemplateBox()
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return invalid, "", "", fail.ConvertError(err)
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
 	}
 
 	// Configures reserved_BashLibrary template var
-	timings := instance.Service().Timings()
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -541,7 +516,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		finalVariables[k] = v
 	}
 
-	script, path, xerr := realizeTemplate(box, tmplName, finalVariables, tmplName)
+	script, path, xerr := realizeTemplate("clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
@@ -611,6 +586,11 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	netCfg, xerr := instance.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -699,7 +679,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, instance.Service().Timings().ConnectionTimeout(), 2*instance.Service().Timings().HostLongOperationTimeout())
+			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), 2*timings.HostLongOperationTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())

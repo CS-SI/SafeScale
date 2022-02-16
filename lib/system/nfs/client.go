@@ -19,9 +19,9 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Client defines the structure of a Client object
@@ -41,7 +41,12 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, fail.Error) {
 
 // Install installs NFS client on remote host
 func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
-	stdout, xerr := executeScript(ctx, svc.Timings(), *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	stdout, xerr := executeScript(ctx, timings, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install NFS client on remote host")
@@ -53,12 +58,17 @@ func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
 func (c *Client) Mount(
 	ctx context.Context, svc iaas.Service, export string, mountPoint string, withCache bool,
 ) fail.Error {
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
-	stdout, xerr := executeScript(ctx, svc.Timings(), *c.SSHConfig, "nfs_client_share_mount.sh", data)
+	stdout, xerr := executeScript(ctx, timings, *c.SSHConfig, "nfs_client_share_mount.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to mount remote NFS share")
@@ -68,8 +78,13 @@ func (c *Client) Mount(
 
 // Unmount a nfs share from NFS server
 func (c *Client) Unmount(ctx context.Context, svc iaas.Service, export string) fail.Error {
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	data := map[string]interface{}{"Export": export}
-	stdout, xerr := executeScript(ctx, svc.Timings(), *c.SSHConfig, "nfs_client_share_unmount.sh", data)
+	stdout, xerr := executeScript(ctx, timings, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unmount remote NFS share")

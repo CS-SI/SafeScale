@@ -17,19 +17,15 @@
 package system
 
 import (
+	_ "embed"
 	"math"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
-
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
-
-//go:generate rice embed-go
 
 const (
 	BashLibraryReservedKeyword            = "reserved_BashLibrary"
@@ -40,9 +36,6 @@ const (
 	DockerImagePullTimeoutReservedKeyword = "reserved_DockerImagePullTimeout"
 )
 
-// bashLibraryContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
-var bashLibraryContent atomic.Value
-
 type BashLibraryDefinition struct {
 	Content                string `json:"reserved_BashLibrary"`
 	DefaultDelay           uint   `json:"reserved_DefaultDelay"`
@@ -52,28 +45,15 @@ type BashLibraryDefinition struct {
 	DockerImagePullTimeout string `json:"reserved_DockerImagePullTimeout"`
 }
 
+//go:embed scripts/bash_library.sh
+var bashLibrary string
+
 // BuildBashLibraryDefinition generates the content of {{.reserved_BashLibrary}} and other reserved template variables
 func BuildBashLibraryDefinition(
 	timings temporal.Timings,
 ) (*BashLibraryDefinition, fail.Error) {
-	anon := bashLibraryContent.Load()
-	if anon == nil {
-		box, err := rice.FindBox("../system/scripts")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-
-		// get file contents as string
-		tmplContent, err := box.String("bash_library.sh")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-		bashLibraryContent.Store(tmplContent)
-		anon = bashLibraryContent.Load()
-	}
-
 	out := &BashLibraryDefinition{
-		Content: anon.(string),
+		Content: bashLibrary,
 		// Sets delays and timeouts for script
 		DefaultDelay:           uint(math.Ceil(2 * timings.NormalDelay().Seconds())),
 		DefaultTimeout:         strings.ReplaceAll((timings.HostOperationTimeout() / 2).Truncate(time.Minute).String(), "0s", ""),

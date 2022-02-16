@@ -20,11 +20,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Description contains the configuration for bucket mount
@@ -55,6 +55,11 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}()
 
 	svc := host.Service()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	svcConf, xerr := svc.GetConfigurationOptions()
 	if xerr != nil {
 		return xerr
@@ -70,7 +75,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 	owner := desc.OperatorUsername + ":" + desc.OperatorUsername
 	target := desc.FilePath()
-	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", svc.Timings().ExecutionTimeout())
+	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to upload rclone configuration file")
 	}

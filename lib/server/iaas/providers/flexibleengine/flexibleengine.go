@@ -22,17 +22,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/huaweicloud"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	imagefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/images"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -141,17 +142,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	}
-
-	ok, verr := govalidator.ValidateStruct(authOptions)
-	if verr != nil {
-		return nil, fail.ConvertError(verr)
-	}
-	if !ok {
-		return nil, fail.NewError("Structure validation failure: %v", authOptions)
+	err := validation.ValidateStruct(&authOptions,
+		validation.Field(&authOptions.Region, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
+		validation.Field(&authOptions.AvailabilityZone, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
+	)
+	if err != nil {
+		return nil, fail.NewError("Structure validation failure: %v", err)
 	}
 
 	providerName := "huaweicloud"
@@ -166,13 +162,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
@@ -365,7 +361,7 @@ func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

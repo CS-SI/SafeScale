@@ -22,16 +22,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/aws"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -70,8 +70,8 @@ func (p provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
 }
 
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
-		return map[string]interface{}{}, nil
+	if valid.IsNil(p) {
+		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
 }
@@ -199,13 +199,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
@@ -257,7 +257,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -276,7 +276,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -317,7 +317,7 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
@@ -325,7 +325,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
@@ -341,7 +341,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

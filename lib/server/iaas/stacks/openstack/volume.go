@@ -26,14 +26,14 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -267,7 +267,12 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = s.Timings().OperationTimeout()
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	var timeout = timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -284,7 +289,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		s.Timings().NormalDelay(),
+		timings.NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {

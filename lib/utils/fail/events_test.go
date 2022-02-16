@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
-	gprcstatus "google.golang.org/grpc/status"
 	grpcstatus "google.golang.org/grpc/status"
 )
 
@@ -77,11 +76,10 @@ func Test_OnExitLogErrorWithLevel(t *testing.T) {
 	require.EqualValues(t, strings.Contains(log, "level=error"), true)
 
 	log = logrus_capture(func() {
-		nerr := gprcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
+		nerr := grpcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
 		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
 
 		fmt.Println(nerr)
-
 	})
 	require.EqualValues(t, strings.Contains(log, "GRPC Error"), true)
 	require.EqualValues(t, strings.Contains(log, "FailedPrecondition"), true)
@@ -142,21 +140,21 @@ func Test_extractCallerName(t *testing.T) {
 	require.EqualValues(t, strings.Contains(result, "runtime.goexit"), true)
 
 	result = func() string {
-		return extractCallerName()
+		return extractCallerName() // nolint
 	}()
 	require.EqualValues(t, strings.Contains(result, "testing.tRunner"), true)
 
 	result = func() string {
-		return func() string {
-			return extractCallerName()
+		return func() string { // nolint
+			return extractCallerName() // nolint
 		}()
 	}()
 	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
 
 	result = func() string {
 		return func() string {
-			return func() string {
-				return extractCallerName()
+			return func() string { // nolint
+				return extractCallerName() // nolint
 			}()
 		}()
 	}()
@@ -165,8 +163,8 @@ func Test_extractCallerName(t *testing.T) {
 	result = func() string {
 		return func() string {
 			return func() string {
-				return func() string {
-					return extractCallerName()
+				return func() string { // nolint
+					return extractCallerName() // nolint
 				}()
 			}()
 		}()
@@ -177,8 +175,8 @@ func Test_extractCallerName(t *testing.T) {
 		return func() string {
 			return func() string {
 				return func() string {
-					return func() string {
-						return extractCallerName()
+					return func() string { // nolint
+						return extractCallerName() // nolint
 					}()
 				}()
 			}()

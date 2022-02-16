@@ -16,13 +16,13 @@
 
 package cache
 
-//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cache
+//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/cache.Cache
 
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Cache interface describing what a struct must implement to be considered as a cache

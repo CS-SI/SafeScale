@@ -20,14 +20,14 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // stack ...
@@ -106,12 +106,12 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 }
 
 // Timings returns the instance containing current timing (timeouts, delays) settings
-func (s *stack) Timings() temporal.Timings {
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
-		return temporal.NewTimings()
+		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if s.MutableTimings == nil {
 		s.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings
+	return s.MutableTimings, nil
 }

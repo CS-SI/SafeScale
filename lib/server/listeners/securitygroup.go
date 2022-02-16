@@ -21,19 +21,19 @@ import (
 	"fmt"
 	"strings"
 
-	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SecurityGroupListener security-group service server grpc

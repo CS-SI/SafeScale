@@ -24,28 +24,28 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 )
 
@@ -169,12 +169,17 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// -- First step: identify subnetID from (networkRef, subnetRef) --
 	var (
 		subnetID        string
 		networkInstance resources.Network
 	)
-	var xerr fail.Error
+
 	networkRef = strings.TrimSpace(networkRef)
 	switch networkRef {
 	case "":
@@ -265,7 +270,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 
 		options := iaas.CacheMissOption(
 			func() (cache.Cacheable, fail.Error) { return onSubnetCacheMiss(svc, subnetID) },
-			svc.Timings().MetadataTimeout(),
+			timings.MetadataTimeout(),
 		)
 		cacheEntry, xerr := subnetCache.Get(subnetID, options...)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -394,13 +399,18 @@ func (instance *Subnet) Carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -578,7 +588,13 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(
 // deleteSubnetThenWaitCompletion deletes the Subnet identified by 'id' and wait for deletion confirmation
 func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 	svc := instance.Service()
-	xerr := svc.DeleteSubnet(id)
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = svc.DeleteSubnet(id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -606,8 +622,8 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 			}
 			return nil
 		},
-		svc.Timings().SmallDelay(),
-		svc.Timings().ContextTimeout(),
+		timings.SmallDelay(),
+		timings.ContextTimeout(),
 	)
 }
 

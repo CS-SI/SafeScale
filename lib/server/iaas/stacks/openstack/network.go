@@ -29,14 +29,14 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 // RouterRequest represents a router request
@@ -626,6 +626,12 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
@@ -666,8 +672,8 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 			}
 			return nil
 		},
-		s.Timings().NormalDelay(),
-		s.Timings().ContextTimeout(),
+		timings.NormalDelay(),
+		timings.ContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

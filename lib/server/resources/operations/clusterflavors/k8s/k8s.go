@@ -21,16 +21,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/clusterflavors"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/consts"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 var (
@@ -146,7 +146,10 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	// Drain pods from node
 	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
-	timings := clusterInstance.Service().Timings()
+	timings, xerr := clusterInstance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())

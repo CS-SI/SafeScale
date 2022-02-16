@@ -20,16 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	scribble "github.com/nanobox-io/golang-scribble"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // safescale template list --all=false
