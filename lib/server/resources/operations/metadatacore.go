@@ -955,7 +955,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		err := json.Unmarshal(buf, &mapped)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxErrorWithCause(err, "unmarshalling JSON to map failed")
+			return fail.SyntaxErrorWithCause(err, nil, "unmarshalling JSON to map failed")
 		}
 		if props, ok = mapped["properties"].(map[string]interface{}); ok {
 			delete(mapped, "properties")
@@ -965,7 +965,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 	jsoned, err := json.Marshal(mapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return fail.SyntaxErrorWithCause(err, "failed to marshal MetadataCore to JSON")
+		return fail.SyntaxErrorWithCause(err, nil, "failed to marshal MetadataCore to JSON")
 	}
 
 	xerr = myself.shielded.Deserialize(jsoned)
@@ -978,7 +978,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		jsoned, err = json.Marshal(props)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxErrorWithCause(err, "failed to marshal properties to JSON")
+			return fail.SyntaxErrorWithCause(err, nil, "failed to marshal properties to JSON")
 		}
 
 		xerr = myself.properties.Deserialize(jsoned)
