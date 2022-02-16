@@ -18,16 +18,16 @@ package operations
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -47,33 +47,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
-
-var (
-	// templateBox is the rice box to use in this package
-	clusterTemplateBox atomic.Value
-)
-
-// getTemplateBox
-func getTemplateBox() (*rice.Box, error) {
-	var (
-		b   *rice.Box
-		err error
-	)
-	anon := clusterTemplateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err = rice.FindBox("../operations/clusterflavors/scripts")
-		err = debug.InjectPlannedError(err)
-		if err != nil {
-			return nil, err
-		}
-		clusterTemplateBox.Store(b)
-		anon = clusterTemplateBox.Load()
-	}
-	return anon.(*rice.Box), nil
-}
 
 // TargetType returns the type of the target
 //
@@ -436,6 +410,9 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 	return feat.Remove(ctx, instance, vars, settings)
 }
 
+//go:embed clusterflavors/scripts/*
+var clusterFlavorScripts embed.FS
+
 // ExecuteScript executes the script template with the parameters on target Host
 func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -469,12 +446,6 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	box, err := getTemplateBox()
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return invalid, "", "", fail.ConvertError(err)
-	}
-
 	// Configures reserved_BashLibrary template var
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -495,7 +466,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		finalVariables[k] = v
 	}
 	variables["Revision"] = system.REV
-	script, path, xerr := realizeTemplate(box, tmplName, finalVariables, tmplName)
+	script, path, xerr := realizeTemplate("clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)

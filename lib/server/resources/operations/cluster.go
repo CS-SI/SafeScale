@@ -19,6 +19,7 @@ package operations
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	mrand "math/rand"
@@ -26,10 +27,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -68,11 +67,6 @@ const (
 	clusterKind        = "cluster"
 	clustersFolderName = "clusters" // path to use to reach Cluster Definitions/Metadata
 
-)
-
-var (
-	// templateBox is the rice box to use in this package
-	ansibleTemplateBox atomic.Value
 )
 
 // Cluster is the implementation of resources.Cluster interface
@@ -2924,25 +2918,21 @@ func (instance *Cluster) determineRequiredNodes() (uint, uint, uint, fail.Error)
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}, fileName string) (string, string, fail.Error) {
-	if box == nil {
-		return "", "", fail.InvalidParameterError("box", "cannot be nil!")
-	}
-
-	tmplString, err := box.String(tmplName)
+func realizeTemplate(tmplName string, adata map[string]interface{}, fileName string) (string, string, fail.Error) {
+	tmplString, err := clusterFlavorScripts.ReadFile(tmplName)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to load template")
 	}
 
-	tmplCmd, err := template.Parse(fileName, tmplString)
+	tmplCmd, err := template.Parse(fileName, string(tmplString))
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to parse template")
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	err = tmplCmd.Option("missingkey=error").Execute(dataBuffer, data)
+	err = tmplCmd.Option("missingkey=error").Execute(dataBuffer, adata)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to execute  template")
@@ -2953,6 +2943,9 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 
 	return cmd, remotePath, nil
 }
+
+//go:embed scripts/*
+var ansibleScripts embed.FS
 
 // Regenerate ansible inventory
 func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.Error {
@@ -3139,34 +3132,14 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		return nil
 	}
 
-	// --------- Load template box --------------
-	anon := ansibleTemplateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err := rice.FindBox("../operations/scripts/")
-		if err != nil {
-			return fail.Wrap(err, "%sfailed to load template directory", prerr)
-		}
-
-		ansibleTemplateBox.Store(b)
-		logrus.Tracef("%sloaded feature \"ansible\" inventory.py template", prerr)
-		anon = ansibleTemplateBox.Load()
-		if anon == nil {
-			return fail.InconsistentError("%sansible inventory template is nil", prerr)
-		}
-	}
-	box, ok := anon.(*rice.Box)
-	if !ok {
-		return fail.InconsistentError("%sfail to load template directory", prerr)
-	}
-	tmplString, err := box.String("ansible_inventory.py")
+	tmplString, err := ansibleScripts.ReadFile("scripts/ansible_inventory.py")
 	if err != nil {
 		return fail.Wrap(err, "%sfailed to load template 'ansible_inventory.py'", prerr)
 	}
 
 	// --------- Build ansible inventory --------------
 	fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
-	tmplCmd, err := template.Parse(fileName, tmplString)
+	tmplCmd, err := template.Parse(fileName, string(tmplString))
 	if err != nil {
 		return fail.Wrap(err, "%sfailed to parse template 'ansible_inventory.py'", prerr)
 	}

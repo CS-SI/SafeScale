@@ -16,10 +16,9 @@
 
 package userdata
 
-//go:generate rice embed-go
-
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -28,7 +27,6 @@ import (
 	"sync/atomic"
 	txttmpl "text/template"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
@@ -77,14 +75,22 @@ type Content struct {
 }
 
 var (
-	userdataPhaseTemplates = map[Phase]*atomic.Value{
+	userdataScriptTemplates = map[Phase]*atomic.Value{
 		PHASE1_INIT:                      nil,
 		PHASE2_NETWORK_AND_SECURITY:      nil,
 		PHASE3_GATEWAY_HIGH_AVAILABILITY: nil,
 		PHASE4_SYSTEM_FIXES:              nil,
 		PHASE5_FINAL:                     nil,
 	}
-	userdataPhaseTemplatesLock sync.RWMutex
+	userdataScriptTemplatesLock sync.RWMutex
+	userdataScriptProvider      string
+	userdataScripts             = map[Phase]string{
+		PHASE1_INIT:                      "scripts/userdata%s.init.sh",
+		PHASE2_NETWORK_AND_SECURITY:      "scripts/userdata%s.netsec.sh",
+		PHASE3_GATEWAY_HIGH_AVAILABILITY: "scripts/userdata%s.gwha.sh",
+		PHASE4_SYSTEM_FIXES:              "scripts/userdata%s.sysfix.sh",
+		PHASE5_FINAL:                     "scripts/userdata%s.final.sh",
+	}
 )
 
 // NewContent ...
@@ -178,7 +184,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		ud.HostName = request.ResourceName
 	}
 
-	// Generate a keypair for first SSH connection, that will then be replace by FinalPxxxKey during phase2
+	// Generate a keypair for first SSH connection, that will then be replaced by FinalPxxxKey during phase2
 	kp, xerr := abstract.NewKeyPair("")
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create initial Keypair")
@@ -204,51 +210,20 @@ func (ud Content) ToMap() (map[string]interface{}, fail.Error) {
 	return mapped, nil
 }
 
+//go:embed scripts/*
+var scripts embed.FS
+
 // Generate generates the script file corresponding to the phase
 func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	var (
-		box    *rice.Box
 		result []byte
 		err    error
 	)
 
-	// DEV VAR
-	provider := ""
-	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPT_FLAVOR"); suffixCandidate != "" {
-		if suffixCandidate != "" {
-			problems := false
+	userdataScriptTemplatesLock.Lock()
+	defer userdataScriptTemplatesLock.Unlock()
 
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil || box == nil {
-				problems = true
-			}
-
-			if !problems && box != nil {
-				_, err = box.String(fmt.Sprintf("userdata%s.init.sh", suffixCandidate))
-				problems = err != nil
-				_, err = box.String(fmt.Sprintf("userdata%s.netsec.sh", suffixCandidate))
-				problems = problems || (err != nil)
-				_, err = box.String(fmt.Sprintf("userdata%s.gwha.sh", suffixCandidate))
-				problems = problems || (err != nil)
-				_, err = box.String(fmt.Sprintf("userdata%s.sysfix.sh", suffixCandidate))
-				problems = problems || (err != nil)
-				_, err = box.String(fmt.Sprintf("userdata%s.final.sh", suffixCandidate))
-				problems = problems || (err != nil)
-				if !problems {
-					provider = fmt.Sprintf(".%s", suffixCandidate)
-				}
-			}
-
-			if problems {
-				logrus.Warnf("Ignoring script flavor [%s]", suffixCandidate)
-			}
-		}
-	}
-
-	userdataPhaseTemplatesLock.Lock()
-	defer userdataPhaseTemplatesLock.Unlock()
-
-	anon, ok := userdataPhaseTemplates[phase]
+	anon, ok := userdataScriptTemplates[phase]
 	if !ok {
 		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
 	}
@@ -257,31 +232,26 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	if anon != nil {
 		tmpl, ok = anon.Load().(*txttmpl.Template)
 		if !ok {
-			return nil, fail.NewError("error loading template for phase %s", phase)
+			return nil, fail.NewError("error loading template for phase '%s'", phase)
 		}
 	} else {
-
-		box, err = rice.FindBox("../userdata/scripts")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-
-		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
+		var tmplString []byte
+		tmplString, err = scripts.ReadFile(fmt.Sprintf(userdataScripts[phase], userdataScriptProvider))
 		if err != nil {
 			return nil, fail.Wrap(err, "error loading script template for phase 'init'")
 		}
 
-		tmpl, err = template.Parse("userdata."+string(phase), tmplString)
+		tmpl, err = template.Parse("userdata."+string(phase), string(tmplString))
 		if err != nil {
 			return nil, fail.Wrap(err, "error parsing script template for phase 'init'")
 		}
 
-		userdataPhaseTemplates[phase] = new(atomic.Value)
-		userdataPhaseTemplates[phase].Store(tmpl)
+		userdataScriptTemplates[phase] = new(atomic.Value)
+		userdataScriptTemplates[phase].Store(tmpl)
 	}
 
 	if tmpl == nil {
-		return nil, fail.NewError("Nil is not a valid template for phase %s", phase)
+		return nil, fail.InconsistentError("failed to recover userdata script for phase '%s'", phase)
 	}
 
 	// Transforms struct content to map using json
@@ -321,4 +291,56 @@ func (ud Content) AddInTag(phase Phase, tagname string, content string) {
 		ud.Tags[phase] = map[string][]string{}
 	}
 	ud.Tags[phase][tagname] = append(ud.Tags[phase][tagname], content)
+}
+
+// checkScriptFilePresents ...
+// returns:
+//  - nil: files found
+//  - *fail.ErrNotFound: at least one file with suffix != "" is not found
+//  - *fail.ErrInconsistent: at least one mandatory file is missing
+func checkScriptFilePresents(suffix string) fail.Error {
+	var (
+		missing Phase
+		problem bool
+	)
+	for k, v := range userdataScripts {
+		_, err := scripts.ReadFile(fmt.Sprintf(v, suffix))
+		problem = problem || (err != nil)
+		if problem {
+			missing = k
+			break
+		}
+	}
+	if problem {
+		if suffix != "" {
+			return fail.Wrap(fail.NotFoundError("missing userdata script 'userdata.%s.%s.sh' in binary", suffix, missing), "ignoring script flavor '%s'", suffix)
+		}
+		return fail.InconsistentError("missing mandatory userdata script 'userdata.%s.sh' in binary", missing)
+	}
+
+	return nil
+}
+
+// init checks at start if all needed userdata scripts are present in binary
+func init() {
+	suffixCandidate := os.Getenv("SAFESCALE_SCRIPT_FLAVOR")
+	xerr := checkScriptFilePresents(suffixCandidate)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// ignore suffixCandidate but still check "traditional" mandatory files are present
+			if suffixCandidate != "" {
+				xerr = checkScriptFilePresents("")
+				if xerr != nil {
+					panic(xerr.Error())
+				}
+			}
+		default:
+			panic(xerr.Error())
+		}
+	}
+
+	if suffixCandidate != "" {
+		userdataScriptProvider = suffixCandidate
+	}
 }

@@ -16,8 +16,6 @@
 
 package operations
 
-//go:generate rice embed-go
-
 import (
 	"context"
 	"reflect"

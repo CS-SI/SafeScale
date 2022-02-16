@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_installer.go -i github.com/CS-SI/SafeScale/lib/server/resources/operations.Installer
+//go:generate minimock -o ../mocks/mock_installer.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources/operations.Installer
 
 // Installer defines the API of an Installer
 type Installer interface {

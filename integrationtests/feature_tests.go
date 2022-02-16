@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/v21/integrationtests/enums/providers"
 )
 
 func Docker(t *testing.T, provider providers.Enum) {

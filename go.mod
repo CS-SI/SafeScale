@@ -4,7 +4,6 @@ go 1.16
 
 require (
 	cloud.google.com/go v0.65.0 // indirect
-	github.com/GeertJohan/go.rice v1.0.2
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible

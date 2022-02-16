@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/v21/integrationtests/enums/providers"
 )
 
 func keyFromProvider(provider providers.Enum) string {

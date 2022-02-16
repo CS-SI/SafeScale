@@ -39,7 +39,6 @@ type Makers struct {
 	DefaultImage           func(c resources.Cluster) string                                              // default image of server(s)
 	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, map[string]interface{})
 	// GetGlobalSystemRequirements func(c resources.Cluster) (string, fail.Error)
-	// GetTemplateBox         func() (*rice.Box, fail.Error)
 	ConfigureGateway       func(c resources.Cluster) fail.Error
 	CreateMaster           func(c resources.Cluster, index uint) fail.Error
 	ConfigureMaster        func(c resources.Cluster, index uint, host resources.Host) fail.Error
@@ -55,18 +54,3 @@ type Makers struct {
 	LeaveNodeFromCluster   func(ctx context.Context, c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
 	GetState               func(c resources.Cluster) (clusterstate.Enum, fail.Error)
 }
-
-// VPL: not used
-// func getTemplateBox() (*rice.Box, fail.Error) { //nolint
-// 	anon := templateBox.Load()
-// 	if anon == nil {
-// 		// Note: path MUST be literal for rice to work
-// 		b, err := rice.FindBox("../flavors/scripts")
-// 		if err != nil {
-// 			return nil, fail.ConvertError(err)
-// 		}
-// 		templateBox.Store(b)
-// 		anon = templateBox.Load()
-// 	}
-// 	return anon.(*rice.Box), nil
-// }
