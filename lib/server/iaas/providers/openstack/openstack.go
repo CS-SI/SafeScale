@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"

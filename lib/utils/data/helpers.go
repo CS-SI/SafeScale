@@ -16,32 +16,26 @@
 
 package data
 
+import (
+	"reflect"
+)
+
 func IsNull(something interface{}) bool {
 	if something == nil {
 		return true
 	}
 
-	if casted, ok := something.(NullValue); ok {
-		if casted == nil {
-			return true
+	// Calling NullValue.IsNull() is valid only if something is a pointer of a struct implementing the interface
+	if reflect.ValueOf(something).Kind() == reflect.Ptr {
+		casted, ok := something.(NullValue)
+		if ok {
+			return casted.IsNull()
 		}
-		return casted.IsNull()
 	}
 
 	return something == nil
 }
 
 func IsNil(something interface{}) bool {
-	if something == nil {
-		return true
-	}
-
-	if casted, ok := something.(NullValue); ok {
-		if casted == nil {
-			return true
-		}
-		return casted.IsNull()
-	}
-
-	return something == nil
+	return IsNull(something)
 }

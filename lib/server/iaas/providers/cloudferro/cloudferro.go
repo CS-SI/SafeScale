@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 

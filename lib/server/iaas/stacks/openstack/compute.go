@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"

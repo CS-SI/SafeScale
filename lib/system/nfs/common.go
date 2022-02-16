@@ -19,11 +19,11 @@ package nfs
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"strings"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/system"
@@ -37,22 +37,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
-//go:generate rice embed-go
-
-// templateProvider is the instance of TemplateProvider used by package nfs
-var tmplBox *rice.Box
-
-// getTemplateProvider returns the instance of TemplateProvider
-func getTemplateBox() (*rice.Box, fail.Error) {
-	if tmplBox == nil {
-		var err error
-		tmplBox, err = rice.FindBox("../nfs/scripts")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-	}
-	return tmplBox, nil
-}
+//go:embed scripts/*
+var nfsScripts embed.FS
 
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
@@ -106,21 +92,16 @@ func executeScript(
 	}
 
 	data["BashHeader"] = scriptHeader
-	tmplBox, xerr := getTemplateBox()
-	if xerr != nil {
-		xerr = fail.ExecutionError(xerr)
-		return "", xerr
-	}
 
 	// get file content as string
-	tmplContent, err := tmplBox.String(name)
+	tmplContent, err := nfsScripts.ReadFile("scripts/" + name)
 	if err != nil {
 		xerr = fail.ExecutionError(err)
 		return "", xerr
 	}
 
 	// Prepare the template for execution
-	tmplPrepared, err := template.Parse(name, tmplContent)
+	tmplPrepared, err := template.Parse(name, string(tmplContent))
 	if err != nil {
 		xerr = fail.ExecutionError(err)
 		return "", xerr

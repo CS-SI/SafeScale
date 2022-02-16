@@ -26,8 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
@@ -43,12 +41,14 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
-//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/lib/server/iaas.Service
+//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
 
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods

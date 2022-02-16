@@ -16,13 +16,13 @@
 
 package operations
 
-//go:generate rice embed-go
-
 import (
 	"context"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -40,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -435,7 +434,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 			return xerr
 		}
 	}
-	if !data.IsNil(ab) {
+	if !data.IsNil(&ab) {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
