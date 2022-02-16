@@ -17,8 +17,93 @@
 package empty
 
 import (
+	"errors"
+	"reflect"
 	"testing"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/stretchr/testify/require"
 )
 
-func TestEmpty(t *testing.T) {
+type IsEmptyTest struct {
+	value  interface{}
+	expect bool
+}
+
+func Test_IsEmpty(t *testing.T) {
+
+	var emptyPtrInt error = nil
+
+	tests := []IsEmptyTest{
+		{
+			value:  nil,
+			expect: true,
+		},
+		{
+			value:  true,
+			expect: false,
+		},
+		{
+			value:  false,
+			expect: true,
+		},
+		{
+			value:  0,
+			expect: true,
+		},
+		{
+			value:  42,
+			expect: false,
+		},
+		{
+			value:  -42,
+			expect: false,
+		},
+		{
+			value:  0.0,
+			expect: true,
+		},
+		{
+			value:  42.0,
+			expect: false,
+		},
+		{
+			value:  errors.New("any"),
+			expect: false,
+		},
+		{
+			value:  emptyPtrInt,
+			expect: true,
+		},
+		{
+			value:  []string{},
+			expect: true,
+		},
+		{
+			value:  []string{"one"},
+			expect: false,
+		},
+		{
+			value:  "one",
+			expect: false,
+		},
+		{
+			value:  struct{}{},
+			expect: true,
+		},
+		{
+			value: struct {
+				any string
+			}{
+				any: "one",
+			},
+			expect: false,
+		},
+	}
+
+	for i := range tests {
+		r := reflect.ValueOf(tests[i].value)
+		require.EqualValues(t, utils.IsEmpty(r), tests[i].expect)
+	}
+
 }
