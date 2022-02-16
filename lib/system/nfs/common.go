@@ -94,7 +94,7 @@ func executeScript(
 	data["BashHeader"] = scriptHeader
 
 	// get file content as string
-	tmplContent, err := nfsScripts.ReadFile(name)
+	tmplContent, err := nfsScripts.ReadFile("scripts/" + name)
 	if err != nil {
 		xerr = fail.ExecutionError(err)
 		return "", xerr

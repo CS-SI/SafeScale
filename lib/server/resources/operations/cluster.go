@@ -3171,7 +3171,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		return nil
 	}
 
-	tmplString, err := ansibleScripts.ReadFile("ansible_inventory.py")
+	tmplString, err := ansibleScripts.ReadFile("scripts/ansible_inventory.py")
 	if err != nil {
 		return fail.Wrap(err, "%s failed to load template 'ansible_inventory.py'", prerr)
 	}

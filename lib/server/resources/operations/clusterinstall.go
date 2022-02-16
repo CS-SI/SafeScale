@@ -511,7 +511,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		finalVariables[k] = v
 	}
 
-	script, path, xerr := realizeTemplate(tmplName, finalVariables, tmplName)
+	script, path, xerr := realizeTemplate("clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)

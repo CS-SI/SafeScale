@@ -162,7 +162,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	// get file content as string
-	tmplContent, err := bucketfsScripts.ReadFile(name)
+	tmplContent, err := bucketfsScripts.ReadFile("scripts/" + name)
 	if err != nil {
 		return "", fail.ExecutionError(err, "failure retrieving embedded box '%s'", name)
 	}
