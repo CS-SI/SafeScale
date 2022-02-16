@@ -113,6 +113,18 @@ func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout t
 	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.MinDelay()), timeout)
 }
 
+func isRaw(in error) bool {
+	switch intype := in.(type) {
+	case *url.Error:
+		if reflect.TypeOf(intype.Err).String() == reflect.TypeOf(errors.New("")).String() {
+			return true
+		}
+		return false
+	default:
+		return false
+	}
+}
+
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
 // If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
@@ -152,10 +164,13 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 		case fail.Error, fail.ErrNotAvailable, fail.ErrOverflow, fail.ErrOverload: // a fail.Error may contain a cause of type net.Error, being *url.Error a special subcase.
 			// net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
 			// In this case, handle those net.Error accordingly
+
 			cause := fail.Cause(realErr)
 			switch thecause := cause.(type) {
 			case *url.Error:
-				if thecause.Temporary() {
+				// errors here (*url.Error), are very low-level, its .Err should be at most an errors.New() kind of error
+				// if we have something more complex, we are talking about hand-crafted errors that won't happen in real world
+				if thecause.Temporary() && isRaw(thecause) {
 					return realErr
 				}
 				if strict {
@@ -176,18 +191,17 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 				return retry.StopRetryError(realErr)
 			}
 		default:
-			// doing something based on error's Error() method is always dangerous, so a little log here might help finding problems later
+			// doing something based on error's Error() method is always dangerous, so a little log here might help to find problems later
 			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
-			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
 			case objectstorage.NotFound: // stow may return that error message if it does not find something
 				return fail.NotFoundError(objectstorage.NotFound)
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
-				if strings.Contains(str, "dial tcp:") {
+				if strings.Contains(str, "dial tcp:") { // FIXME: This should be a constant
 					return fail.NotAvailableError(str)
 				}
-				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
+				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails // FIXME: Also a constant
 					return fail.NotAvailableError("encountered end-of-file")
 				}
 				// In any other case, the error should explain the retry has to stop
@@ -323,6 +337,11 @@ func IsConnectionReset(err error) bool {
 					}
 				}
 			}
+		}
+
+		var errno syscall.Errno
+		if errors.As(err, &errno) {
+			return errno == syscall.ECONNRESET
 		}
 
 		return false

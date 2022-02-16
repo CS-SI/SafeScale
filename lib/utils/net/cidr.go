@@ -51,9 +51,24 @@ func CIDRToUInt32Range(cidr string) (uint32, uint32, fail.Error) {
 		end   uint32 // End IP address range
 	)
 
-	splitted := strings.Split(cidr, "/")
+	var splitted []string
+	if strings.Contains(cidr, "/") {
+		splitted = strings.Split(cidr, "/")
+	} else {
+		splitted = []string{
+			cidr,
+			"32",
+		}
+	}
+
 	ip = IPv4StringToUInt32(splitted[0])
-	bits, _ := strconv.ParseUint(splitted[1], 10, 32)
+	bits, err := strconv.ParseUint(splitted[1], 10, 32)
+	if err != nil {
+		return 0, 0, fail.InvalidParameterError("fail to extract network mask", err)
+	}
+	if bits > 32 {
+		return 0, 0, fail.InvalidParameterError("invalid network mask", err)
+	}
 
 	if start == 0 || start > ip {
 		start = ip
@@ -73,7 +88,15 @@ func IsCIDRRoutable(cidr string) (bool, fail.Error) {
 	if err != nil {
 		return false, err
 	}
-	splitted := strings.Split(cidr, "/")
+	var splitted []string
+	if strings.Contains(cidr, "/") {
+		splitted = strings.Split(cidr, "/")
+	} else {
+		splitted = []string{
+			cidr,
+			"32",
+		}
+	}
 	firstIP, _, _ := net.ParseCIDR(first + "/" + splitted[1])
 	lastIP, _, _ := net.ParseCIDR(last + "/" + splitted[1])
 	for _, nr := range networks {
@@ -95,7 +118,10 @@ type CIDRString string
 
 // Contains tells if 'cs' contains 'cidr'
 func (cs CIDRString) Contains(cidr CIDRString) (bool, error) {
-	_, sourceDesc, _ := net.ParseCIDR(string(cs))
+	_, sourceDesc, err := net.ParseCIDR(string(cs))
+	if err != nil {
+		return false, err
+	}
 	_, targetDesc, err := net.ParseCIDR(string(cidr))
 	if err != nil {
 		return false, err
