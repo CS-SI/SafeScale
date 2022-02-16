@@ -90,7 +90,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
-			return nullASG, fail.DuplicateErrorWithCause(xerr, "more than one Security Group named '%s' found", name)
+			return nullASG, fail.DuplicateErrorWithCause(xerr, nil, "more than one Security Group named '%s' found", name)
 		default:
 			return nullASG, xerr
 		}

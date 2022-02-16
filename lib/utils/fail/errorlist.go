@@ -41,13 +41,30 @@ func NewErrorList(errors []error) Error {
 	}
 }
 
+func NewErrorListComplete(errors []error, cause error, consequences []error, msg ...interface{}) Error {
+	if len(errors) == 0 {
+		return &ErrorList{
+			errorCore: newError(cause, consequences, msg...),
+		}
+	}
+
+	return &ErrorList{
+		errorCore: newError(cause, consequences, msg...),
+		errors:    errors,
+	}
+}
+
 // ToGRPCStatus returns a grpcstatus struct from ErrorList
 func (el ErrorList) ToGRPCStatus() error {
-	return grpcstatus.Errorf(el.GRPCCode(), el.Error())
+	return grpcstatus.Errorf(el.getGRPCCode(), el.Error())
 }
 
 // AddConsequence ...
 func (el *ErrorList) AddConsequence(err error) Error {
+	if el == nil {
+		logrus.Errorf("invalid call of ErrorList.AddConsequence() from nil instance")
+		return el
+	}
 	if el == err { // do nothing
 		return el
 	}
@@ -62,8 +79,12 @@ func (el *ErrorList) AddConsequence(err error) Error {
 // Annotate ...
 // satisfies interface data.Annotatable
 func (el *ErrorList) Annotate(key string, value data.Annotation) data.Annotatable {
+	if el == nil {
+		logrus.Errorf("invalid call of ErrorList.Annotate() from nil instance")
+		return el
+	}
 	if el.IsNull() {
-		logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
+		logrus.Errorf("invalid call of ErrorList.Annotate() from null instance")
 		return el
 	}
 	el.errorCore.Annotate(key, value)
@@ -74,6 +95,10 @@ func (el *ErrorList) Annotate(key string, value data.Annotation) data.Annotatabl
 
 // Error returns a string containing all the errors
 func (el *ErrorList) Error() string {
+	if el == nil {
+		logrus.Errorf("invalid call of ErrorList.Error() from nil instance")
+		return ""
+	}
 	if el.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.Error() from null instance")
 		return ""
@@ -94,8 +119,12 @@ func (el *ErrorList) UnformattedError() string {
 
 // ToErrorSlice transforms ErrorList to []error
 func (el *ErrorList) ToErrorSlice() []error {
+	if el == nil {
+		logrus.Errorf("invalid call of ErrorList.ToErrorSlice() from nil instance")
+		return []error{}
+	}
 	if el.IsNull() {
-		logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
+		logrus.Errorf("invalid call of ErrorList.ToErrorSlice() from null instance")
 		return []error{}
 	}
 	return el.errors
