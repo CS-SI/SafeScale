@@ -18,7 +18,6 @@ package empty
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -102,8 +101,7 @@ func Test_IsEmpty(t *testing.T) {
 	}
 
 	for i := range tests {
-		r := reflect.ValueOf(tests[i].value)
-		require.EqualValues(t, utils.IsEmpty(r), tests[i].expect)
+		require.EqualValues(t, utils.IsEmpty(tests[i].value), tests[i].expect)
 	}
 
 }
