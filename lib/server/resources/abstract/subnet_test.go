@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

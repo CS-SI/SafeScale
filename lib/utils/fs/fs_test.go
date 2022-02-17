@@ -18,29 +18,12 @@ package fs
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
 )
-
-func logrus_capture(routine func()) string {
-
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	logrus.SetOutput(w)
-
-	routine()
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-	return string(out)
-
-}
 
 func Test_LazyRemove(t *testing.T) {
 
@@ -59,7 +42,7 @@ func Test_LazyRemove(t *testing.T) {
 	// Make working directory
 	_ = os.Mkdir("/tmp/safescale-test", 0x0777)
 
-	log := logrus_capture(func() {
+	log := tests.LogrusCapture(func() {
 		err := utils.LazyRemove("/tmp/safescale-test")
 		if err != nil {
 			// Remove working directory

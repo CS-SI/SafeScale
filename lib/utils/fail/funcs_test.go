@@ -95,67 +95,6 @@ func Test_Annotate(t *testing.T) {
 
 }
 
-func Test_IsGRPCTimeout(t *testing.T) {
-
-	require.EqualValues(t, IsGRPCTimeout(nil), false)
-
-	err := errors.New("any error")
-	require.EqualValues(t, IsGRPCTimeout(err), false)
-
-	errCore := &errorCore{
-		message:             "math: can't divide by zero",
-		cause:               errors.New("math: can't divide by zero"),
-		consequences:        []error{errors.New("can't resolve equation")},
-		annotations:         make(data.Annotations),
-		grpcCode:            codes.DeadlineExceeded,
-		causeFormatter:      defaultCauseFormatter,
-		annotationFormatter: defaultAnnotationFormatter,
-		lock:                &sync.RWMutex{},
-	}
-	require.EqualValues(t, IsGRPCTimeout(errCore), true)
-
-	errCore = &errorCore{
-		message:             "math: can't divide by zero",
-		cause:               errors.New("math: can't divide by zero"),
-		consequences:        []error{errors.New("can't resolve equation")},
-		annotations:         make(data.Annotations),
-		grpcCode:            codes.OK,
-		causeFormatter:      defaultCauseFormatter,
-		annotationFormatter: defaultAnnotationFormatter,
-		lock:                &sync.RWMutex{},
-	}
-	require.EqualValues(t, IsGRPCTimeout(errCore), false)
-
-	xerr := &ErrWarning{
-		errorCore: &errorCore{
-			message:             "math: can't divide by zero",
-			cause:               errors.New("math: can't divide by zero"),
-			consequences:        []error{errors.New("can't resolve equation")},
-			annotations:         make(data.Annotations),
-			grpcCode:            codes.DeadlineExceeded,
-			causeFormatter:      defaultCauseFormatter,
-			annotationFormatter: defaultAnnotationFormatter,
-			lock:                &sync.RWMutex{},
-		},
-	}
-	require.EqualValues(t, IsGRPCTimeout(xerr), true)
-
-	xerr = &ErrWarning{
-		errorCore: &errorCore{
-			message:             "math: can't divide by zero",
-			cause:               errors.New("math: can't divide by zero"),
-			consequences:        []error{errors.New("can't resolve equation")},
-			annotations:         make(data.Annotations),
-			grpcCode:            codes.OK,
-			causeFormatter:      defaultCauseFormatter,
-			annotationFormatter: defaultAnnotationFormatter,
-			lock:                &sync.RWMutex{},
-		},
-	}
-	require.EqualValues(t, IsGRPCTimeout(xerr), false)
-
-}
-
 func Test_IsGRPCError(t *testing.T) {
 
 	require.EqualValues(t, IsGRPCError(nil), false)

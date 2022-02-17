@@ -19,7 +19,6 @@ package retry
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -30,25 +29,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
-
-func logrus_capture(routine func()) string {
-
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	logrus.SetOutput(w)
-
-	routine()
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-	return string(out)
-
-}
 
 func Test_Action(t *testing.T) {
 
@@ -188,7 +172,7 @@ func Test_WhileUnsuccessful(t *testing.T) {
 
 func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 
-	log := logrus_capture(func() {
+	log := tests.LogrusCapture(func() {
 		err := WhileUnsuccessfulWithLimitedRetries(
 			func() error {
 				return nil
@@ -255,7 +239,7 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 
 func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 
-	log := logrus_capture(func() {
+	log := tests.LogrusCapture(func() {
 		err := WhileUnsuccessfulWithHardTimeout(
 			func() error {
 				return nil
@@ -265,6 +249,7 @@ func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 		)
 		require.EqualValues(t, err, nil)
 	})
+
 	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
 
 	err := WhileUnsuccessfulWithHardTimeout(
@@ -282,7 +267,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 
 	var notify Notify = DefaultNotifier()
 
-	log := logrus_capture(func() {
+	log := tests.LogrusCapture(func() {
 		err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
 			func() error {
 				return nil
@@ -293,6 +278,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		)
 		require.EqualValues(t, err, nil)
 	})
+
 	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
 
 	err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
