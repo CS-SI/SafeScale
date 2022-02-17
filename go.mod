@@ -68,3 +68,8 @@ require (
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
+
+retract (
+v21.0.0-20210521164327-48fde38a25be
+)
+
