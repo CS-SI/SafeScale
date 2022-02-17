@@ -20,22 +20,53 @@ import (
 	"reflect"
 )
 
-func IsNull(something interface{}) bool {
+func hasFieldWithNameAndIsNil(iface interface{}, name string) bool {
+	ifv := reflect.ValueOf(iface)
+
+	fiv := ifv.FieldByName(name)
+	if fiv.IsValid() {
+		return fiv.IsNil()
+	}
+	return false
+}
+
+func IsNil(something interface{}) bool {
 	if something == nil {
 		return true
 	}
 
-	// Calling NullValue.IsNull() is valid only if something is a pointer of a struct implementing the interface
-	if reflect.ValueOf(something).Kind() == reflect.Ptr {
-		casted, ok := something.(NullValue)
+	if casted, ok := something.(interface{ IsNull() bool }); ok {
+		if casted == nil {
+			return true
+		}
+		return casted.IsNull()
+	}
+
+	if casted, ok := something.(interface{ IsNil() bool }); ok {
+		if casted == nil {
+			return true
+		}
+		return casted.IsNil()
+	}
+
+	theKind := reflect.ValueOf(something).Kind()
+	if theKind == reflect.Ptr {
+		val := reflect.Indirect(reflect.ValueOf(something))
+		if !val.IsValid() {
+			return true
+		}
+
+		casted, ok := something.(interface{ IsNull() bool })
 		if ok {
 			return casted.IsNull()
 		}
+	} else if theKind == reflect.Struct {
+		return hasFieldWithNameAndIsNil(something, "errorCore")
 	}
 
-	return something == nil
+	return false
 }
 
-func IsNil(something interface{}) bool {
-	return IsNull(something)
+func IsNull(something interface{}) bool {
+	return IsNil(something)
 }
