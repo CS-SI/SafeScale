@@ -20,13 +20,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-
-	"github.com/CS-SI/SafeScale/lib/client"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/client"
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var tenantCmdLabel = "tenant"

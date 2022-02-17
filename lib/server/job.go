@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	uuidpkg "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"

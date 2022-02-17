@@ -24,17 +24,16 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/system"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/client"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var sshCmdName = "ssh"

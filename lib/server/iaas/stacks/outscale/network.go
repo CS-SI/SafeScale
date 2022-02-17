@@ -22,12 +22,12 @@ import (
 
 	"github.com/outscale/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 )
 
 const tagNameLabel = "name"

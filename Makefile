@@ -13,7 +13,6 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 
 # Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
-RICE := github.com/GeertJohan/go.rice
 PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
@@ -190,11 +189,6 @@ coverdeps: begin ground
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n"; \
-		$(GO) get $(RICE)@v1.0.2 &>/dev/null; \
-		$(GO) install $(RICE)/rice@v1.0.2 &>/dev/null; \
-	fi
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \

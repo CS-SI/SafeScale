@@ -25,16 +25,16 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	filters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 const (

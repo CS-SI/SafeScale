@@ -17,14 +17,14 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	bucketfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/bucket"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	bucketfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/bucket"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go

@@ -24,17 +24,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
-
-	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/client"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const networkCmdLabel = "network"

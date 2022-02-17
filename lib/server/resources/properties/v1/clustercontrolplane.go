@@ -17,10 +17,10 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 )
 
 // ClusterControlplane contains information used by cluster control plane (when there is one)

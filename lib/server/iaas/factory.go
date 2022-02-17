@@ -23,17 +23,17 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 var (

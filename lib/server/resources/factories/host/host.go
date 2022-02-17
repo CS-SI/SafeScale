@@ -19,12 +19,12 @@ package host
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // List returns a list of available hosts

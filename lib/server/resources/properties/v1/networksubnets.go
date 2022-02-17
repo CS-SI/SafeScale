@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 )
 
 // NetworkSubnets contains additional information describing the subnets in a network, in V1

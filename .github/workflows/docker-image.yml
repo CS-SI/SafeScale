@@ -2,9 +2,16 @@ name: Docker Image CI Go Stable
 
 on:
   push:
-    branches: [ develop ]
+    branches:
+      - master
+      - develop
+      - 'release/**'
   pull_request:
-    branches: [ develop ]
+    # The branches below must be a subset of the branches above
+    branches:
+      - master
+      - develop
+      - 'release/**'
 
 jobs:
 

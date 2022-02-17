@@ -26,28 +26,28 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/xrash/smetrics"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	imagefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
-//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/lib/server/iaas.Service
+//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
 
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods

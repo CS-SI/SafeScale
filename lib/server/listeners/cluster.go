@@ -20,22 +20,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
+	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterListener host service server grpc
@@ -107,7 +107,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.New(job.Service())
+	instance, xerr := clusterfactory.New(job.Context(), job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -165,7 +165,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -214,7 +214,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -254,7 +254,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -297,7 +297,7 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -340,7 +340,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), ref)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -392,7 +392,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		sizing.Image = in.GetImageId()
 	}
 
-	instance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -451,7 +451,7 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -514,7 +514,7 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -579,7 +579,7 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), in.GetName())
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -642,7 +642,7 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -703,7 +703,7 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -769,7 +769,7 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -835,7 +835,7 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -899,7 +899,7 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -952,7 +952,7 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1012,7 +1012,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	instance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1083,7 +1083,7 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -1150,7 +1150,7 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -1216,7 +1216,7 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	clusterInstance, xerr := clusterfactory.Load(job.Service(), clusterName)
+	clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -20,18 +20,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)

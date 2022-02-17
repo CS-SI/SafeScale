@@ -27,28 +27,28 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusternodetype"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/consts"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
@@ -62,7 +62,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
-	existing, xerr := LoadCluster(instance.GetService(), req.Name)
+	existing, xerr := LoadCluster(ctx, instance.GetService(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1744,7 +1744,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
-	sleepTime := <-instance.generator
+	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
@@ -2309,7 +2309,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 
-	sleepTime := <-instance.generator
+	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}

@@ -17,10 +17,10 @@
 package stacks
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // RetryableRemoteCall calls a remote API with tolerance to communication failures

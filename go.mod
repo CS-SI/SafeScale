@@ -1,10 +1,9 @@
-module github.com/CS-SI/SafeScale
+module github.com/CS-SI/SafeScale/v21
 
 go 1.16
 
 require (
 	cloud.google.com/go v0.65.0 // indirect
-	github.com/GeertJohan/go.rice v1.0.2
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible
@@ -69,3 +68,8 @@ require (
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
+
+retract (
+v21.0.0-20210521164327-48fde38a25be
+)
+

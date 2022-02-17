@@ -22,22 +22,22 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
 	// "github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
-	featurefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/feature"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
+	featurefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/feature"
+	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // FeatureListener feature service server grpc
@@ -105,7 +105,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		//
 		// return converters.FeatureSliceFromResourceToProtocol(list), nil
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -198,7 +198,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		return empty, fail.NotFoundError("feature '%s' not found on Host '%s'", featureName, hostInstance.GetName())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -294,7 +294,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		return empty, fail.ExecutionError(nil, "failed to add feature '%s' to Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -375,7 +375,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		return empty, fail.ExecutionError(nil, "failed to remove feature '%s' from Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}

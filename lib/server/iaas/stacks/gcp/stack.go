@@ -25,8 +25,8 @@ import (
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // stack ...

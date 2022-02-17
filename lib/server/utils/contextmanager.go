@@ -24,7 +24,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 var clientRPCUUID uuid.UUID

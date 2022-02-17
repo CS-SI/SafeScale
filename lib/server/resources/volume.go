@@ -19,14 +19,14 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Volume links Object Storage folder and getVolumes

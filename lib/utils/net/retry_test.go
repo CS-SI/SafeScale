@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/stretchr/testify/assert"
 )
 

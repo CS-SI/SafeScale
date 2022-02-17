@@ -24,19 +24,19 @@ import (
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
+	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
-	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
+	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // safescale network subnet create --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" net1 subnet-1 (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)

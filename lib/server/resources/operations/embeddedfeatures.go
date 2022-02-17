@@ -19,25 +19,21 @@ package operations
 import (
 	"bytes"
 	"crypto/sha256"
+	"embed"
 	"encoding/hex"
+	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
-
-//go:generate rice embed-go
 
 const featureFileExt = ".yml"
 
 var (
-	templateBox *rice.Box
-	// emptyParams = map[string]interface{}{}
-
 	availableEmbeddedFeaturesMap = map[installmethod.Enum]map[string]*Feature{}
 	allEmbeddedFeaturesMap       = map[string]*Feature{}
 	allEmbeddedFeatures          []*Feature
@@ -52,24 +48,19 @@ func getSHA256Hash(text string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+//go:embed embeddedfeatures/*
+var embeddedFeatures embed.FS
+
 // loadSpecFile returns the content of the spec file of the feature named 'name'
 func loadSpecFile(name string) (string, *viper.Viper, error) {
-	if templateBox == nil {
-		var err error
-		templateBox, err = rice.FindBox("../operations/embeddedfeatures")
-		err = debug.InjectPlannedError(err)
-		if err != nil {
-			return "", nil, fail.Wrap(err, "failed to open embedded feature specification MetadataFolder")
-		}
-	}
 	name += featureFileExt
-	tmplString, err := templateBox.String(name)
+	tmplString, err := embeddedFeatures.ReadFile("embeddedfeatures/" + name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature specification file '%s'", name)
 	}
 
-	logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
+	logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(tmplString)))
 
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -332,4 +323,67 @@ func edgeproxy4subnetFeature() *Feature {
 	}
 }
 
-// NOTE: init() moved in zinit.go, to be sure the init() of rice-box.go is called first
+func init() {
+	allEmbeddedFeatures = []*Feature{
+		dockerFeature(),
+		dockerSwarmFeature(),
+		ntpServerFeature(),
+		ntpClientFeature(),
+		ansibleFeature(),
+		// ansibleForClusterFeature(),
+		certificateAuthorityFeature(),
+		// postgresql4platformFeature(),
+		nVidiaDockerFeature(),
+		// mpichOsPkgFeature(),
+		// mpichBuildFeature(),
+		// ohpcSlurmMasterFeature(),
+		// ohpcSlurmNodeFeature(),
+		remoteDesktopFeature(),
+		postgres4gatewayFeature(),
+		edgeproxy4subnetFeature(),
+		// keycloak4platformFeature(),
+		kubernetesFeature(),
+		proxycacheServerFeature(),
+		proxycacheClientFeature(),
+		// apacheIgniteFeature(),
+		// elasticsearchFeature(),
+		// logstashFeature(),
+		// metricbeatFeature(),
+		// filebeatFeature(),
+		// kibanaFeature(),
+		helm2Feature(),
+		helm3Feature(),
+		// sparkmaster4platformFeature(),
+		// elassandraFeature(),
+		// consul4platformFeature(),
+		// monitoring4platformFeature(),
+		// geoserverFeature(),
+	}
+
+	for _, item := range allEmbeddedFeatures {
+		itemName := item.GetName()
+
+		// allEmbeddedMap[item.BaseFilename()] = item
+		allEmbeddedFeaturesMap[itemName] = item
+		installers := item.specs.GetStringMap("feature.install")
+		for k := range installers {
+			meth, err := installmethod.Parse(k)
+			if err != nil {
+				displayFilename := item.GetDisplayFilename()
+				if displayFilename == "" {
+					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
+				} else {
+					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s), install method '%s' is unknown", itemName, displayFilename, k))
+				}
+				continue
+			}
+			if _, found := availableEmbeddedFeaturesMap[meth]; !found {
+				availableEmbeddedFeaturesMap[meth] = map[string]*Feature{
+					itemName: item,
+				}
+			} else {
+				availableEmbeddedFeaturesMap[meth][itemName] = item
+			}
+		}
+	}
+}

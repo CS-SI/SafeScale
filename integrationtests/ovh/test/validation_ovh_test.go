@@ -3,8 +3,8 @@ package test
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/integrationtests"
-	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/v21/integrationtests"
+	"github.com/CS-SI/SafeScale/v21/integrationtests/enums/providers"
 )
 
 func Test_Basic(t *testing.T) {

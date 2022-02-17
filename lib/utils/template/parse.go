@@ -21,7 +21,7 @@ import (
 
 	"github.com/Masterminds/sprig"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // Parse returns a text template with default funcs declared

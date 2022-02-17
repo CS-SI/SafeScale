@@ -25,7 +25,7 @@ import (
 	"github.com/denisbrodbeck/machineid"
 	"github.com/urfave/cli/v2"
 
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 )
 
 // GenerateClientIdentity builds a string identifying the client

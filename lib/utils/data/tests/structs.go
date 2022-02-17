@@ -17,7 +17,7 @@
 package tests
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
 type StructWithoutPointers struct {

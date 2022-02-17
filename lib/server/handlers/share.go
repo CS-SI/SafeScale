@@ -20,17 +20,17 @@ import (
 	"path"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	sharefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/share"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 //go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ShareHandler

@@ -19,10 +19,10 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 )
 
 // ClusterState contains the bare minimum information about the state of a cluster

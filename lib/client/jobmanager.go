@@ -21,8 +21,8 @@ import (
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
 )
 
 // bucket is the part of the safescale client handling buckets

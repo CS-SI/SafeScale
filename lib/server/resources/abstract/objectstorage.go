@@ -19,9 +19,9 @@ package abstract
 import (
 	stdjson "encoding/json"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)

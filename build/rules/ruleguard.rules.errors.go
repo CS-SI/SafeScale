@@ -25,7 +25,7 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 
 func kickYouOutOfMyHead(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
 
 	m.Match(
 		"$*_, $err := $x; if $y != nil { $*_ }",
@@ -57,7 +57,7 @@ func nilxerr(m dsl.Matcher) {
 // err but no an error
 func errnoterror(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
 
 	m.Match(
 		"if $*_, err := $x; $err != nil { $*_ } else if $_ { $*_ }",
@@ -83,7 +83,7 @@ func errnoterror(m dsl.Matcher) {
 // err but no an error
 func xerrnoterror(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
 
 	m.Match(
 		"if $*_, xerr := $x; $err != nil { $*_ } else if $_ { $*_ }",
@@ -155,19 +155,19 @@ func unexpectedNegatives(m dsl.Matcher) {
 }
 
 func dangerousNegatives(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
 	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(!m["z"].Text.Matches(".fail.*") && !m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be nil")
 }
 
 func typedNil(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
 	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(m["z"].Text.Matches(".fail.*") && m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be a typed nil")
 }
 
 func usingTypedNil(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
 	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(m["z"].Text.Matches(".fail.*") && !m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be a typed nil, so using $x is a serious mistake")
 }

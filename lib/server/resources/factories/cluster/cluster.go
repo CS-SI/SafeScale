@@ -19,11 +19,11 @@ package cluster
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // List returns a list of available hosts
@@ -37,7 +37,7 @@ func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentit
 		return emptyList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	instance, xerr := New(svc)
+	instance, xerr := New(ctx, svc)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -51,11 +51,11 @@ func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentit
 }
 
 // New creates a new instance of resources.Cluster
-func New(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
-	return operations.NewCluster(svc)
+func New(ctx context.Context, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+	return operations.NewCluster(ctx, svc)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
-	return operations.LoadCluster(svc, name)
+func Load(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+	return operations.LoadCluster(ctx, svc, name)
 }
