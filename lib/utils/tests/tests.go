@@ -18,41 +18,57 @@ package tests
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
+type SafeLog struct {
+	mu  sync.Mutex
+	log string
+}
+
+func (c *SafeLog) Trace(line string) {
+	c.mu.Lock()
+	c.log = c.log + line
+	defer c.mu.Unlock()
+}
+
+func (c *SafeLog) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.log
+}
+
+var preservedOutput = os.Stdout
+
 // Used for tests to capture logrus output
 func LogrusCapture(routine func()) string {
 
-	old := os.Stdout // keep backup of the real stdout
+	logLine := make(chan string)
+	logs := SafeLog{log: ""}
+
 	r, w, _ := os.Pipe()
-	os.Stdout = w
 	logrus.SetOutput(w)
+	os.Stdout = w
+	defer func() {
+		os.Stdout = preservedOutput
+		logrus.SetOutput(preservedOutput)
+	}()
 
-	routine()
-
-	outC := make(chan string)
-	// copy the output in a separate goroutine so printing can't block indefinitely
 	go func() {
 		var buf bytes.Buffer
 		io.Copy(&buf, r)
-		outC <- buf.String()
+		logLine <- buf.String()
 	}()
 
-	// back to normal state
+	routine()
 	w.Close()
-	os.Stdout = old // restoring the real stdout
-	logrus.SetOutput(old)
-	out := <-outC
-
-	return out
+	logs.Trace(<-logLine)
+	return logs.String()
 
 }
 
@@ -65,9 +81,6 @@ func TimelimitCapture(routine func(), timeout time.Duration) bool {
 
 	go func() {
 		defer wg.Done()
-
-		fmt.Println(reflect.TypeOf(routine))
-
 		routine()
 	}()
 

@@ -265,8 +265,6 @@ func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 
 func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 
-	var notify Notify = DefaultNotifier()
-
 	log := tests.LogrusCapture(func() {
 		err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
 			func() error {
@@ -274,7 +272,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 			},
 			50*time.Millisecond,
 			40*time.Millisecond,
-			notify,
+			DefaultNotifier(),
 		)
 		require.EqualValues(t, err, nil)
 	})
@@ -287,7 +285,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		},
 		-1*time.Millisecond,
 		40*time.Millisecond,
-		notify,
+		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
 
@@ -297,7 +295,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		},
 		50*time.Millisecond,
 		-1*time.Millisecond,
-		notify,
+		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
 
@@ -307,7 +305,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		},
 		50*time.Millisecond,
 		-1*time.Millisecond,
-		notify,
+		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
 
@@ -317,7 +315,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		},
 		50*time.Millisecond,
 		1*time.Second,
-		notify,
+		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
 
@@ -327,7 +325,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		},
 		50*time.Millisecond,
 		1*time.Second,
-		notify,
+		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
 
