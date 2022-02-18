@@ -735,7 +735,7 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 		default:
 			// Retry is wanted, so blocks the loop the amount of time needed
 			if a.Officer != nil {
-				go func() {
+				go func(aTry Try) {
 					var crash error
 					defer func() {
 						if crash != nil {
@@ -744,9 +744,9 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 					}()
 					defer fail.OnPanic(&crash)
 
-					a.Officer.Block(try)
+					a.Officer.Block(aTry)
 					ch <- nil
-				}()
+				}(try)
 
 				select {
 				case response := <-ch:
