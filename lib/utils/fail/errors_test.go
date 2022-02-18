@@ -323,7 +323,7 @@ func TestErrorCore_RootCauseBad(t *testing.T) {
 		defer wg.Done()
 		defer OnPanic(&panicked)
 		var err *errorCore = nil
-		_ = err.RootCause()
+		_ = err.RootCause() // this panics
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
 	if failed && panicked == nil { // It never ended
