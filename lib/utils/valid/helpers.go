@@ -16,26 +16,18 @@
 
 package valid
 
-func IsNull(something interface{}) bool {
-	if something == nil {
-		return true
-	}
+import (
+	"reflect"
+)
 
-	if casted, ok := something.(interface{ IsNull() bool }); ok {
-		if casted == nil {
-			return true
-		}
-		return casted.IsNull()
-	}
+func hasFieldWithNameAndIsNil(iface interface{}, name string) bool {
+	ifv := reflect.ValueOf(iface)
 
-	if casted, ok := something.(interface{ IsNil() bool }); ok {
-		if casted == nil {
-			return true
-		}
-		return casted.IsNil()
+	fiv := ifv.FieldByName(name)
+	if fiv.IsValid() {
+		return fiv.IsNil()
 	}
-
-	return something == nil
+	return false
 }
 
 func IsNil(something interface{}) bool {
@@ -57,5 +49,24 @@ func IsNil(something interface{}) bool {
 		return casted.IsNil()
 	}
 
-	return something == nil
+	theKind := reflect.ValueOf(something).Kind()
+	if theKind == reflect.Ptr {
+		val := reflect.Indirect(reflect.ValueOf(something))
+		if !val.IsValid() {
+			return true
+		}
+
+		casted, ok := something.(interface{ IsNull() bool })
+		if ok {
+			return casted.IsNull()
+		}
+	} else if theKind == reflect.Struct {
+		return hasFieldWithNameAndIsNil(something, "errorCore")
+	}
+
+	return false
+}
+
+func IsNull(something interface{}) bool {
+	return IsNil(something)
 }

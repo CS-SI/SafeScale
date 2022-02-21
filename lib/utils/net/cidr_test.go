@@ -86,9 +86,8 @@ func Test_CIDRToUInt32Range(t *testing.T) {
 
 	// Valid
 	ipv4l, ipv4h, err = CIDRToUInt32Range("192.168.0.1/24")
-	require.EqualValues(t, ipv4l, 3232235521)
-	require.EqualValues(t, ipv4h, 3232235775)
-
+	require.EqualValues(t, uint64(ipv4l), uint64(3232235521))
+	require.EqualValues(t, uint64(ipv4h), uint64(3232235775))
 }
 
 func Test_IsCIDRRoutable(t *testing.T) {

@@ -62,6 +62,8 @@ type Error interface {
 	ToGRPCStatus() error
 }
 
+const EmbeddedErrorStructName = "errorCore"
+
 // errorCore is the implementation of interface Error
 type errorCore struct {
 	message             string
