@@ -77,8 +77,8 @@ func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 
 	last := recovered[len(recovered)-1]
 
-	what_to_remove := sourceFilePrefixToRemove()
-	last.file = strings.Replace(last.file, what_to_remove, "", 1)
+	whatToRemove := sourceFilePrefixToRemove()
+	last.file = strings.Replace(last.file, whatToRemove, "", 1)
 
 	fragments = append(fragments, fmt.Sprintf("in function %s", last.fn))
 	fragments = append(fragments, why)
@@ -146,7 +146,7 @@ func getStack(callTrace interface{}, search string, stop Enum) ([]call, error) {
 				fn:   line,
 				file: nextline,
 			})
-			if found == true {
+			if found {
 				break
 			}
 			if strings.Contains(nextline, search) {
@@ -238,7 +238,7 @@ func IgnoreTraceUntil(callTrace interface{}, search string, stop Enum) string {
 				fn:   line,
 				file: nextline,
 			})
-			if found == true {
+			if found {
 				break
 			}
 			if strings.Contains(nextline, search) {
