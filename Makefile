@@ -29,6 +29,8 @@ COVERTOOL := github.com/dlespiau/covertool
 RULES := github.com/quasilyte/go-ruleguard/cmd/ruleguard
 RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
 GOGREP := mvdan.cc/gogrep
+GOENUM := github.com/abice/go-enum
+GOWRAP := github.com/hexdigest/gowrap
 
 # CI tools
 BATS := github.com/sstephenson/bats
@@ -253,10 +255,20 @@ getdevdeps: begin ground
 		$(GO) install $(STRINGER)@v0.1.9 &>/dev/null || true; \
 	fi
 	@sleep 2
+	@$(WHICH) go-enum > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading go-enum...\n"; \
+		$(GO) install $(GOENUM)@v0.3.11 &>/dev/null || true; \
+	fi
+	@sleep 2
+	@$(WHICH) gowrap > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gowrap...\n"; \
+		$(GO) install $(GOWRAP)/cmd/gowrap@v1.2.2 &>/dev/null || true; \
+	fi
+	@sleep 2
 	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n"; \
-		$(GO) install $(RULES)@v0.3.10 &>/dev/null || true; \
-		$(GO) get -d $(RULES_DSL)@v0.3.10 &>/dev/null || true; \
+		$(GO) install $(RULES)@v0.3.15 &>/dev/null || true; \
+		$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) gogrep > /dev/null; if [ $$? -ne 0 ]; then \
@@ -266,7 +278,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.43.0 || true; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.42.1 || true; \
 	fi
 	@sleep 5
 
@@ -407,7 +419,7 @@ vet: begin generate
 
 semgrep: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks with '$(CERR)' ruleset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) get -d $(RULES_DSL)@v0.3.10 &>/dev/null || true;
+	@$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true;
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
 ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) semgrep_results.log || true
@@ -463,6 +475,17 @@ ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) style_results.log || true
 	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | awk 'NF' | $(TEE) style_results.log
 	@if [ -s ./style_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) style FAILED, look at style_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
+
+maint: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running maint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+	@$(RM) maint_results.log || true
+	@golangci-lint --color never --timeout=10m --no-config --disable-all --enable=maintidx run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | awk 'NF' | $(TEE) maint_results.log
+	@if [ -s ./maint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at maint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 endif
