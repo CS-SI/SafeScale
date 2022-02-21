@@ -18,6 +18,7 @@ package tests
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -26,49 +27,27 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type SafeLog struct {
-	mu  sync.Mutex
-	log string
-}
-
-func (c *SafeLog) Trace(line string) {
-	c.mu.Lock()
-	c.log = c.log + line
-	defer c.mu.Unlock()
-}
-
-func (c *SafeLog) String() string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.log
-}
-
 var preservedOutput = os.Stdout
 
 // Used for tests to capture logrus output
 func LogrusCapture(routine func()) string {
 
-	logLine := make(chan string)
-	logs := SafeLog{log: ""}
-
 	r, w, _ := os.Pipe()
 	logrus.SetOutput(w)
 	os.Stdout = w
-	defer func() {
-		os.Stdout = preservedOutput
-		logrus.SetOutput(preservedOutput)
-	}()
-
-	go func() {
-		var buf bytes.Buffer
-		io.Copy(&buf, r)
-		logLine <- buf.String()
-	}()
 
 	routine()
+
+	os.Stdout = preservedOutput
+	logrus.SetOutput(preservedOutput)
+
 	w.Close()
-	logs.Trace(<-logLine)
-	return logs.String()
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	log := buf.String()
+	fmt.Println(log)
+	return log
 
 }
 

@@ -304,26 +304,6 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 			return nil
 		},
 		50*time.Millisecond,
-		-1*time.Millisecond,
-		DefaultNotifier(),
-	)
-	require.EqualValues(t, err, nil)
-
-	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
-		func() error {
-			return nil
-		},
-		50*time.Millisecond,
-		1*time.Second,
-		DefaultNotifier(),
-	)
-	require.EqualValues(t, err, nil)
-
-	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
-		func() error {
-			return nil
-		},
-		50*time.Millisecond,
 		1*time.Second,
 		DefaultNotifier(),
 	)

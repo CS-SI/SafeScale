@@ -19,7 +19,6 @@ package fail
 import (
 	"fmt"
 	"os/exec"
-	"reflect"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -167,12 +166,6 @@ func defaultCauseFormatter(e Error) string {
 		return NewError().UnformattedError()
 	}
 
-	state := reflect.ValueOf(errCore.lock).Elem().FieldByName("w").FieldByName("state")
-	if state.Int()&1 == 1 {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.defaultCauseFormatter", "mutex locked", 0))
-		return NewError().UnformattedError()
-	}
-
 	errCore.lock.RLock()
 	if errCore.cause != nil {
 		switch cerr := errCore.cause.(type) {
@@ -245,7 +238,7 @@ func (e errorCore) Unwrap() error {
 // Cause is just an accessor for internal e.cause
 func (e errorCore) Cause() error {
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return NewError()
 	}
 	e.lock.RLock()
@@ -276,7 +269,7 @@ func defaultAnnotationFormatter(a data.Annotations) (string, error) {
 // Annotations ...
 func (e errorCore) Annotations() data.Annotations {
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return data.Annotations{}
 	}
 	e.lock.RLock()
@@ -288,7 +281,7 @@ func (e errorCore) Annotations() data.Annotations {
 // Annotation ...
 func (e errorCore) Annotation(key string) (data.Annotation, bool) {
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'RootCause'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return nil, false
 	}
 	e.lock.RLock()
@@ -348,7 +341,7 @@ func (e *errorCore) AddConsequence(err error) Error {
 // Consequences returns the consequences of current error (detected teardown problems)
 func (e errorCore) Consequences() []error {
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'Consequences'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return []error{}
 	}
 	e.lock.RLock()
@@ -361,7 +354,7 @@ func (e errorCore) Consequences() []error {
 func (e *errorCore) Error() string {
 
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'Error'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return ""
 	}
 	e.lock.RLock()
@@ -398,7 +391,7 @@ func (e *errorCore) Error() string {
 func (e *errorCore) UnformattedError() string {
 
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'UnformattedError'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return ""
 	}
 
@@ -432,25 +425,18 @@ func (e *errorCore) GRPCCode() codes.Code {
 	return e.grpcCode
 }
 
-// GRPCCode returns the appropriate error code to use with gRPC
-func (e *errorCore) getGRPCCode() codes.Code {
-	e.lock.RLock()
-	defer e.lock.RUnlock()
-	return e.grpcCode
-}
-
 // ToGRPCStatus returns a grpcstatus struct from error
 func (e errorCore) ToGRPCStatus() error {
 
 	if e.lock == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid call : ", "'ToGRPCStatus'", "on nil pointer *errorCore", 0))
+		logrus.Errorf("invalid nil pointer for parameter 'lock'")
 		return grpcstatus.Errorf(codes.Unknown, "")
 	}
 
 	e.lock.RLock()
 	defer e.lock.RUnlock()
 
-	return grpcstatus.Errorf(e.getGRPCCode(), e.Error())
+	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
 }
 
 // ErrWarning defines an ErrWarning error
@@ -502,8 +488,23 @@ func (e *ErrWarning) UnformattedError() string {
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrWarning) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrWarning) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
+}
+
+// Cause is just an accessor for internal e.cause
+func (e *ErrWarning) Cause() error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Cause()", "from null instance", 0))
+		return NewError()
+	}
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+	return e.errorCore.cause
 }
 
 // ErrTimeout defines a ErrTimeout error
@@ -568,17 +569,12 @@ func (e *ErrTimeout) UnformattedError() string {
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrTimeout) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
-}
-
-// GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrTimeout) GRPCCode() codes.Code {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
-	return e.errorCore.getGRPCCode()
+	return e.errorCore.GRPCCode()
 }
 
 // Cause is just an accessor for internal e.cause
@@ -641,17 +637,12 @@ func (e *ErrNotFound) UnformattedError() string {
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrNotFound) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
-}
-
-// GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotFound) GRPCCode() codes.Code {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
-	return e.errorCore.getGRPCCode()
+	return e.errorCore.GRPCCode()
 }
 
 // Cause is just an accessor for internal e.cause
@@ -710,17 +701,12 @@ func (e *ErrNotAvailable) UnformattedError() string {
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrNotAvailable) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
-}
-
-// GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotAvailable) GRPCCode() codes.Code {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.GRPCCode()", "from null instance", 0))
 		return codes.Unknown
 	}
-	return e.errorCore.getGRPCCode()
+	return e.errorCore.GRPCCode()
 }
 
 // Cause is just an accessor for internal e.cause
@@ -780,8 +766,12 @@ func (e *ErrDuplicate) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrDuplicate) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrDuplicate) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrInvalidRequest ...
@@ -830,8 +820,12 @@ func (e *ErrInvalidRequest) Annotate(key string, value data.Annotation) data.Ann
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidRequest) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrInvalidRequest) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrSyntax ...
@@ -882,12 +876,12 @@ func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrSyntax) getGRPCCode() codes.Code {
+func (e *ErrSyntax) GRPCCode() codes.Code {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.getGRPCCode()", "from null instance", 0))
-		return codes.InvalidArgument
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
 	}
-	return e.errorCore.getGRPCCode()
+	return e.errorCore.GRPCCode()
 }
 
 // ErrNotAuthenticated when action is done without being authenticated first
@@ -938,8 +932,12 @@ func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.A
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrNotAuthenticated) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrNotAuthenticated) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrForbidden when action is not allowed.
@@ -990,8 +988,12 @@ func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrForbidden) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrForbidden) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrAborted is used to signal abortion
@@ -1055,8 +1057,12 @@ func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatabl
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrAborted) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrAborted) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrOverflow is used when a limit is reached
@@ -1130,8 +1136,12 @@ func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatab
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrOverflow) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrOverflow) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occurred in a given time).
@@ -1179,8 +1189,12 @@ func (e *ErrOverload) Annotate(key string, value data.Annotation) data.Annotatab
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrOverload) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrOverload) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrNotImplemented ...
@@ -1231,8 +1245,12 @@ func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Ann
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrNotImplemented) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrNotImplemented) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrRuntimePanic ...
@@ -1292,8 +1310,12 @@ func (e *ErrRuntimePanic) Annotate(key string, value data.Annotation) data.Annot
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrRuntimePanic) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrRuntimePanic) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
@@ -1343,8 +1365,12 @@ func (e *ErrInvalidInstance) Annotate(key string, value data.Annotation) data.An
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidInstance) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrInvalidInstance) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrInvalidParameter ...
@@ -1417,8 +1443,12 @@ func (e *ErrInvalidParameter) Annotate(key string, value data.Annotation) data.A
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidParameter) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrInvalidParameter) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
@@ -1478,8 +1508,12 @@ func (e *ErrInvalidInstanceContent) Annotate(key string, value data.Annotation) 
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInvalidInstanceContent) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrInvalidInstanceContent) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrInconsistent is used when data used is ErrInconsistent
@@ -1527,8 +1561,12 @@ func (e *ErrInconsistent) Annotate(key string, value data.Annotation) data.Annot
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrInconsistent) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrInconsistent) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrExecution is used when code ErrExecution failed
@@ -1604,8 +1642,12 @@ func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrExecution) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrExecution) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrAlteredNothing is used when an Alter() call changed nothing
@@ -1653,8 +1695,12 @@ func (e *ErrAlteredNothing) Annotate(key string, value data.Annotation) data.Ann
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrAlteredNothing) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrAlteredNothing) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
 
 // ErrUnknown is used when situation is unknown
@@ -1702,6 +1748,10 @@ func (e *ErrUnknown) Annotate(key string, value data.Annotation) data.Annotatabl
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *ErrUnknown) getGRPCCode() codes.Code {
-	return e.errorCore.getGRPCCode()
+func (e *ErrUnknown) GRPCCode() codes.Code {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.GRPCCode()", "from null instance", 0))
+		return codes.Unknown
+	}
+	return e.errorCore.GRPCCode()
 }
