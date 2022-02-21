@@ -31,6 +31,7 @@ RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
 GOGREP := mvdan.cc/gogrep
 GOENUM := github.com/abice/go-enum
 GOWRAP := github.com/hexdigest/gowrap
+MAINT := github.com/yagipy/maintidx/cmd/maintidx
 
 # CI tools
 BATS := github.com/sstephenson/bats
@@ -271,6 +272,11 @@ getdevdeps: begin ground
 		$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true; \
 	fi
 	@sleep 2
+	@$(WHICH) maintidx > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading maintidx...\n"; \
+		$(GO) install $(MAINT)@v1.0.0 &>/dev/null || true; \
+	fi
+	@sleep 2
 	@$(WHICH) gogrep > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gogrep...\n" && $(GO) get $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
 		$(GO) install $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
@@ -481,10 +487,10 @@ endif
 
 maint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running maint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+	@($(WHICH) maintidx > /dev/null || (echo "maintidx not installed in your system" && exit 1))
 ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) maint_results.log || true
-	@golangci-lint --color never --timeout=10m --no-config --disable-all --enable=maintidx run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | awk 'NF' | $(TEE) maint_results.log
+	@maintidx ./... 2>&1 | $(TEE) maint_results.log
 	@if [ -s ./maint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at maint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
