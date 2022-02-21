@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.43.1
+	github.com/aws/aws-sdk-go v1.43.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
@@ -16,7 +16,6 @@ require (
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/gophercloud/gophercloud v0.24.0
-	github.com/gregoryv/gocyclo v0.1.1
 	github.com/itchyny/gojq v0.12.6
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.5
