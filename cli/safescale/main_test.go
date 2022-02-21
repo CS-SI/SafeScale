@@ -22,8 +22,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/makholm/covertool/pkg/cover"
-	"github.com/makholm/covertool/pkg/exit"
+	"github.com/oscarpicas/covertool/pkg/cover"
+	"github.com/oscarpicas/covertool/pkg/exit"
 )
 
 func TestMain(m *testing.M) {
