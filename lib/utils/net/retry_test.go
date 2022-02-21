@@ -342,7 +342,7 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 				[]error{},
 				"Any error",
 			),
-			out: "*fail.ErrNotAvailable",
+			out: "*fail.ErrInvalidRequest",
 		},
 		{
 			in: fail.NotAvailableErrorWithCause(

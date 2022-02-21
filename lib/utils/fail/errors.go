@@ -1020,7 +1020,7 @@ func AbortedError(err error, msg ...interface{}) *ErrAborted {
 // AbortedErrorWithCauseAndConsequences creates an ErrAborted error
 func AbortedErrorWithCauseAndConsequences(err error, consequences []error, msg ...interface{}) *ErrAborted {
 	var message string
-	if len(msg) == 0 {
+	if len(msg) == 0 || (len(msg) == 1 && msg[0] == "") {
 		message = "aborted"
 	} else {
 		message = strprocess.FormatStrings(msg...)
@@ -1181,6 +1181,9 @@ func (e *ErrOverload) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverload) UnformattedError() string {
+	if e.IsNull() {
+		return ""
+	}
 	return e.unsafeUnformattedError()
 }
 

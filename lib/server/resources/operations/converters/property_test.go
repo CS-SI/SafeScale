@@ -170,10 +170,9 @@ func Test_ClusterCompositeFromPropertyToProtocol(t *testing.T) {
 
 }
 
-/*
-func Test_ClusterDefaultsFromPropertyToProtocol(t *testing.T) {
+func Test_ClusterDefaultsFromPropertyV2ToProtocol(t *testing.T) {
 
-	cc := ClusterDefaultsFromPropertyToProtocol(propertiesv2.ClusterDefaults{
+	cc := ClusterDefaultsFromPropertyV2ToProtocol(propertiesv2.ClusterDefaults{
 		GatewaySizing: propertiesv2.HostSizingRequirements{
 			MinCores:    1,
 			MaxCores:    1,
@@ -216,7 +215,52 @@ func Test_ClusterDefaultsFromPropertyToProtocol(t *testing.T) {
 	}
 
 }
-*/
+
+func Test_ClusterDefaultsFromPropertyV3ToProtocol(t *testing.T) {
+
+	cc := ClusterDefaultsFromPropertyV3ToProtocol(propertiesv3.ClusterDefaults{
+		GatewaySizing: propertiesv2.HostSizingRequirements{
+			MinCores:    1,
+			MaxCores:    1,
+			MinRAMSize:  64,
+			MaxRAMSize:  128,
+			MinDiskSize: 50,
+			MinGPU:      1,
+			MinCPUFreq:  3200,
+			Replaceable: false,
+		},
+		GatewayTemplateID: "",
+		MasterSizing: propertiesv2.HostSizingRequirements{
+			MinCores:    1,
+			MaxCores:    1,
+			MinRAMSize:  64,
+			MaxRAMSize:  128,
+			MinDiskSize: 50,
+			MinGPU:      1,
+			MinCPUFreq:  3200,
+			Replaceable: false,
+		},
+		MasterTemplateID: "",
+		NodeSizing: propertiesv2.HostSizingRequirements{
+			MinCores:    1,
+			MaxCores:    1,
+			MinRAMSize:  64,
+			MaxRAMSize:  128,
+			MinDiskSize: 50,
+			MinGPU:      1,
+			MinCPUFreq:  3200,
+			Replaceable: false,
+		},
+		NodeTemplateID: "NodeTemplateID",
+		Image:          "Image",
+		ImageID:        "ImageID",
+	})
+	if reflect.TypeOf(cc).String() != "*protocol.ClusterDefaults" {
+		t.Error("Expect type *protocol.ClusterDefaults")
+		t.Fail()
+	}
+
+}
 
 func Test_ClusterNetworkFromPropertyToProtocol(t *testing.T) {
 
