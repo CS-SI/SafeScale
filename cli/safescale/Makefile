@@ -59,7 +59,7 @@ clean:
 	@$(RM) $(EXEC) || true
 
 generate: gensrc
-	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
+	@gofmt $(VERSIONFILE) > /dev/null 2>&1
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
@@ -71,4 +71,4 @@ gensrc:
 	@echo "    Revision  = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo "    Tags      = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
-	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
+	@gofmt $(VERSIONFILE) > /dev/null 2>&1
