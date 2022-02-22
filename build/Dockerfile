@@ -1,4 +1,4 @@
-FROM ubuntu:bionic as base
+FROM ubuntu:focal as base
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -48,7 +48,7 @@ make \
 curl \
 git \
 jq \
-python3.6 \
+python3 \
 python3-pip \
 locales \
 && apt-get autoclean -y \
