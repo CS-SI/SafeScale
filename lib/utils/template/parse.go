@@ -20,7 +20,7 @@ import (
 	txttmpl "text/template"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/Masterminds/sprig/v3"
+	sprig "github.com/Masterminds/sprig/v3"
 )
 
 // Parse returns a text template with default funcs declared

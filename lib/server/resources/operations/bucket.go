@@ -451,6 +451,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 
 // Delete a bucket
 func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -515,6 +516,8 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 // - *fail.ErrDuplicate: already mounted on Host
 // - *fail.ErrNotAvailable: already mounted
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
+
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -527,8 +530,6 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 	if path == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
-
-	defer fail.OnPanic(&outerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -689,6 +690,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 
 // Unmount a bucket
 func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
