@@ -134,6 +134,11 @@ mod:
 	@($(GO) mod download &>/dev/null || true)
 	@($(GO) mod tidy &>/dev/null || true)
 	@($(GO) mod download &>/dev/null || true)
+	@($(GO) mod tidy &>/dev/null || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 &>/dev/null || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 &>/dev/null || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 &>/dev/null || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 &>/dev/null || true)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 debug:
