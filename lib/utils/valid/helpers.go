@@ -17,6 +17,7 @@
 package valid
 
 import (
+	"fmt"
 	"reflect"
 )
 
@@ -36,30 +37,32 @@ func IsNil(something interface{}) bool {
 	}
 
 	if casted, ok := something.(interface{ IsNull() bool }); ok {
-		if casted == nil {
+		if casted == nil || fmt.Sprintf("%p", casted) == "0x0" {
 			return true
 		}
 		return casted.IsNull()
 	}
 
 	if casted, ok := something.(interface{ IsNil() bool }); ok {
-		if casted == nil {
+		if casted == nil || fmt.Sprintf("%p", casted) == "0x0" {
 			return true
 		}
 		return casted.IsNil()
 	}
 
 	theKind := reflect.ValueOf(something).Kind()
+
 	if theKind == reflect.Ptr {
 		val := reflect.Indirect(reflect.ValueOf(something))
 		if !val.IsValid() {
 			return true
 		}
-
+		/* UNREACHABLE
 		casted, ok := something.(interface{ IsNull() bool })
 		if ok {
 			return casted.IsNull()
 		}
+		*/
 	} else if theKind == reflect.Struct {
 		return hasFieldWithNameAndIsNil(something, "errorCore")
 	}

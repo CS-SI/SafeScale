@@ -24,16 +24,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type IsEmptyTest struct {
-	value  interface{}
-	expect bool
-}
-
 func Test_IsEmpty(t *testing.T) {
 
 	var emptyPtrInt error = nil
 
-	tests := []IsEmptyTest{
+	tests := []struct {
+		value  interface{}
+		expect bool
+	}{
 		{
 			value:  nil,
 			expect: true,

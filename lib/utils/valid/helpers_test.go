@@ -5,7 +5,32 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/stretchr/testify/require"
 )
+
+type NullableInterface interface {
+	IsNull() bool
+}
+type Nullable struct {
+	NullableInterface
+	isnull bool
+}
+
+func (e Nullable) IsNull() bool {
+	return e.isnull
+}
+
+type NillableInterface interface {
+	IsNil() bool
+}
+type Nillable struct {
+	NillableInterface
+	isnil bool
+}
+
+func (e Nillable) IsNil() bool {
+	return e.isnil
+}
 
 func TestIsNull(t *testing.T) {
 	var err error
@@ -95,4 +120,37 @@ func TestNotNulls(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_IsNil(t *testing.T) {
+
+	var a_null Nullable
+	var a_nil Nillable
+	var p_null *Nullable = nil
+	var p_nil *Nillable = nil
+
+	require.EqualValues(t, IsNil(nil), true)
+	require.EqualValues(t, IsNil(a_null), false)
+	require.EqualValues(t, IsNil(p_null), true)
+	require.EqualValues(t, IsNil(Nullable{isnull: true}), true)
+	require.EqualValues(t, IsNil(&Nullable{isnull: true}), true)
+	require.EqualValues(t, IsNil(Nullable{isnull: false}), false)
+	require.EqualValues(t, IsNil(&Nullable{isnull: false}), false)
+	require.EqualValues(t, IsNil(a_nil), false)
+	require.EqualValues(t, IsNil(p_nil), true)
+	require.EqualValues(t, IsNil(Nillable{isnil: true}), true)
+	require.EqualValues(t, IsNil(&Nillable{isnil: true}), true)
+	require.EqualValues(t, IsNil(Nillable{isnil: false}), false)
+	require.EqualValues(t, IsNil(&Nillable{isnil: false}), false)
+	require.EqualValues(t, IsNil("test"), false)
+	require.EqualValues(t, IsNil(&struct {
+		Price  float64
+		Symbol string
+		Rating uint
+	}{
+		Price:  5.55,
+		Symbol: "€",
+		Rating: 4,
+	}), false)
+
 }

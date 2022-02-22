@@ -20,9 +20,17 @@ import (
 	"reflect"
 )
 
-func hasFieldWithNameAndIsNil(iface interface{}, name string) bool {
+func hasFieldWithNameAndIsNil(iface interface{}, name string) (result bool) {
+	if iface == nil {
+		return false
+	}
+	defer func() {
+		r := recover()
+		if r != nil {
+			result = false
+		}
+	}()
 	ifv := reflect.ValueOf(iface)
-
 	fiv := ifv.FieldByName(name)
 	if fiv.IsValid() {
 		return fiv.IsNil()
