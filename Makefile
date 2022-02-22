@@ -28,7 +28,6 @@ XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 RULES := github.com/quasilyte/go-ruleguard/cmd/ruleguard
 RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
-GOGREP := mvdan.cc/gogrep
 GOENUM := github.com/abice/go-enum
 GOWRAP := github.com/hexdigest/gowrap
 MAINT := github.com/yagipy/maintidx/cmd/maintidx
@@ -275,11 +274,6 @@ getdevdeps: begin ground
 	@$(WHICH) maintidx > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading maintidx...\n"; \
 		$(GO) install $(MAINT)@v1.0.0 &>/dev/null || true; \
-	fi
-	@sleep 2
-	@$(WHICH) gogrep > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gogrep...\n" && $(GO) get $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
-		$(GO) install $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \

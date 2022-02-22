@@ -31,4 +31,4 @@ lib/server/handlers:
 clean:
 	@(cd iaas && $(MAKE) $@)
 	@(cd resources && $(MAKE) $@)
-	@$(RM) ./mocks/*.go || true
+	@$(RM) ./mocks/mock_*.go || true
