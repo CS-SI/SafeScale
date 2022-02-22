@@ -45,7 +45,7 @@ export BUILD_TAGS
 TEST_COVERAGE_ARGS =
 export TEST_COVERAGE_ARGS
 
-all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet semgrep style metalint
+all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
@@ -147,6 +147,11 @@ mod:
 	done
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
+cleancache:
+	@($(GO) clean -cache -modcache -i -r &>/dev/null || true)
+
+modclean: cleancache mod
+
 debug:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'debug' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "debug,$(BUILD_TAGS)")
@@ -178,11 +183,11 @@ cideps: begin ground
 	fi
 	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n"; \
-		$(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
+		$(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.4 &>/dev/null || true; \
 	fi
 	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n"; \
-		$(GO) install $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+		$(GO) install $(JSONTOML)/cmd/tomljson@v1.9.4 &>/dev/null || true; \
 	fi
 
 batscheck: begin
