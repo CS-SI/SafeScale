@@ -131,13 +131,14 @@ begin: versioncut
 
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) mod download &>/dev/null || true)
 	@sleep 90
-	@($(GO) mod tidy &>/dev/null || true)
-	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 &>/dev/null || true)
-	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 &>/dev/null || true)
-	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 &>/dev/null || true)
-	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 &>/dev/null || true)
+	@($(GO) mod download || true)
+	@sleep 90
+	@($(GO) mod tidy || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 || true)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 debug:
