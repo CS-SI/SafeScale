@@ -345,11 +345,11 @@ generate: sdk
 	@sleep 2
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./generation_results.log || true
-	@$(GO) generate -run stringer ./... 2>&1 | $(TEE) -a generation_results.log
-	@cd cli && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log
-	@cd lib && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log
-	@cd lib && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log
-	@cd cli && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log
+	@$(GO) generate -run stringer ./... 2>&1 | $(TEE) -a generation_results.log || true
+	@cd cli && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log || true
+	@cd lib && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log || true
+	@cd lib && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log || true
+	@cd cli && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log || true
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
