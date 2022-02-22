@@ -9,7 +9,6 @@ vet:
 
 generate:
 	@(cd enums && $(MAKE) $(@))
-	@$(GO) generate -run rice
 
 clean:
 	@$(RM) enums/*/enum_string.go || true
