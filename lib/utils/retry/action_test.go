@@ -34,6 +34,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_NewAction(t *testing.T) {
+
+	var (
+		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
+		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		run     func() error = func() (nested error) {
+			return nil
+		}
+		notify  Notify
+		timeout time.Duration = 5 * time.Second
+	)
+
+	action := NewAction(officer, arbiter, run, notify, timeout)
+	require.EqualValues(t, reflect.TypeOf(action).String(), "*retry.action")
+
+}
+
 func Test_Action(t *testing.T) {
 
 	var (
@@ -305,6 +322,114 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		},
 		50*time.Millisecond,
 		1*time.Second,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithNotify(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			DefaultNotifier(),
+		)
+		require.EqualValues(t, err, nil)
+	})
+
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
+
+	arb := func(arbiters ...Arbiter) Arbiter {
+		var arb Arbiter
+		if len(arbiters) > 0 {
+			arb = arbiters[0]
+		}
+		return arb
+	}
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithAggregator(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			arb,
+			DefaultNotifier(),
+		)
+		require.EqualValues(t, err, nil)
+	})
+
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		arb,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		arb,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		arb,
 		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)

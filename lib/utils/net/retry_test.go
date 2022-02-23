@@ -195,6 +195,24 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
 	require.EqualValues(t, tries, maxTries)
 
+	// Success one with options
+	waitfor = retry.Linear(50 * time.Millisecond)
+	timeout = 5 * time.Second
+	callback = func() error {
+		return nil
+	}
+
+	var (
+		opt1 retry.Option = func(a *retry.ActionOptions) error {
+			return nil
+		}
+		opt2 retry.Option = func(a *retry.ActionOptions) error {
+			return errors.New("Action option 2")
+		}
+	)
+	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout, opt1, opt2)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrUnqualified")
+
 }
 
 func Test_WhileCommunicationUnsuccessfulDelay1Second(t *testing.T) {

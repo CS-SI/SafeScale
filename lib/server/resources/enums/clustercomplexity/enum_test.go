@@ -19,6 +19,8 @@ package clustercomplexity
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnum_String(t *testing.T) {
@@ -35,4 +37,85 @@ func TestEnum_String(t *testing.T) {
 			t.Errorf("Key %s not found: ", k)
 		}
 	}
+}
+
+func Test_Parse(t *testing.T) {
+
+	tests := []struct {
+		key    string
+		result Enum
+		err    bool
+	}{
+		{
+			key:    "Small",
+			result: Small,
+			err:    false,
+		},
+		{
+			key:    "SMALL",
+			result: Small,
+			err:    false,
+		},
+		{
+			key:    "small",
+			result: Small,
+			err:    false,
+		},
+		{
+			key:    "Normal",
+			result: Normal,
+			err:    false,
+		},
+		{
+			key:    "Large",
+			result: Large,
+			err:    false,
+		},
+		{
+			key: "Tiny",
+			err: true,
+		},
+		{
+			key: "",
+			err: true,
+		},
+	}
+	for i := range tests {
+		test := tests[i]
+		result, err := Parse(test.key)
+		require.EqualValues(t, result, test.result)
+		require.EqualValues(t, err == nil, !test.err)
+	}
+
+}
+
+func Test_String(t *testing.T) {
+
+	tests := []struct {
+		key    Enum
+		result string
+	}{
+		{
+			key:    Small,
+			result: "Small",
+		},
+		{
+			key:    Normal,
+			result: "Normal",
+		},
+		{
+			key:    Large,
+			result: "Large",
+		},
+		{
+			key:    Enum(42),
+			result: "Enum(42)",
+		},
+	}
+	for i := range tests {
+		test := tests[i]
+		result := test.key.String()
+		require.EqualValues(t, test.result, result)
+	}
+
 }

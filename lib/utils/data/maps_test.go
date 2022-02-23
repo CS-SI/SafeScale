@@ -157,9 +157,14 @@ func TestMap_Keys(t *testing.T) {
 		"1": "second",
 		"2": "third",
 	}
-	m := []string{"0", "1", "2"}
-
-	require.EqualValues(t, a.Keys(), m)
+	k := a.Keys()
+	for i := range k {
+		l := k[i]
+		if l != "0" && l != "1" && l != "2" {
+			t.Errorf("Unexpected key %s", l)
+			t.Fail()
+		}
+	}
 
 }
 func TestMap_Values(t *testing.T) {

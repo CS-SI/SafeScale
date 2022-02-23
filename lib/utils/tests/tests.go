@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -75,5 +76,44 @@ func TimelimitCapture(routine func(), timeout time.Duration) bool {
 		logrus.Warnf("Routine exceed timelimit of %d sec", timeout/1000000000)
 		return false
 	}
+
+}
+
+// Check if Minio is locally online
+/*
+	Fragment TOML
+
+[[tenants]]
+    [tenants.objectstorage]
+        Type        = "s3"
+        Region      = "stub"
+        Endpoint    = "http://localhost:9000"
+        AccessKey   = "accessKey"
+        SecretKey   = "secretKey"
+
+*/
+func MinioOnline() bool {
+
+	endpoint := func() string {
+		value, ok := os.LookupEnv("MINIO_HEALTH_ENDPOINT")
+		if !ok {
+			value = "http://localhost:9000/"
+		}
+		return value
+	}()
+
+	return func() (status bool) {
+		resp, err := http.Get(endpoint)
+		if err != nil {
+			return false
+		}
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				status = false
+			}
+		}(resp.Body)
+		return true
+	}()
 
 }

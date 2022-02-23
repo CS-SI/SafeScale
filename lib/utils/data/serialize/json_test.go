@@ -30,6 +30,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -77,6 +78,14 @@ func (f *LikeFeatures) Replace(p data.Clonable) data.Clonable {
 		f.Disabled[k] = v
 	}
 	return f
+}
+
+func TestJsonProperty_IsNull(t *testing.T) {
+
+	var jp *jsonProperty = nil
+	result := jp.IsNull()
+	require.EqualValues(t, result, true)
+
 }
 
 func TestNewJSONProperties(t *testing.T) {
