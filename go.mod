@@ -15,6 +15,7 @@ require (
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
+	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gophercloud/gophercloud v0.24.0
 	github.com/itchyny/gojq v0.12.6
 	github.com/json-iterator/go v1.1.12

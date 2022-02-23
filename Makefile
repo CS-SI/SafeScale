@@ -131,14 +131,20 @@ begin: versioncut
 
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@sleep 90
 	@($(GO) mod download || true)
-	@sleep 90
+	@sleep 4
+	@while [ $(ps -ef | grep "mod download") ] ; do \
+		sleep 4 ; \
+	done
 	@($(GO) mod tidy || true)
 	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 || true)
 	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 || true)
 	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 || true)
 	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 || true)
+	@sleep 4
+	@while [ $(ps -ef | grep "mod download") ] ; do \
+		sleep 4 ; \
+	done
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 debug:
