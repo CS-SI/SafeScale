@@ -31,6 +31,7 @@ RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
 GOENUM := github.com/abice/go-enum
 GOWRAP := github.com/hexdigest/gowrap
 MAINT := github.com/yagipy/maintidx/cmd/maintidx
+IRETURN := github.com/butuzov/ireturn/cmd/ireturn
 
 # CI tools
 BATS := github.com/sstephenson/bats
@@ -292,6 +293,11 @@ getdevdeps: begin ground
 		$(GO) install $(MAINT)@v1.0.0 &>/dev/null || true; \
 	fi
 	@sleep 2
+	@$(WHICH) ireturn > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ireturn...\n"; \
+		$(GO) install $(IRETURN)@v0.1.1 &>/dev/null || true; \
+	fi
+	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.42.1 || true; \
@@ -301,7 +307,10 @@ getdevdeps: begin ground
 ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-sdk: getdevdeps
+unmerged:
+	@$(WHICH) git > /dev/null && git grep -r "<<<<<" -- "*.*" && printf "%b" "$(ERR_COLOR)$(INFO_STRING) Unmerged content...\n" && exit 1 || true
+
+sdk: getdevdeps unmerged
 	@(cd lib && $(MAKE) $(@))
 
 force_sdk_python: sdk
@@ -435,7 +444,7 @@ vet: begin generate
 
 semgrep: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks with '$(CERR)' ruleset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(($(GO) version | grep go1.18)) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Semgrep don't work with go1.18 yet ! $(NO_COLOR)\n" && false);
+	@($(GO) version | grep go1.18) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Semgrep don't work with go1.18 yet ! $(NO_COLOR)\n" && false) || true;
 	@$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true;
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
 ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
@@ -503,6 +512,17 @@ ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) maint_results.log || true
 	@maintidx ./... 2>&1 | $(TEE) maint_results.log
 	@if [ -s ./maint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at maint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
+
+badpractices: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running bad practices checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) ireturn > /dev/null || (echo "ireturn not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+	@$(RM) practices_results.log || true
+	@ireturn ./... 2>&1 | grep -v mock_ | grep -v _test | grep -v fail.Error | $(TEE) practices_results.log
+	@if [ -s ./practices_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at practices_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 endif
