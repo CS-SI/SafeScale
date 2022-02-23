@@ -521,7 +521,7 @@ badpractices: begin
 	@($(WHICH) ireturn > /dev/null || (echo "ireturn not installed in your system" && exit 1))
 ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) practices_results.log || true
-	@ireturn ./... 2>&1 | grep -v mock_ | grep -v _test | grep -v fail.Error | $(TEE) practices_results.log
+	@ireturn ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) practices_results.log
 	@if [ -s ./practices_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at practices_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
