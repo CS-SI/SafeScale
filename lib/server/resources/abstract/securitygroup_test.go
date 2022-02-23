@@ -24,9 +24,23 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
+	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFuzzSg(t *testing.T) {
+	for i := 0; i < 2000; i++ {
+		o := NewSecurityGroupRule()
+
+		f := fuzz.New().NilChance(0.7)
+		f.Fuzz(&o)
+
+		if o.IsNull() && o.Validate() == nil { // If it's null cannot be valid
+			t.FailNow()
+		}
+	}
+}
 
 func TestSecurityGroup_Clone(t *testing.T) {
 	sg := NewSecurityGroup()
