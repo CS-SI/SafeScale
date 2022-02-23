@@ -15,16 +15,17 @@ require (
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
-	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/google/gofuzz v1.2.0
 	github.com/gophercloud/gophercloud v0.24.0
 	github.com/itchyny/gojq v0.12.6
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
 	github.com/mitchellh/mapstructure v1.4.3
-	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
+	github.com/oscarpicas/go-dsp v0.1.0
 	github.com/oscarpicas/scribble v1.0.4
+	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -34,7 +35,6 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
-	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220126234351-aa10faf2a1f8
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee

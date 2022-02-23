@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/gojuno/minimock/v3"
+	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
-	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/mocks"

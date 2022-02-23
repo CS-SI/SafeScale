@@ -440,8 +440,6 @@ github.com/mitchellh/mapstructure v1.4.3 h1:OVowDSCllw/YjdLkam3/sm7wEtOy59d8ndGg
 github.com/mitchellh/mapstructure v1.4.3/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mitchellh/reflectwalk v1.0.0 h1:9D+8oIskB4VJBN5SFlmc27fSlIBZaov1Wpk/IfikLNY=
 github.com/mitchellh/reflectwalk v1.0.0/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
-github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12 h1:dd7vnTDfjtwCETZDrRe+GPYNLA1jBtbZeyfyE8eZCyk=
-github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12/go.mod h1:i/KKcxEWEO8Yyl11DYafRPKOPVYTrhxiTRigjtEEXZU=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -480,8 +478,12 @@ github.com/openzipkin/zipkin-go v0.2.1/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnh
 github.com/openzipkin/zipkin-go v0.2.2/go.mod h1:NaW6tEwdmWMaCDZzg8sh+IBNOxHMPnhQw8ySjnjRyN4=
 github.com/oscarpicas/covertool v0.4.1 h1:BvMC+hnaFMSeICIOpaJ2B9oskrGTkcRyZZWFnQ4IDTY=
 github.com/oscarpicas/covertool v0.4.1/go.mod h1:IfYhY3V3HmsXbncNU+AxbRx4rsLDqFgu86oOfNd93Q0=
+github.com/oscarpicas/go-dsp v0.1.0 h1:iOOUEVEWrBAljSZ0ZfqGcp5tsBvsEwvVvssa06ihC1E=
+github.com/oscarpicas/go-dsp v0.1.0/go.mod h1:iGxUzWEfb9xH4ywUUyCqL0QZkcpbmeknXWko6hOxjsM=
 github.com/oscarpicas/scribble v1.0.4 h1:fBVqRxV8Wvvqrn6LwPVGWyPF2QtJ8yCojKlmzeZURGM=
 github.com/oscarpicas/scribble v1.0.4/go.mod h1:Zum80peP/sPwjvqgkIxoj0d6J9lWsZ/FxDmxmkWE2sM=
+github.com/oscarpicas/smetrics v0.1.0 h1:cZWNhs1ZZIUjTGLCEP+zMHDzvWQ4fzP2vNwYL1eyZjg=
+github.com/oscarpicas/smetrics v0.1.0/go.mod h1:fuEa49km1JnuPsL9w257kBAYYzHSVcsauzFfVtrbhpQ=
 github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b h1:j7JX4xh1oxRvCeshZxwLvasEA0WED9g4FhVQnvq4iNY=
 github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b/go.mod h1:5AqqNH1X8zCHescKVlpSHRzrat1KCKDXqZoQPe8fY3A=
 github.com/ovh/go-ovh v1.1.0 h1:bHXZmw8nTgZin4Nv7JuaLs0KG5x54EQR7migYTd1zrk=
@@ -597,8 +599,6 @@ github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtX
 github.com/urfave/cli/v2 v2.3.0 h1:qph92Y649prgesehzOrQjdWyxFOp/QVM+6imKHad91M=
 github.com/urfave/cli/v2 v2.3.0/go.mod h1:LJmUH05zAU44vOAcrfzZQKsZbVcdbOG8rtL3/XcUArI=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
-github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9 h1:w8V9v0qVympSF6GjdjIyeqR7+EVhAF9CBQmkmW7Zw0w=
-github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9/go.mod h1:N3UwUGtsrSj3ccvlPHLoLsHnpR27oXr4ZE984MbSER8=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

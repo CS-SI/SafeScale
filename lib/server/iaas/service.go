@@ -28,8 +28,8 @@ import (
 
 	uuid "github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
+	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
-	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
