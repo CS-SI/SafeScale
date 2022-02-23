@@ -19,7 +19,6 @@ require (
 	github.com/itchyny/gojq v0.12.6
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.5
-	github.com/mitchellh/mapstructure v1.4.3
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
@@ -39,7 +38,7 @@ require (
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.69.0
+	google.golang.org/api v0.70.0
 	google.golang.org/grpc v1.44.0
 	google.golang.org/protobuf v1.27.1
 )
