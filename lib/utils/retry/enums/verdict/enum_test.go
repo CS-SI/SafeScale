@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-package password
+package verdict_test
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_GeneratePassword(t *testing.T) {
+func TestEnum_String(t *testing.T) {
 
-	_, err := utils.GeneratePassword(11)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be under 12"), true)
-
-	_, err = utils.GeneratePassword(12)
-	require.EqualValues(t, err, nil)
+	require.EqualValues(t, verdict.Done.String(), "Done")
+	require.EqualValues(t, verdict.Retry.String(), "Retry")
+	require.EqualValues(t, verdict.Abort.String(), "Abort")
+	require.EqualValues(t, verdict.Undecided.String(), "Undecided")
+	require.EqualValues(t, verdict.Enum(42).String(), "Enum(42)")
 
 }

@@ -120,6 +120,18 @@ func Test_AbsPathify(t *testing.T) {
 		require.EqualValues(t, strings.Contains(result, "//"), false)
 	})
 
+	t.Run("7th", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				fmt.Println("The code did not panic, :)")
+			} else {
+				t.Errorf("Horrible failure")
+			}
+		}()
+		result := AbsPathify("${MANY}/some")
+		require.EqualValues(t, result, "/some")
+	})
+
 }
 
 func TestOriginalAbsPathify(t *testing.T) {

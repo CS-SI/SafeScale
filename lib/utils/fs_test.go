@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package fs
+package utils
 
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
 )
 
@@ -43,7 +42,7 @@ func Test_LazyRemove(t *testing.T) {
 	_ = os.Mkdir("/tmp/safescale-test", 0x0777)
 
 	log := tests.LogrusCapture(func() {
-		err := utils.LazyRemove("/tmp/safescale-test")
+		err := LazyRemove("/tmp/safescale-test")
 		if err != nil {
 			// Remove working directory
 			os.RemoveAll("/tmp/safescale-test")

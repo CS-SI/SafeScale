@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package empty
+package utils
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -99,7 +98,7 @@ func Test_IsEmpty(t *testing.T) {
 	}
 
 	for i := range tests {
-		require.EqualValues(t, utils.IsEmpty(tests[i].value), tests[i].expect)
+		require.EqualValues(t, IsEmpty(tests[i].value), tests[i].expect)
 	}
 
 }
