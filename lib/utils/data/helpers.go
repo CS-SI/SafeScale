@@ -83,7 +83,7 @@ func IsNil(something interface{}) bool {
 			return casted.IsNull()
 		}
 	} else if theKind == reflect.Struct {
-		res, err := hasFieldWithNameAndIsNil(something, "errorCore") // FIXME: this is an implementation detail tied to our fail.Error design, it shoud NOT be harcoded, it should be here though codegen (importing results in cyclic dependency error)
+		res, err := hasFieldWithNameAndIsNil(something, EmbeddedErrorStructName) // FIXME, this is an implementation detail tied to our fail.Error design, it shoud NOT be harcoded, it should be here though codegen (importing results in cyclic dependency error)
 		if err != nil {
 			panic(err) // It should never happen in production code if we test this right.
 		}
