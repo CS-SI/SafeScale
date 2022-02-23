@@ -17,17 +17,39 @@
 package data
 
 import (
+	"fmt"
 	"reflect"
 )
 
-func hasFieldWithNameAndIsNil(iface interface{}, name string) bool {
+// NOTE: This lib/utils/valid/helpers.go and lib/utils/data/helpers.go are duplicates, tests are in lib/utils/valid
+// problem is that depending on who invokes this code it results in a cyclic dependency error
+// when it's fixed only one will remain
+
+func hasFieldWithNameAndIsNil(iface interface{}, name string) (bool, error) {
+	if iface == nil { // this can happen
+		return false, nil
+	}
+	if name == "" { // but this is a dev mistake
+		return false, fmt.Errorf("parameter 'name' CANNOT be empty")
+	}
+
 	ifv := reflect.ValueOf(iface)
 
 	fiv := ifv.FieldByName(name)
 	if fiv.IsValid() {
-		return fiv.IsNil()
+		switch fiv.Kind() {
+		case reflect.Chan:
+		case reflect.Func:
+		case reflect.Interface:
+		case reflect.Map:
+		case reflect.Ptr:
+		case reflect.Slice:
+		default:
+			return false, nil
+		}
+		return fiv.IsNil(), nil
 	}
-	return false
+	return false, nil
 }
 
 func IsNil(something interface{}) bool {
@@ -61,7 +83,11 @@ func IsNil(something interface{}) bool {
 			return casted.IsNull()
 		}
 	} else if theKind == reflect.Struct {
-		return hasFieldWithNameAndIsNil(something, "errorCore")
+		res, err := hasFieldWithNameAndIsNil(something, "errorCore") // FIXME: this is an implementation detail tied to our fail.Error design, it shoud NOT be harcoded, it should be here though codegen (importing results in cyclic dependency error)
+		if err != nil {
+			panic(err) // It should never happen in production code if we test this right.
+		}
+		return res
 	}
 
 	return false
