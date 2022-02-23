@@ -792,11 +792,19 @@ func up() {
 }
 
 func to() {
-	var valieva error
+	var value error
 
 	// meh
 	// panic("made my mind") // here is the panic, we expect old_errors_test.go:799, period
-	fmt.Println(valieva.Error())
+	fmt.Println(value.Error())
+}
+
+func to2() {
+	panic("made my mind") // this is the other panic, we expect old_errors_test.go:803, period
+}
+
+func up2() {
+	to2()
 }
 
 func TestPanicLogs(t *testing.T) {
@@ -805,8 +813,10 @@ func TestPanicLogs(t *testing.T) {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
 			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:799`) {
-				t.Errorf("Bad content")
-				t.FailNow()
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:799`) {
+					t.Errorf("Bad content")
+					t.FailNow()
+				}
 			}
 		} else {
 			t.Errorf("Nil error")
@@ -823,9 +833,13 @@ func TestPanicLogsPlayed(t *testing.T) {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
 			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:799`) {
-				t.FailNow()
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:799`) {
+					t.Errorf("Bad content")
+					t.FailNow()
+				}
 			}
 		} else {
+			t.Errorf("Nil error")
 			t.FailNow()
 		}
 	}()
@@ -839,9 +853,13 @@ func TestPanicLogsBis(t *testing.T) {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
 			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:799`) {
-				t.FailNow()
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:799`) {
+					t.Errorf("Bad content")
+					t.FailNow()
+				}
 			}
 		} else {
+			t.Errorf("Nil error")
 			t.FailNow()
 		}
 	}()
@@ -962,4 +980,64 @@ func TestPanicBizarroButCleaner(t *testing.T) {
 	if !strings.Contains(meh, "unexpected type '*string'") {
 		t.FailNow()
 	}
+}
+
+func TestPanicLogsAlt(t *testing.T) {
+	var err error
+	defer func() {
+		if err != nil {
+			fmt.Println("The perfect creatures: " + err.Error())
+			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:803`) {
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:803`) {
+					t.Errorf("Bad content")
+					t.FailNow()
+				}
+			}
+		} else {
+			t.Errorf("Nil error")
+			t.FailNow()
+		}
+	}()
+	defer OnPanic(&err)
+	up2()
+}
+
+func TestPanicLogsPlayedAlt(t *testing.T) {
+	var err error = fmt.Errorf("disaster")
+	defer func() {
+		if err != nil {
+			fmt.Println("The perfect creatures: " + err.Error())
+			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:803`) {
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:803`) {
+					t.Errorf("Bad content")
+					t.FailNow()
+				}
+			}
+		} else {
+			t.Errorf("Nil error")
+			t.FailNow()
+		}
+	}()
+	defer OnPanic(&err)
+	up2()
+}
+
+func TestPanicLogsBisAlt(t *testing.T) {
+	var err Error
+	defer func() {
+		if err != nil {
+			fmt.Println("The perfect creatures: " + err.Error())
+			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:803`) {
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v21/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:803`) {
+					t.Errorf("Bad content")
+					t.FailNow()
+				}
+			}
+		} else {
+			t.Errorf("Nil error")
+			t.FailNow()
+		}
+	}()
+	defer OnPanic(&err)
+	up2()
 }
