@@ -1,10 +1,11 @@
-package valid
+package fail
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,13 +38,13 @@ func TestIsNull(t *testing.T) {
 	var ptrerr *error
 	var dblptrerr **error
 
-	var ourErr fail.Error
-	var ptrOurErr *fail.Error
-	var dblptrOurErr **fail.Error
+	var ourErr Error
+	var ptrOurErr *Error
+	var dblptrOurErr **Error
 
-	var ourConcreteErr fail.ErrNotFound
-	var ptrOurConcreteErr *fail.ErrNotFound
-	var dlbPtrOurConcreteErr **fail.ErrNotFound
+	var ourConcreteErr ErrNotFound
+	var ptrOurConcreteErr *ErrNotFound
+	var dlbPtrOurConcreteErr **ErrNotFound
 
 	type args struct {
 		something interface{}
@@ -67,7 +68,7 @@ func TestIsNull(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsNull(tt.args.something); got != tt.want {
+			if got := valid.IsNull(tt.args.something); got != tt.want {
 				t.Errorf("IsNull() = %v, want %v", got, tt.want)
 			}
 		})
@@ -79,13 +80,13 @@ func TestNotNulls(t *testing.T) {
 	var ptrerr *error = &err
 	var dblptrerr **error = &ptrerr
 
-	var ourErr fail.Error = fail.NewError("")
-	var ptrOurErr *fail.Error = &ourErr
-	var dblptrOurErr **fail.Error = &ptrOurErr
+	var ourErr Error = NewError("")
+	var ptrOurErr *Error = &ourErr
+	var dblptrOurErr **Error = &ptrOurErr
 
-	var ptrOurConcreteErr *fail.ErrNotFound = fail.NotFoundError("")
-	var ourConcreteErr fail.ErrNotFound = *ptrOurConcreteErr
-	var dlbPtrOurConcreteErr **fail.ErrNotFound = &ptrOurConcreteErr
+	var ptrOurConcreteErr *ErrNotFound = NotFoundError("")
+	var ourConcreteErr ErrNotFound = *ptrOurConcreteErr
+	var dlbPtrOurConcreteErr **ErrNotFound = &ptrOurConcreteErr
 
 	type brand struct {
 		content string
@@ -115,7 +116,7 @@ func TestNotNulls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsNull(tt.args.something); got != tt.want {
+			if got := valid.IsNull(tt.args.something); got != tt.want {
 				t.Errorf("IsNull() = %v, want %v", got, tt.want)
 			}
 		})

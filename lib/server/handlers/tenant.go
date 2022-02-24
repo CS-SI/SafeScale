@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
@@ -669,7 +670,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 	svc := handler.job.Service()
 	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 
@@ -694,7 +695,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 	svc := handler.job.Service()
 	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 		subnet, xerr = subnetfactory.New(svc)

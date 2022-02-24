@@ -27,7 +27,7 @@ generate: clean gensrc
 	@(cd bucketfs && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
 	@$(GO) generate . >/dev/null 2>&1
-	@$(GO) fmt $(VERSIONFILE) >/dev/null 2>&1
+	@gofmt $(VERSIONFILE) >/dev/null 2>&1
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
@@ -36,7 +36,7 @@ gensrc:
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo "  Tags = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
-	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
+	@gofmt $(VERSIONFILE) > /dev/null 2>&1
 
 clean:
 	@(cd bucketfs && $(MAKE) $(@))

@@ -8,6 +8,7 @@ on:
       - hotfixes
       - 'feature/**'
       - 'release/**'
+      - 'review/**'
   pull_request:
     branches:
       - master

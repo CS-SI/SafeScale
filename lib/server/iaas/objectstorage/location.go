@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
@@ -185,7 +186,7 @@ func (instance *location) connect() fail.Error {
 
 // Protocol returns the type of ObjectStorage
 func (instance location) Protocol() (string, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	return instance.config.Type, nil
@@ -193,7 +194,7 @@ func (instance location) Protocol() (string, fail.Error) {
 
 // Configuration returns the configuration used to create Location
 func (instance location) Configuration() (Config, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return Config{}, fail.InvalidInstanceError()
 	}
 	return instance.config, nil
@@ -236,7 +237,7 @@ func (instance location) estimateSize(prefix string) (int, error) {
 func (instance location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
@@ -270,7 +271,7 @@ func (instance location) ListBuckets(prefix string) (_ []string, xerr fail.Error
 func (instance location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -309,7 +310,7 @@ func (instance location) FindBucket(bucketName string) (_ bool, xerr fail.Error)
 func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStorageBucket, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -331,7 +332,7 @@ func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStor
 
 // inspectBucket ...
 func (instance location) inspectBucket(bucketName string) (bucket, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return bucket{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -359,7 +360,7 @@ func (instance location) CreateBucket(bucketName string) (aosb abstract.ObjectSt
 	defer fail.OnPanic(&xerr)
 
 	aosb = abstract.ObjectStorageBucket{}
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return aosb, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -382,7 +383,7 @@ func (instance location) CreateBucket(bucketName string) (aosb abstract.ObjectSt
 // DeleteBucket removes a bucket from Object Storage
 func (instance location) DeleteBucket(bucketName string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -402,7 +403,7 @@ func (instance location) DeleteBucket(bucketName string) (xerr fail.Error) {
 func (instance location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -440,7 +441,7 @@ func (instance location) InspectObject(bucketName string, objectName string) (ao
 // DeleteObject ...
 func (instance location) DeleteObject(bucketName, objectName string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -462,7 +463,7 @@ func (instance location) DeleteObject(bucketName, objectName string) (xerr fail.
 // ListObjects lists the objects in a GetBucket
 func (instance location) ListObjects(bucketName string, path, prefix string) (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -481,7 +482,7 @@ func (instance location) ListObjects(bucketName string, path, prefix string) (_ 
 // BrowseBucket walks through the objects in a GetBucket and apply callback to each object
 func (instance location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -500,7 +501,7 @@ func (instance location) BrowseBucket(bucketName string, path, prefix string, ca
 // ClearBucket ...
 func (instance location) ClearBucket(bucketName string, path, prefix string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -519,7 +520,7 @@ func (instance location) ClearBucket(bucketName string, path, prefix string) (xe
 // ReadObject reads the content of an object and put it in an io.Writer
 func (instance location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -557,7 +558,7 @@ func (instance location) WriteObject(
 ) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -604,7 +605,7 @@ func (instance location) WriteMultiPartObject(
 ) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {

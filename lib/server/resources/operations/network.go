@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -160,7 +161,7 @@ func onNetworkCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Err
 
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *Network) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // Create creates a Network
@@ -171,7 +172,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		networkName := instance.GetName()
 		if networkName != "" {
 			return fail.NotAvailableError("already carrying Network '%s'", networkName)
@@ -291,7 +292,7 @@ func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	identifiable, ok := clonable.(data.Identifiable)
@@ -349,7 +350,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if ctx == nil {
@@ -486,7 +487,7 @@ var (
 func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -710,7 +711,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -734,7 +735,7 @@ func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
 func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -779,7 +780,7 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -790,7 +791,7 @@ func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fai
 func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -852,7 +853,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

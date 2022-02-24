@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -163,7 +164,7 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 	if xerr != nil {
 		return nil, xerr
 	}
-	if data.IsNil(feat) {
+	if valid.IsNil(feat) {
 		return nil, fail.InconsistentError("invalid feature %s", featureName)
 	}
 
@@ -244,7 +245,7 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 	if xerr != nil {
 		return nil, xerr
 	}
-	if data.IsNil(feat) {
+	if valid.IsNil(feat) {
 		return nil, fail.InconsistentError("invalid feature: %s", featureName)
 	}
 

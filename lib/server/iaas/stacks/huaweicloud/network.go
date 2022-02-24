@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
@@ -96,7 +97,7 @@ type vpcDeleteResult struct { // nolint
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 func (s stack) HasDefaultNetwork() (bool, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return false, nil
 	}
 	return s.vpc != nil, nil
@@ -104,7 +105,7 @@ func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
 func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return abstract.NewNetwork(), fail.InvalidInstanceError()
 	}
 	if s.vpc == nil {
@@ -116,7 +117,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 // CreateNetwork creates a Network, which corresponds to a VPC in FlexibleEngine terminology
 func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 
@@ -165,7 +166,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 // ListRouters lists available routers
 func (s stack) ListRouters() ([]Router, fail.Error) {
 	var emptySlice []Router
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -232,7 +233,7 @@ func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network
 // InspectNetwork returns the information about a VPC identified by 'id'
 func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -282,7 +283,7 @@ func toAbstractNetwork(vpc VPC) *abstract.Network {
 // InspectNetworkByName returns the information about a Network/VPC identified by 'name'
 func (s stack) InspectNetworkByName(name string) (an *abstract.Network, xerr fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
@@ -311,7 +312,7 @@ func (s stack) InspectNetworkByName(name string) (an *abstract.Network, xerr fai
 // ListNetworks lists all the Network/VPC created
 func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	var emptySlice []*abstract.Network
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -363,7 +364,7 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 
 // DeleteNetwork deletes a Network/VPC identified by 'id'
 func (s stack) DeleteNetwork(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -390,7 +391,7 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 // CreateSubnet creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 
@@ -476,7 +477,7 @@ func validateNetwork(req abstract.SubnetRequest) (bool, fail.Error) {
 // InspectSubnetByName ...
 func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
@@ -530,7 +531,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 // InspectSubnet returns the subnet identified by id
 func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -570,7 +571,7 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 
 func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -605,7 +606,7 @@ func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) 
 // ListSubnets lists networks
 func (s stack) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
 	var emptySlice []*abstract.Subnet
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -650,7 +651,7 @@ func (s stack) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
 
 // DeleteSubnet consists to delete subnet in FlexibleEngine VPC
 func (s stack) DeleteSubnet(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -883,7 +884,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // If public is set to true,
 func (s stack) CreateVIP(networkID, subnetID, name string, sgs []string) (*abstract.VirtualIP, fail.Error) {
 	nullAVIP := abstract.NewVirtualIP()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAVIP, fail.InvalidInstanceError()
 	}
 	if subnetID == "" {

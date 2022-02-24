@@ -21,7 +21,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mjibson/go-dsp/fft"
+	"github.com/oscarpicas/go-dsp/fft"
 )
 
 func main() {

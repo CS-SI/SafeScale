@@ -20,6 +20,7 @@ import (
 	stdjson "encoding/json"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
@@ -36,7 +37,7 @@ type jsonProperty struct {
 
 // IsNull tells if the jsonProperty is a Null Value
 func (jp *jsonProperty) IsNull() bool {
-	return jp == nil || jp.Shielded.IsNull()
+	return jp == nil || valid.IsNil(jp.Shielded)
 }
 
 func (jp jsonProperty) Clone() data.Clonable {
@@ -90,7 +91,7 @@ func (x *JSONProperties) Lookup(key string) bool {
 	defer x.RUnlock()
 
 	p, ok := x.Properties[key]
-	return ok && !p.IsNull()
+	return ok && !valid.IsNil(p)
 }
 
 // Clone ...

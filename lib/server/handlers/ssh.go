@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server"
@@ -582,7 +583,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 			}
 			checksumErr := crcCheck()
 			if checksumErr != nil {
-				if _, ok := checksumErr.(*fail.ErrWarning); !ok || checksumErr.IsNull() {
+				if _, ok := checksumErr.(*fail.ErrWarning); !ok || valid.IsNil(checksumErr) {
 					return checksumErr
 				}
 				logrus.Warnf(checksumErr.Error())

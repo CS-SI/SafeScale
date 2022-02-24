@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
@@ -44,7 +45,7 @@ import (
 // ListImages lists available OS images
 func (s stack) ListImages(bool) (out []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -75,7 +76,7 @@ func toAbstractImage(in compute.Image) abstract.Image {
 // InspectImage returns the Image referenced by id
 func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	nullAI := abstract.Image{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAI, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -97,7 +98,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -131,7 +132,7 @@ func toAbstractHostTemplate(in compute.MachineType) abstract.HostTemplate {
 // InspectTemplate ...
 func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -153,7 +154,7 @@ func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Er
 // CreateKeyPair FIXME: change code to really create a keypair on provider side
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -185,7 +186,7 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	nullUD := userdata.NewContent()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, nullUD, fail.InvalidInstanceError()
 	}
 
@@ -379,7 +380,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHC, fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -458,7 +459,7 @@ func (s stack) buildGcpMachine(
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -482,7 +483,7 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 
@@ -653,7 +654,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -702,7 +703,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 // ListHosts lists available hosts
 func (s stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) {
 	var emptyList abstract.HostList
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
@@ -741,7 +742,7 @@ func (s stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) {
 
 // StopHost stops the host identified by id
 func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -756,7 +757,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 
 // StartHost starts the host identified by id
 func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -771,7 +772,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 
 // RebootHost reboot the host identified by id
 func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -790,7 +791,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 
 // GetHostState returns the host identified by id
 func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return hoststate.Error, fail.InvalidInstanceError()
 	}
 
@@ -807,7 +808,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
 	emptyMap := make(map[string]bool)
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
@@ -828,7 +829,7 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
 // ListRegions ...
 func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 	var emptySlice []string
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -848,7 +849,7 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 
 // BindSecurityGroupToHost ...
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -872,7 +873,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)

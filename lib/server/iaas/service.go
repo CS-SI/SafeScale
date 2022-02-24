@@ -28,8 +28,8 @@ import (
 
 	uuid "github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
+	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
-	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
@@ -41,7 +41,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
@@ -829,7 +828,7 @@ func addPadding(in string, maxLength int) string {
 
 // CreateHostWithKeyPair creates a host
 func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
@@ -885,7 +884,7 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 
 // ListHostsByName list hosts by name
 func (instance service) ListHostsByName(details bool) (map[string]*abstract.HostFull, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -904,7 +903,7 @@ func (instance service) ListHostsByName(details bool) (map[string]*abstract.Host
 // if force equals false and there is metadata, returns an error
 // WARNING: !!! this will make SafeScale unable to handle the resources !!!
 func (instance service) TenantCleanup(force bool) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -915,7 +914,7 @@ func (instance service) TenantCleanup(force bool) fail.Error {
 func (instance service) LookupRuleInSecurityGroup(
 	asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
 ) (bool, fail.Error) {
-	if data.IsNil(asg) {
+	if valid.IsNil(asg) {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 
@@ -933,7 +932,7 @@ func (instance service) LookupRuleInSecurityGroup(
 
 // InspectHostByName hides the "complexity" of the way to get Host by name
 func (instance service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return instance.InspectHost(abstract.NewHostCore().SetName(name))
@@ -941,7 +940,7 @@ func (instance service) InspectHostByName(name string) (*abstract.HostFull, fail
 
 // InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
 func (instance service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return instance.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
@@ -949,7 +948,7 @@ func (instance service) InspectSecurityGroupByName(networkID, name string) (*abs
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
 func (instance service) ObjectStorageConfiguration() (objectstorage.Config, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return objectstorage.Config{}, fail.InvalidInstanceError()
 	}
 	return instance.Location.Configuration()

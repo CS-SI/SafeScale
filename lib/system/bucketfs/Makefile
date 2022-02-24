@@ -7,8 +7,5 @@ all: generate
 vet:
 	@$(GO) vet ./...
 
-generate:
-	@$(GO) generate -run rice
-
 clean:
 	@:

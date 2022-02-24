@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -171,12 +172,12 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 
 // isNull ...
 func (instance *taskGroup) isNull() bool {
-	return instance == nil || instance.task == nil || instance.task.IsNull()
+	return instance == nil || instance.task == nil || valid.IsNil(instance.task)
 }
 
 // GetID returns an unique id for the task
 func (instance *taskGroup) GetID() (string, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -185,7 +186,7 @@ func (instance *taskGroup) GetID() (string, fail.Error) {
 
 // Signature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
 func (instance *taskGroup) Signature() string {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 
@@ -196,7 +197,7 @@ func (instance *taskGroup) Signature() string {
 
 // Status returns the current status of the TaskGroup (ie the parent Task running the children)
 func (instance *taskGroup) Status() (TaskStatus, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return TaskStatus(0), fail.InvalidInstanceError()
 	}
 
@@ -205,7 +206,7 @@ func (instance *taskGroup) Status() (TaskStatus, fail.Error) {
 
 // Context returns the TaskGroup context
 func (instance *taskGroup) Context() context.Context {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return context.TODO() // nolint
 	}
 
@@ -215,7 +216,7 @@ func (instance *taskGroup) Context() context.Context {
 // SetID allows specifying task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
 func (instance *taskGroup) SetID(id string) fail.Error {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -226,7 +227,7 @@ func (instance *taskGroup) SetID(id string) fail.Error {
 // Returns the subtask created to run the action (should be ignored in most cases)
 func (instance *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (tg Task, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return instance, fail.InvalidInstanceError()
 	}
 
@@ -237,7 +238,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 // Returns the subtask created to run the action (should be ignored in most cases)
 func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (_ Task, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return instance, fail.InvalidInstanceError()
 	}
 
@@ -330,7 +331,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 
 // Wait is a synonym to WaitGroup (exists to satisfy interface Task)
 func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return instance, fail.InvalidInstanceError()
 	}
 
@@ -351,7 +352,7 @@ func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 //       It's highly recommended to use Task.Aborted() in the body of a TaskAction to check
 //       for abortion signal and quit the go routine accordingly to reduce the risk.
 func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -413,7 +414,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 
 			_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
 			if check != nil {
-				if _, ok := check.(*fail.ErrAborted); !ok || check.IsNull() {
+				if _, ok := check.(*fail.ErrAborted); !ok || valid.IsNil(check) {
 					logrus.Tracef("BROKEN ASSUMPTION: %v", check)
 				}
 			}
@@ -542,7 +543,7 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error, fa
 
 // TryWait executes TryWaitGroup
 func (instance *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -555,7 +556,7 @@ func (instance *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
 // If TaskGroup still running, returns (false, nil, nil)
 // if TaskGroup is not started, returns (false, nil, *fail.ErrInconsistent)
 func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -604,7 +605,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
 
 	_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
 	if check != nil {
-		if _, ok := check.(*fail.ErrAborted); !ok || check.IsNull() {
+		if _, ok := check.(*fail.ErrAborted); !ok || valid.IsNil(check) {
 			logrus.Tracef("BROKEN ASSUMPTION: %v", check)
 		}
 	}
@@ -638,7 +639,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
 
 // WaitFor is an alias to WaitGroupFor to satisfy interface TaskCore
 func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -655,7 +656,7 @@ func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fa
 // - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
 // - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out
 func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupResult, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -757,7 +758,7 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 // If TaskGroup is already finished, returns nil (and in this case TaskGroup.Wait() will not report a *fail.ErrAborted)
 // Otherwise, return error if Abort() was not sent successfully
 func (instance *taskGroup) Abort() fail.Error {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -784,7 +785,7 @@ func (instance *taskGroup) Abort() fail.Error {
 }
 
 func (instance *taskGroup) AbortWithCause(cerr fail.Error) fail.Error {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -812,7 +813,7 @@ func (instance *taskGroup) AbortWithCause(cerr fail.Error) fail.Error {
 
 // Aborted tells if the task group is aborted
 func (instance *taskGroup) Aborted() bool {
-	if instance.isNull() || instance.task.IsNull() {
+	if valid.IsNil(instance) || valid.IsNil(instance.task) {
 		return false
 	}
 
@@ -845,7 +846,7 @@ func (instance *taskGroup) Aborted() bool {
 
 // New creates a subtask from current task
 func (instance *taskGroup) New() (Task, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -854,7 +855,7 @@ func (instance *taskGroup) New() (Task, fail.Error) {
 
 // GroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus
 func (instance *taskGroup) GroupStatus() (map[TaskStatus][]string, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -881,7 +882,7 @@ func (instance *taskGroup) GroupStatus() (map[TaskStatus][]string, fail.Error) {
 
 // Started returns the number of subtasks started in the TaskGroup
 func (instance *taskGroup) Started() (uint, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 

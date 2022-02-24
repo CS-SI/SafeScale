@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -141,7 +142,7 @@ func onBucketCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Erro
 
 // IsNull tells if the instance corresponds to null value
 func (instance *bucket) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry ...
@@ -149,7 +150,7 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -262,7 +263,7 @@ func (instance *bucket) Browse(
 
 // GetHost ...
 func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -310,7 +311,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 
 // GetMountPoint ...
 func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -362,7 +363,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		bucketName := instance.GetName()
 		if bucketName != "" {
 			return fail.NotAvailableError("already carrying Share '%s'", bucketName)
@@ -434,7 +435,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 			return xerr
 		}
 	}
-	if !data.IsNil(&ab) {
+	if !valid.IsNil(&ab) {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
@@ -451,7 +452,8 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 
 // Delete a bucket
 func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	defer fail.OnPanic(&xerr)
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -515,7 +517,9 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 // - *fail.ErrDuplicate: already mounted on Host
 // - *fail.ErrNotAvailable: already mounted
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	defer fail.OnPanic(&outerr)
+
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -527,8 +531,6 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 	if path == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
-
-	defer fail.OnPanic(&outerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -689,7 +691,9 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 
 // Unmount a bucket
 func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	defer fail.OnPanic(&xerr)
+
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

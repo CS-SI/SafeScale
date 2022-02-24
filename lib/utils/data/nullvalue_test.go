@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,7 +49,7 @@ func TestIsNull(t *testing.T) {
 func TestIsNilIsGoodEnough(t *testing.T) {
 	// what changes is the forget function, how we test the validity of thing, here is with the new IsNil method
 	forget := func(thing NullValue) error {
-		if !IsNil(thing) {
+		if !valid.IsNil(thing) {
 			if _, ok := thing.(NullValue); ok {
 				return nil
 			}

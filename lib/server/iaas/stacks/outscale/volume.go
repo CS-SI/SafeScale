@@ -24,12 +24,13 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // CreateVolume creates a block volume
 func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
@@ -123,7 +124,7 @@ func toAbstractVolumeState(state string) volumestate.Enum {
 
 // WaitForVolumeState wait for volume to be in the specified state
 func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -154,7 +155,7 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -181,7 +182,7 @@ func (s stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
 // InspectVolumeByName returns the volume with name name
 func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -208,7 +209,7 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.
 // ListVolumes list available volumes
 func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 	var emptySlice []abstract.Volume
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -238,7 +239,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s stack) DeleteVolume(id string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -282,7 +283,7 @@ func (s stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
 
 // CreateVolumeAttachment attaches a volume to a host
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.HostID == "" {
@@ -310,7 +311,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
 func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
 	nullVA := abstract.NewVolumeAttachment()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullVA, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -348,7 +349,7 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 // ListVolumeAttachments lists available volume attachment
 func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, xerr fail.Error) {
 	emptySlice := make([]abstract.VolumeAttachment, 0)
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -378,7 +379,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fa
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID == "" {

@@ -1,4 +1,4 @@
-FROM ubuntu:bionic as builder
+FROM ubuntu:focal as builder
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -29,7 +29,7 @@ jq \
 iproute2 \
 iputils-ping \
 openssh-server \
-python3.6 \
+python3 \
 python3-pip --no-install-recommends \
 && apt-get autoclean -y \
 && apt-get autoremove -y \

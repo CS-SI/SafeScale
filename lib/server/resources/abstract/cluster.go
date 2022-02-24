@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // ClusterRequest defines what kind of Cluster is wanted
@@ -119,7 +120,7 @@ func (instance ClusterIdentity) OK() bool {
 
 // Serialize serializes ClusterIdentity instance into bytes (output json code)
 func (instance *ClusterIdentity) Serialize() ([]byte, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

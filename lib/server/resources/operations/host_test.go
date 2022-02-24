@@ -19,18 +19,19 @@ package operations
 import (
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_host_IsNull_Empty(t *testing.T) {
 	rh := &Host{}
-	itis := rh.IsNull()
+	itis := valid.IsNil(rh)
 	require.True(t, itis)
 }
 
 func Test_host_IsNull_Nil(t *testing.T) {
 	var rh *Host
 	//goland:noinspection GoNilness
-	itis := rh.IsNull()
+	itis := valid.IsNil(rh)
 	require.True(t, itis)
 }

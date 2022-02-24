@@ -36,8 +36,9 @@ func SourceFilePathUpdater() func(string) string {
 }
 
 const (
-	defaultPartToRemove    = "go/src/github.com/CS-SI/SafeScale/"
-	sourceFileSearchString = "github.com/CS-SI/SafeScale/"
+	defaultPartToRemove     = "go/src/github.com/CS-SI/SafeScale/"
+	sourceFileSearchString  = "github.com/CS-SI/SafeScale/"
+	sourceCodeRootDirSuffix = "SafeScale"
 )
 
 // sourceFilePrefixToRemove returns the part of the file path to remove before display.
@@ -53,6 +54,11 @@ func init() {
 	if _, f, _, ok := runtime.Caller(0); ok {
 		rootPath = strings.TrimRight(strings.Split(f, sourceFileSearchString)[0], "/")
 		rootPath = filepath.Dir(filepath.Dir(rootPath))
+		rootPath = filepath.ToSlash(rootPath)
+		ind := strings.LastIndex(rootPath, sourceCodeRootDirSuffix)
+		if ind != -1 {
+			rootPath = rootPath[0 : ind+len(sourceCodeRootDirSuffix)]
+		}
 	}
 	sourceFileRemovePart.Store(rootPath)
 }

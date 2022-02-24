@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
@@ -228,7 +229,7 @@ func onShareCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry creates metadata and add Volume to service cache
@@ -236,7 +237,7 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -361,7 +362,7 @@ func (instance *Share) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		newShareName := instance.GetName()
 		if newShareName != "" {
 			return fail.NotAvailableError("already carrying Share '%s'", newShareName)
@@ -611,7 +612,7 @@ func (instance *Share) Create(
 func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -650,7 +651,7 @@ func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
 func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -694,7 +695,7 @@ func (instance *Share) Mount(
 ) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -977,7 +978,7 @@ func (instance *Share) Mount(
 func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1122,7 +1123,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1254,7 +1255,7 @@ func sanitize(in string) (string, fail.Error) {
 func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

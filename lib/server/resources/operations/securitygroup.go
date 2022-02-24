@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -203,7 +204,7 @@ func (instance *SecurityGroup) IsNull() bool {
 		return true
 	}
 
-	return instance.MetadataCore.IsNull()
+	return valid.IsNil(instance.MetadataCore)
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
@@ -211,7 +212,7 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -322,7 +323,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		sgName := instance.GetName()
 		if sgName != "" {
 			return fail.NotAvailableError("already carrying SecurityGroup '%s'", sgName)
@@ -501,7 +502,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -790,7 +791,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 func (instance *SecurityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -824,7 +825,7 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 func (instance *SecurityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -889,7 +890,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -921,7 +922,7 @@ func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.Secur
 func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.SecurityGroupRules) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -960,7 +961,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 
 		// newAsg := asg.Clone().(*abstract.SecurityGroup)
 		for k, v := range rules {
-			if data.IsNil(v) {
+			if valid.IsNil(v) {
 				return fail.InvalidParameterError("rules", "entry #%d cannot be null value of 'abstract.SecurityGroupRule'", k)
 			}
 			innerXErr = v.Validate()
@@ -984,7 +985,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1043,7 +1044,7 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1097,7 +1098,7 @@ func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1155,7 +1156,7 @@ func (instance *SecurityGroup) CheckConsistency(_ context.Context) fail.Error {
 func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1181,7 +1182,7 @@ func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, 
 func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if hostInstance == nil {
@@ -1201,7 +1202,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance reso
 func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1263,7 +1264,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, hostRef string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1340,7 +1341,7 @@ func (instance *SecurityGroup) BindToSubnet(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1528,7 +1529,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1565,7 +1566,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1656,7 +1657,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

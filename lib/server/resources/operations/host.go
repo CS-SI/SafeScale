@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -401,7 +402,7 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 }
 
 func (instance *Host) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry ...
@@ -409,7 +410,7 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -530,7 +531,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	defer fail.OnPanic(&ferr)
 
 	state = hoststate.Unknown
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -591,7 +592,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 func (instance *Host) unsafeReload() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -691,7 +692,7 @@ func (instance *Host) unsafeReload() (xerr fail.Error) {
 func (instance *Host) Reload() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -792,7 +793,7 @@ func (instance *Host) Reload() (xerr fail.Error) {
 // GetState returns the last known state of the Host, without forced inspect
 func (instance *Host) GetState() (hoststate.Enum, fail.Error) {
 	state := hoststate.Unknown
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
 
@@ -832,7 +833,7 @@ func (instance *Host) Create(
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		hostname := instance.GetName()
 		if hostname != "" {
 			return nil, fail.NotAvailableError("already carrying Host '%s'", hostname)
@@ -2073,7 +2074,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				theCause := fail.ConvertError(fail.Cause(xerr))
-				if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
+				if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
 					return xerr
 				}
 
@@ -2129,7 +2130,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2327,7 +2328,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2384,7 +2385,7 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2745,7 +2746,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
 					innerXErr = fail.ConvertError(fail.Cause(innerXErr))
-					if _, ok := innerXErr.(*fail.ErrNotFound); !ok || innerXErr.IsNull() {
+					if _, ok := innerXErr.(*fail.ErrNotFound); !ok || valid.IsNil(innerXErr) {
 						return innerXErr
 					}
 					debug.IgnoreError(innerXErr)
@@ -2784,7 +2785,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
 		}
 		debug.IgnoreError(xerr)
@@ -2798,7 +2799,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -2815,7 +2816,7 @@ func (instance *Host) Run(
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if instance.sshProfile == nil {
@@ -2862,7 +2863,7 @@ func (instance *Host) Pull(
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2953,7 +2954,7 @@ func (instance *Host) Push(
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2991,7 +2992,7 @@ func (instance *Host) Push(
 func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -3046,7 +3047,7 @@ func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -3060,7 +3061,7 @@ func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, xerr fail.Error
 func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3155,7 +3156,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3299,7 +3300,7 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3347,7 +3348,7 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3379,7 +3380,7 @@ func (instance *Host) GetPublicIP() (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
 
@@ -3396,7 +3397,7 @@ func (instance *Host) GetPublicIP() (ip string, xerr fail.Error) {
 func (instance *Host) GetPrivateIP() (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -3411,7 +3412,7 @@ func (instance *Host) GetPrivateIPOnSubnet(subnetID string) (ip string, xerr fai
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
 	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
@@ -3441,7 +3442,7 @@ func (instance *Host) GetAccessIP() (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
 
@@ -3456,7 +3457,7 @@ func (instance *Host) GetShares() (shares *propertiesv1.HostShares, xerr fail.Er
 	defer fail.OnPanic(&xerr)
 
 	shares = &propertiesv1.HostShares{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return shares, fail.InvalidInstanceError()
 	}
 
@@ -3482,7 +3483,7 @@ func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Er
 	defer fail.OnPanic(&xerr)
 
 	mounts = nil
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return mounts, fail.InvalidInstanceError()
 	}
 
@@ -3497,7 +3498,7 @@ func (instance *Host) IsClusterMember() (yes bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	yes = false
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return yes, fail.InvalidInstanceError()
 	}
 
@@ -3525,7 +3526,7 @@ func (instance *Host) IsClusterMember() (yes bool, xerr fail.Error) {
 func (instance *Host) IsGateway() (_ bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -3556,7 +3557,7 @@ func (instance *Host) IsGateway() (_ bool, xerr fail.Error) {
 func (instance *Host) IsSingle() (_ bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -3593,7 +3594,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3637,7 +3638,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 func (instance *Host) GetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return NullSubnet(), fail.InvalidInstanceError()
 	}
 
@@ -3651,7 +3652,7 @@ func (instance *Host) GetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) 
 func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -3723,7 +3724,7 @@ func (instance *Host) BindSecurityGroup(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3806,7 +3807,7 @@ func (instance *Host) BindSecurityGroup(
 func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3905,7 +3906,7 @@ func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []
 	defer fail.OnPanic(&xerr)
 
 	var emptySlice []*propertiesv1.SecurityGroupBond
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -3935,7 +3936,7 @@ func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []
 func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -4044,7 +4045,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

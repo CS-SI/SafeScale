@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // HostSizingRequirements describes host sizing requirements to fulfill
@@ -91,7 +92,7 @@ func NewHostSizing() *HostSizing {
 // IsNull ...
 // satisfies interface data.Clonable
 func (hs *HostSizing) IsNull() bool {
-	return hs == nil || (hs.RequestedSize.IsNull() && hs.Template == "" && hs.AllocatedSize.IsNull())
+	return hs == nil || (valid.IsNil(hs.RequestedSize) && hs.Template == "" && valid.IsNil(hs.AllocatedSize))
 }
 
 // Clone ... (data.Clonable interface)

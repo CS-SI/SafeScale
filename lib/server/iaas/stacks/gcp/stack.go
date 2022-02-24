@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
@@ -59,7 +60,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
-	if s.IsNull() || s.Config == nil {
+	if valid.IsNil(s) || s.Config == nil {
 		return stacks.ConfigurationOptions{}, nil
 	}
 	return *s.Config, nil
@@ -67,7 +68,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
-	if s.IsNull() || s.AuthOptions == nil {
+	if valid.IsNil(s) || s.AuthOptions == nil {
 		return stacks.AuthenticationOptions{}, nil
 	}
 	return *s.AuthOptions, nil

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
@@ -107,7 +108,7 @@ func (instance *object) IsNull() bool {
 
 // newObjectFromStow ...
 func newObjectFromStow(b *bucket, item stow.Item) object {
-	if b.IsNull() || item == nil {
+	if valid.IsNil(b) || item == nil {
 		return nullObject()
 	}
 	return object{
@@ -119,7 +120,7 @@ func newObjectFromStow(b *bucket, item stow.Item) object {
 
 // Stored return true if the object exists in Object Storage
 func (instance object) Stored() (bool, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	return instance.item != nil, nil
@@ -127,7 +128,7 @@ func (instance object) Stored() (bool, fail.Error) {
 
 // Reload reloads the data of the Object from the Object Storage
 func (instance *object) Reload() fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -159,7 +160,7 @@ func (instance *object) reloadFromItem(item stow.Item) fail.Error {
 // Read reads the content of the object from Object Storage and writes it in 'target'
 func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -247,7 +248,7 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 
 // Write the source to the object in Object Storage
 func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if source == nil {
@@ -269,7 +270,7 @@ func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (instance *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if source == nil { // If source is nil, do nothing and don't trigger an error
@@ -322,7 +323,7 @@ func writeChunk(container stow.Container, objectName string, source io.Reader, n
 
 // Delete deletes the object from Object Storage
 func (instance *object) Delete() fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if instance.item == nil {
@@ -341,7 +342,7 @@ func (instance *object) Delete() fail.Error {
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
 func (instance *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -355,7 +356,7 @@ func (instance *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemM
 
 // AddMetadata adds missing entries in object metadata
 func (instance *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -372,7 +373,7 @@ func (instance *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetada
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
 func (instance *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -384,7 +385,7 @@ func (instance *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMe
 
 // GetLastUpdate returns the date of last update
 func (instance object) GetLastUpdate() (time.Time, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return time.Time{}, fail.InvalidInstanceError()
 	}
 	if instance.item == nil {
@@ -399,7 +400,7 @@ func (instance object) GetLastUpdate() (time.Time, fail.Error) {
 
 // GetMetadata returns the metadata of the object in Object Storage
 func (instance object) GetMetadata() (abstract.ObjectStorageItemMetadata, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return abstract.ObjectStorageItemMetadata{}, fail.InvalidInstanceError()
 	}
 	return instance.metadata.Clone(), nil
@@ -407,7 +408,7 @@ func (instance object) GetMetadata() (abstract.ObjectStorageItemMetadata, fail.E
 
 // GetSize returns the size of the content of the object
 func (instance object) GetSize() (int64, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 	if instance.item == nil {
@@ -422,7 +423,7 @@ func (instance object) GetSize() (int64, fail.Error) {
 
 // GetETag returns the value of the ETag (+/- md5sum of the content...)
 func (instance object) GetETag() (string, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if instance.item == nil {
@@ -437,7 +438,7 @@ func (instance object) GetETag() (string, fail.Error) {
 
 // GetID returns the ID of the object
 func (instance object) GetID() (string, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if instance.item == nil {
@@ -448,7 +449,7 @@ func (instance object) GetID() (string, fail.Error) {
 
 // GetName returns the name of the object
 func (instance object) GetName() (string, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	return instance.name, nil

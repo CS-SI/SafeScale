@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -40,7 +41,7 @@ func NewShielded(witness data.Clonable) *Shielded {
 // IsNull ...
 // satisfies interface data.Clonable
 func (instance *Shielded) IsNull() bool {
-	return instance == nil || instance.witness.IsNull()
+	return instance == nil || valid.IsNil(instance.witness)
 }
 
 // Clone ...

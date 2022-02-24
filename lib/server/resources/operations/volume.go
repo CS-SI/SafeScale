@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
@@ -169,7 +170,7 @@ func onVolumeCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Erro
 
 // IsNull tells if the instance is a null value
 func (instance *volume) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache
@@ -177,7 +178,7 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -234,7 +235,7 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 func (instance *volume) GetSpeed() (_ volumespeed.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -248,7 +249,7 @@ func (instance *volume) GetSpeed() (_ volumespeed.Enum, xerr fail.Error) {
 func (instance *volume) GetSize() (_ int, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -262,7 +263,7 @@ func (instance *volume) GetSize() (_ int, xerr fail.Error) {
 func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -352,7 +353,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -443,7 +444,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		volumeName := instance.GetName()
 		if volumeName != "" {
 			return fail.NotAvailableError("already carrying Subnet '%s'", volumeName)
@@ -552,7 +553,7 @@ func (instance *volume) Attach(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1044,7 +1045,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1294,7 +1295,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 
 // ToProtocol converts the volume to protocol message VolumeInspectResponse
 func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server"
@@ -280,7 +281,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// Load volume data
 	rv, xerr := volumefactory.Load(handler.job.Service(), volumeRef)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
 		}
 

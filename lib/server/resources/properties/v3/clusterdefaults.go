@@ -21,6 +21,7 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // ClusterDefaults ...
@@ -44,7 +45,7 @@ func newClusterDefaults() *ClusterDefaults {
 // IsNull ...
 // satisfies interface data.Clonable
 func (cd *ClusterDefaults) IsNull() bool {
-	return cd == nil || (cd.GatewaySizing.IsNull() && cd.MasterSizing.IsNull() && cd.NodeSizing.IsNull())
+	return cd == nil || (valid.IsNil(cd.GatewaySizing) && valid.IsNil(cd.MasterSizing) && valid.IsNil(cd.NodeSizing))
 }
 
 // Clone ...
@@ -61,7 +62,7 @@ func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
 		return cd
 	}
 
-	src, _ := p.(*ClusterDefaults) //nolint
+	src, _ := p.(*ClusterDefaults) // nolint
 	*cd = *src
 	length := len(src.FeatureParameters)
 	if length > 0 {

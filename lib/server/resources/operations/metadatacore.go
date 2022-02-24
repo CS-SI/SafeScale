@@ -22,6 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -114,7 +115,7 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 
 // IsNull returns true if the MetadataCore instance represents the null value for MetadataCore
 func (myself *MetadataCore) IsNull() bool {
-	return myself == nil || (myself.kind == "" || myself.kind == NullMetadataKind || myself.folder.IsNull() || (myself.getID() == NullMetadataID && myself.getName() == NullMetadataName))
+	return myself == nil || (myself.kind == "" || myself.kind == NullMetadataKind || valid.IsNil(myself.folder) || (myself.getID() == NullMetadataID && myself.getName() == NullMetadataName))
 }
 
 // Service returns the iaas.Service used to create/load the persistent object
@@ -129,7 +130,7 @@ func (myself *MetadataCore) Service() iaas.Service {
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
 func (myself *MetadataCore) GetID() string {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return NullMetadataID
 	}
 
@@ -148,7 +149,7 @@ func (myself *MetadataCore) getID() string {
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
 func (myself *MetadataCore) GetName() string {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return NullMetadataName
 	}
 
@@ -176,7 +177,7 @@ func (myself *MetadataCore) GetKind() string {
 func (myself *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -209,7 +210,7 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Erro
 func (myself *MetadataCore) Review(callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -233,7 +234,7 @@ func (myself *MetadataCore) Review(callback resources.Callback) (xerr fail.Error
 func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -315,7 +316,7 @@ func (myself *MetadataCore) Carry(clonable data.Clonable) (xerr fail.Error) {
 	if myself == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !myself.IsNull() {
+	if !valid.IsNil(myself) {
 		return fail.InvalidRequestError("cannot carry, already carries something")
 	}
 	if clonable == nil {
@@ -622,7 +623,7 @@ func (myself *MetadataCore) write() fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (myself *MetadataCore) Reload() (xerr fail.Error) {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -749,7 +750,7 @@ func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (
 func (myself *MetadataCore) Delete() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -860,7 +861,7 @@ func (myself *MetadataCore) Delete() (xerr fail.Error) {
 
 // Serialize serializes instance into bytes (output json code)
 func (myself *MetadataCore) Serialize() (_ []byte, xerr fail.Error) {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -924,7 +925,7 @@ func (myself *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 func (myself *MetadataCore) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -995,7 +996,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (myself *MetadataCore) Released() {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		logrus.Errorf(callstack.DecorateWith("", "Released called on an invalid instance", "cannot be nil or null value", 0))
 		return
 	}
@@ -1025,7 +1026,7 @@ func (myself *MetadataCore) released() {
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (myself *MetadataCore) Destroyed() {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		logrus.Warnf("Destroyed called on an invalid instance")
 		return
 	}
@@ -1054,7 +1055,7 @@ func (myself *MetadataCore) destroyed() {
 // AddObserver ...
 // satisfies interface data.Observable
 func (myself *MetadataCore) AddObserver(o observer.Observer) error {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if o == nil {
@@ -1077,7 +1078,7 @@ func (myself *MetadataCore) AddObserver(o observer.Observer) error {
 // NotifyObservers sends a signal to all registered Observers to notify change
 // Satisfies interface data.Observable
 func (myself *MetadataCore) NotifyObservers() error {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1103,7 +1104,7 @@ func (myself *MetadataCore) notifyObservers() error {
 
 // RemoveObserver ...
 func (myself *MetadataCore) RemoveObserver(name string) error {
-	if myself == nil || myself.IsNull() {
+	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

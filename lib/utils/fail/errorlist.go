@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -68,7 +69,7 @@ func (el *ErrorList) AddConsequence(err error) Error {
 	if el == err { // do nothing
 		return el
 	}
-	if el.IsNull() {
+	if valid.IsNil(el) {
 		logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
 		return el
 	}
@@ -83,7 +84,7 @@ func (el *ErrorList) Annotate(key string, value data.Annotation) data.Annotatabl
 		logrus.Errorf("invalid call of ErrorList.Annotate() from nil instance")
 		return el
 	}
-	if el.IsNull() {
+	if valid.IsNil(el) {
 		logrus.Errorf("invalid call of ErrorList.Annotate() from null instance")
 		return el
 	}
@@ -99,7 +100,7 @@ func (el *ErrorList) Error() string {
 		logrus.Errorf("invalid call of ErrorList.Error() from nil instance")
 		return ""
 	}
-	if el.IsNull() {
+	if valid.IsNil(el) {
 		logrus.Errorf("invalid call of ErrorList.Error() from null instance")
 		return ""
 	}
@@ -123,7 +124,7 @@ func (el *ErrorList) ToErrorSlice() []error {
 		logrus.Errorf("invalid call of ErrorList.ToErrorSlice() from nil instance")
 		return []error{}
 	}
-	if el.IsNull() {
+	if valid.IsNil(el) {
 		logrus.Errorf("invalid call of ErrorList.ToErrorSlice() from null instance")
 		return []error{}
 	}

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
@@ -111,7 +112,7 @@ func (instance *tracer) IsNull() bool {
 
 // EnteringMessage returns the content of the message when entering the function
 func (instance *tracer) EnteringMessage() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return goingInPrefix + instance.buildMessage()
@@ -128,7 +129,7 @@ func (instance *tracer) WithStopwatch() Tracer {
 
 // Entering logs the input message (signifying we are going in) using TRACE level
 func (instance *tracer) Entering() Tracer {
-	if !instance.IsNull() && !instance.inDone {
+	if !valid.IsNil(instance) && !instance.inDone {
 		if instance.sw != nil {
 			instance.sw.Start()
 		}
@@ -145,7 +146,7 @@ func (instance *tracer) Entering() Tracer {
 
 // ExitingMessage returns the content of the message when exiting the function
 func (instance *tracer) ExitingMessage() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return goingOutPrefix + instance.buildMessage()
@@ -153,7 +154,7 @@ func (instance *tracer) ExitingMessage() string {
 
 // Exiting logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
 func (instance *tracer) Exiting() Tracer {
-	if !instance.IsNull() && !instance.outDone {
+	if !valid.IsNil(instance) && !instance.outDone {
 		if instance.sw != nil {
 			instance.sw.Stop()
 		}
@@ -173,7 +174,7 @@ func (instance *tracer) Exiting() Tracer {
 
 // buildMessage builds the message with available information from stack trace
 func (instance *tracer) buildMessage() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 
@@ -195,7 +196,7 @@ func (instance *tracer) TraceMessage(msg ...interface{}) string {
 
 // Trace traces a message
 func (instance *tracer) Trace(msg ...interface{}) Tracer {
-	if !instance.IsNull() && instance.enabled {
+	if !valid.IsNil(instance) && instance.enabled {
 		message := instance.TraceMessage(msg...)
 		if message != "" {
 			logrus.Tracef(message)
@@ -206,7 +207,7 @@ func (instance *tracer) Trace(msg ...interface{}) Tracer {
 
 // TraceAsError traces a message with error level
 func (instance *tracer) TraceAsError(msg ...interface{}) Tracer {
-	if !instance.IsNull() && instance.enabled {
+	if !valid.IsNil(instance) && instance.enabled {
 		message := instance.TraceMessage(msg...)
 		if message != "" {
 			logrus.Errorf(message)
@@ -222,7 +223,7 @@ func (instance *tracer) TraceCallStack() Tracer {
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
 func (instance *tracer) Stopwatch() temporal.Stopwatch {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return temporal.NewStopwatch()
 	}
 	return instance.sw

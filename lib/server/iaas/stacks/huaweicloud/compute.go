@@ -302,7 +302,7 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 	var emptyMap map[string]bool
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
@@ -344,7 +344,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 
 // SelectedAvailabilityZone returns the selected availability zone
 func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -372,7 +372,7 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
 func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -418,7 +418,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	var xerr fail.Error
 	nullAhf := abstract.NewHostFull()
 	nullUdc := userdata.NewContent()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAhf, nullUdc, fail.InvalidInstanceError()
 	}
 
@@ -764,7 +764,7 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 // InspectImage returns the Image referenced by id
 func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	nullAI := abstract.Image{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAI, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -801,7 +801,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	defer fail.OnPanic(&ferr)
 
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 
@@ -849,7 +849,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 // ListImages lists available OS images
 func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -890,7 +890,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -1109,7 +1109,7 @@ func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversio
 // ListHosts lists available hosts
 func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
@@ -1154,7 +1154,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 

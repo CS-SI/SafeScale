@@ -20,6 +20,7 @@ package aws
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -64,7 +65,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return stacks.ConfigurationOptions{}, nil
 	}
 	return *s.Config, nil
@@ -72,7 +73,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return stacks.AuthenticationOptions{}, nil
 	}
 	return *s.AuthOptions, nil

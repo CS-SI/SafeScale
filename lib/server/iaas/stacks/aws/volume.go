@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -37,7 +38,7 @@ import (
 // CreateVolume ...
 func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 
@@ -76,7 +77,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 // InspectVolume ...
 func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -188,7 +189,7 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 // ListVolumes ...
 func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 	var emptySlice []abstract.Volume
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -235,7 +236,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 
 // DeleteVolume ...
 func (s stack) DeleteVolume(id string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -259,7 +260,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 // CreateVolumeAttachment ...
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -357,7 +358,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 // InspectVolumeAttachment returns information about a volume attachment
 func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAVA, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -402,7 +403,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 // ListVolumeAttachments ...
 func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, xerr fail.Error) {
 	var emptySlice []abstract.VolumeAttachment
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -450,7 +451,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fa
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
 func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID == "" {

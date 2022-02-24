@@ -22,6 +22,7 @@ import (
 	"time"
 
 	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
@@ -63,7 +64,7 @@ func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Erro
 	cryptKey, xerr := svc.GetMetadataKey()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return MetadataFolder{}, xerr
 		}
 		debug.IgnoreError(xerr)
@@ -83,7 +84,7 @@ func (instance *MetadataFolder) IsNull() bool {
 
 // Service returns the service used by the MetadataFolder
 func (instance MetadataFolder) Service() iaas.Service {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return iaas.NullService()
 	}
 	return instance.service
@@ -91,7 +92,7 @@ func (instance MetadataFolder) Service() iaas.Service {
 
 // GetBucket returns the bucket used by the MetadataFolder to store Object Storage
 func (instance MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return abstract.ObjectStorageBucket{}, nil
 	}
 
@@ -114,7 +115,7 @@ func (instance MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.E
 
 // Path returns the base path of the MetadataFolder
 func (instance MetadataFolder) Path() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return instance.path
@@ -145,7 +146,7 @@ func (instance MetadataFolder) absolutePath(path ...string) string {
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
 func (instance MetadataFolder) Lookup(path string, name string) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -175,7 +176,7 @@ func (instance MetadataFolder) Lookup(path string, name string) fail.Error {
 
 // Delete removes metadata passed as parameter
 func (instance MetadataFolder) Delete(path string, name string) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -197,7 +198,7 @@ func (instance MetadataFolder) Delete(path string, name string) fail.Error {
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
 func (instance MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
@@ -280,7 +281,7 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
 func (instance MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -398,7 +399,7 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
 func (instance MetadataFolder) Browse(path string, callback folderDecoderCallback) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 

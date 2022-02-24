@@ -23,6 +23,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	mapset "github.com/deckarep/golang-set"
@@ -44,7 +45,7 @@ import (
 // CreateKeyPair creates a keypair and upload it to AWS
 func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -67,7 +68,7 @@ func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error)
 
 // ImportKeyPair imports an existing resources.KeyPair to AWS (not in the interface yet, but will come soon)
 func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -84,7 +85,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 // Note: the private key is not stored by AWS...
 func (s stack) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -117,7 +118,7 @@ func toAbstractKeyPair(in ec2.KeyPairInfo) abstract.KeyPair {
 // ListKeyPairs lists keypairs stored in AWS
 func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
 	var emptySlice []abstract.KeyPair
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -140,7 +141,7 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
 
 // DeleteKeyPair deletes a keypair from AWS
 func (s stack) DeleteKeyPair(id string) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -153,7 +154,7 @@ func (s stack) DeleteKeyPair(id string) (ferr fail.Error) {
 // ListAvailabilityZones lists AWS availability zones available
 func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
 	emptyMap := map[string]bool{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
@@ -181,7 +182,7 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
 // ListRegions lists regions available in AWS
 func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 	var emptySlice []string
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -206,7 +207,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 // InspectImage loads information about an image stored in AWS
 func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	nullAI := abstract.Image{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAI, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -227,7 +228,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 // InspectTemplate loads information about a template stored in AWS
 func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -323,7 +324,7 @@ func filterOwners(s stack) []*ec2.Filter {
 // ListImages lists available image
 func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 	var emptySlice []abstract.Image
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -364,7 +365,7 @@ func toAbstractImage(in ec2.Image) abstract.Image {
 // ListTemplates lists templates stored in AWS
 func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fail.Error) {
 	var emptySlice []abstract.HostTemplate
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -443,7 +444,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	defer fail.OnPanic(&ferr)
 
 	nullAHC := abstract.NewHostCore()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHC, fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -506,7 +507,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 
@@ -817,7 +818,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	defer fail.OnPanic(&ferr)
 
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 	var hostLabel string
@@ -966,7 +967,7 @@ func (s stack) getTagOfSubnet(subnetID *string, str string) string {
 // InspectHostByName returns host information by its name
 func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.Error) {
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -986,7 +987,7 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.E
 
 // GetHostState returns the current state of the host
 func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
@@ -1001,7 +1002,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, x
 // ListHosts returns a list of hosts
 func (s stack) ListHosts(details bool) (hosts abstract.HostList, ferr fail.Error) {
 	nullList := abstract.HostList{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullList, fail.InvalidInstanceError()
 	}
 
@@ -1046,7 +1047,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, ferr fail.Error
 
 // DeleteHost deletes a Host
 func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1167,7 +1168,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 
 // StopHost stops a running host
 func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1223,7 +1224,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr f
 
 // StartHost starts a stopped host
 func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1278,7 +1279,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 
 // RebootHost stops then starts a host
 func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1333,7 +1334,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 // ResizeHost changes the sizing of an existing host
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 
@@ -1344,7 +1345,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1398,7 +1399,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)

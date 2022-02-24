@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -251,7 +252,7 @@ func (instance *Cluster) updateCachedInformation() {
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Cluster) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
@@ -271,7 +272,7 @@ func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	identifiable, ok := clonable.(data.Identifiable)
@@ -335,7 +336,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		clusterName := instance.GetName()
 		if clusterName != "" {
 			return fail.NotAvailableError("already carrying Cluster '%s'", clusterName)
@@ -390,7 +391,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 func (instance *Cluster) Serialize() (_ []byte, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return []byte{}, fail.InvalidInstanceError()
 	}
 
@@ -405,7 +406,7 @@ func (instance *Cluster) Serialize() (_ []byte, xerr fail.Error) {
 func (instance *Cluster) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -487,7 +488,7 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 
 // GetIdentity returns the identity of the Cluster
 func (instance *Cluster) GetIdentity() (clusterIdentity abstract.ClusterIdentity, xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
 	}
 
@@ -499,7 +500,7 @@ func (instance *Cluster) GetIdentity() (clusterIdentity abstract.ClusterIdentity
 
 // GetFlavor returns the flavor of the Cluster
 func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -516,7 +517,7 @@ func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, xerr fail.Error
 func (instance *Cluster) GetComplexity() (_ clustercomplexity.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -531,7 +532,7 @@ func (instance *Cluster) GetComplexity() (_ clustercomplexity.Enum, xerr fail.Er
 func (instance *Cluster) GetAdminPassword() (adminPassword string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -551,7 +552,7 @@ func (instance *Cluster) GetKeyPair() (keyPair abstract.KeyPair, xerr fail.Error
 	defer fail.OnPanic(&xerr)
 
 	nullAKP := abstract.KeyPair{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 
@@ -569,7 +570,7 @@ func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 	defer fail.OnPanic(&xerr)
 
 	nullConfig := &propertiesv3.ClusterNetwork{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nullConfig, fail.InvalidInstanceError()
 	}
 
@@ -605,7 +606,7 @@ func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -886,7 +887,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1119,7 +1120,7 @@ func (instance *Cluster) GetState() (state clusterstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	state = clusterstate.Unknown
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
 
@@ -1134,7 +1135,7 @@ func (instance *Cluster) GetState() (state clusterstate.Enum, xerr fail.Error) {
 func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1403,7 +1404,7 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1494,7 +1495,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
 func (instance *Cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
 	emptyList := resources.IndexedListOfClusterNodes{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1537,7 +1538,7 @@ func (instance *Cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1611,7 +1612,7 @@ func (instance *Cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1630,7 +1631,7 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1668,7 +1669,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 	defer fail.OnPanic(&xerr)
 
 	master = nil
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1715,7 +1716,7 @@ func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 	defer fail.OnPanic(&xerr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1773,7 +1774,7 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1847,7 +1848,7 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1884,7 +1885,7 @@ func (instance *Cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1926,7 +1927,7 @@ func (instance *Cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1965,7 +1966,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2033,7 +2034,7 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 func (instance *Cluster) CountNodes(ctx context.Context) (count uint, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2097,7 +2098,7 @@ func (instance *Cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostInstance resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2187,7 +2188,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -2402,7 +2403,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 		}
 	} else {
 		// host still exists, leave it from Cluster, if master is not null
-		if master != nil && !master.IsNull() {
+		if master != nil && !valid.IsNil(master) {
 			xerr = instance.leaveNodesFromList(ctx, []resources.Host{hostInstance}, master)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -2438,7 +2439,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2483,7 +2484,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 	var cleaningErrors []error
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -2727,7 +2728,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	if subnetInstance != nil && !subnetInstance.IsNull() {
+	if subnetInstance != nil && !valid.IsNil(subnetInstance) {
 		subnetName := subnetInstance.GetName()
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
@@ -2770,7 +2771,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if networkInstance != nil && !networkInstance.IsNull() && deleteNetwork {
+	if networkInstance != nil && !valid.IsNil(networkInstance) && deleteNetwork {
 		networkName := networkInstance.GetName()
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
@@ -2996,7 +2997,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -3427,7 +3428,7 @@ func (instance *Cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 
 // ToProtocol converts instance to protocol.ClusterResponse message
 func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -3572,7 +3573,7 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 // Shrink reduces cluster size by 'count' nodes
 func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3743,7 +3744,7 @@ func (instance *Cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 	defer fail.OnPanic(&xerr)
 
 	found = false
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
