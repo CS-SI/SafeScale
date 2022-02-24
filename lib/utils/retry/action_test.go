@@ -17,6 +17,7 @@
 package retry
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -350,6 +351,16 @@ func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
 		},
 		-1*time.Millisecond,
 		40*time.Millisecond,
+		nil,
+	)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+
+	err = WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
 		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
@@ -408,6 +419,17 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 		-1*time.Millisecond,
 		40*time.Millisecond,
 		arb,
+		nil,
+	)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+
+	err = WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		arb,
 		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
@@ -433,6 +455,186 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 		DefaultNotifier(),
 	)
 	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileSuccessful(t *testing.T) {
+
+	// no waitfor
+	maxtries := 5
+	tries := 0
+	err := WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+	maxtries = 5
+	tries = 0
+	err = WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+}
+
+func Test_WhileSuccessfulWithNotify(t *testing.T) {
+
+	var notify Notify
+
+	// no waitfor
+	maxtries := 5
+	tries := 0
+	err := WhileSuccessfulWithNotify(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1, nil)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+	require.NotEqual(t, tries, maxtries)
+
+	notify = func(Try, verdict.Enum) {
+
+	}
+
+	// no waitfor
+	maxtries = 5
+	tries = 0
+	err = WhileSuccessfulWithNotify(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any error")
+		}
+	}, 50*time.Millisecond, -1, notify)
+	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.NotEqual(t, tries, maxtries)
+
+	maxtries = 5
+	tries = 0
+	err = WhileSuccessfulWithNotify(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any error")
+		}
+	}, 50*time.Millisecond, -1, notify)
+	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.NotEqual(t, tries, maxtries)
+
+}
+
+func Test_DefaultNotifier(t *testing.T) {
+
+	forensics := os.Getenv("SAFESCALE_FORENSICS")
+	os.Setenv("SAFESCALE_FORENSICS", "test")
+	d := DefaultNotifier()
+	n := Try{Err: errors.New("nope"), Count: 0}
+	log := tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	n = Try{Count: 2}
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Undecided)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Abort)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	os.Setenv("SAFESCALE_FORENSICS", forensics)
+
+}
+
+func Test_DefaultMetadataNotifier(t *testing.T) {
+
+	d := DefaultMetadataNotifier("metaID")
+	n := Try{Err: errors.New("nope"), Count: 0}
+	log := tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Undecided)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Abort)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+
+}
+
+func Test_DefaultNotifierWithContext(t *testing.T) {
+
+	ctx := context.Background()
+	d, err := DefaultNotifierWithContext(ctx)
+	require.EqualValues(t, err, nil)
+	n := Try{}
+	log := tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+
+	forensics := os.Getenv("SAFESCALE_FORENSICS")
+	os.Setenv("SAFESCALE_FORENSICS", "test")
+
+	n = Try{Err: errors.New("nope"), Count: 0}
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Undecided)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Abort)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+
+	os.Setenv("SAFESCALE_FORENSICS", forensics)
 
 }
 
