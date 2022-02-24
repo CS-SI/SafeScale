@@ -252,7 +252,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -276,7 +276,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -306,7 +306,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // InspectTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (p provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
 	nullAHT := abstract.HostTemplate{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nullAHT, fail.InvalidInstanceError()
 	}
 
@@ -327,7 +327,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
@@ -335,7 +335,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(false)
@@ -404,7 +404,7 @@ func isFlexTemplate(t abstract.HostTemplate) bool {
 
 // CreateNetwork is overloaded to handle specific OVH situation
 func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -428,7 +428,7 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
@@ -443,7 +443,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 
 // BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -458,7 +458,7 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 
 // UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -474,7 +474,7 @@ func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
@@ -43,7 +44,7 @@ import (
 func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -120,7 +121,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -164,7 +165,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -230,7 +231,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 // TargetType returns the type of the target.
 // satisfies install.Targetable interface.
 func (instance *Host) TargetType() featuretargettype.Enum {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return featuretargettype.Unknown
 	}
 
@@ -241,7 +242,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 // satisfies interface install.Targetable
 func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 	// FIXME: Return error
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
 	}
@@ -259,7 +260,7 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == nil {
@@ -289,7 +290,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 				featuresV1.Installed[feat.GetName()] = item
 			}
 			if item != nil {
-				if !data.IsNil(requiredBy) {
+				if !valid.IsNil(requiredBy) {
 					if item.RequiredBy != nil {
 						item.RequiredBy[requiredBy.GetName()] = struct{}{}
 					} else {
@@ -308,7 +309,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 func (instance *Host) UnregisterFeature(feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == "" {
@@ -336,7 +337,7 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -379,7 +380,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -450,7 +451,7 @@ func (instance *Host) InstalledFeatures() []string {
 func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if v == nil {
@@ -563,7 +564,7 @@ func (instance *Host) IsFeatureInstalled(name string) (found bool, xerr fail.Err
 	found = false
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {

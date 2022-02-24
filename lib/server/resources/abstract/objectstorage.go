@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)
@@ -74,9 +75,9 @@ func (instance *ObjectStorageBucket) Replace(p data.Clonable) data.Clonable {
 	return instance
 }
 
-// Serialize serializes Host instance into bytes (output json code)
+// Serialize serializes Host 'instance' into bytes (output json code)
 func (instance *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -116,7 +117,7 @@ func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName name returns the name of the host
 // Satisfies interface data.Identifiable
 func (instance ObjectStorageBucket) GetName() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return instance.Name
@@ -125,7 +126,7 @@ func (instance ObjectStorageBucket) GetName() string {
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
 func (instance ObjectStorageBucket) GetID() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return instance.ID

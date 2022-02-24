@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -89,7 +90,7 @@ func (instance *ResourceCache) isNull() bool {
 
 // Get returns the content associated with key
 func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -213,7 +214,7 @@ func (instance *ResourceCache) loadEntry(key string) (*cache.Entry, bool) {
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
 func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) fail.Error {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -231,7 +232,7 @@ func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) f
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
 func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -251,7 +252,7 @@ func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) 
 
 // FreeEntry removes the reservation in cache
 func (instance *ResourceCache) FreeEntry(key string) fail.Error {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -266,7 +267,7 @@ func (instance *ResourceCache) FreeEntry(key string) fail.Error {
 
 // AddEntry ...
 func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

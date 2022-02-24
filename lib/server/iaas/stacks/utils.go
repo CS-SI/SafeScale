@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
@@ -44,7 +44,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 		ahf.Core.ID = hostParam
 		hostLabel = hostParam
 	case *abstract.HostCore:
-		if datadef.IsNil(hostParam) {
+		if valid.IsNil(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostCore null value")
 		}
 		ahf.Core = hostParam
@@ -54,7 +54,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 			hostLabel = ahf.Core.ID
 		}
 	case *abstract.HostFull:
-		if datadef.IsNil(hostParam) {
+		if valid.IsNil(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostFull null value")
 		}
 		ahf = hostParam

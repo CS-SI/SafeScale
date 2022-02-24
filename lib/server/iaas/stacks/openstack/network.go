@@ -20,6 +20,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -69,7 +70,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 
@@ -134,7 +135,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 // InspectNetworkByName ...
 func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -181,7 +182,7 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 // InspectNetwork returns the network identified by id
 func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -225,7 +226,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 // ListNetworks lists available networks
 func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	var emptySlice []*abstract.Network
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -269,7 +270,7 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s stack) DeleteNetwork(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -345,7 +346,7 @@ func ToAbstractIPVersion(v int) ipversion.Enum {
 // CreateSubnet creates a subnet
 func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 
@@ -461,7 +462,7 @@ func (s stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Networ
 // InspectSubnet returns the subnet identified by id
 func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -496,7 +497,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 // InspectSubnetByName ...
 func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -577,7 +578,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 // ListSubnets lists available subnets in a network
 func (s stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
 	var emptySlice []*abstract.Subnet
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -618,7 +619,7 @@ func (s stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
 
 // DeleteSubnet deletes the network identified by id
 func (s stack) DeleteSubnet(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -723,7 +724,7 @@ func (s stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 // ListRouters lists available routers
 func (s stack) ListRouters() ([]Router, fail.Error) {
 	var emptySlice []Router
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -791,7 +792,7 @@ func (s stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Err
 
 // BindSecurityGroupToSubnet binds a security group to a subnet
 func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if subnetID != "" {
@@ -810,7 +811,7 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
 func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if subnetID == "" {
@@ -831,7 +832,7 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 // If public is set to true,
 func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	nullAVIP := abstract.NewVirtualIP()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAVIP, fail.InvalidInstanceError()
 	}
 	if networkID = strings.TrimSpace(networkID); networkID == "" {
@@ -871,7 +872,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -880,7 +881,7 @@ func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -931,7 +932,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -982,7 +983,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {

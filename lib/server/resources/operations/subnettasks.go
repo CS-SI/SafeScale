@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
@@ -44,7 +45,7 @@ func (instance *Subnet) taskCreateGateway(
 ) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -189,7 +190,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 ) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -205,7 +206,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 	}
 
 	objgw := castedParams.host
-	if objgw == nil || objgw.IsNull() {
+	if objgw == nil || valid.IsNil(objgw) {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
 
@@ -239,7 +240,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			theCause := fail.ConvertError(fail.Cause(xerr))
-			if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
+			if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
 				return nil, xerr
 			}
 

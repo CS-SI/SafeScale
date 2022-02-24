@@ -40,6 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -157,7 +158,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		gatewayIDs                        []string
 	)
 
-	if owningInstance != nil && !owningInstance.IsNull() {
+	if owningInstance != nil && !valid.IsNil(owningInstance) {
 		networkName = owningInstance.GetName()
 	}
 	subnetName = currentInstance.GetName()
@@ -171,7 +172,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		}
 
 		// Make sure the ID of the Network is valid (at least with FlexibleEngine, Network ID corresponds to Subnet ID in previous versions of SafeScale)
-		if owningInstance != nil && !owningInstance.IsNull() {
+		if owningInstance != nil && !valid.IsNil(owningInstance) {
 			abstractNetwork.ID = owningInstance.GetID()
 		}
 
@@ -200,7 +201,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}
 
 			// If Subnet is not "owned" yet, do the necessary to create Network metadata
-			if (owningInstance == nil || owningInstance.IsNull()) && abstractSubnet.Network != "" {
+			if (owningInstance == nil || valid.IsNil(owningInstance)) && abstractSubnet.Network != "" {
 				abstractOwningNetwork, innerXErr := svc.InspectNetwork(abstractSubnet.Network)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
@@ -778,7 +779,7 @@ func (tv toV21_05_0) upgradeClusters(svc iaas.Service) fail.Error {
 }
 
 func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster) fail.Error {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 

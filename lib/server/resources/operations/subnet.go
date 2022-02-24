@@ -46,6 +46,7 @@ import (
 	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -386,7 +387,7 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 }
 
 func (instance *Subnet) IsNull() bool {
-	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && instance.MetadataCore.IsNull())))
+	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && valid.IsNil(instance.MetadataCore))))
 }
 
 // Carry wraps rv.core.Carry() to add Volume to service cache
@@ -451,7 +452,7 @@ func (instance *Subnet) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) {
 		subnetName := instance.GetName()
 		if subnetName != "" {
 			return fail.NotAvailableError("already carrying Subnet '%s'", subnetName)
@@ -855,7 +856,7 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -980,7 +981,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xe
 func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1023,7 +1024,7 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (xerr fai
 func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1078,7 +1079,7 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr
 func (instance *Subnet) InspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return HostNullValue(), fail.InvalidInstanceError()
 	}
 
@@ -1092,7 +1093,7 @@ func (instance *Subnet) InspectGateway(primary bool) (_ resources.Host, xerr fai
 func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -1145,7 +1146,7 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var emptySlice []string
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -1198,7 +1199,7 @@ var (
 func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1431,7 +1432,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 
 // Released overloads core.Released() to release the parent Network instance
 func (instance *Subnet) Released() {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return
 	}
 
@@ -1443,7 +1444,7 @@ func (instance *Subnet) Released() {
 func (instance *Subnet) InspectNetwork() (rn resources.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1561,7 +1562,7 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(
 func (instance *Subnet) GetDefaultRouteIP() (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	instance.lock.RLock()
@@ -1575,7 +1576,7 @@ func (instance *Subnet) GetEndpointIP() (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
 
@@ -1606,7 +1607,7 @@ func (instance *Subnet) GetEndpointIP() (ip string, xerr fail.Error) {
 
 // HasVirtualIP tells if the Subnet uses a VIP a default route
 func (instance *Subnet) HasVirtualIP() (bool, fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -1620,7 +1621,7 @@ func (instance *Subnet) HasVirtualIP() (bool, fail.Error) {
 func (instance *Subnet) GetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	instance.lock.RLock()
@@ -1633,7 +1634,7 @@ func (instance *Subnet) GetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error
 func (instance *Subnet) GetCIDR() (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -1647,7 +1648,7 @@ func (instance *Subnet) GetCIDR() (cidr string, xerr fail.Error) {
 func (instance *Subnet) GetState() (state subnetstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return subnetstate.Unknown, fail.InvalidInstanceError()
 	}
 
@@ -1661,7 +1662,7 @@ func (instance *Subnet) GetState() (state subnetstate.Enum, xerr fail.Error) {
 func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1688,7 +1689,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	gw, xerr = instance.unsafeInspectGateway(false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 	} else {
@@ -1707,7 +1708,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	vip, xerr = instance.unsafeGetVirtualIP()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 	}
@@ -1724,7 +1725,7 @@ func (instance *Subnet) BindSecurityGroup(
 ) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1822,7 +1823,7 @@ func (instance *Subnet) BindSecurityGroup(
 func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1842,7 +1843,7 @@ func (instance *Subnet) ListSecurityGroups(
 	defer fail.OnPanic(&xerr)
 
 	var emptyList []*propertiesv1.SecurityGroupBond
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1890,7 +1891,7 @@ func (instance *Subnet) ListSecurityGroups(
 func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2015,7 +2016,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2131,7 +2132,7 @@ func (instance *Subnet) InspectGatewaySecurityGroup() (sgInstance resources.Secu
 	defer fail.OnPanic(&xerr)
 
 	sgInstance = SecurityGroupNullValue()
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return sgInstance, fail.InvalidInstanceError()
 	}
 
@@ -2155,7 +2156,7 @@ func (instance *Subnet) InspectInternalSecurityGroup() (sg resources.SecurityGro
 	defer fail.OnPanic(&xerr)
 
 	sg = SecurityGroupNullValue()
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return sg, fail.InvalidInstanceError()
 	}
 
@@ -2179,7 +2180,7 @@ func (instance *Subnet) InspectPublicIPSecurityGroup() (sg resources.SecurityGro
 	defer fail.OnPanic(&xerr)
 
 	sg = SecurityGroupNullValue()
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return sg, fail.InvalidInstanceError()
 	}
 

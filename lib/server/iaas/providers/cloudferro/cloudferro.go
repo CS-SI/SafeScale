@@ -198,7 +198,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -217,7 +217,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -247,7 +247,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
 
@@ -261,7 +261,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 // ListImages ...
 // Value of all has no impact on the result
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
 
@@ -285,7 +285,7 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 
@@ -294,7 +294,7 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return providers.Capabilities{}, fail.InvalidInstanceError()
 	}
 
@@ -306,7 +306,7 @@ func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

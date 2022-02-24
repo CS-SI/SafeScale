@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -60,7 +61,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 // CreateNetwork creates a Network, ie a VPC in AWS terminology
 func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 
@@ -181,7 +182,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 // InspectNetwork returns information about Network/VPC from AWS
 func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -225,7 +226,7 @@ func toAbstractNetwork(in *ec2.Vpc) (*abstract.Network, fail.Error) {
 // InspectNetworkByName does the same as InspectNetwork but on its name
 func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
 	nullAN := abstract.NewNetwork()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -250,7 +251,7 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 // ListNetworks ...
 func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	var emptySlice []*abstract.Network
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -279,7 +280,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 
 // DeleteNetwork ...
 func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -387,7 +388,7 @@ func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
 // CreateSubnet ...
 func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 
@@ -471,7 +472,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 // InspectSubnet returns information about the Subnet from AWS
 func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -509,7 +510,7 @@ func toAbstractSubnet(in *ec2.Subnet) (*abstract.Subnet, fail.Error) {
 // InspectSubnetByName ...
 func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
 	}
 	if subnetName == "" {
@@ -563,7 +564,7 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 // ListSubnets ...
 func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, ferr fail.Error) {
 	var emptySlice []*abstract.Subnet
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -667,7 +668,7 @@ func (s stack) listSubnetIDs(networkRef string) (list []string, ferr fail.Error)
 
 // DeleteSubnet ...
 func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {

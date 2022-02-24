@@ -30,6 +30,7 @@ import (
 
 	utils2 "github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -392,7 +393,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				}
 
 				if xerr = crcCheck(); xerr != nil {
-					if _, ok := xerr.(*fail.ErrWarning); !ok || xerr.IsNull() {
+					if _, ok := xerr.(*fail.ErrWarning); !ok || valid.IsNil(xerr) {
 						return xerr
 					}
 					logrus.Warnf(xerr.Error())

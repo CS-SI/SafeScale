@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"net/http"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -131,7 +132,7 @@ type deleteResult struct {
 
 // ListFloatingIPs lists all the floating IP currently requested for the VPC
 func (s stack) ListFloatingIPs() pagination.Pager {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return pagination.Pager{}
 	}
 
@@ -143,7 +144,7 @@ func (s stack) ListFloatingIPs() pagination.Pager {
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
 func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
@@ -176,7 +177,7 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
 func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
@@ -213,7 +214,7 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 
 // CreateFloatingIP creates a floating IP
 func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 	if host == nil {
@@ -272,7 +273,7 @@ func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 
 // DeleteFloatingIP deletes a floating IP
 func (s stack) DeleteFloatingIP(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -296,7 +297,7 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 
 // AssociateFloatingIP associates a floating ip to a host
 func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -325,7 +326,7 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 
 // DissociateFloatingIP from host
 func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 

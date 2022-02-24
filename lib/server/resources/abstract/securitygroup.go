@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -150,7 +151,7 @@ func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 // SourcesConcernGroups figures out if rule contains Security Group IDs as sources
 // By design, CIDR and SG ID cannot be mixed
 func (instance *SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
 	return concernsGroups(instance.Sources)
@@ -159,7 +160,7 @@ func (instance *SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
 // TargetsConcernGroups figures out if rule contains Security Group IDs as targets
 // By design, CIDR and SG ID cannot be mixed
 func (instance *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
 	return concernsGroups(instance.Targets)
@@ -443,7 +444,7 @@ func (instance *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 
 // Serialize serializes instance into bytes (output json code)
 func (instance *SecurityGroup) Serialize() ([]byte, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

@@ -22,6 +22,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
@@ -400,7 +401,7 @@ func NewHostFull() *HostFull {
 
 // IsNull tells if the instance should be considered as a null value
 func (hf *HostFull) IsNull() bool {
-	return hf == nil || hf.Core.IsNull()
+	return hf == nil || valid.IsNil(hf.Core)
 }
 
 // IsConsistent returns true if the struct is consistent

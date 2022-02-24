@@ -23,12 +23,13 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -47,7 +48,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Erro
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
 func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -63,7 +64,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 // InspectKeyPair returns the key pair identified by id
 func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -88,7 +89,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 // ListKeyPairs lists available key pairs
 func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 	var emptySlice []abstract.KeyPair
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -113,7 +114,7 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -158,7 +159,7 @@ func (e *errorCore) IsNull() bool {
 func defaultCauseFormatter(e Error) string {
 	msgFinal := ""
 
-	if e == nil || data.IsNil(e) {
+	if e == nil || valid.IsNil(e) {
 		return ""
 	}
 
@@ -210,7 +211,7 @@ func defaultCauseFormatter(e Error) string {
 
 // setCauseFormatter defines the func uses to format cause into a string
 func (e *errorCore) setCauseFormatter(formatter func(Error) string) error {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return fmt.Errorf(callstack.DecorateWith("invalid call", "errorCore.setCauseFormatter", "from null value", 0))
 	}
 	if formatter == nil {
@@ -292,7 +293,7 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 
 // SetAnnotationFormatter defines the func to use to format annotations
 func (e *errorCore) setAnnotationFormatter(formatter func(data.Annotations) (string, error)) error {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return fmt.Errorf(callstack.DecorateWith("invalid call", "errorCore.setAnnotationFormatter()", "from null value", 0))
 	}
 	if formatter == nil {
@@ -428,7 +429,7 @@ func WarningErrorWithCauseAndConsequences(cause error, consequences []error, msg
 
 // IsNull tells if the instance is null
 func (e *ErrWarning) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -494,7 +495,7 @@ func TimeoutErrorWithCauseAndConsequences(cause error, dur time.Duration, conseq
 
 // IsNull tells if the instance is null
 func (e *ErrTimeout) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -543,7 +544,7 @@ func NotFoundErrorWithCause(cause error, consequences []error, msg ...interface{
 
 // IsNull tells if the instance is null
 func (e *ErrNotFound) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -557,7 +558,7 @@ func (e *ErrNotFound) AddConsequence(err error) Error {
 
 // Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		logrus.Errorf(callstack.DecorateWith("invalid call", "ErrNotFound.Annotate()", "from null instance", 0))
 		return e
 	}
@@ -596,7 +597,7 @@ func NotAvailableErrorWithCause(cause error, consequences []error, msg ...interf
 
 // IsNull tells if the instance is null
 func (e *ErrNotAvailable) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -645,7 +646,7 @@ func DuplicateErrorWithCause(cause error, consequences []error, msg ...interface
 
 // IsNull tells if the instance is null
 func (e *ErrDuplicate) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -695,7 +696,7 @@ func InvalidRequestErrorWithCause(cause error, consequences []error, msg ...inte
 
 // IsNull tells if the instance is null
 func (e *ErrInvalidRequest) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -745,7 +746,7 @@ func SyntaxErrorWithCause(cause error, consequences []error, msg ...interface{})
 
 // IsNull tells if the instance is null
 func (e *ErrSyntax) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -759,7 +760,7 @@ func (e *ErrSyntax) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrSyntax) UnformattedError() string {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return ""
 	}
 	return e.unsafeUnformattedError()
@@ -773,7 +774,7 @@ func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable
 
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrSyntax) getGRPCCode() codes.Code {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		logrus.Errorf(callstack.DecorateWith("invalid call", "errorCore.getGRPCCode()", "from null instance", 0))
 		return codes.InvalidArgument
 	}
@@ -801,7 +802,7 @@ func NotAuthenticatedErrorWithCause(cause error, consequences []error, msg ...in
 
 // IsNull tells if the instance is null
 func (e *ErrNotAuthenticated) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -815,7 +816,7 @@ func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAuthenticated) UnformattedError() string {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return ""
 	}
 	return e.unsafeUnformattedError()
@@ -853,7 +854,7 @@ func ForbiddenErrorWithCause(cause error, consequences []error, msg ...interface
 
 // IsNull tells if the instance is null
 func (e *ErrForbidden) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -867,7 +868,7 @@ func (e *ErrForbidden) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrForbidden) UnformattedError() string {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return ""
 	}
 	return e.unsafeUnformattedError()
@@ -918,7 +919,7 @@ func AbortedErrorWithCauseAndConsequences(err error, consequences []error, msg .
 
 // IsNull tells if the instance is null
 func (e *ErrAborted) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -932,7 +933,7 @@ func (e *ErrAborted) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAborted) UnformattedError() string {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return ""
 	}
 	return e.unsafeUnformattedError()
@@ -993,7 +994,7 @@ func OverflowErrorWithCause(err error, limit uint, consequences []error, msg ...
 
 // IsNull tells if the instance is null
 func (e *ErrOverflow) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1007,7 +1008,7 @@ func (e *ErrOverflow) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverflow) UnformattedError() string {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return ""
 	}
 	return e.unsafeUnformattedError()
@@ -1045,7 +1046,7 @@ func OverloadErrorWithCause(cause error, consequences []error, msg ...interface{
 
 // IsNull tells if the instance is null
 func (e *ErrOverload) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1087,7 +1088,7 @@ func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
 
 // IsNull tells if the instance is null
 func (e *ErrNotImplemented) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // NotImplementedErrorWithCauseAndConsequences creates an ErrNotImplemented report
@@ -1108,7 +1109,7 @@ func (e *ErrNotImplemented) AddConsequence(err error) Error {
 
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotImplemented) UnformattedError() string {
-	if e.IsNull() {
+	if valid.IsNil(e) {
 		return ""
 	}
 	return e.unsafeUnformattedError()
@@ -1159,7 +1160,7 @@ func RuntimePanicErrorWithCauseAndConsequences(cause error, consequences []error
 
 // IsNull tells if the instance is null
 func (e *ErrRuntimePanic) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1210,7 +1211,7 @@ func InvalidInstanceErrorWithCause(cause error, consequences []error, msg ...int
 
 // IsNull tells if the instance is null
 func (e *ErrInvalidInstance) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1284,7 +1285,7 @@ func InvalidParameterCannotBeEmptyStringError(what string) *ErrInvalidParameter 
 
 // IsNull tells if the instance is null
 func (e *ErrInvalidParameter) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1345,7 +1346,7 @@ func InvalidInstanceContentErrorWithCause(cause error, consequences []error, wha
 
 // IsNull tells if the instance is null
 func (e *ErrInvalidInstanceContent) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1394,7 +1395,7 @@ func InconsistentErrorWithCause(cause error, consequences []error, msg ...interf
 
 // IsNull tells if the instance is null
 func (e *ErrInconsistent) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1471,7 +1472,7 @@ func (e *ErrExecution) IsNull() bool {
 	if _, ok := e.Annotation("retcode"); ok {
 		return false
 	}
-	return e.errorCore.IsNull()
+	return valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1520,7 +1521,7 @@ func AlteredNothingErrorWithCause(cause error, consequences []error, msg ...inte
 
 // IsNull tells if the instance is null
 func (e *ErrAlteredNothing) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'
@@ -1569,7 +1570,7 @@ func UnknownErrorWithCause(cause error, consequences []error, msg ...interface{}
 
 // IsNull tells if the instance is null
 func (e *ErrUnknown) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	return e == nil || valid.IsNil(e.errorCore)
 }
 
 // AddConsequence adds a consequence 'err' to current error 'e'

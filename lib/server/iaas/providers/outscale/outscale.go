@@ -192,7 +192,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 
 // GetAuthenticationOptions returns authentication parameters
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -210,7 +210,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 
 // GetConfigurationOptions returns configuration parameters
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -252,7 +252,7 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
@@ -282,7 +282,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

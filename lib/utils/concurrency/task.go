@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
@@ -323,7 +324,7 @@ func (instance *task) IsNull() bool {
 
 // LastError returns the last error of the Task
 func (instance *task) LastError() (error, fail.Error) { // nolint
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -335,7 +336,7 @@ func (instance *task) LastError() (error, fail.Error) { // nolint
 
 // Result returns the result of the ended task
 func (instance *task) Result() (TaskResult, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -351,7 +352,7 @@ func (instance *task) Result() (TaskResult, fail.Error) {
 
 // ID returns an unique id for the task
 func (instance *task) ID() (string, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -364,7 +365,7 @@ func (instance *task) ID() (string, fail.Error) {
 // Signature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (instance *task) Signature() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 
@@ -384,7 +385,7 @@ func (instance *task) signature() string {
 
 // Status returns the current task status
 func (instance *task) Status() (TaskStatus, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -396,7 +397,7 @@ func (instance *task) Status() (TaskStatus, fail.Error) {
 
 // Context returns the context associated to the task, or context.Background() if there is no context
 func (instance *task) Context() context.Context {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return context.TODO() // nolint
 	}
 
@@ -412,7 +413,7 @@ func (instance *task) Context() context.Context {
 // SetID allows specifying task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
 func (instance *task) SetID(id string) fail.Error {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -449,7 +450,7 @@ func (instance *task) SetID(id string) fail.Error {
 
 // Start runs in goroutine the function with parameters
 func (instance *task) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -459,7 +460,7 @@ func (instance *task) Start(action TaskAction, params TaskParameters, options ..
 // StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
 // If timeout happens, error returned will be '*fail.ErrTimeout'
 func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, _ ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -524,7 +525,7 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 
 // controller controls the start, termination and possibly abortion of the action
 func (instance *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) (ferr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	defer fail.OnPanic(&ferr) // better safe than sorry
@@ -969,7 +970,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 
 // Run starts task, waits its completion then return the error code
 func (instance *task) Run(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -988,7 +989,7 @@ func (instance *task) Run(action TaskAction, params TaskParameters, options ...d
 // - TaskResult, *fail.ErrTimeout: the Task has reached its execution timeout
 // - TaskResult, <other error>: the Task runs successfully but returned an error
 func (instance *task) Wait() (TaskResult, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1118,7 +1119,7 @@ func (instance *task) contextCleanup() {
 // If task is not done, returns (false, nil, nil) (subsequent calls of TryWait may be necessary)
 // if Task is not started, returns (false, nil, *fail.ErrInconsistent)
 func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -1170,7 +1171,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 // - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
 //                                 abort signal has been received would be attached to the error as consequence)
 func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xerr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -1272,7 +1273,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 // Note: a TaskAction, when .Aborted() returns true, _MUST_ return an error to signify its end on Abort (it does not have
 // to be a fail.AbortedError(), but cannot be nil).
 func (instance *task) Abort() (err fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1301,7 +1302,7 @@ func (instance *task) Abort() (err fail.Error) {
 }
 
 func (instance *task) AbortWithCause(cerr fail.Error) (err fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1363,7 +1364,7 @@ func (instance *task) forceAbort() {
 // the Task has to check regularly if Task has been aborted and stop execution (return...) as soon as possible
 // (leaving place for cleanup if needed). Without the use of Aborted(), a task may run indefinitely.
 func (instance *task) Aborted() bool {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false
 	}
 
@@ -1402,7 +1403,7 @@ func (instance *task) Aborted() bool {
 
 // Abortable tells if task can be aborted
 func (instance *task) Abortable() (bool, fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -1420,7 +1421,7 @@ func (instance *task) Abortable() (bool, fail.Error) {
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
 // Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitly a subtask.
 func (instance *task) DisarmAbortSignal() func() {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
 		return func() {}
 	}
@@ -1434,7 +1435,7 @@ func (instance *task) DisarmAbortSignal() func() {
 
 		// Return a func that reengage abort signal
 		return func() {
-			if instance.IsNull() {
+			if valid.IsNil(instance) {
 				return
 			}
 

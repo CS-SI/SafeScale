@@ -29,6 +29,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 )
@@ -74,7 +75,7 @@ func Test_newError(t *testing.T) {
 func TestErrorCore_IsNull(t *testing.T) {
 
 	var err *errorCore = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 	err = &errorCore{
 		message:             "houston, we have a problem",
 		cause:               errors.New("math: can't divide by zero"),
@@ -86,7 +87,7 @@ func TestErrorCore_IsNull(t *testing.T) {
 		lock:                &sync.RWMutex{},
 	}
 
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 	err = &errorCore{
 		message:             "",
 		cause:               nil,
@@ -97,7 +98,7 @@ func TestErrorCore_IsNull(t *testing.T) {
 		annotationFormatter: nil,
 		lock:                &sync.RWMutex{},
 	}
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 	err = &errorCore{
 		message:             "houston, we have a problem",
 		cause:               errors.New("math: can't divide by zero"),
@@ -108,7 +109,7 @@ func TestErrorCore_IsNull(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -813,7 +814,7 @@ func Test_WarningError(t *testing.T) {
 
 func TestErrWarning_IsNull(t *testing.T) {
 	var err *ErrWarning = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrWarning{
 		errorCore: &errorCore{
@@ -827,7 +828,7 @@ func TestErrWarning_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrWarning{
 		errorCore: &errorCore{
@@ -841,7 +842,7 @@ func TestErrWarning_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -1028,7 +1029,7 @@ func Test_TimeoutError(t *testing.T) {
 func TestErrTimeout_IsNull(t *testing.T) {
 
 	var err *ErrTimeout = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrTimeout{
 		errorCore: &errorCore{
@@ -1042,7 +1043,7 @@ func TestErrTimeout_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrTimeout{
 		errorCore: &errorCore{
@@ -1056,7 +1057,7 @@ func TestErrTimeout_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -1435,7 +1436,7 @@ func Test_NotAvailableErrorWithCause(t *testing.T) {
 func TestErrNotAvailable_IsNull(t *testing.T) {
 
 	var err *ErrNotAvailable = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrNotAvailable{
 		errorCore: &errorCore{
@@ -1449,7 +1450,7 @@ func TestErrNotAvailable_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrNotAvailable{
 		errorCore: &errorCore{
@@ -1463,7 +1464,7 @@ func TestErrNotAvailable_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -1655,7 +1656,7 @@ func Test_DuplicateErrorWithCause(t *testing.T) {
 func TestDuplicateError_IsNull(t *testing.T) {
 
 	var err *ErrDuplicate = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrDuplicate{
 		errorCore: &errorCore{
@@ -1669,7 +1670,7 @@ func TestDuplicateError_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrDuplicate{
 		errorCore: &errorCore{
@@ -1683,7 +1684,7 @@ func TestDuplicateError_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -1870,7 +1871,7 @@ func Test_InvalidRequestError(t *testing.T) {
 func TestErrInvalidRequest_IsNull(t *testing.T) {
 
 	var err *ErrInvalidRequest = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrInvalidRequest{
 		errorCore: &errorCore{
@@ -1884,7 +1885,7 @@ func TestErrInvalidRequest_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrInvalidRequest{
 		errorCore: &errorCore{
@@ -1898,7 +1899,7 @@ func TestErrInvalidRequest_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -2092,7 +2093,7 @@ func Test_SyntaxErrorWithCause(t *testing.T) {
 func TestErrSyntax_IsNull(t *testing.T) {
 
 	var err *ErrSyntax = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrSyntax{
 		errorCore: &errorCore{
@@ -2106,7 +2107,7 @@ func TestErrSyntax_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrSyntax{
 		errorCore: &errorCore{
@@ -2120,7 +2121,7 @@ func TestErrSyntax_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -2307,7 +2308,7 @@ func Test_NotAuthenticatedError(t *testing.T) {
 func TestErrNotAuthenticated_IsNull(t *testing.T) {
 
 	var err *ErrNotAuthenticated = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrNotAuthenticated{
 		errorCore: &errorCore{
@@ -2321,7 +2322,7 @@ func TestErrNotAuthenticated_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrNotAuthenticated{
 		errorCore: &errorCore{
@@ -2335,7 +2336,7 @@ func TestErrNotAuthenticated_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -2522,7 +2523,7 @@ func Test_ForbiddenError(t *testing.T) {
 func TestErrForbidden_IsNull(t *testing.T) {
 
 	var err *ErrForbidden = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrForbidden{
 		errorCore: &errorCore{
@@ -2536,7 +2537,7 @@ func TestErrForbidden_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrForbidden{
 		errorCore: &errorCore{
@@ -2550,7 +2551,7 @@ func TestErrForbidden_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -2740,7 +2741,7 @@ func Test_AbortedError(t *testing.T) {
 func TestErrAborted_IsNull(t *testing.T) {
 
 	var err *ErrAborted = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrAborted{
 		errorCore: &errorCore{
@@ -2754,7 +2755,7 @@ func TestErrAborted_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrAborted{
 		errorCore: &errorCore{
@@ -2768,7 +2769,7 @@ func TestErrAborted_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -2954,7 +2955,7 @@ func Test_OverflowError(t *testing.T) {
 func TestErrOverflow_IsNull(t *testing.T) {
 
 	var err *ErrOverflow = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrOverflow{
 		errorCore: &errorCore{
@@ -2968,7 +2969,7 @@ func TestErrOverflow_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrOverflow{
 		errorCore: &errorCore{
@@ -2982,7 +2983,7 @@ func TestErrOverflow_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -3169,7 +3170,7 @@ func Test_OverloadError(t *testing.T) {
 func TestErrOverload_IsNull(t *testing.T) {
 
 	var err *ErrOverload = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrOverload{
 		errorCore: &errorCore{
@@ -3183,7 +3184,7 @@ func TestErrOverload_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrOverload{
 		errorCore: &errorCore{
@@ -3197,7 +3198,7 @@ func TestErrOverload_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -3386,7 +3387,7 @@ func Test_NotImplementedErrorWithReason(t *testing.T) {
 
 func TestErrNotImplemented_IsNull(t *testing.T) {
 	var err *ErrNotImplemented = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrNotImplemented{
 		errorCore: &errorCore{
@@ -3400,7 +3401,7 @@ func TestErrNotImplemented_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrNotImplemented{
 		errorCore: &errorCore{
@@ -3414,7 +3415,7 @@ func TestErrNotImplemented_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -3601,7 +3602,7 @@ func Test_RuntimePanicError(t *testing.T) {
 func TestErrRuntimePanic_IsNull(t *testing.T) {
 
 	var err *ErrRuntimePanic = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrRuntimePanic{
 		errorCore: &errorCore{
@@ -3615,7 +3616,7 @@ func TestErrRuntimePanic_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrRuntimePanic{
 		errorCore: &errorCore{
@@ -3629,7 +3630,7 @@ func TestErrRuntimePanic_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -3816,7 +3817,7 @@ func Test_InvalidInstanceError(t *testing.T) {
 func TestErrInvalidInstance_IsNull(t *testing.T) {
 
 	var err *ErrInvalidInstance = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrInvalidInstance{
 		errorCore: &errorCore{
@@ -3830,7 +3831,7 @@ func TestErrInvalidInstance_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrInvalidInstance{
 		errorCore: &errorCore{
@@ -3844,7 +3845,7 @@ func TestErrInvalidInstance_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -4045,7 +4046,7 @@ func Test_InvalidParameterCannotBeEmptyStringError(t *testing.T) {
 func TestErrInvalidParameter_IsNull(t *testing.T) {
 
 	var err *ErrInvalidParameter = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrInvalidParameter{
 		errorCore: &errorCore{
@@ -4059,7 +4060,7 @@ func TestErrInvalidParameter_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrInvalidParameter{
 		errorCore: &errorCore{
@@ -4073,7 +4074,7 @@ func TestErrInvalidParameter_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -4260,7 +4261,7 @@ func Test_InvalidInstanceContentError(t *testing.T) {
 func TestErrInvalidInstanceContent_IsNull(t *testing.T) {
 
 	var err *ErrInvalidInstanceContent = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrInvalidInstanceContent{
 		errorCore: &errorCore{
@@ -4274,7 +4275,7 @@ func TestErrInvalidInstanceContent_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrInvalidInstanceContent{
 		errorCore: &errorCore{
@@ -4288,7 +4289,7 @@ func TestErrInvalidInstanceContent_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -4475,7 +4476,7 @@ func Test_InconsistentError(t *testing.T) {
 func TestErrInconsistent_IsNull(t *testing.T) {
 
 	var err *ErrInconsistent = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrInconsistent{
 		errorCore: &errorCore{
@@ -4489,7 +4490,7 @@ func TestErrInconsistent_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrInconsistent{
 		errorCore: &errorCore{
@@ -4503,7 +4504,7 @@ func TestErrInconsistent_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -4717,7 +4718,7 @@ func Test_ExecutionError(t *testing.T) {
 func TestErrExecution_IsNull(t *testing.T) {
 
 	var err *ErrExecution = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrExecution{
 		errorCore: &errorCore{
@@ -4731,7 +4732,7 @@ func TestErrExecution_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrExecution{
 		errorCore: &errorCore{
@@ -4745,7 +4746,7 @@ func TestErrExecution_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -4932,7 +4933,7 @@ func Test_AlteredNothingError(t *testing.T) {
 func TestErrAlteredNothing_IsNull(t *testing.T) {
 
 	var err *ErrAlteredNothing = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrAlteredNothing{
 		errorCore: &errorCore{
@@ -4946,7 +4947,7 @@ func TestErrAlteredNothing_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrAlteredNothing{
 		errorCore: &errorCore{
@@ -4960,7 +4961,7 @@ func TestErrAlteredNothing_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 
@@ -5147,7 +5148,7 @@ func Test_UnknownError(t *testing.T) {
 func TestErrUnknown_IsNull(t *testing.T) {
 
 	var err *ErrUnknown = nil
-	require.EqualValues(t, err.IsNull(), true)
+	require.EqualValues(t, valid.IsNil(err), true)
 
 	err = &ErrUnknown{
 		errorCore: &errorCore{
@@ -5161,7 +5162,7 @@ func TestErrUnknown_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 	err = &ErrUnknown{
 		errorCore: &errorCore{
@@ -5175,7 +5176,7 @@ func TestErrUnknown_IsNull(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	require.EqualValues(t, err.IsNull(), false)
+	require.EqualValues(t, valid.IsNil(err), false)
 
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -274,7 +275,7 @@ func (instance *Feature) Replace(p data.Clonable) data.Clonable {
 
 // GetName returns the display name of the Feature, with error handling
 func (instance *Feature) GetName() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return instance.displayName
@@ -282,7 +283,7 @@ func (instance *Feature) GetName() string {
 
 // GetID ...
 func (instance *Feature) GetID() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return instance.GetName()
@@ -290,7 +291,7 @@ func (instance *Feature) GetID() string {
 
 // GetFilename returns the filename of the Feature definition, with error handling
 func (instance *Feature) GetFilename() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 
@@ -299,7 +300,7 @@ func (instance *Feature) GetFilename() string {
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
 func (instance *Feature) GetDisplayFilename() string {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return ""
 	}
 	return instance.displayFileName
@@ -307,7 +308,7 @@ func (instance *Feature) GetDisplayFilename() string {
 
 // installerOfMethod instanciates the right installer corresponding to the method
 func (instance *Feature) installerOfMethod(m installmethod.Enum) Installer {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil
 	}
 	var installer Installer
@@ -328,7 +329,7 @@ func (instance *Feature) installerOfMethod(m installmethod.Enum) Installer {
 
 // Specs returns a copy of the spec file (we don't want external use to modify Feature.specs)
 func (instance *Feature) Specs() *viper.Viper {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return &viper.Viper{}
 	}
 	roSpecs := *instance.specs
@@ -337,7 +338,7 @@ func (instance *Feature) Specs() *viper.Viper {
 
 // Applyable tells if the Feature is installable on the target
 func (instance *Feature) Applicable(t resources.Targetable) bool {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return false
 	}
 
@@ -354,7 +355,7 @@ func (instance *Feature) Applicable(t resources.Targetable) bool {
 // Check if Feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
 func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -498,7 +499,7 @@ func checkRequiredParameters(f Feature, v data.Map) fail.Error {
 func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -598,7 +599,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 
 // Remove uninstalls the Feature from the target
 func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -682,7 +683,7 @@ const yamlKey = "feature.requirements.features"
 // GetRequirements returns a list of features needed as requirements
 func (instance *Feature) GetRequirements() (map[string]struct{}, fail.Error) {
 	emptyMap := map[string]struct{}{}
-	if instance.IsNull() {
+	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 

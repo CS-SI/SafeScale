@@ -17,9 +17,9 @@
 package huaweicloud
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -37,7 +37,7 @@ const defaultSecurityGroupName = "default"
 // Parameter 'networkRef' is not used in Openstack (they are tenant-wide)
 func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -72,7 +72,7 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 // Returns nil, *fail.ErrDuplicate(with a cause *fail.ErrDuplicate) if more than 1 security group exist with that name
 func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -145,10 +145,10 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 
 // DeleteSecurityGroup deletes a security group and its rules
 func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if data.IsNil(asg) {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
@@ -188,7 +188,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 // InspectSecurityGroup returns information about a security group
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, asgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -248,7 +248,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 // ClearSecurityGroup removes all rules but keep group
 func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -377,7 +377,7 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 // On success, return Security Group with added rule
 func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 
@@ -505,7 +505,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
 func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
@@ -556,7 +556,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
 func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", nil
 	}
 

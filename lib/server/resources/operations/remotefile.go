@@ -42,8 +42,8 @@ type Item struct {
 }
 
 // Upload transfers the local file to the hostname
-func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

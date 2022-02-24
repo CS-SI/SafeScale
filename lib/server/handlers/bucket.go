@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go
@@ -99,7 +100,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	svc := handler.job.Service()
 	rb, xerr := bucketfactory.Load(svc, name)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
 		}
 	}

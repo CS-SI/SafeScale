@@ -237,7 +237,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
@@ -246,7 +246,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
@@ -278,7 +278,7 @@ func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

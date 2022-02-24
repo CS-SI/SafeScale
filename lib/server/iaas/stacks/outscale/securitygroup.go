@@ -17,7 +17,7 @@
 package outscale
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
@@ -32,7 +32,7 @@ import (
 // ListSecurityGroups lists existing security groups
 func (s stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGroup, xerr fail.Error) {
 	list = []*abstract.SecurityGroup{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return list, fail.InvalidInstanceError()
 	}
 
@@ -83,7 +83,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 // CreateSecurityGroup creates a security group
 func (s stack) CreateSecurityGroup(networkID, name, description string, rules abstract.SecurityGroupRules) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -131,10 +131,10 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 
 // DeleteSecurityGroup deletes a security group and its rules
 func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if data.IsNil(asg) {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
@@ -153,7 +153,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 // InspectSecurityGroup returns information about a security group
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -184,7 +184,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 // ClearSecurityGroup removes all rules but keep group
 func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -224,7 +224,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 // AddRuleToSecurityGroup adds a rule to a security group
 func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -330,7 +330,7 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
 func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)

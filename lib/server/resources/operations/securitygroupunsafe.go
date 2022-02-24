@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // delete effectively remove a Security Group
@@ -262,7 +263,7 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -325,7 +326,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

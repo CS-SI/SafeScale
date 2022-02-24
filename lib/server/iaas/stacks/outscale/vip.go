@@ -24,11 +24,12 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // CreateVIP ...
 func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 	// networkID is not used by Outscale
@@ -66,7 +67,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -98,7 +99,7 @@ func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -114,7 +115,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -129,7 +130,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr f
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
