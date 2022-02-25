@@ -33,7 +33,7 @@ const (
 type AuthenticationOptions struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
 	// the Identity API of the appropriate version. While it's ultimately needed by
-	// all of the identity services, it will often be populated by a provider-level
+	// all the identity services, it will often be populated by a provider-level
 	// function.
 	IdentityEndpoint string
 

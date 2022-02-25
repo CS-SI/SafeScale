@@ -598,8 +598,7 @@ func (instance *task) reactWithTimeout(timeout time.Duration, traceR *tracer) (c
 			instance.lock.Unlock() // nolint
 
 			if status != ABORTED && status != TIMEOUT && !terminated {
-				var xerr fail.Error
-				xerr = instance.processCancel(traceR)
+				xerr := instance.processCancel(traceR)
 				if xerr != nil {
 					return canceled, expired, finished, xerr
 				}

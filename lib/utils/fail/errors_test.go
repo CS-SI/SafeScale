@@ -519,9 +519,12 @@ func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
+	err := errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
 		return "any", nil
 	})
+	if err != nil {
+		t.FailNow()
+	}
 
 	errCore = errorCore{
 		message:      "houston, we have a problem",
@@ -539,10 +542,13 @@ func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	errCore.setAnnotationFormatter(nil)
+	err = errCore.setAnnotationFormatter(nil)
+	if err == nil {
+		t.FailNow()
+	}
 	require.NotEqual(t, strings.Index(errCore.UnformattedError(), "{\"eggs\":{},\"two\":\"second one\"}"), -1)
 
-	errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
+	err = errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
 		if anns == nil {
 			return "", nil
 		}
@@ -552,6 +558,9 @@ func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 		}
 		return string(j), nil
 	})
+	if err != nil {
+		t.FailNow()
+	}
 	require.NotEqual(t, strings.Index(errCore.UnformattedError(), "{\"eggs\":{},\"two\":\"second one\"}"), -1)
 
 }

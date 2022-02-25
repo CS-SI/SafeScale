@@ -291,7 +291,7 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 	return e
 }
 
-// SetAnnotationFormatter defines the func to use to format annotations
+// setAnnotationFormatter defines the func to use to format annotations
 func (e *errorCore) setAnnotationFormatter(formatter func(data.Annotations) (string, error)) error {
 	if valid.IsNil(e) {
 		return fmt.Errorf(callstack.DecorateWith("invalid call", "errorCore.setAnnotationFormatter()", "from null value", 0))

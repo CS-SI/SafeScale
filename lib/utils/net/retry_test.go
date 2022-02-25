@@ -62,11 +62,11 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 
 	// no waitfor
 	var (
-		callback func() error = func() error {
+		callback = func() error {
 			return errors.New("Any error")
 		}
 		waitfor *retry.Officer = nil
-		timeout time.Duration  = 0 * time.Second
+		timeout                = 0 * time.Second
 		err     error
 	)
 

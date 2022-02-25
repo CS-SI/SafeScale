@@ -56,7 +56,7 @@ func TestIsNilIsGoodEnough(t *testing.T) {
 			return nil
 		}
 
-		return fmt.Errorf("It was a nil!")
+		return fmt.Errorf("it was a nil")
 	}
 
 	// this code is the same for everyone
@@ -88,7 +88,7 @@ func TestIsNullMethodIsNotGoodEnough(t *testing.T) {
 			return nil
 		}
 
-		return fmt.Errorf("It was a nil!")
+		return fmt.Errorf("it was a nil")
 	}
 
 	// this code is the same for everyone
@@ -123,7 +123,7 @@ func TestEqualNilAndIsNullMethodIsGoodEnough(t *testing.T) {
 			}
 		}
 
-		return fmt.Errorf("It was a nil!")
+		return fmt.Errorf("it was a nil")
 	}
 
 	// this code is the same for everyone

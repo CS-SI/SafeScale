@@ -2133,7 +2133,7 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 		playbookFile := ""
 		args := c.Args().Tail()
 		for _, arg := range args {
-			isParam = (string([]rune(arg))[0] == '-')
+			isParam = arg[0] == '-'
 			if isParam {
 				capturePlaybookFile = false
 			}
