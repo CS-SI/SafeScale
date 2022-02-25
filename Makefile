@@ -32,6 +32,7 @@ GOENUM := github.com/abice/go-enum
 GOWRAP := github.com/hexdigest/gowrap
 MAINT := github.com/yagipy/maintidx/cmd/maintidx
 IRETURN := github.com/butuzov/ireturn/cmd/ireturn
+CTXCHECK := github.com/sylvia7788/contextcheck/cmd/contextcheck
 
 # CI tools
 BATS := github.com/sstephenson/bats
@@ -299,6 +300,11 @@ getdevdeps: begin ground
 		$(GO) install $(IRETURN)@v0.1.1 &>/dev/null || true; \
 	fi
 	@sleep 2
+	@$(WHICH) contextcheck > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading contextcheck...\n"; \
+		$(GO) install $(CTXCHECK)@v1.0.5 &>/dev/null || true; \
+	fi
+	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.42.1 || true; \
@@ -524,6 +530,17 @@ ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) practices_results.log || true
 	@ireturn ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) practices_results.log
 	@if [ -s ./practices_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at practices_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
+
+ctxcheck: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running context checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+	@$(RM) ctxcheck_results.log || true
+	@contextcheck ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) ctxcheck_results.log
+	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 endif
