@@ -128,7 +128,7 @@ versioncut:
 	@(($(GO) version | grep go1.18) || ($(GO) version | grep go1.17) ||($(GO) version | grep go1.16)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.16 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD), go '$$($(GO) version)', protoc '$$(protoc --version)' ...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD), commit $$(git log --format="%H" -n 1), go '$$($(GO) version)', protoc '$$(protoc --version)' ...$(NO_COLOR)\n";
 
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
