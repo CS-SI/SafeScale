@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// MaxTimeout
+// MaxTimeout return the maximum of timeouts 'a' and 'b'
 func MaxTimeout(a time.Duration, b time.Duration) time.Duration {
 	if a > b {
 		return a
@@ -31,7 +31,7 @@ func MaxTimeout(a time.Duration, b time.Duration) time.Duration {
 	return b
 }
 
-// getFromEnv reads a environment variable 'string', interprets the variable as a time.Duration if possible and returns the time to the caller
+// getFromEnv reads an environment variable 'string', interprets the variable as a time.Duration if possible and returns the time to the caller
 // if there is a failure, it returns a default duration 'duration' passed as an argument when calling the function
 func getFromEnv(fallbackDuration time.Duration, keys ...string) time.Duration {
 	for _, key := range keys {

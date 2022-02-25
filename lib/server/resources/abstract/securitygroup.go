@@ -456,8 +456,8 @@ func (instance *SecurityGroup) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a SecurityGroup
-func (instance *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return fail.InvalidInstanceError()

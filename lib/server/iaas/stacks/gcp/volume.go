@@ -41,7 +41,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
@@ -75,7 +75,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	return out, nil
 }
 
-func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
+func toAbstractVolume(in compute.Disk) (out *abstract.Volume, ferr fail.Error) {
 	out = abstract.NewVolume()
 	out.Name = in.Name
 	if strings.Contains(in.Type, "pd-ssd") {
@@ -85,6 +85,8 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
 	}
 	out.Size = int(in.SizeGb)
 	out.ID = strconv.FormatUint(in.Id, 10)
+
+	var xerr fail.Error
 	if out.State, xerr = toAbstractVolumeState(in.Status); xerr != nil {
 		return abstract.NewVolume(), xerr
 	}
@@ -92,7 +94,7 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()

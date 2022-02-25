@@ -101,12 +101,12 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and restores a Volume
-func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
+func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 	if v == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, v))
 }
 

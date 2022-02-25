@@ -52,7 +52,7 @@ import (
 )
 
 // ListRegions ...
-func (s stack) ListRegions() (list []string, xerr fail.Error) {
+func (s stack) ListRegions() (list []string, ferr fail.Error) {
 	var emptySlice []string
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -61,7 +61,7 @@ func (s stack) ListRegions() (list []string, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
 				// ParentRegionID: "RegionOne",
@@ -101,8 +101,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
-	var xerr fail.Error
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
 			return innerErr
@@ -176,7 +175,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	nullAI := abstract.Image{}
 	if valid.IsNil(s) {
 		return nullAI, fail.InvalidInstanceError()
@@ -189,7 +188,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	defer tracer.Exiting()
 
 	var img *images.Image
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			img, innerErr = images.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -209,7 +208,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
+func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
 	if valid.IsNil(s) {
 		return nullAHT, fail.InvalidInstanceError()
@@ -223,7 +222,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 	// Try to get template
 	var flv *flavors.Flavor
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -1187,7 +1186,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	nullServer := &servers.Server{}
 	if valid.IsNil(s) {
 		return nullServer, fail.InvalidInstanceError()
@@ -1548,13 +1547,13 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // rpcGetServer returns
-func (s stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
+func (s stack) rpcGetServer(id string) (_ *servers.Server, ferr fail.Error) {
 	if id == "" {
 		return &servers.Server{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	var resp *servers.Server
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = servers.Get(s.ComputeClient, id).Extract()
 			return err

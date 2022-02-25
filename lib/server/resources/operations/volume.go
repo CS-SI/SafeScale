@@ -68,7 +68,7 @@ func VolumeNullValue() *volume { // nolint
 }
 
 // NewVolume creates an instance of Volume
-func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
+func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 	if svc == nil {
 		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -232,8 +232,8 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // GetSpeed ...
-func (instance *volume) GetSpeed() (_ volumespeed.Enum, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
@@ -246,8 +246,8 @@ func (instance *volume) GetSpeed() (_ volumespeed.Enum, xerr fail.Error) {
 }
 
 // GetSize ...
-func (instance *volume) GetSize() (_ int, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) GetSize() (_ int, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
@@ -260,8 +260,9 @@ func (instance *volume) GetSize() (_ int, xerr fail.Error) {
 }
 
 // GetAttachments returns where the Volume is attached
-func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -290,8 +291,8 @@ func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xer
 }
 
 // Browse walks through volume MetadataFolder and executes a callback for each entry
-func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
 	if instance == nil {
@@ -350,8 +351,8 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 }
 
 // Delete deletes Volume and its metadata
-func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -967,7 +968,7 @@ func (instance *volume) Attach(
 	return nil
 }
 
-func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set, xerr fail.Error) {
+func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set, ferr fail.Error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -1042,8 +1043,8 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

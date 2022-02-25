@@ -225,8 +225,8 @@ func (instance *taskGroup) SetID(id string) fail.Error {
 
 // Start runs in goroutine the function with parameters
 // Returns the subtask created to run the action (should be ignored in most cases)
-func (instance *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (tg Task, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (tg Task, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return instance, fail.InvalidInstanceError()
 	}
@@ -236,8 +236,8 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 
 // StartWithTimeout runs in goroutine the function with parameters, with a timeout
 // Returns the subtask created to run the action (should be ignored in most cases)
-func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (_ Task, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (_ Task, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return instance, fail.InvalidInstanceError()
 	}
@@ -281,12 +281,17 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 		}
 
 		if timeout > 0 {
+			var xerr fail.Error
 			_, xerr = subtask.StartWithTimeout(action, params, timeout, options...)
+			if xerr != nil {
+				return nil, xerr
+			}
 		} else {
+			var xerr fail.Error
 			_, xerr = subtask.Start(action, params, options...)
-		}
-		if xerr != nil {
-			return nil, err
+			if xerr != nil {
+				return nil, xerr
+			}
 		}
 
 		instance.children.tasks = append(instance.children.tasks, newChild)

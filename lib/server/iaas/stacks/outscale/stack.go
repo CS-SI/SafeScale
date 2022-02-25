@@ -110,7 +110,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // New creates a new stack
-func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
+func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	if options == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
@@ -212,7 +212,7 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s stack) ListRegions() (_ []string, xerr fail.Error) {
+func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return []string{}, fail.InvalidInstanceError()
 	}
@@ -234,7 +234,7 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (az map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()

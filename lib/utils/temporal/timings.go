@@ -328,7 +328,7 @@ func HostOperationTimeout() time.Duration {
 	return getFromEnv(defaultHostOperationTimeout, "SAFESCALE_HOST_TIMEOUT")
 }
 
-// OperationTimeout
+// OperationTimeout ...
 func OperationTimeout() time.Duration {
 	return getFromEnv(defaultOperationTimeout, "SAFESCALE_OP_TIMEOUT", "SAFESCALE_OPERATION_TIMEOUT")
 }

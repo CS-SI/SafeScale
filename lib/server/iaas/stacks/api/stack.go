@@ -94,7 +94,7 @@ type Stack interface {
 	CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)
 	// InspectSubnet returns the network identified by id
 	InspectSubnet(id string) (*abstract.Subnet, fail.Error)
-	// InspectSubnetByName returns the network identified by name)
+	// InspectSubnetByName returns the network identified by 'name'
 	InspectSubnetByName(networkID, name string) (*abstract.Subnet, fail.Error)
 	// ListSubnets lists all subnets of a network (or all subnets if no networkRef is provided)
 	ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error)

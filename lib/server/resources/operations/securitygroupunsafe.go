@@ -235,10 +235,10 @@ func (instance *SecurityGroup) unsafeClear() fail.Error {
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	xerr = rule.Validate()
+	xerr := rule.Validate()
 	if xerr != nil {
 		return xerr
 	}
@@ -260,8 +260,8 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 }
 
 // unsafeUnbindFromSubnet unbinds the security group from a subnet
-func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -323,8 +323,8 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 
 // unsafeBindToSubnet binds the security group to a host
 // This method is called assuming Subnet resource is locked (so do not used the resource directly to prevent deadlock
-func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -411,8 +411,8 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 
 // unsafeBindToHost binds the security group to a host.
 // instance is not locked, it must have been done outside to prevent data races
-func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)

@@ -198,11 +198,12 @@ func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fa
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host, xerr fail.Error) {
+func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
+		var xerr fail.Error
 		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -213,11 +214,12 @@ func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host,
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, xerr fail.Error) {
+func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
+		var xerr fail.Error
 		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -465,9 +467,10 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
 // and keep this list during all the installation session
-func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
+func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.Host, ferr fail.Error) {
 	var hosts []resources.Host
 
+	var xerr fail.Error
 	hosts, xerr = w.identifyAllGateways(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -486,7 +489,7 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the installation session
-func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
+func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, ferr fail.Error) {
 	if w.allGateways != nil {
 		return w.allGateways, nil
 	}
@@ -553,7 +556,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(ctx context.Context, params data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
+func (w *worker) Proceed(ctx context.Context, params data.Map, settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
 	w.variables = params
 	w.settings = settings
 
@@ -825,7 +828,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	defer fail.OnExitLogError(&ferr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName),
-		fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, xerr),
+		fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, ferr),
 		logrus.DebugLevel,
 	)
 
@@ -1053,7 +1056,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 	return fail.NotAvailableError("Feature '%s' not suitable for host", w.feature.GetName())
 }
 
-func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
+func (w *worker) validateClusterSizing(ctx context.Context) (ferr fail.Error) {
 	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1343,8 +1346,8 @@ type taskApplyProxyRuleParameters struct {
 	variables  *data.Map
 }
 
-func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
@@ -1533,8 +1536,8 @@ func normalizeScript(timings temporal.Timings, params *data.Map, reserved data.M
 }
 
 // setSecurity applies the security rules defined in specification file (if there are some)
-func (w *worker) setSecurity(ctx context.Context) (xerr fail.Error) {
-	xerr = w.setNetworkingSecurity(ctx)
+func (w *worker) setSecurity(ctx context.Context) (ferr fail.Error) {
+	xerr := w.setNetworkingSecurity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1543,7 +1546,7 @@ func (w *worker) setSecurity(ctx context.Context) (xerr fail.Error) {
 }
 
 // setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
-func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
+func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

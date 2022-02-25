@@ -116,7 +116,7 @@ func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string 
 }
 
 // ClusterRequestFromProtocolToAbstract ...
-func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, xerr fail.Error) {
+func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, ferr fail.Error) {
 	nullCR := abstract.ClusterRequest{}
 
 	var (
@@ -124,6 +124,8 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		masterSizing  *abstract.HostSizingRequirements
 		nodeSizing    *abstract.HostSizingRequirements
 	)
+
+	var xerr fail.Error
 	if in.GatewaySizing != "" {
 		gatewaySizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.GatewaySizing)
 		if xerr != nil {

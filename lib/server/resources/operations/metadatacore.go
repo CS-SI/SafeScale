@@ -72,8 +72,8 @@ func NullCore() *MetadataCore {
 }
 
 // NewCore creates an instance of MetadataCore
-func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return NullCore(), fail.InvalidParameterCannotBeNilError("svc")
@@ -174,8 +174,9 @@ func (myself *MetadataCore) GetKind() string {
 }
 
 // Inspect protects the data for shared read
-func (myself *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
@@ -207,8 +208,8 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Erro
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change thru time).
-func (myself *MetadataCore) Review(callback resources.Callback) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
@@ -231,8 +232,9 @@ func (myself *MetadataCore) Review(callback resources.Callback) (xerr fail.Error
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow to disable reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
@@ -309,8 +311,9 @@ func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.I
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the MetadataCore instance already carries a data
-func (myself *MetadataCore) Carry(clonable data.Clonable) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	// Note: do not test with IsNull() here, it MUST be null value on call
 	if myself == nil {
@@ -386,8 +389,9 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (myself *MetadataCore) Read(ref string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	// Note: do not test with .IsNull() here, it may be null value on first read
 	if myself == nil {
@@ -622,7 +626,7 @@ func (myself *MetadataCore) write() fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *MetadataCore) Reload() (xerr fail.Error) {
+func (myself *MetadataCore) Reload() (ferr fail.Error) {
 	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -723,8 +727,8 @@ func (myself *MetadataCore) reload() (ferr fail.Error) {
 }
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
-func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if myself == nil {
 		return fail.InvalidInstanceError()
@@ -747,8 +751,8 @@ func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (
 }
 
 // Delete deletes the metadata
-func (myself *MetadataCore) Delete() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Delete() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
@@ -769,6 +773,7 @@ func (myself *MetadataCore) Delete() (xerr fail.Error) {
 			return fail.InconsistentError("field 'id' is not set with string")
 		}
 
+		var xerr fail.Error
 		xerr = myself.folder.Lookup(byIDFolderName, id)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -826,6 +831,7 @@ func (myself *MetadataCore) Delete() (xerr fail.Error) {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
 
+		var xerr fail.Error
 		xerr = myself.folder.Lookup("", name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -860,7 +866,7 @@ func (myself *MetadataCore) Delete() (xerr fail.Error) {
 }
 
 // Serialize serializes instance into bytes (output json code)
-func (myself *MetadataCore) Serialize() (_ []byte, xerr fail.Error) {
+func (myself *MetadataCore) Serialize() (_ []byte, ferr fail.Error) {
 	if myself == nil || valid.IsNil(myself) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -873,8 +879,8 @@ func (myself *MetadataCore) Serialize() (_ []byte, xerr fail.Error) {
 
 // serialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (myself *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) serialize() (_ []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	var (
 		shieldedJSONed []byte
@@ -882,6 +888,7 @@ func (myself *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 		propsMapped    = map[string]string{}
 	)
 
+	var xerr fail.Error
 	shieldedJSONed, xerr = myself.shielded.Serialize()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -922,8 +929,8 @@ func (myself *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates
-func (myself *MetadataCore) Deserialize(buf []byte) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if myself == nil || valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
@@ -937,8 +944,9 @@ func (myself *MetadataCore) Deserialize(buf []byte) (xerr fail.Error) {
 
 // deserialize reads json code and reinstantiates
 // Note: must be called after locking the instance
-func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
+func (myself *MetadataCore) deserialize(buf []byte) (ferr fail.Error) {
 	if myself.properties == nil {
+		var xerr fail.Error
 		myself.properties, xerr = serializer.NewJSONProperties("resources." + myself.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -969,7 +977,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		return fail.SyntaxErrorWithCause(err, nil, "failed to marshal MetadataCore to JSON")
 	}
 
-	xerr = myself.shielded.Deserialize(jsoned)
+	xerr := myself.shielded.Deserialize(jsoned)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "deserializing MetadataCore failed")

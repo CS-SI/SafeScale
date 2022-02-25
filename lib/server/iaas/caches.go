@@ -89,7 +89,7 @@ func (instance *ResourceCache) isNull() bool {
 }
 
 // Get returns the content associated with key
-func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
+func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, ferr fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -128,6 +128,7 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 		if onMissFunc != nil {
 			if onMissTimeout <= 0 {
+				var xerr fail.Error
 				_, xerr = onMissFunc() // onMissFunc() knows what the error is
 				return nil, xerr
 			}
@@ -231,7 +232,7 @@ func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) f
 }
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
-func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, ferr fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -242,6 +243,7 @@ func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	var xerr fail.Error
 	if ce, xerr = instance.byID.Commit(key, content); xerr != nil {
 		return nil, xerr
 	}
@@ -266,7 +268,7 @@ func (instance *ResourceCache) FreeEntry(key string) fail.Error {
 }
 
 // AddEntry ...
-func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, ferr fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -274,6 +276,7 @@ func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entr
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	var xerr fail.Error
 	if ce, xerr = instance.byID.Add(content); xerr != nil {
 		return nil, xerr
 	}

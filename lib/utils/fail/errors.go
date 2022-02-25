@@ -1512,7 +1512,7 @@ func AlteredNothingError(msg ...interface{}) *ErrAlteredNothing {
 	return &ErrAlteredNothing{r}
 }
 
-// AlteredNothingError creates an ErrAlteredNothing error
+// AlteredNothingErrorWithCause creates an ErrAlteredNothing error
 func AlteredNothingErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrAlteredNothing {
 	r := newError(cause, consequences, msg...)
 	r.grpcCode = codes.PermissionDenied

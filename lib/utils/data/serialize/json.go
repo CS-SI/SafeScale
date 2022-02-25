@@ -276,12 +276,12 @@ func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 // Deserialize ...
 // Returns fail.SyntaxError if an JSON syntax error happens
 // satisfies interface data.Serializable
-func (x *JSONProperties) Deserialize(buf []byte) (xerr fail.Error) {
+func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()

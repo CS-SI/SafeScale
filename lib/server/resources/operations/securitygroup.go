@@ -262,8 +262,8 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through SecurityGroup MetadataFolder and executes a callback for each entries
-func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with IsNull here, as Browse may be used from null value
 	if instance == nil {
@@ -499,8 +499,8 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 }
 
 // Delete deletes a Security Group
-func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -788,8 +788,8 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 }
 
 // Clear removes all rules from a security group
-func (instance *SecurityGroup) Clear(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Clear(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -822,8 +822,8 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 }
 
 // Reset clears a security group and re-adds associated rules as stored in metadata
-func (instance *SecurityGroup) Reset(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -887,8 +887,8 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 }
 
 // AddRule adds a rule to a security group
-func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.SecurityGroupRule) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -919,8 +919,8 @@ func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.Secur
 }
 
 // AddRules adds rules to a Security Group
-func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.SecurityGroupRules) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.SecurityGroupRules) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -953,7 +953,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -964,16 +964,16 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 			if valid.IsNil(v) {
 				return fail.InvalidParameterError("rules", "entry #%d cannot be null value of 'abstract.SecurityGroupRule'", k)
 			}
-			innerXErr = v.Validate()
-			if innerXErr != nil {
-				return innerXErr
+			inErr := v.Validate()
+			if inErr != nil {
+				return inErr
 			}
 		}
 		svc := instance.Service()
 		for _, v := range rules {
-			_, innerXErr = svc.AddRuleToSecurityGroup(asg, v)
-			if innerXErr != nil {
-				return innerXErr
+			_, inErr := svc.AddRuleToSecurityGroup(asg, v)
+			if inErr != nil {
+				return inErr
 			}
 		}
 		return nil
@@ -982,8 +982,8 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 
 // DeleteRule deletes a rule identified by its ID from a security group
 // If rule is not in the security group, returns *fail.ErrNotFound
-func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.SecurityGroupRule) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -994,7 +994,8 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 	if rule == nil {
 		return fail.InvalidParameterCannotBeNilError("rule")
 	}
-	xerr = rule.Validate()
+
+	xerr := rule.Validate()
 	if xerr != nil {
 		return xerr
 	}
@@ -1041,8 +1042,8 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 }
 
 // GetBoundHosts returns the list of ID of hosts bound to the security group
-func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1095,8 +1096,8 @@ func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 }
 
 // GetBoundSubnets returns the subnet bound to the security group
-func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1153,8 +1154,8 @@ func (instance *SecurityGroup) CheckConsistency(_ context.Context) fail.Error {
 }
 
 // ToProtocol converts a Security Group to protobuf message
-func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1179,8 +1180,8 @@ func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, 
 }
 
 // BindToHost binds the security group to a host.
-func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1199,8 +1200,8 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance reso
 }
 
 // UnbindFromHost unbinds the security group from a host
-func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1261,8 +1262,8 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 }
 
 // UnbindFromHostByReference unbinds the security group from a host identified by reference (id or name)
-func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, hostRef string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, hostRef string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1338,8 +1339,8 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 func (instance *SecurityGroup) BindToSubnet(
 	ctx context.Context, subnetInstance resources.Subnet, enable resources.SecurityGroupActivation,
 	mark resources.SecurityGroupMark,
-) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1526,8 +1527,8 @@ func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(
 // UnbindFromSubnet unbinds the security group from a subnet
 func (instance *SecurityGroup) UnbindFromSubnet(
 	ctx context.Context, subnetInstance resources.Subnet,
-) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1543,7 +1544,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(
 	defer instance.lock.Unlock()
 
 	var subnetHosts *propertiesv1.SubnetHosts
-	xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
@@ -1563,8 +1564,8 @@ func (instance *SecurityGroup) UnbindFromSubnet(
 // unbindFromSubnetHosts unbinds the security group from Hosts attached to a Subnet
 func (instance *SecurityGroup) unbindFromSubnetHosts(
 	ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams,
-) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1654,8 +1655,8 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 // UnbindFromSubnetByReference unbinds the security group from a subnet
 func (instance *SecurityGroup) UnbindFromSubnetByReference(
 	ctx context.Context, subnetRef string,
-) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

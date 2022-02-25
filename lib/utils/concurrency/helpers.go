@@ -64,7 +64,7 @@ func randomIntWithReseed(min, max int) int { // nolint
 }
 
 func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func(chan string) error) TaskAction {
-	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+	return func(t Task, parameters TaskParameters) (_ TaskResult, ferr fail.Error) {
 		traceR := newTracer(t, false) // change to true to display traces
 
 		type internalRes struct {
@@ -73,7 +73,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		}
 
 		if actionHandlesPanicByItself {
-			defer fail.OnPanic(&xerr)
+			defer fail.OnPanic(&ferr)
 		}
 
 		ctx := t.Context()

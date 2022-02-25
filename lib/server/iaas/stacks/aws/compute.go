@@ -986,7 +986,7 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.E
 }
 
 // GetHostState returns the current state of the host
-func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
+func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}

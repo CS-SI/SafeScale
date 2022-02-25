@@ -90,7 +90,7 @@ func (tv toV21_05_0) Upgrade(svc iaas.Service, from string, dryRun bool) fail.Er
 	return nil
 }
 
-func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
+func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (ferr fail.Error) {
 	logrus.Infof("Upgrading metadata of Networks...")
 
 	var (
@@ -103,6 +103,7 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 		return err
 	}
 
+	var xerr fail.Error
 	if withDefaultNetwork {
 		// If there is a default Network/VPC, uses it as owning network for all defined networks in metadata to convert to Subnets
 		abstractOwningNetwork, xerr = svc.GetDefaultNetwork()
@@ -668,14 +669,15 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 	// -- Make sure host is referenced in Subnet --
 	var subnetInstance resources.Subnet
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) (innerXErr fail.Error) {
+		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkingV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expectede, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			subnetInstance, innerXErr = operations.LoadSubnet(instance.Service(), "", hostNetworkingV2.DefaultSubnetID)
-			return innerXErr
+			var inErr fail.Error
+			subnetInstance, inErr = operations.LoadSubnet(instance.Service(), "", hostNetworkingV2.DefaultSubnetID)
+			return inErr
 		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
@@ -778,7 +780,7 @@ func (tv toV21_05_0) upgradeClusters(svc iaas.Service) fail.Error {
 	})
 }
 
-func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster) fail.Error {
+func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster) (ferr fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
@@ -806,14 +808,15 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 			return xerr
 		}
 
-		if flavor, xerr := instance.GetFlavor(); xerr == nil && flavor == clusterflavor.K8S {
+		if flavor, flErr := instance.GetFlavor(); flErr == nil && flavor == clusterflavor.K8S {
 			var (
 				featName string
 				feat     resources.Feature
 				requires map[string]struct{}
 			)
-			xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+
+			altErr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.Features' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -823,14 +826,15 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 						featuresV1.Installed = make(map[string]*propertiesv1.ClusterInstalledFeature)
 					}
 					featName = "kubernetes"
-					feat, innerXErr = operations.NewFeature(instance.Service(), featName)
-					if innerXErr != nil {
-						return innerXErr
+					var inErr fail.Error
+					feat, inErr = operations.NewFeature(instance.Service(), featName)
+					if inErr != nil {
+						return inErr
 					}
 
-					requires, innerXErr = feat.GetRequirements()
-					if innerXErr != nil {
-						return innerXErr
+					requires, inErr = feat.GetRequirements()
+					if inErr != nil {
+						return inErr
 					}
 
 					featuresV1.Installed[featName] = &propertiesv1.ClusterInstalledFeature{
@@ -841,44 +845,44 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 					return nil
 				})
 			})
-			if xerr != nil {
-				return xerr
+			if altErr != nil {
+				return altErr
 			}
 
 			// Now add reference to kubernetes in cluster hosts properties
-			masters, xerr := instance.ListMasterIDs(context.Background())
-			if xerr != nil {
-				switch xerr.(type) {
+			masters, inErr := instance.ListMasterIDs(context.Background())
+			if inErr != nil {
+				switch inErr.(type) {
 				case *fail.ErrNotAvailable:
 					break
 				default:
-					return xerr
+					return inErr
 				}
 			} else {
-				xerr = tv.addFeatureInProperties(feat, instance.Service(), masters)
-				if xerr != nil {
-					return xerr
+				inErr = tv.addFeatureInProperties(feat, instance.Service(), masters)
+				if inErr != nil {
+					return inErr
 				}
 			}
 
-			nodes, xerr := instance.ListNodeIDs(context.Background())
-			if xerr != nil {
-				switch xerr.(type) {
+			nodes, inErr := instance.ListNodeIDs(context.Background())
+			if inErr != nil {
+				switch inErr.(type) {
 				case *fail.ErrNotAvailable:
 					break
 				default:
-					return xerr
+					return inErr
 				}
 			} else {
-				xerr = tv.addFeatureInProperties(feat, instance.Service(), nodes)
-				if xerr != nil {
-					return xerr
+				inErr = tv.addFeatureInProperties(feat, instance.Service(), nodes)
+				if inErr != nil {
+					return inErr
 				}
 			}
 
-			netconf, xerr := instance.GetNetworkConfig()
-			if xerr != nil {
-				return xerr
+			netconf, inErr := instance.GetNetworkConfig()
+			if inErr != nil {
+				return inErr
 			}
 
 			gws := data.IndexedListOfStrings{}
@@ -889,9 +893,9 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 				gws[1] = netconf.SecondaryGatewayID
 			}
 			if len(gws) > 0 {
-				xerr = tv.addFeatureInProperties(feat, instance.Service(), gws)
-				if xerr != nil {
-					return xerr
+				inErr = tv.addFeatureInProperties(feat, instance.Service(), gws)
+				if inErr != nil {
+					return inErr
 				}
 			}
 		}
@@ -1135,25 +1139,26 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 			update bool
 		)
 
+		var inErr fail.Error
 		if props.Lookup(clusterproperty.NetworkV2) {
 			// Having a clusterproperty.NetworkV2, need to update instance with clusterproperty.NetworkV3
-			innerXErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			inErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, subnetName)
-				innerXErr = debug.InjectPlannedFail(innerXErr)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
+				networkInstance, subnetInstance, clusterCreatedNetwork, nErr := inspectNetworkAndSubnet(instance, subnetName)
+				nErr = debug.InjectPlannedFail(nErr)
+				if nErr != nil {
+					switch nErr.(type) {
 					case *fail.ErrNotFound:
-						innerXErr = fail.Wrap(innerXErr, "missing metadata of Network or Subnet referenced by Cluster %s", clusterName)
-						logrus.Warning(innerXErr.Error())
+						nErr = fail.Wrap(nErr, "missing metadata of Network or Subnet referenced by Cluster %s", clusterName)
+						logrus.Warning(nErr.Error())
 						missingSomething = true
 					default:
 					}
-					return innerXErr
+					return nErr
 				}
 				defer networkInstance.Released()
 				defer subnetInstance.Released()
@@ -1178,16 +1183,16 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 			})
 		} else {
 			// Having a clusterproperty.NetworkV1, need to update instance with clusterproperty.NetworkV3
-			innerXErr = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
+			inErr = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
 					return fail.InconsistentError()
 				}
 
-				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, subnetName)
-				innerXErr = debug.InjectPlannedFail(innerXErr)
-				if innerXErr != nil {
-					return innerXErr
+				networkInstance, subnetInstance, clusterCreatedNetwork, nErr := inspectNetworkAndSubnet(instance, subnetName)
+				nErr = debug.InjectPlannedFail(nErr)
+				if nErr != nil {
+					return nErr
 				}
 				defer networkInstance.Released()
 				defer subnetInstance.Released()
@@ -1206,9 +1211,9 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 				return nil
 			})
 		}
-		innerXErr = debug.InjectPlannedFail(innerXErr)
-		if innerXErr != nil && !missingSomething {
-			return innerXErr
+		inErr = debug.InjectPlannedFail(inErr)
+		if inErr != nil && !missingSomething {
+			return inErr
 		}
 
 		if !missingSomething && update {

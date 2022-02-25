@@ -51,15 +51,15 @@ func NewBucketHandler(job server.Job) BucketHandler {
 }
 
 // List retrieves all available buckets
-func (handler *bucketHandler) List(all bool) (_ []string, outerr fail.Error) {
-	defer fail.OnPanic(&outerr)
+func (handler *bucketHandler) List(all bool) (_ []string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(handler.job.Task(), true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&outerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	if all {
 		return handler.job.Service().ListBuckets(objectstorage.RootPath)

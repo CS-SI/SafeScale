@@ -86,7 +86,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build builds a new Client from configuration parameter
-func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr fail.Error) {
+func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr fail.Error) {
 	identity := remap(opt["identity"])
 	compute := remap(opt["compute"])
 	metadata := remap(opt["metadata"])
@@ -104,6 +104,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			return nil, fail.SyntaxError("keyword 'UserID' in section 'identity' not found in tenant file")
 		}
 
+		var xerr fail.Error
 		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if xerr != nil {
 			return nil, xerr

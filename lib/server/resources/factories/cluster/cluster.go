@@ -27,7 +27,7 @@ import (
 )
 
 // List returns a list of available hosts
-func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
+func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentity, ferr fail.Error) {
 	var emptyList []abstract.ClusterIdentity
 
 	if ctx == nil {
@@ -51,11 +51,11 @@ func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentit
 }
 
 // New creates a new instance of resources.Cluster
-func New(ctx context.Context, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+func New(ctx context.Context, svc iaas.Service) (_ resources.Cluster, ferr fail.Error) {
 	return operations.NewCluster(ctx, svc)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+func Load(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, ferr fail.Error) {
 	return operations.LoadCluster(ctx, svc, name)
 }

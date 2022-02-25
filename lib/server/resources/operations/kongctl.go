@@ -109,9 +109,10 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 					item := propertiesv1.NewHostInstalledFeature()
 					item.HostContext = true
-					item.Requires, innerXErr = featureInstance.GetRequirements()
-					if innerXErr != nil {
-						return innerXErr
+					var inErr fail.Error
+					item.Requires, inErr = featureInstance.GetRequirements()
+					if inErr != nil {
+						return inErr
 					}
 					featuresV1.Installed[featureInstance.GetName()] = item
 					return nil

@@ -67,8 +67,8 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 }
 
 // PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")

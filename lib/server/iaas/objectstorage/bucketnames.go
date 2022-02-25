@@ -37,7 +37,7 @@ const (
 )
 
 // BuildMetadataBucketName builds the name of the bucket/stowContainer that will store metadata
-func BuildMetadataBucketName(driver, region, domain, project string) (name string, xerr fail.Error) {
+func BuildMetadataBucketName(driver, region, domain, project string) (name string, ferr fail.Error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
 	_, herr := hash.Write([]byte(sig))

@@ -66,15 +66,15 @@ func (handler *imageHandler) List(all bool) (images []abstract.Image, ferr fail.
 }
 
 // Select selects the image that best fits osname
-func (handler *imageHandler) Select(osname string) (image *abstract.Image, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *imageHandler) Select(osname string) (image *abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
-func (handler *imageHandler) Filter(osname string) (image []abstract.Image, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *imageHandler) Filter(osname string) (image []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented")
 }

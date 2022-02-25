@@ -543,7 +543,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	return nil
 }
 
-func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	var resultList []*protocol.ScanResult
@@ -573,7 +573,7 @@ func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.
 	return &protocol.ScanResultList{Results: resultList}, xerr
 }
 
-func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Error) {
+func (handler *tenantHandler) checkScannable() (isScannable bool, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	params, xerr := svc.GetTenantParameters()
@@ -591,7 +591,7 @@ func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Erro
 	return isScannable, xerr
 }
 
-func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
+func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
 	err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
 		return fail.ConvertError(err)
@@ -628,7 +628,7 @@ func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 	return nil
 }
 
-func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
+func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ConvertError(err)
 	}
@@ -665,9 +665,11 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 	return nil
 }
 
-func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
+func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
 	task := handler.job.Task()
 	svc := handler.job.Service()
+
+	var xerr fail.Error
 	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
@@ -690,9 +692,11 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 	return network, xerr
 }
 
-func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
+func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, ferr fail.Error) {
 	task := handler.job.Task()
 	svc := handler.job.Service()
+
+	var xerr fail.Error
 	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
@@ -721,7 +725,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 	return subnet, xerr
 }
 
-func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
+func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {
 	str := strings.TrimSpace(output)
 
 	tokens := strings.Split(str, "î")
@@ -801,7 +805,7 @@ func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
 	return &info, nil
 }
 
-func (handler *tenantHandler) collect() (xerr fail.Error) {
+func (handler *tenantHandler) collect() (ferr fail.Error) {
 	svc := handler.job.Service()
 
 	authOpts, xerr := svc.GetAuthenticationOptions()

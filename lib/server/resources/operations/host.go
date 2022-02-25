@@ -92,8 +92,8 @@ type Host struct {
 }
 
 // NewHost ...
-func NewHost(svc iaas.Service) (_ *Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -117,8 +117,8 @@ func HostNullValue() *Host {
 }
 
 // LoadHost ...
-func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -472,8 +472,8 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through Host MetadataFolder and executes a callback for each entry
-func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -517,8 +517,9 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 			}
 
 			ahc := abstract.NewHostCore()
-			if innerXErr = ahc.Deserialize(buf); innerXErr != nil {
-				return innerXErr
+			var inErr fail.Error
+			if inErr = ahc.Deserialize(buf); inErr != nil {
+				return inErr
 			}
 
 			return callback(ahc)
@@ -589,19 +590,19 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
-func (instance *Host) unsafeReload() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) unsafeReload() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	xerr = instance.MetadataCore.Reload()
+	xerr := instance.MetadataCore.Reload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
-			xerr = fail.NotFoundError("metadata of Host '%s' not found; Host deleted?", instance.GetName())
+			return fail.NotFoundErrorWithCause(xerr, nil, "metadata of Host '%s' not found; Host deleted?", instance.GetName())
 		default:
 			return xerr
 		}
@@ -689,8 +690,8 @@ func (instance *Host) unsafeReload() (xerr fail.Error) {
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
-func (instance *Host) Reload() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Reload() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -699,7 +700,7 @@ func (instance *Host) Reload() (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	xerr = instance.MetadataCore.Reload()
+	xerr := instance.MetadataCore.Reload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2127,8 +2128,8 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 }
 
 // WaitSSHReady waits until SSH responds successfully
-func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (_ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
@@ -2325,8 +2326,8 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 }
 
 // Delete deletes a Host with its metadata and updates subnet links
-func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -2382,8 +2383,8 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // RelaxedDeleteHost is the method that really deletes a host, being a gateway or not
-func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -2796,8 +2797,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -2812,8 +2813,8 @@ func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, xerr fail.Error) {
 // Run tries to execute command 'cmd' on the Host
 func (instance *Host) Run(
 	ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration,
-) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if instance == nil || valid.IsNil(instance) {
@@ -2859,8 +2860,8 @@ func (instance *Host) Run(
 // Pull downloads a file from Host
 func (instance *Host) Pull(
 	ctx context.Context, target, source string, timeout time.Duration,
-) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if instance == nil || valid.IsNil(instance) {
@@ -2950,8 +2951,8 @@ func (instance *Host) Pull(
 // Push uploads a file to Host
 func (instance *Host) Push(
 	ctx context.Context, source, target, owner, mode string, timeout time.Duration,
-) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if instance == nil || valid.IsNil(instance) {
@@ -2989,8 +2990,8 @@ func (instance *Host) Push(
 }
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -3044,8 +3045,8 @@ func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 }
 
 // GetVolumes returns information about volumes attached to the Host
-func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -3058,8 +3059,8 @@ func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, xerr fail.Error
 }
 
 // Start starts the Host
-func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -3153,8 +3154,8 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 }
 
 // Stop stops the Host
-func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -3345,8 +3346,8 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 
 // Resize ...
 // not yet implemented
-func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -3376,8 +3377,8 @@ func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 }
 
 // GetPublicIP returns the public IP address of the Host
-func (instance *Host) GetPublicIP() (ip string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetPublicIP() (ip string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	ip = ""
 	if instance == nil || valid.IsNil(instance) {
@@ -3394,8 +3395,8 @@ func (instance *Host) GetPublicIP() (ip string, xerr fail.Error) {
 }
 
 // GetPrivateIP returns the private IP of the Host on its default Networking
-func (instance *Host) GetPrivateIP() (_ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetPrivateIP() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
@@ -3408,8 +3409,8 @@ func (instance *Host) GetPrivateIP() (_ string, xerr fail.Error) {
 }
 
 // GetPrivateIPOnSubnet returns the private IP of the Host on its default Subnet
-func (instance *Host) GetPrivateIPOnSubnet(subnetID string) (ip string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetPrivateIPOnSubnet(subnetID string) (ip string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	ip = ""
 	if instance == nil || valid.IsNil(instance) {
@@ -3422,7 +3423,7 @@ func (instance *Host) GetPrivateIPOnSubnet(subnetID string) (ip string, xerr fai
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -3438,8 +3439,8 @@ func (instance *Host) GetPrivateIPOnSubnet(subnetID string) (ip string, xerr fai
 }
 
 // GetAccessIP returns the IP to reach the Host
-func (instance *Host) GetAccessIP() (ip string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetAccessIP() (ip string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	ip = ""
 	if instance == nil || valid.IsNil(instance) {
@@ -3453,8 +3454,8 @@ func (instance *Host) GetAccessIP() (ip string, xerr fail.Error) {
 }
 
 // GetShares returns the information about the shares hosted by the Host
-func (instance *Host) GetShares() (shares *propertiesv1.HostShares, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetShares() (shares *propertiesv1.HostShares, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	shares = &propertiesv1.HostShares{}
 	if instance == nil || valid.IsNil(instance) {
@@ -3464,7 +3465,7 @@ func (instance *Host) GetShares() (shares *propertiesv1.HostShares, xerr fail.Er
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -3479,8 +3480,8 @@ func (instance *Host) GetShares() (shares *propertiesv1.HostShares, xerr fail.Er
 }
 
 // GetMounts returns the information abouts the mounts of the Host
-func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	mounts = nil
 	if instance == nil || valid.IsNil(instance) {
@@ -3494,8 +3495,8 @@ func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Er
 }
 
 // IsClusterMember returns true if the Host is member of a cluster
-func (instance *Host) IsClusterMember() (yes bool, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) IsClusterMember() (yes bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	yes = false
 	if instance == nil || valid.IsNil(instance) {
@@ -3505,7 +3506,7 @@ func (instance *Host) IsClusterMember() (yes bool, xerr fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.ClusterMembershipV1, func(clonable data.Clonable) fail.Error {
 			hostClusterMembershipV1, ok := clonable.(*propertiesv1.HostClusterMembership)
 			if !ok {
@@ -3523,8 +3524,8 @@ func (instance *Host) IsClusterMember() (yes bool, xerr fail.Error) {
 }
 
 // IsGateway tells if the Host acts as a gateway for a Subnet
-func (instance *Host) IsGateway() (_ bool, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) IsGateway() (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
@@ -3534,7 +3535,7 @@ func (instance *Host) IsGateway() (_ bool, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	var state bool
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -3554,8 +3555,8 @@ func (instance *Host) IsGateway() (_ bool, xerr fail.Error) {
 }
 
 // IsSingle tells if the Host is single
-func (instance *Host) IsSingle() (_ bool, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) IsSingle() (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
@@ -3565,7 +3566,7 @@ func (instance *Host) IsSingle() (_ bool, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	var state bool
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -3584,15 +3585,15 @@ func (instance *Host) IsSingle() (_ bool, xerr fail.Error) {
 }
 
 // PushStringToFile creates a file 'filename' on remote 'Host' with the content 'content'
-func (instance *Host) PushStringToFile(ctx context.Context, content string, filename string) (xerr fail.Error) {
+func (instance *Host) PushStringToFile(ctx context.Context, content string, filename string) (ferr fail.Error) {
 	return instance.PushStringToFileWithOwnership(ctx, content, filename, "", "")
 }
 
 // PushStringToFileWithOwnership creates a file 'filename' on remote 'Host' with the content 'content', and apply ownership
 func (instance *Host) PushStringToFileWithOwnership(
 	ctx context.Context, content string, filename string, owner, mode string,
-) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -3635,8 +3636,8 @@ func (instance *Host) PushStringToFileWithOwnership(
 }
 
 // GetDefaultSubnet returns the Networking instance corresponding to Host default subnet
-func (instance *Host) GetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) GetDefaultSubnet() (rs resources.Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return NullSubnet(), fail.InvalidInstanceError()
@@ -3649,8 +3650,8 @@ func (instance *Host) GetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) 
 }
 
 // ToProtocol convert a resources.Host to protocol.Host
-func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -3669,7 +3670,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 	publicIP := instance.publicIP
 	privateIP := instance.privateIP
 
-	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		ahc, ok = clonable.(*abstract.HostCore)
 		if !ok {
@@ -3721,8 +3722,8 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 // BindSecurityGroup binds a security group to the Host; if enabled is true, apply it immediately
 func (instance *Host) BindSecurityGroup(
 	ctx context.Context, sgInstance resources.SecurityGroup, enable resources.SecurityGroupActivation,
-) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -3804,8 +3805,8 @@ func (instance *Host) BindSecurityGroup(
 }
 
 // UnbindSecurityGroup unbinds a security group from the Host
-func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -3902,8 +3903,8 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 }
 
 // ListSecurityGroups returns a slice of security groups bound to Host
-func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	var emptySlice []*propertiesv1.SecurityGroupBond
 	if instance == nil || valid.IsNil(instance) {
@@ -3913,7 +3914,7 @@ func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -3933,8 +3934,8 @@ func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []
 }
 
 // EnableSecurityGroup enables a bound security group to Host by applying its rules
-func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -4042,8 +4043,8 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 }
 
 // DisableSecurityGroup disables a bound security group to Host
-func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

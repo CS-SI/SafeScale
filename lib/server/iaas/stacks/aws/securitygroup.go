@@ -143,11 +143,12 @@ func (s stack) fromAbstractSecurityGroupRules(asg abstract.SecurityGroup, in abs
 }
 
 // fromAbstractSecurityGroupRule converts an abstract.SecurityGroupRule to AWS ec2.IpPermission
-func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (_ *ec2.IpPermission, xerr fail.Error) {
+func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (_ *ec2.IpPermission, ferr fail.Error) {
 	var (
 		involved   []string
 		usesGroups bool
 	)
+	var xerr fail.Error
 	switch in.Direction {
 	case securitygroupruledirection.Ingress:
 		involved = in.Sources
@@ -209,7 +210,7 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -217,6 +218,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
+		var xerr fail.Error
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
 		if xerr != nil {
 			return xerr
@@ -266,7 +268,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 }
 
 // toAbstractSecurityGroup converts a security group coming from AWS to an abstracted Security Group
-func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, xerr fail.Error) {
+func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -276,6 +278,7 @@ func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, 
 		Name:        aws.StringValue(in.GroupName),
 		Description: aws.StringValue(in.Description),
 	}
+	var xerr fail.Error
 	out.Rules, xerr = toAbstractSecurityGroupRules(in)
 	if xerr != nil {
 		return nil, xerr
@@ -331,7 +334,7 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 }
 
 // InspectSecurityGroupByName inspects a security group identified by name
-func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()

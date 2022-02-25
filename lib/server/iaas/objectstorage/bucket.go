@@ -101,8 +101,8 @@ func (instance *bucket) IsNull() bool {
 }
 
 // CreateObject ...
-func (instance bucket) CreateObject(objectName string) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) CreateObject(objectName string) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -117,8 +117,8 @@ func (instance bucket) CreateObject(objectName string) (_ Object, xerr fail.Erro
 }
 
 // InspectObject ...
-func (instance bucket) InspectObject(objectName string) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) InspectObject(objectName string) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -174,8 +174,8 @@ func (instance bucket) estimateSize(path, prefix string) (int, error) {
 }
 
 // ListObjects list objects of a GetBucket
-func (instance bucket) ListObjects(path, prefix string) (_ []string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) ListObjects(path, prefix string) (_ []string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -210,8 +210,8 @@ func (instance bucket) ListObjects(path, prefix string) (_ []string, xerr fail.E
 }
 
 // Browse walks through the objects in the GetBucket and executes callback on each Object found
-func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -241,8 +241,8 @@ func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Er
 }
 
 // Clear empties a bucket
-func (instance bucket) Clear(path, prefix string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) Clear(path, prefix string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -274,8 +274,8 @@ func (instance bucket) Clear(path, prefix string) (xerr fail.Error) {
 }
 
 // DeleteObject deletes an object from a bucket
-func (instance bucket) DeleteObject(objectName string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) DeleteObject(objectName string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -293,8 +293,8 @@ func (instance bucket) DeleteObject(objectName string) (xerr fail.Error) {
 }
 
 // ReadObject ...
-func (instance bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -313,8 +313,8 @@ func (instance bucket) ReadObject(objectName string, target io.Writer, from int6
 }
 
 // WriteObject ...
-func (instance bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -345,8 +345,8 @@ func (instance bucket) WriteMultiPartObject(
 	source io.Reader, sourceSize int64,
 	chunkSize int,
 	metadata abstract.ObjectStorageItemMetadata,
-) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -369,8 +369,8 @@ func (instance bucket) WriteMultiPartObject(
 }
 
 // GetName returns the name of the GetBucket
-func (instance bucket) GetName() (_ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) GetName() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -379,8 +379,8 @@ func (instance bucket) GetName() (_ string, xerr fail.Error) {
 
 // GetCount returns the count of objects in the GetBucket
 // 'path' corresponds to stow prefix, and 'prefix' allows filtering what to count
-func (instance bucket) GetCount(path, prefix string) (_ int64, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) GetCount(path, prefix string) (_ int64, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -413,8 +413,8 @@ func (instance bucket) GetCount(path, prefix string) (_ int64, xerr fail.Error) 
 }
 
 // GetSize returns the total size of the Objects inside the GetBucket
-func (instance bucket) GetSize(path, prefix string) (_ int64, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance bucket) GetSize(path, prefix string) (_ int64, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return 0, "", fail.InvalidInstanceError()
 	}

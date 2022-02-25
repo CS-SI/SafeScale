@@ -41,8 +41,8 @@ import (
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
-func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -118,8 +118,8 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 }
 
 // CheckFeature ...
-func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -162,8 +162,8 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -257,8 +257,8 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -306,8 +306,8 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
-func (instance *Host) UnregisterFeature(feat string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) UnregisterFeature(feat string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -448,8 +448,8 @@ func (instance *Host) InstalledFeatures() []string {
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
 // satisfies interface install.Targetable
-func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -460,7 +460,8 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -560,9 +561,9 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 }
 
 // IsFeatureInstalled ...
-func (instance *Host) IsFeatureInstalled(name string) (found bool, xerr fail.Error) {
+func (instance *Host) IsFeatureInstalled(name string) (found bool, ferr fail.Error) {
 	found = false
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()

@@ -132,13 +132,13 @@ func (instance *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a ClusterIdentity
-func (instance *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
+func (instance *ClusterIdentity) Deserialize(buf []byte) (ferr fail.Error) {
 	// instance cannot be nil, but can be null value (which will be filled by this method)
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	jserr := json.Unmarshal(buf, instance)
 	if jserr != nil {

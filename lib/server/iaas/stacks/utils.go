@@ -20,21 +20,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	uuid "github.com/gofrs/uuid"
 )
 
 // HostParameter can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
 type HostParameter interface{}
 
 // ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
-func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, xerr fail.Error) {
+func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
 	ahf = abstract.NewHostFull()
 	switch hostParam := hostParam.(type) {
 	case string:
@@ -76,7 +73,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 }
 
 // ProvideCredentialsIfNeeded ...
-func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
+func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (ferr fail.Error) {
 	if request == nil {
 		return fail.InvalidParameterCannotBeNilError("request")
 	}
@@ -85,16 +82,13 @@ func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error)
 	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
-			xerr = fail.Wrap(err, "failed to create host UUID")
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return xerr
+			return fail.Wrap(err, "failed to create host UUID")
 		}
 
+		var xerr fail.Error
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
 		if request.KeyPair, xerr = abstract.NewKeyPair(name); xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to create Host key pair")
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return xerr
+			return fail.Wrap(xerr, "failed to create Host key pair")
 		}
 	}
 
