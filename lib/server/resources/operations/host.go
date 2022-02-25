@@ -2886,6 +2886,18 @@ func (instance *Host) Run(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot run anything on '%s', '%s' is NOT started", targetName, targetName))
+	}
+
 	return instance.unsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
 }
 
@@ -2937,6 +2949,18 @@ func (instance *Host) Pull(
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot pull anything on '%s', '%s' is NOT started", targetName, targetName))
+	}
 
 	var (
 		stdout, stderr string
@@ -3017,6 +3041,18 @@ func (instance *Host) Push(
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started", targetName, targetName))
+	}
 
 	return instance.unsafePush(ctx, source, target, owner, mode, timeout)
 }
@@ -3671,6 +3707,18 @@ func (instance *Host) PushStringToFileWithOwnership(
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started", targetName, targetName))
+	}
 
 	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, owner, mode)
 }

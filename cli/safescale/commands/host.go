@@ -978,14 +978,6 @@ func hostFeatureAddAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	// Wait for SSH service on remote host first
-	err = clientSession.SSH.WaitReady(hostInstance.Id, temporal.ConnectionTimeout())
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
-	}
-
 	err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
@@ -1017,7 +1009,7 @@ var hostFeatureCheckCommand = &cli.Command{
 func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
-	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
+	_, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
@@ -1033,13 +1025,6 @@ func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 	clientSession, xerr := client.New(c.String("server"))
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	// Wait for SSH service on remote host first
-	if err = clientSession.SSH.WaitReady(hostInstance.Id, temporal.ConnectionTimeout()); err != nil {
-		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 
 	if err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
@@ -1091,14 +1076,6 @@ func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 	clientSession, xerr := client.New(c.String("server"))
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	// Wait for SSH service on remote host first
-	err = clientSession.SSH.WaitReady(hostInstance.Id, temporal.ConnectionTimeout())
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 
 	err = clientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)

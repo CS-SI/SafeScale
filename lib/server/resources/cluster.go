@@ -58,7 +58,7 @@ type Cluster interface {
 	GetKeyPair() (abstract.KeyPair, fail.Error)                                                                                                  // returns the key pair used in the cluster
 	GetNetworkConfig() (*propertiesv3.ClusterNetwork, fail.Error)                                                                                // returns network configuration of the cluster
 	GetState() (clusterstate.Enum, fail.Error)                                                                                                   // returns the current state of the cluster
-	IsFeatureInstalled(ctx context.Context, name string) (found bool, xerr fail.Error)                                                           // tells if a feature is installed in Cluster using only metadata
+	IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error)                                                           // tells if a feature is installed in Cluster using only metadata
 	ListEligibleFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                            // returns the list of eligible features for the Cluster
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                           // returns the list of installed features on the Cluster
 	ListMasters(ctx context.Context) (IndexedListOfClusterNodes, fail.Error)                                                                     // lists the node instances corresponding to masters (if there is such masters in the flavor...)

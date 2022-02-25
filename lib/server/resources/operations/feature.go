@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
@@ -430,6 +431,30 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		}
 	}
 
+	switch ata := target.(type) {
+	case resources.Host:
+		state, xerr := ata.GetState()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if state != hoststate.Started {
+			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT started", targetName, targetName))
+		}
+		/*
+			case resources.Cluster:
+				state, xerr := ata.GetState()
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if state != clusterstate.Nominal {
+					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT nominal", targetName, targetName))
+				}
+		*/
+	default:
+	}
+
 	// -- fall back to active check
 	installer, xerr := instance.findInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
@@ -548,6 +573,30 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName),
 	)()
 
+	switch ata := target.(type) {
+	case resources.Host:
+		state, xerr := ata.GetState()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if state != hoststate.Started {
+			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot add feature on '%s', '%s' is NOT started", targetName, targetName))
+		}
+		/*
+			case resources.Cluster:
+				state, xerr := ata.GetState()
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if state != clusterstate.Nominal {
+					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot add feature on '%s', '%s' is NOT nominal", targetName, targetName))
+				}
+		*/
+	default:
+	}
+
 	installer, xerr := instance.findInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -663,6 +712,30 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		fmt.Sprintf("Starting removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
 		fmt.Sprintf("Ending removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
 	)()
+
+	switch ata := target.(type) {
+	case resources.Host:
+		state, xerr := ata.GetState()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if state != hoststate.Started {
+			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot remove feature on '%s', '%s' is NOT started", targetName, targetName))
+		}
+		/*
+			case resources.Cluster:
+				state, xerr := ata.GetState()
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if state != clusterstate.Nominal {
+					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot remove feature on '%s', '%s' is NOT nominal", targetName, targetName))
+				}
+		*/
+	default:
+	}
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV, cerr := v.FakeClone()
