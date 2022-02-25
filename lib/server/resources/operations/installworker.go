@@ -773,8 +773,8 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
@@ -822,7 +822,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
+	defer fail.OnExitLogError(&ferr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName),
 		fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, xerr),

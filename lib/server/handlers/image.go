@@ -48,8 +48,8 @@ func NewImageHandler(job server.Job) ImageHandler {
 }
 
 // List returns the image list
-func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *imageHandler) List(all bool) (images []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -60,7 +60,7 @@ func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.
 
 	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	return handler.job.Service().ListImages(all)
 }

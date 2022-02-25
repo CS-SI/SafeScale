@@ -74,8 +74,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -94,7 +94,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	host, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
@@ -285,7 +285,9 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (xerr fail.Error) {
+func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -299,7 +301,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	ssh, xerr := handler.GetConfig(hostParam)
 	if xerr != nil {

@@ -67,7 +67,9 @@ const (
 )
 
 // New returns an instance of safescale Client
-func New(server string) (_ *Session, xerr fail.Error) {
+func New(server string) (_ *Session, ferr fail.Error) {
+
+	var xerr fail.Error
 	// Validate server parameter (can be empty string...)
 	if server != "" {
 		if server, xerr = validateServerString(server); xerr != nil {

@@ -356,8 +356,8 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 }
 
 // Create a bucket
-func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -397,7 +397,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -451,8 +451,8 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 }
 
 // Delete a bucket
-func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -473,7 +473,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -690,8 +690,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 }
 
 // Unmount a bucket
-func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -723,7 +723,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 
 	tracer := debug.NewTracer(task, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()

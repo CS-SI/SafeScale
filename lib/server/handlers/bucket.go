@@ -83,8 +83,8 @@ func (handler *bucketHandler) List(all bool) (_ []string, outerr fail.Error) {
 }
 
 // Create a bucket
-func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -95,7 +95,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
 	rb, xerr := bucketfactory.Load(svc, name)
@@ -116,8 +116,8 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 }
 
 // Delete a bucket
-func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -128,7 +128,7 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	rb, xerr := bucketfactory.Load(handler.job.Service(), name)
 	if xerr != nil {
@@ -138,8 +138,8 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 }
 
 // Inspect a bucket
-func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -150,8 +150,9 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
+	var xerr fail.Error
 	rb, xerr = bucketfactory.Load(handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr

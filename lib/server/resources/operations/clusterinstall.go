@@ -487,7 +487,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {

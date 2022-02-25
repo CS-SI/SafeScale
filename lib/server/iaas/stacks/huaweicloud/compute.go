@@ -300,7 +300,9 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptyMap map[string]bool
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -308,9 +310,10 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
+	var xerr fail.Error
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
@@ -847,7 +850,9 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptySlice []abstract.Image
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -855,7 +860,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	opts := images.ListOpts{
 		Status: images.ImageStatusActive,

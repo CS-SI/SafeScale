@@ -354,7 +354,9 @@ func (instance *Feature) Applicable(t resources.Targetable) bool {
 
 // Check if Feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -384,7 +386,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	targetType := strings.ToLower(target.TargetType().String())
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	// -- passive check if feature is installed on target
 	switch target.(type) { // nolint
@@ -598,7 +600,9 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 }
 
 // Remove uninstalls the Feature from the target
-func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -628,7 +632,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	targetType := target.TargetType().String()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var (
 		results resources.Results
