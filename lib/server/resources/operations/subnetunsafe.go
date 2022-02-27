@@ -1161,6 +1161,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	if xerr != nil {
 		return fail.Wrap(xerr, "error finalizing gateway configuration")
 	}
+
 	return nil
 }
 

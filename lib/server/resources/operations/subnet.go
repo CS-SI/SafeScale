@@ -501,6 +501,8 @@ func (instance *Subnet) Create(
 		}
 	}()
 
+	// FIXME: What about host metadata itself ?
+
 	defer func() {
 		if ferr != nil {
 			if instance != nil {

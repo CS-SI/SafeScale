@@ -1080,6 +1080,29 @@ func (instance *Host) Create(
 		}
 	}()
 
+	defer func() {
+		if ferr != nil {
+			if !valid.IsNil(ahf) {
+				if !valid.IsNil(ahf.Core) {
+					derr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+						ahc, ok := clonable.(*abstract.HostCore)
+						if !ok {
+							return fail.InconsistentError(
+								"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+							)
+						}
+
+						ahc.LastState = hoststate.Failed
+						return nil
+					})
+					if derr != nil {
+						_ = ferr.AddConsequence(derr)
+					}
+				}
+			}
+		}
+	}()
+
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
 			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
@@ -1243,6 +1266,28 @@ func (instance *Host) Create(
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// FIXME: OPP Time to mark this as Started in metadata
+	// If not, there should be a prior defer that marks this as a failure.
+
+	if !valid.IsNil(ahf) {
+		if !valid.IsNil(ahf.Core) {
+			derr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				ahc, ok := clonable.(*abstract.HostCore)
+				if !ok {
+					return fail.InconsistentError(
+						"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+					)
+				}
+
+				ahc.LastState = hoststate.Started
+				return nil
+			})
+			if derr != nil {
+				return userdataContent, derr
+			}
+		}
 	}
 
 	logrus.Infof("Host '%s' created successfully", instance.GetName())
@@ -3051,7 +3096,7 @@ func (instance *Host) Push(
 	}
 
 	if state != hoststate.Started {
-		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started", targetName, targetName))
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
 	}
 
 	return instance.unsafePush(ctx, source, target, owner, mode, timeout)
@@ -3717,7 +3762,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 	}
 
 	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started", targetName, targetName))
+		return fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
 	}
 
 	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, owner, mode)
