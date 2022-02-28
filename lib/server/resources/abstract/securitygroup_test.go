@@ -729,6 +729,9 @@ func TestSecurityGroupRules_Clone(t *testing.T) {
 	if !areEqual {
 		t.Error("Clone uncomplete")
 		t.Fail()
+	}
+}
+
 func TestFuzzSg(t *testing.T) {
 	for i := 0; i < 2000; i++ {
 		o := NewSecurityGroupRule()

@@ -1,4 +1,4 @@
-package fail
+package valid_test
 
 import (
 	"fmt"
@@ -38,13 +38,13 @@ func TestIsNull(t *testing.T) {
 	var ptrerr *error
 	var dblptrerr **error
 
-	var ourErr Error
-	var ptrOurErr *Error
-	var dblptrOurErr **Error
+	var ourErr fail.Error
+	var ptrOurErr *fail.Error
+	var dblptrOurErr **fail.Error
 
-	var ourConcreteErr ErrNotFound
-	var ptrOurConcreteErr *ErrNotFound
-	var dlbPtrOurConcreteErr **ErrNotFound
+	var ourConcreteErr fail.ErrNotFound
+	var ptrOurConcreteErr *fail.ErrNotFound
+	var dlbPtrOurConcreteErr **fail.ErrNotFound
 
 	type args struct {
 		something interface{}
@@ -80,13 +80,13 @@ func TestNotNulls(t *testing.T) {
 	var ptrerr *error = &err
 	var dblptrerr **error = &ptrerr
 
-	var ourErr Error = NewError("")
-	var ptrOurErr *Error = &ourErr
-	var dblptrOurErr **Error = &ptrOurErr
+	var ourErr fail.Error = fail.NewError("")
+	var ptrOurErr *fail.Error = &ourErr
+	var dblptrOurErr **fail.Error = &ptrOurErr
 
-	var ptrOurConcreteErr *ErrNotFound = NotFoundError("")
-	var ourConcreteErr ErrNotFound = *ptrOurConcreteErr
-	var dlbPtrOurConcreteErr **ErrNotFound = &ptrOurConcreteErr
+	var ptrOurConcreteErr *fail.ErrNotFound = fail.NotFoundError("")
+	var ourConcreteErr fail.ErrNotFound = *ptrOurConcreteErr
+	var dlbPtrOurConcreteErr **fail.ErrNotFound = &ptrOurConcreteErr
 
 	type brand struct {
 		content string
@@ -101,7 +101,7 @@ func TestNotNulls(t *testing.T) {
 		want bool
 	}{
 		{"string", args{"whatever"}, false},
-		{"struct", args{brand{}}, false},
+		{"struct", args{brand{}}, true},
 		{"ptr struct", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},
@@ -117,7 +117,7 @@ func TestNotNulls(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := valid.IsNull(tt.args.something); got != tt.want {
-				t.Errorf("IsNull() = %v, want %v", got, tt.want)
+				t.Errorf("%s: IsNull() = %v, want %v", tt.name, got, tt.want)
 			}
 		})
 	}
@@ -130,21 +130,21 @@ func Test_IsNil(t *testing.T) {
 	var p_null *Nullable = nil
 	var p_nil *Nillable = nil
 
-	require.EqualValues(t, IsNil(nil), true)
-	require.EqualValues(t, IsNil(a_null), false)
-	require.EqualValues(t, IsNil(p_null), true)
-	require.EqualValues(t, IsNil(Nullable{isnull: true}), true)
-	require.EqualValues(t, IsNil(&Nullable{isnull: true}), true)
-	require.EqualValues(t, IsNil(Nullable{isnull: false}), false)
-	require.EqualValues(t, IsNil(&Nullable{isnull: false}), false)
-	require.EqualValues(t, IsNil(a_nil), false)
-	require.EqualValues(t, IsNil(p_nil), true)
-	require.EqualValues(t, IsNil(Nillable{isnil: true}), true)
-	require.EqualValues(t, IsNil(&Nillable{isnil: true}), true)
-	require.EqualValues(t, IsNil(Nillable{isnil: false}), false)
-	require.EqualValues(t, IsNil(&Nillable{isnil: false}), false)
-	require.EqualValues(t, IsNil("test"), false)
-	require.EqualValues(t, IsNil(&struct {
+	require.EqualValues(t, valid.IsNil(nil), true)
+	require.EqualValues(t, valid.IsNil(a_null), false)
+	require.EqualValues(t, valid.IsNil(p_null), true)
+	require.EqualValues(t, valid.IsNil(Nullable{isnull: true}), true)
+	require.EqualValues(t, valid.IsNil(&Nullable{isnull: true}), true)
+	require.EqualValues(t, valid.IsNil(Nullable{isnull: false}), false)
+	require.EqualValues(t, valid.IsNil(&Nullable{isnull: false}), false)
+	require.EqualValues(t, valid.IsNil(a_nil), false)
+	require.EqualValues(t, valid.IsNil(p_nil), true)
+	require.EqualValues(t, valid.IsNil(Nillable{isnil: true}), true)
+	require.EqualValues(t, valid.IsNil(&Nillable{isnil: true}), true)
+	require.EqualValues(t, valid.IsNil(Nillable{isnil: false}), false)
+	require.EqualValues(t, valid.IsNil(&Nillable{isnil: false}), false)
+	require.EqualValues(t, valid.IsNil("test"), false)
+	require.EqualValues(t, valid.IsNil(&struct {
 		Price  float64
 		Symbol string
 		Rating uint

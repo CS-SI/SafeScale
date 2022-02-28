@@ -44,23 +44,43 @@ func Test_IsEmpty(t *testing.T) {
 			expect: true,
 		},
 		{
-			value:  0,
+			value:  uint8(0),
 			expect: true,
 		},
 		{
-			value:  42,
+			value:  uint8(42),
 			expect: false,
 		},
 		{
-			value:  -42,
-			expect: false,
-		},
-		{
-			value:  0.0,
+			value:  uint(0),
 			expect: true,
 		},
 		{
-			value:  42.0,
+			value:  uint(42),
+			expect: false,
+		},
+		{
+			value:  int32(0),
+			expect: true,
+		},
+		{
+			value:  int32(42),
+			expect: false,
+		},
+		{
+			value:  int32(-42),
+			expect: false,
+		},
+		{
+			value:  float32(0.0),
+			expect: true,
+		},
+		{
+			value:  complex64(complex(0, 0)),
+			expect: true,
+		},
+		{
+			value:  complex64(complex(2, 7)),
 			expect: false,
 		},
 		{

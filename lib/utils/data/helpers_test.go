@@ -48,25 +48,28 @@ func (e Nillable) IsNil() bool {
 
 func Test_hasFieldWithNameAndIsNil(t *testing.T) {
 
-	result := hasFieldWithNameAndIsNil(nil, "field")
+	result, err := hasFieldWithNameAndIsNil(nil, "field")
+	require.EqualValues(t, err, nil)
 	require.EqualValues(t, result, false)
 
-	result = hasFieldWithNameAndIsNil(struct {
+	result, err = hasFieldWithNameAndIsNil(struct {
 		a string
 		b uint
 		c bool
 	}{}, "d")
+	require.EqualValues(t, err, nil)
 	require.EqualValues(t, result, false)
 
-	result = hasFieldWithNameAndIsNil(struct {
+	result, err = hasFieldWithNameAndIsNil(struct {
 		a string
 		b uint
 		c bool
 		d float64
 	}{}, "d")
+	require.EqualValues(t, err, nil)
 	require.EqualValues(t, result, false)
 
-	result = hasFieldWithNameAndIsNil(struct {
+	result, err = hasFieldWithNameAndIsNil(struct {
 		a string
 		b uint
 		c bool
@@ -74,6 +77,7 @@ func Test_hasFieldWithNameAndIsNil(t *testing.T) {
 	}{
 		d: nil,
 	}, "d")
+	require.EqualValues(t, err, nil)
 	require.EqualValues(t, result, true)
 
 }

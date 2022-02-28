@@ -72,7 +72,6 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter waiter"), true)
 	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
 
 	// no timeout

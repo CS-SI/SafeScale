@@ -41,24 +41,24 @@ func TestClusterDefaults_IsNull(t *testing.T) {
 		Image:         "",
 	}
 	if !cd.IsNull() {
-		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null is null")
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null => is null")
 		t.Fail()
 	}
 	cd.GatewaySizing.Cores = 1
 	if cd.IsNull() {
-		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null is null")
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null =>  is null")
 		t.Fail()
 	}
 	cd.GatewaySizing.Cores = 0
 	cd.MasterSizing.Cores = 1
 	if cd.IsNull() {
-		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null is null")
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null =>  is null")
 		t.Fail()
 	}
 	cd.MasterSizing.Cores = 0
 	cd.NodeSizing.Cores = 1
 	if cd.IsNull() {
-		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null is null")
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null =>  is null")
 		t.Fail()
 	}
 }
