@@ -64,7 +64,7 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (_ []abstract.Image, ferr fail.Error) {
 	var emptySlice []abstract.Image
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -118,7 +118,7 @@ func (s stack) cpuFreq(perf int) float32 {
 	return freq
 }
 
-func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
+func parseSizing(s string) (cpus, ram, perf int, ferr fail.Error) {
 	tokens := strings.FieldsFunc(
 		s, func(r rune) bool {
 			return r == 'c' || r == 'r' || r == 'p' || r == 'g'
@@ -150,7 +150,7 @@ func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
 	return
 }
 
-func parseGPU(s string) (gpus int, gpuType string, xerr fail.Error) {
+func parseGPU(s string) (gpus int, gpuType string, ferr fail.Error) {
 	tokens := strings.FieldsFunc(
 		s, func(r rune) bool {
 			return r == 'g' || r == 't'
@@ -201,7 +201,7 @@ func (s stack) parseTemplateID(id string) (abstract.HostTemplate, fail.Error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, ferr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -366,7 +366,7 @@ func toAbstractImage(in osc.Image) abstract.Image {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Error) {
+func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
 	if valid.IsNil(s) {
 		return nullAHT, fail.InvalidInstanceError()
@@ -423,10 +423,11 @@ func (s stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet)
 	return resp, nil
 }
 
-func (s stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr fail.Error) {
+func (s stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, ferr fail.Error) {
 	nics = []osc.Nic{}
 
 	// first network is the default network
+	var xerr fail.Error
 	nics, xerr = s.tryCreateNICS(request, nics)
 	if xerr != nil { // if error delete created NICS
 		for _, v := range nics {
@@ -510,7 +511,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // - *retry.ErrTimeout: when the timeout is reached
 // - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	nullAHC := abstract.NewHostCore()
 	if valid.IsNil(s) {
 		return nullAHC, fail.InvalidInstanceError()
@@ -602,7 +603,7 @@ func (s stack) addNICs(request *abstract.HostRequest, vmID string) ([]osc.Nic, f
 	return nil, nil
 }
 
-func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate, vmID string) (xerr fail.Error) {
+func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate, vmID string) (ferr fail.Error) {
 	if tpl.GPUNumber <= 0 {
 		return nil
 	}
@@ -612,6 +613,7 @@ func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate,
 		createErr    fail.Error
 		resp         osc.FlexibleGpu
 	)
+	var xerr fail.Error
 	for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
 		resp, xerr = s.rpcCreateFlexibleGpu(tpl.GPUType)
 		if xerr != nil {
@@ -1110,7 +1112,7 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1167,12 +1169,13 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
-func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
+func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 	var hostLabel string
+	var xerr fail.Error
 	ahf, hostLabel, xerr = stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nullAHF, xerr
@@ -1184,11 +1187,14 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	var vm osc.Vm
 	if ahf.Core.ID != "" {
 		vm, xerr = s.rpcReadVMByID(ahf.Core.ID)
+		if xerr != nil {
+			return nullAHF, xerr
+		}
 	} else {
 		vm, xerr = s.rpcReadVMByName(ahf.Core.Name)
-	}
-	if xerr != nil {
-		return nullAHF, xerr
+		if xerr != nil {
+			return nullAHF, xerr
+		}
 	}
 
 	return ahf, s.complementHost(ahf, vm)
@@ -1222,7 +1228,7 @@ func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 }
 
 // GetHostState returns the current state of the host identified by id
-func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
+func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
@@ -1238,7 +1244,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, x
 }
 
 // ListHosts lists all hosts
-func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
+func (s stack) ListHosts(details bool) (_ abstract.HostList, ferr fail.Error) {
 	emptyList := abstract.HostList{}
 	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
@@ -1282,7 +1288,7 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr fail.Error) {
+func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1298,7 +1304,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 }
 
 // StartHost starts the host identified by id
-func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1314,7 +1320,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // RebootHost Reboot host
-func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1346,7 +1352,7 @@ func (s stack) perfFromFreq(freq float32) int {
 // ResizeHost Resize host
 func (s stack) ResizeHost(
 	hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements,
-) (ahf *abstract.HostFull, xerr fail.Error) {
+) (ahf *abstract.HostFull, ferr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()

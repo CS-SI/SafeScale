@@ -37,8 +37,8 @@ import (
 // params is intended to receive a '*host'
 func (instance *SecurityGroup) taskUnbindFromHost(
 	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -62,7 +62,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 	sgID := instance.GetID()
 
 	// Unbind Security Group from Host on provider side
-	xerr = instance.Service().UnbindSecurityGroupFromHost(sgID, hostInstance.GetID())
+	xerr := instance.Service().UnbindSecurityGroupFromHost(sgID, hostInstance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -173,8 +173,8 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 // - nil, *fail.ErrNotFound: Host identified by params not found
 func (instance *SecurityGroup) taskBindEnabledOnHost(
 	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -222,8 +222,8 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 // params is intended to receive a non-empty string corresponding to host ID
 func (instance *SecurityGroup) taskBindDisabledOnHost(
 	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()

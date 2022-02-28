@@ -460,7 +460,7 @@ func (s stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Networ
 }
 
 // InspectSubnet returns the subnet identified by id
-func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
@@ -473,7 +473,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
 			return innerErr
@@ -495,7 +495,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 }
 
 // InspectSubnetByName ...
-func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
@@ -511,6 +511,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 	}
 	var an *abstract.Network
 	if networkRef != "" {
+		var xerr fail.Error
 		an, xerr = s.InspectNetwork(networkRef)
 		if xerr != nil {
 			switch xerr.(type) { // nolint
@@ -528,7 +529,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 	}
 
 	var resp []subnets.Subnet
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			var allPages pagination.Page
 			var innerErr error

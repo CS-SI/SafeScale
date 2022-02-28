@@ -17,6 +17,7 @@
 package callstack
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -29,7 +30,13 @@ var sourceFileRemovePart atomic.Value
 func SourceFilePathUpdater() func(string) string {
 	removePath := sourceFilePrefixToRemove()
 	fn := func(path string) string {
-		newPath := strings.Replace(path, removePath, "...", 1)
+		newPath := strings.Replace(path, removePath, "", 1)
+		if !strings.HasPrefix(newPath, "/") {
+			if ind := strings.Index(newPath, "/"); ind != -1 {
+				newPath = newPath[ind:]
+			}
+		}
+		newPath = fmt.Sprintf("...%s", newPath)
 		return newPath
 	}
 	return fn

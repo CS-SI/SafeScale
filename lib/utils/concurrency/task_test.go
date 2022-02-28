@@ -1360,7 +1360,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		// VPL: when we reach this code, task has been timed out and terminated. WaitFor then succeeds (rv == true), and xerr contains *fail.ErrTimeout
 		//      Ti the question: how we make the difference between a timeout from Task and a timeout from WaitFor ? rv is the answer. In the former case, rv should be true, in the latter case it should be false
 		rv, _, xerr := single.WaitFor(16 * time.Millisecond)
-		require.NotNil(t, xerr) // xerr must be not nil
+		require.NotNil(t, xerr) // xerr must be not nil // FIXME: CI Fails here sometimes
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			// expected

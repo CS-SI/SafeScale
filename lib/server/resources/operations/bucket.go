@@ -75,7 +75,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
+func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -207,8 +207,8 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 // Browse walks through Bucket metadata folder and executes a callback for each entry
 func (instance *bucket) Browse(
 	ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error,
-) (outerr fail.Error) {
-	defer fail.OnPanic(&outerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -252,8 +252,9 @@ func (instance *bucket) Browse(
 			}
 
 			ab := abstract.NewObjectStorageBucket()
-			if innerXErr = ab.Deserialize(buf); innerXErr != nil {
-				return innerXErr
+			var inErr fail.Error
+			if inErr = ab.Deserialize(buf); inErr != nil {
+				return inErr
 			}
 
 			return callback(ab)
@@ -262,7 +263,7 @@ func (instance *bucket) Browse(
 }
 
 // GetHost ...
-func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error) {
+func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -356,8 +357,8 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 }
 
 // Create a bucket
-func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -397,7 +398,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -451,8 +452,8 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 }
 
 // Delete a bucket
-func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -473,7 +474,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -516,8 +517,8 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 // - *fail.ErrNotFound: Host not found
 // - *fail.ErrDuplicate: already mounted on Host
 // - *fail.ErrNotAvailable: already mounted
-func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outerr fail.Error) {
-	defer fail.OnPanic(&outerr)
+func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -552,7 +553,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 
 	tracer := debug.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&outerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -690,8 +691,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 }
 
 // Unmount a bucket
-func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -723,7 +724,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 
 	tracer := debug.NewTracer(task, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -737,7 +738,13 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 
 	var mountPoint string
 	bucketName := instance.GetName()
+
 	mounts, xerr := hostInstance.GetMounts()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	for k, v := range mounts.BucketMounts {
 		if k == bucketName {
 			mountPoint = v

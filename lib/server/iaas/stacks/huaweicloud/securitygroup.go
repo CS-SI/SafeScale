@@ -144,13 +144,15 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
+
+	var xerr fail.Error
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
 		if xerr != nil {
@@ -375,12 +377,13 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 
 // AddRuleToSecurityGroup adds a rule to a security group
 // On success, return Security Group with added rule
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
 
+	var xerr fail.Error
 	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
@@ -503,11 +506,13 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if valid.IsNil(s) {
 		return nullASG, fail.InvalidInstanceError()
 	}
+
+	var xerr fail.Error
 	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr

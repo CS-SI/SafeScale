@@ -180,7 +180,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 }
 
 // InspectNetwork returns information about Network/VPC from AWS
-func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
+func (s stack) InspectNetwork(id string) (_ *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
@@ -224,7 +224,7 @@ func toAbstractNetwork(in *ec2.Vpc) (*abstract.Network, fail.Error) {
 }
 
 // InspectNetworkByName does the same as InspectNetwork but on its name
-func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
+func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
@@ -249,7 +249,7 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 }
 
 // ListNetworks ...
-func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
+func (s stack) ListNetworks() (_ []*abstract.Network, ferr fail.Error) {
 	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -279,7 +279,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 }
 
 // DeleteNetwork ...
-func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
+func (s stack) DeleteNetwork(id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -289,6 +289,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
+	var xerr fail.Error
 	if _, xerr = s.InspectNetwork(id); xerr != nil {
 		return xerr
 	}
@@ -470,7 +471,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 }
 
 // InspectSubnet returns information about the Subnet from AWS
-func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
@@ -667,7 +668,7 @@ func (s stack) listSubnetIDs(networkRef string) (list []string, ferr fail.Error)
 }
 
 // DeleteSubnet ...
-func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
+func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

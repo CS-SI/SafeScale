@@ -75,7 +75,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 }
 
 // InspectVolume ...
-func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
@@ -187,17 +187,17 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
+func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 	var emptySlice []abstract.Volume
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	defer fail.OnExitLogError(&ferr)
 
 	var resp *ec2.DescribeVolumesOutput
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
 			return normalizeError(innerErr)
@@ -235,7 +235,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 }
 
 // DeleteVolume ...
-func (s stack) DeleteVolume(id string) (xerr fail.Error) {
+func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -244,7 +244,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	defer fail.OnExitLogError(&ferr)
 
 	query := ec2.DeleteVolumeInput{
 		VolumeId: aws.String(id),
@@ -259,17 +259,17 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 }
 
 // CreateVolumeAttachment ...
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, xerr fail.Error) {
+func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	defer fail.OnExitLogError(&ferr)
 
 	availableDevices := initAvailableDevices()
 	var resp *ec2.VolumeAttachment
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var (
 				deviceName string
@@ -356,7 +356,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 }
 
 // InspectVolumeAttachment returns information about a volume attachment
-func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
+func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
 		return nullAVA, fail.InvalidInstanceError()
@@ -376,7 +376,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 		VolumeIds: []*string{aws.String(id)},
 	}
 	var resp *ec2.DescribeVolumesOutput
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.EC2Service.DescribeVolumes(&query)
 			return normalizeError(err)
@@ -401,7 +401,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 }
 
 // ListVolumeAttachments ...
-func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, xerr fail.Error) {
+func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
 	var emptySlice []abstract.VolumeAttachment
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -421,7 +421,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 		},
 	}
 	var resp *ec2.DescribeVolumesOutput
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.EC2Service.DescribeVolumes(&query)
 			return normalizeError(err)
@@ -445,12 +445,12 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	return vas, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fail.Error) {
+func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
-func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
+func (s stack) DeleteVolumeAttachment(serverID, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

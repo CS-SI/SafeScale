@@ -248,8 +248,8 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")

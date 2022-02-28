@@ -299,7 +299,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 }
 
 // ListRegions ...
-func (s stack) ListRegions() (list []string, xerr fail.Error) {
+func (s stack) ListRegions() (list []string, ferr fail.Error) {
 	var emptySlice []string
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -308,7 +308,7 @@ func (s stack) ListRegions() (list []string, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
 				// ParentRegionID: "RegionOne",
@@ -335,7 +335,7 @@ func (s stack) ListRegions() (list []string, xerr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
+func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
 	if valid.IsNil(s) {
 		return nullAHT, fail.InvalidInstanceError()
@@ -349,7 +349,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 	// Try to get template
 	var flv *flavors.Flavor
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -949,8 +949,8 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()

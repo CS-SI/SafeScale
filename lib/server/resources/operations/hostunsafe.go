@@ -45,8 +45,8 @@ import (
 )
 
 // unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
-func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if cmd == "" {
@@ -187,8 +187,8 @@ func getMD5Hash(text string) string {
 
 // unsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
 // Note: must be used with wisdom
-func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if source == "" {
@@ -381,8 +381,8 @@ func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 
 // unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, ferr fail.Error) {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -404,7 +404,7 @@ func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr f
 	return mounts, nil
 }
 
-func (instance *Host) unsafePushStringToFile(ctx context.Context, content string, filename string) (xerr fail.Error) {
+func (instance *Host) unsafePushStringToFile(ctx context.Context, content string, filename string) (ferr fail.Error) {
 	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, "", "")
 }
 
@@ -536,20 +536,21 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 }
 
 // unsafeGetDefaultSubnet returns the Networking instance corresponding to host default subnet
-func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	svc := instance.Service()
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				rs, innerXErr = LoadSubnet(svc, "", networkV2.DefaultSubnetID)
-				if innerXErr != nil {
-					return innerXErr
+				var inErr fail.Error
+				rs, inErr = LoadSubnet(svc, "", networkV2.DefaultSubnetID)
+				if inErr != nil {
+					return inErr
 				}
 				return nil
 			})
@@ -559,9 +560,10 @@ func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.E
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			rs, innerXErr = LoadSubnet(svc, "", hostNetworkV2.DefaultSubnetID)
-			if innerXErr != nil {
-				return innerXErr
+			var inErr fail.Error
+			rs, inErr = LoadSubnet(svc, "", hostNetworkV2.DefaultSubnetID)
+			if inErr != nil {
+				return inErr
 			}
 			return nil
 		})

@@ -28,7 +28,7 @@ import (
 )
 
 // GenerateRSAKeyPair creates a key pair
-func GenerateRSAKeyPair(name string) (privKey string, pubKey string, xerr fail.Error) {
+func GenerateRSAKeyPair(name string) (privKey string, pubKey string, ferr fail.Error) {
 	if name == "" {
 		return "", "", fail.InvalidParameterCannotBeEmptyStringError("name")
 	}

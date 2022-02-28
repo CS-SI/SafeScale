@@ -50,8 +50,8 @@ func (instance *Shielded) Clone() *Shielded {
 }
 
 // Inspect is used to lock a clonable for read
-func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return fail.InvalidInstanceError()
@@ -74,8 +74,8 @@ func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Er
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
-func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return fail.InvalidInstanceError()
@@ -91,6 +91,7 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (xerr fa
 		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
+	var xerr fail.Error
 	clone := instance.witness.Clone()
 	if xerr = alterer(clone); xerr != nil {
 		return xerr
@@ -102,15 +103,15 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (xerr fa
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Serialize() (_ []byte, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var jsoned []byte
-	xerr = instance.Inspect(func(clonable data.Clonable) fail.Error {
+	xerr := instance.Inspect(func(clonable data.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
 		if innerErr != nil {
@@ -128,8 +129,8 @@ func (instance *Shielded) Serialize() (_ []byte, xerr fail.Error) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Deserialize(buf []byte) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return fail.InvalidInstanceError()

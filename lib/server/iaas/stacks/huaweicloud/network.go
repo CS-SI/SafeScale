@@ -281,7 +281,7 @@ func toAbstractNetwork(vpc VPC) *abstract.Network {
 }
 
 // InspectNetworkByName returns the information about a Network/VPC identified by 'name'
-func (s stack) InspectNetworkByName(name string) (an *abstract.Network, xerr fail.Error) {
+func (s stack) InspectNetworkByName(name string) (an *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
@@ -389,7 +389,7 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 }
 
 // CreateSubnet creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
@@ -398,6 +398,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 	tracer := debug.NewTracer(nil, true, "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	var xerr fail.Error
 	if _, xerr = s.InspectSubnetByName(req.NetworkID, req.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

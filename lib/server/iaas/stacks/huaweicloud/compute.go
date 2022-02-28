@@ -300,7 +300,9 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptyMap map[string]bool
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -308,10 +310,10 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
 			return innerErr
@@ -762,7 +764,7 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	nullAI := abstract.Image{}
 	if valid.IsNil(s) {
 		return nullAI, fail.InvalidInstanceError()
@@ -775,7 +777,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	defer tracer.Exiting()
 
 	var img *images.Image
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			img, innerErr = images.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -847,7 +849,9 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptySlice []abstract.Image
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -855,7 +859,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	opts := images.ListOpts{
 		Status: images.ImageStatusActive,
@@ -943,8 +947,8 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
 	if xerr != nil {

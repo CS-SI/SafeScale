@@ -50,7 +50,6 @@ git \
 jq \
 python3 \
 python3-pip \
-locales \
 && apt-get autoclean -y \
 && apt-get autoremove -y \
 && rm -rf /var/lib/apt/lists/*

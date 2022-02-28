@@ -246,7 +246,7 @@ func toAbstractNetwork(in osc.Net) *abstract.Network {
 }
 
 // InspectNetwork returns the network identified by id
-func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
+func (s stack) InspectNetwork(id string) (_ *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
@@ -266,8 +266,8 @@ func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) 
 	return toAbstractNetwork(resp), nil
 }
 
-// InspectNetworkByName returns the network identified by name)
-func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
+// InspectNetworkByName returns the network identified by 'name'
+func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
 		return nullAN, fail.InvalidInstanceError()
@@ -285,7 +285,7 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 }
 
 // ListNetworks lists all networks
-func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
+func (s stack) ListNetworks() (_ []*abstract.Network, ferr fail.Error) {
 	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -308,7 +308,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
+func (s stack) DeleteNetwork(id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -371,7 +371,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, fe
 		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' must be inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
 
-	// Create a subnet with the same Targets than the network
+	// Create a subnet with the same Targets as the network
 	resp, xerr := s.rpcCreateSubnet(req.Name, vpc.ID, req.CIDR)
 	if xerr != nil {
 		return nil, xerr
@@ -398,7 +398,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, fe
 }
 
 // InspectSubnet returns the Subnet identified by id
-func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
@@ -419,7 +419,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 }
 
 // InspectSubnetByName returns the Subnet identified by name
-func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
@@ -496,7 +496,7 @@ func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
 }
 
 // ListSubnets lists all subnets
-func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.Error) {
+func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
 	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -571,7 +571,7 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 }
 
 // DeleteSubnet deletes the subnet identified by id
-func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
+func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

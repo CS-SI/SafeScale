@@ -134,11 +134,11 @@ func (s *Subnet) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a Subnet
-func (s *Subnet) Deserialize(buf []byte) (xerr fail.Error) {
+func (s *Subnet) Deserialize(buf []byte) (ferr fail.Error) {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, s))
 }
 

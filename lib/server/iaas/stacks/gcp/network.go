@@ -168,7 +168,7 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
+func (s stack) DeleteNetwork(ref string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -405,7 +405,7 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 }
 
 // InspectSubnetByName returns the subnet identified by name
-func (s stack) InspectSubnetByName(networkRef, name string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnetByName(networkRef, name string) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nullAS, fail.InvalidInstanceError()
@@ -432,7 +432,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (_ *abstract.Subnet,
 }
 
 // ListSubnets lists available subnets
-func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.Error) {
+func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
 	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -447,6 +447,7 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 	)
 
 	var an *abstract.Network
+	var xerr fail.Error
 	if networkRef != "" {
 		an, xerr = s.InspectNetwork(networkRef)
 		if xerr != nil {
@@ -487,7 +488,7 @@ func toAbstractSubnet(in compute.Subnetwork) *abstract.Subnet {
 }
 
 // DeleteSubnet deletes the subnet identified by id
-func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
+func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -500,6 +501,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 
 	// Delete NAT route
 	natRouteName := fmt.Sprintf(NATRouteNameFormat, id)
+	var xerr fail.Error
 	if xerr = s.rpcDeleteRoute(natRouteName); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

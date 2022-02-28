@@ -671,8 +671,8 @@ func complexSleepyFailure() error {
 	return fail.NotFoundError("Not here")
 }
 
-func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
-	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+func CreateErrorWithNConsequences(n uint) (ferr fail.Error) {
+	xerr := WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -682,8 +682,8 @@ func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
 	return xerr
 }
 
-func CreateSkippableError() (xerr fail.Error) {
-	xerr = WhileSuccessful(
+func CreateSkippableError() (ferr fail.Error) {
+	xerr := WhileSuccessful(
 		func() error {
 			fmt.Println("Around the world...")
 			return StopRetryError(fail.NotFoundError("wrong place"), "no more")
@@ -692,8 +692,8 @@ func CreateSkippableError() (xerr fail.Error) {
 	return xerr
 }
 
-func CreateSkippableErrorBis() (xerr fail.Error) {
-	xerr = WhileSuccessful(
+func CreateSkippableErrorBis() (ferr fail.Error) {
+	xerr := WhileSuccessful(
 		func() error {
 			fmt.Println("Around the world...")
 			return StopRetryError(fail.AbortedError(fail.NotFoundError("wrong place"), "indeed"), "no more")
@@ -702,8 +702,8 @@ func CreateSkippableErrorBis() (xerr fail.Error) {
 	return xerr
 }
 
-func CreateComplexErrorWithNConsequences(n uint) (xerr fail.Error) {
-	xerr = WhileUnsuccessful(complexSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+func CreateComplexErrorWithNConsequences(n uint) (ferr fail.Error) {
+	xerr := WhileUnsuccessful(complexSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -721,37 +721,37 @@ func JustThrowError() fail.Error {
 	return abstract.ResourceDuplicateError("host", "boo")
 }
 
-func JustThrowComplexError() (xerr fail.Error) {
-	xerr = abstract.ResourceDuplicateError("host", "booboo")
+func JustThrowComplexError() (ferr fail.Error) {
+	xerr := abstract.ResourceDuplicateError("host", "booboo")
 	_ = xerr.AddConsequence(fmt.Errorf("cleanup error"))
 	return xerr
 }
 
-func CreateDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
+func CreateDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				_ = xerr.AddConsequence(nerr)
+				_ = ferr.AddConsequence(nerr)
 			}
 		}
 	}()
 
-	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+	xerr := WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	return xerr
 }
 
-func CreateWrappedDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
+func CreateWrappedDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				_ = xerr.AddConsequence(nerr)
+				_ = ferr.AddConsequence(nerr)
 			}
 		}
 	}()
 
-	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+	xerr := WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	return xerr
 }
 

@@ -344,8 +344,8 @@ func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Import imports an existing Network in SafeScale metadata
-func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return fail.InvalidInstanceError()
@@ -427,8 +427,8 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 }
 
 // Browse walks through all the metadata objects in subnet
-func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -484,8 +484,8 @@ var (
 )
 
 // Delete deletes subnet
-func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -708,8 +708,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) GetCIDR() (cidr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
@@ -719,7 +719,7 @@ func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	cidr = ""
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -732,8 +732,8 @@ func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) ToProtocol() (_ *protocol.Network, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -743,7 +743,7 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	var pn *protocol.Network
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -777,8 +777,8 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -788,8 +788,8 @@ func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fai
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata
-func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -850,8 +850,8 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 }
 
 // AbandonSubnet unregisters a Subnet from the Network (does not imply the Subnet is deleted)
-func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

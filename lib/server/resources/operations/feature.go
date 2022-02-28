@@ -65,7 +65,7 @@ func FeatureNullValue() *Feature {
 }
 
 // ListFeatures lists all features suitable for hosts or clusters
-func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr fail.Error) {
+func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -204,7 +204,7 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.E
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
+func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -336,7 +336,7 @@ func (instance *Feature) Specs() *viper.Viper {
 	return &roSpecs
 }
 
-// Applyable tells if the Feature is installable on the target
+// Applicable tells if the Feature is installable on the target
 func (instance *Feature) Applicable(t resources.Targetable) bool {
 	if valid.IsNil(instance) {
 		return false
@@ -354,7 +354,9 @@ func (instance *Feature) Applicable(t resources.Targetable) bool {
 
 // Check if Feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -384,7 +386,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	targetType := strings.ToLower(target.TargetType().String())
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	// -- passive check if feature is installed on target
 	switch target.(type) { // nolint
@@ -455,7 +457,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 }
 
 // findInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
-func (instance *Feature) findInstallerForTarget(target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
+func (instance *Feature) findInstallerForTarget(target resources.Targetable, action string) (installer Installer, ferr fail.Error) {
 	methods := target.InstallMethods()
 	w := instance.specs.GetStringMap("feature.install")
 	for i := uint8(1); i <= uint8(len(methods)); i++ {
@@ -598,7 +600,9 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 }
 
 // Remove uninstalls the Feature from the target
-func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -628,7 +632,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	targetType := target.TargetType().String()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var (
 		results resources.Results

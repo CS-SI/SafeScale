@@ -1935,20 +1935,21 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 					node.ID = hostInstance.GetID()
 
 					// Recover public IP of the master if it exists
-					node.PublicIP, innerXErr = hostInstance.GetPublicIP()
-					if innerXErr != nil {
-						switch innerXErr.(type) {
+					var inErr fail.Error
+					node.PublicIP, inErr = hostInstance.GetPublicIP()
+					if inErr != nil {
+						switch inErr.(type) {
 						case *fail.ErrNotFound:
 							// No public IP, this can happen; continue
 						default:
-							return innerXErr
+							return inErr
 						}
 					}
 
 					// Recover the private IP of the master that MUST exist
-					node.PrivateIP, innerXErr = hostInstance.GetPrivateIP()
-					if innerXErr != nil {
-						return innerXErr
+					node.PrivateIP, inErr = hostInstance.GetPrivateIP()
+					if inErr != nil {
+						return inErr
 					}
 
 					// Updates property
@@ -2510,18 +2511,19 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 					node = nodesV3.ByNumericalID[nodeIdx]
 					node.ID = hostInstance.GetID()
-					node.PublicIP, innerXErr = hostInstance.GetPublicIP()
-					if innerXErr != nil {
-						switch innerXErr.(type) {
+					var inErr fail.Error
+					node.PublicIP, inErr = hostInstance.GetPublicIP()
+					if inErr != nil {
+						switch inErr.(type) {
 						case *fail.ErrNotFound:
 							// No public IP, this can happen; continue
 						default:
-							return innerXErr
+							return inErr
 						}
 					}
 
-					if node.PrivateIP, innerXErr = hostInstance.GetPrivateIP(); innerXErr != nil {
-						return innerXErr
+					if node.PrivateIP, inErr = hostInstance.GetPrivateIP(); inErr != nil {
+						return inErr
 					}
 
 					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
@@ -3046,9 +3048,9 @@ type taskUpdateClusterInventoryMasterParameters struct {
 }
 
 // taskUpdateClusterInventoryMaster task to updates a Host (master) ansible inventory
-func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -3067,7 +3069,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task,
 }
 
 // updateClusterInventoryMaster updates a Host (master) ansible inventory
-func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, master resources.Host, inventoryData string) (xerr fail.Error) {
+func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, master resources.Host, inventoryData string) (ferr fail.Error) {
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr

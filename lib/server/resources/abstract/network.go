@@ -127,11 +127,11 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a Network
-func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
+func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 	if n == nil {
 		return fail.InvalidInstanceError()
 	}
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, n))
 }
 

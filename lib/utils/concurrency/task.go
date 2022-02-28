@@ -239,8 +239,8 @@ func NewTaskWithContext(ctx context.Context, options ...data.ImmutableKeyValue) 
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
-func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyValue) (nt *task, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyValue) (nt *task, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	var (
 		childContext context.Context
 		cancel       context.CancelFunc
@@ -585,7 +585,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 }
 
 // reactWithTimeout reacts on events with timeout
-func (instance *task) reactWithTimeout(timeout time.Duration, traceR *tracer) (canceled, expired, finished bool, xerr fail.Error) {
+func (instance *task) reactWithTimeout(timeout time.Duration, traceR *tracer) (canceled, expired, finished bool, ferr fail.Error) {
 	for !finished && !canceled {
 		select {
 		case <-instance.ctx.Done():
@@ -598,7 +598,7 @@ func (instance *task) reactWithTimeout(timeout time.Duration, traceR *tracer) (c
 			instance.lock.Unlock() // nolint
 
 			if status != ABORTED && status != TIMEOUT && !terminated {
-				xerr = instance.processCancel(traceR)
+				xerr := instance.processCancel(traceR)
 				if xerr != nil {
 					return canceled, expired, finished, xerr
 				}
@@ -612,6 +612,7 @@ func (instance *task) reactWithTimeout(timeout time.Duration, traceR *tracer) (c
 			traceR.trace("received abort signal after %v\n", time.Since(instance.stats.controllerBegin))
 			instance.lock.Unlock() // nolint
 
+			var xerr fail.Error
 			xerr = instance.processAbort(traceR)
 			if xerr != nil {
 				return canceled, expired, finished, xerr
@@ -643,7 +644,7 @@ func (instance *task) reactWithTimeout(timeout time.Duration, traceR *tracer) (c
 }
 
 // reactWithoutTimeout reacts on events without timeout
-func (instance *task) reactWithoutTimeout(traceR *tracer) (canceled, finished bool, xerr fail.Error) {
+func (instance *task) reactWithoutTimeout(traceR *tracer) (canceled, finished bool, ferr fail.Error) {
 	for !finished && !canceled {
 		select {
 		case <-instance.ctx.Done():
@@ -1170,7 +1171,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 // - true, TaskResult, *failErrAborted: Task terminates on Abort
 // - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
 //                                 abort signal has been received would be attached to the error as consequence)
-func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xerr fail.Error) {
+func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
 	}

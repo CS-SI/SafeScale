@@ -175,7 +175,7 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -192,6 +192,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 	if len(asg.Rules) > 0 {
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
+				var xerr fail.Error
 				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:

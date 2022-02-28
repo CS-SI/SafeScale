@@ -487,7 +487,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
@@ -904,8 +904,8 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.M
 }
 
 // installAnsible installs feature ansible on all masters of the Cluster
-func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)

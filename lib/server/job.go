@@ -65,8 +65,8 @@ var (
 )
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, xerr fail.Error) { // nolint
-	defer fail.OnPanic(&xerr)
+func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, ferr fail.Error) { // nolint
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -176,8 +176,8 @@ func (instance job) Duration() time.Duration {
 }
 
 // Abort tells the job it has to abort operations
-func (instance *job) Abort() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *job) Abort() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -244,8 +244,8 @@ func deregister(job Job) fail.Error {
 }
 
 // AbortJobByID asks the job identified by 'id' to abort
-func AbortJobByID(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func AbortJobByID(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")

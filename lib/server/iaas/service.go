@@ -159,7 +159,7 @@ func (instance service) GetName() (string, fail.Error) {
 
 // GetCache returns the data.Cache instance corresponding to the name passed as parameter
 // If the cache does not exist, create it
-func (instance *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
+func (instance *service) GetCache(name string) (_ *ResourceCache, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}

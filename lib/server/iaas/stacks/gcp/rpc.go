@@ -48,7 +48,7 @@ type result struct {
 }
 
 // refreshResult ...
-func refreshResult(oco opContext) (res result, xerr fail.Error) {
+func refreshResult(oco opContext) (res result, ferr fail.Error) {
 	var err error
 	res = result{}
 	if oco.Operation != nil {
@@ -127,7 +127,7 @@ func indexOf(element string, data []string) int {
 	return -1 // not found.
 }
 
-func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation, poll time.Duration, duration time.Duration) (xerr fail.Error) {
+func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation, poll time.Duration, duration time.Duration) (ferr fail.Error) {
 	if opp == nil {
 		return fail.InvalidParameterCannotBeNilError("opp")
 	}
@@ -1450,7 +1450,7 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	return nil
 }
 
-func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
+func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, ferr fail.Error) {
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -1650,9 +1650,10 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	return nil
 }
 
-func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
+func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, ferr fail.Error) {
 	var resp *compute.Address
 	zero := &compute.Address{}
+	var xerr fail.Error
 	if global {
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
@@ -2076,14 +2077,14 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, timings.SmallDelay(), 2*timings.ContextTimeout())
 }
 
-func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
+func (s stack) rpcListNetworks() (_ []*compute.Network, ferr fail.Error) {
 	var (
 		out  []*compute.Network
 		resp *compute.NetworkList
 	)
 	for token := ""; ; {
 		var zero []*compute.Network
-		xerr = stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 				if err != nil {

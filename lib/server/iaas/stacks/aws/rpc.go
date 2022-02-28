@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/request"
+	req "github.com/aws/aws-sdk-go/aws/request"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -1219,21 +1219,21 @@ func (s stack) rpcDescribeRegions(names []*string) ([]*ec2.Region, fail.Error) {
 }
 
 func rpcDescribeImagesByOwner(s stack, ids []*string, filters []*ec2.Filter) ([]*ec2.Image, fail.Error) {
-	var req ec2.DescribeImagesInput
+	var request ec2.DescribeImagesInput
 	if len(ids) > 0 {
-		req.ImageIds = ids
+		request.ImageIds = ids
 	}
-	req.Filters = filters
+	request.Filters = filters
 
 	countDecodingProblems := 0
 
 	var resp *ec2.DescribeImagesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeImages(&req)
+			resp, err = s.EC2Service.DescribeImages(&request)
 			if err != nil {
 				if awe, ok := err.(awserr.Error); ok {
-					if awe.Code() == request.ErrCodeSerialization {
+					if awe.Code() == req.ErrCodeSerialization {
 						countDecodingProblems++
 						if countDecodingProblems > 1 {
 							return retry.StopRetryError(err, "too many decoding errors")

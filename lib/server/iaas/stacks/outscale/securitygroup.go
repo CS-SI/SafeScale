@@ -30,7 +30,7 @@ import (
 )
 
 // ListSecurityGroups lists existing security groups
-func (s stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGroup, ferr fail.Error) {
 	list = []*abstract.SecurityGroup{}
 	if valid.IsNil(s) {
 		return list, fail.InvalidInstanceError()
@@ -130,7 +130,7 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -138,6 +138,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
+		var xerr fail.Error
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
 		if xerr != nil {
 			return xerr
@@ -257,7 +258,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	return s.InspectSecurityGroup(asg.ID)
 }
 
-func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ osc.SecurityGroupRule, xerr fail.Error) {
+func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ osc.SecurityGroupRule, ferr fail.Error) {
 	rule := osc.SecurityGroupRule{}
 	if in == nil {
 		return "", rule, fail.InvalidParameterCannotBeNilError("in")
@@ -273,6 +274,8 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 		flow       string
 		usesGroups bool
 	)
+	var xerr fail.Error
+
 	switch in.Direction {
 	case securitygroupruledirection.Ingress:
 		flow = "Inbound"

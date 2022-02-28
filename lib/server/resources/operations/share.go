@@ -78,8 +78,8 @@ func (si ShareIdentity) Serialize() ([]byte, fail.Error) {
 
 // Deserialize ...
 // satisfies interface data.Serializable
-func (si *ShareIdentity) Deserialize(buf []byte) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+func (si *ShareIdentity) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, si))
 }
 
@@ -293,8 +293,8 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through shares MetadataFolder and executes a callback for each entry
-func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -609,15 +609,15 @@ func (instance *Share) Create(
 
 // unsafeGetServer returns the Host acting as Share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
-func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) unsafeGetServer() (_ resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostID, hostName string
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -648,8 +648,8 @@ func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
 
 // GetServer returns the Host acting as Share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
-func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) GetServer() (_ resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -659,7 +659,7 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	var hostID, hostName string
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -975,8 +975,8 @@ func (instance *Share) Mount(
 }
 
 // Unmount unmounts a Share from local directory of a host
-func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1019,6 +1019,10 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 		shareID = si.ShareID
 		return nil
 	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
 
 	rhServer, xerr := instance.unsafeGetServer()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1120,8 +1124,8 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 }
 
 // Delete deletes a Share from server
-func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -1252,8 +1256,8 @@ func sanitize(in string) (string, fail.Error) {
 }
 
 // ToProtocol transforms a Share into its protobuf representation
-func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()

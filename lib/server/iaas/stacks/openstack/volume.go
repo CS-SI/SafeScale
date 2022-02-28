@@ -88,7 +88,7 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
@@ -256,8 +256,8 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
@@ -412,7 +412,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 	return vs, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fail.Error) {
+func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 

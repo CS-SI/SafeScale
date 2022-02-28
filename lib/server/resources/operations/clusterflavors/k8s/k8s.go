@@ -126,7 +126,7 @@ func configureCluster(ctx context.Context, c resources.Cluster, params data.Map)
 }
 
 // This function is called to remove a node from a Cluster
-func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster, node resources.Host, selectedMaster resources.Host) (xerr fail.Error) {
+func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster, node resources.Host, selectedMaster resources.Host) (ferr fail.Error) {
 	if clusterInstance == nil {
 		return fail.InvalidParameterCannotBeNilError("clusterInstance")
 	}
@@ -135,6 +135,7 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	}
 
 	if selectedMaster == nil {
+		var xerr fail.Error
 		selectedMaster, xerr = clusterInstance.FindAvailableMaster(ctx)
 		if xerr != nil {
 			return xerr

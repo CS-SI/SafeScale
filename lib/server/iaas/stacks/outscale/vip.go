@@ -28,7 +28,7 @@ import (
 )
 
 // CreateVIP ...
-func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
+func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -98,7 +98,7 @@ func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
+func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -114,7 +114,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
+func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -129,7 +129,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr f
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
+func (s stack) DeleteVIP(vip *abstract.VirtualIP) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

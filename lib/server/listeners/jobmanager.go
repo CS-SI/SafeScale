@@ -67,8 +67,8 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 }
 
 // PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -93,10 +93,10 @@ type JobManagerListener struct {
 // func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot stop job")
-	defer fail.OnPanic(&err)
+func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot stop job")
+	defer fail.OnPanic(&ferr)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -122,7 +122,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer := debug.NewTracer(task, true, "('%s')", uuid).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 

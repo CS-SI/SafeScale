@@ -187,8 +187,8 @@ type taskFinalizeGatewayConfigurationParameters struct {
 
 func (instance *Subnet) taskFinalizeGatewayConfiguration(
 	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+) (result concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -216,12 +216,13 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 	// Executes userdata phase2 script to finalize host installation
 	tracer := debug.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
+	var xerr fail.Error
 	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
 
 	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {

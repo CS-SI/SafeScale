@@ -141,11 +141,11 @@ func Test_IsError(t *testing.T) {
 
 func Test_StatusWrapErr(t *testing.T) {
 
-	err := StatusWrapErr(errors.New("Any error"), "message")
+	err := StatusWrapErr(errors.New("any error"), "message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.status")
 	require.EqualValues(t, err.IsError(), true)
 	require.EqualValues(t, err.Message(), "message")
-	require.EqualValues(t, err.Cause().Error(), "Any error")
+	require.EqualValues(t, err.Cause().Error(), "any error")
 
 }
 

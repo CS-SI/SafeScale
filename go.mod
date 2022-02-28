@@ -6,7 +6,7 @@ require (
 	github.com/GeertJohan/go.rice v1.0.2
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.43.5
+	github.com/aws/aws-sdk-go v1.43.6
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0

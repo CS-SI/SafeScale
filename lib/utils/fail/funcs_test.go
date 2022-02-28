@@ -167,7 +167,7 @@ func Test_FromGRPCStatus(t *testing.T) {
 	result = FromGRPCStatus(xerr)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrWarning")
 
-	codes := map[codes.Code]string{
+	mapcodes := map[codes.Code]string{
 		codes.DeadlineExceeded:   "*fail.ErrTimeout",
 		codes.Aborted:            "*fail.ErrAborted",
 		codes.FailedPrecondition: "*fail.ErrInvalidParameter",
@@ -182,7 +182,7 @@ func Test_FromGRPCStatus(t *testing.T) {
 		codes.DataLoss:           "*fail.ErrInconsistent",
 		codes.Unauthenticated:    "*fail.ErrNotAuthenticated",
 	}
-	for k, v := range codes {
+	for k, v := range mapcodes {
 		err = grpcstatus.Error(k, fmt.Sprintf("grpccode %d to %s", k, v))
 		result = FromGRPCStatus(err)
 		require.EqualValues(t, reflect.TypeOf(result).String(), v)
