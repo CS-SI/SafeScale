@@ -34,6 +34,22 @@ func Test_NewCache(t *testing.T) {
 	require.Error(t, err)
 
 }
+
+func TestCache_IsNull(t *testing.T) {
+
+	var c *cache = nil
+	require.EqualValues(t, c.isNull(), true)
+
+	c, err := NewCache("")
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, c.isNull(), true)
+
+	c, err = NewCache("name")
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, c.isNull(), false)
+
+}
+
 func TestCache_Entry(t *testing.T) {
 
 	// Empty cache

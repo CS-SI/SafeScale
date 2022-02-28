@@ -41,7 +41,7 @@ type cache struct {
 }
 
 // NewCache creates a new cache
-func NewCache(name string) (Cache, fail.Error) {
+func NewCache(name string) (*cache, fail.Error) {
 	if name == "" {
 		return &cache{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
@@ -55,7 +55,7 @@ func NewCache(name string) (Cache, fail.Error) {
 }
 
 func (instance *cache) isNull() bool {
-	return instance == nil || instance.name.Load().(string) == "" || instance.cache == nil
+	return instance == nil || instance.cache == nil || instance.name.Load().(string) == ""
 }
 
 // GetID satisfies interface data.Identifiable
@@ -86,7 +86,6 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 		if !ok {
 			return nil, fail.InconsistentError("reserved entry '%s' in %s cache does not have a corresponding cache entry", key, instance.GetName())
 		}
-
 		reservation, ok := ce.Content().(*reservation)
 		if !ok {
 			// May have transitioned from reservation content to real content, first check that there is no more reservation...
