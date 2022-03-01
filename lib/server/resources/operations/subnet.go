@@ -1357,7 +1357,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		// 4st free CIDR index if the Subnet has been created for a single Host
 		if as.SingleHostCIDRIndex > 0 {
 			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-			networkInstance, innerXErr := instance.InspectNetwork()
+			networkInstance, innerXErr := LoadNetwork(instance.Service(), as.Network)
 			if innerXErr != nil {
 				return innerXErr
 			}
