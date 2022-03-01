@@ -94,23 +94,26 @@ func (x *JSONProperties) Lookup(key string) bool {
 	return ok && !valid.IsNil(p)
 }
 
-// Clone ...
-func (x *JSONProperties) Clone() *JSONProperties {
-	if x == nil {
-		return nil
-	}
-
+func (x *JSONProperties) hasKey(key string) (*jsonProperty, bool) {
 	x.RLock()
 	defer x.RUnlock()
 
-	newP := &JSONProperties{
-		module: x.module,
+	jsp, found := x.Properties[key]
+	return jsp, found
+}
+
+func (x *JSONProperties) storeZero(key string) *jsonProperty {
+	x.Lock()
+	defer x.Unlock()
+
+	zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+	item := &jsonProperty{
+		Shielded: shielded.NewShielded(zeroValue),
+		module:   x.module,
+		key:      key,
 	}
-	for k, v := range x.Properties {
-		// FIXME: Another problem here, Clone() should return (*JSONProperties, error)
-		newP.Properties[k], _ = v.Clone().(*jsonProperty) // nolint
-	}
-	return newP
+	x.Properties[key] = item
+	return item
 }
 
 // Count returns the number of properties available
@@ -118,12 +121,18 @@ func (x *JSONProperties) Count() uint {
 	if x == nil {
 		return 0
 	}
+
+	x.RLock()
+	defer x.RUnlock()
+
 	return uint(len(x.Properties))
 }
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) fail.Error) fail.Error {
+func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -145,16 +154,9 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		found bool
 	)
 
-	x.RLock()
-	defer x.RUnlock()
-	if item, found = x.Properties[key]; !found {
-		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-		item = &jsonProperty{
-			Shielded: shielded.NewShielded(zeroValue),
-			module:   x.module,
-			key:      key,
-		}
-		x.Properties[key] = item
+	item, found = x.hasKey(key)
+	if !found {
+		item = x.storeZero(key)
 	}
 
 	clone := item.Clone()
@@ -177,7 +179,9 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 // can't fail because a key doesn't exist).
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
-func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Error) fail.Error {
+func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -228,7 +232,9 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
-func (x *JSONProperties) SetModule(module string) fail.Error {
+func (x *JSONProperties) SetModule(module string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -247,7 +253,9 @@ func (x *JSONProperties) SetModule(module string) fail.Error {
 
 // Serialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
+func (x *JSONProperties) Serialize() (_ []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -277,11 +285,11 @@ func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 // Returns fail.SyntaxError if an JSON syntax error happens
 // satisfies interface data.Serializable
 func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
-
-	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()
