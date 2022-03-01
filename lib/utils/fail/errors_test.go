@@ -623,7 +623,7 @@ func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	err := errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
+	err = errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
 		return "any", nil
 	})
 	if err != nil {
