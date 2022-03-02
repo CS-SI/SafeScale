@@ -71,7 +71,9 @@ type JSONProperties struct {
 }
 
 // NewJSONProperties creates a new JSonProperties instance
-func NewJSONProperties(module string) (*JSONProperties, fail.Error) {
+func NewJSONProperties(module string) (_ *JSONProperties, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if module == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("module")
 	}
