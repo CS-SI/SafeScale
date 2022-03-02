@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -148,13 +148,13 @@ func Test_HostSizingRequirementsFromStringToAbstract(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-	//require.EqualValues(t, hsr.MinCores, 0)
+	// require.EqualValues(t, hsr.MinCores, 0)
 	require.EqualValues(t, hsr.MaxCores, 4)
-	//require.EqualValues(t, hsr.MinRAMSize, 0)
+	// require.EqualValues(t, hsr.MinRAMSize, 0)
 	require.EqualValues(t, hsr.MaxRAMSize, 10)
 	require.EqualValues(t, hsr.MinDiskSize, 100)
-	//require.EqualValues(t, hsr.MinGPU, -1) // @TODO: Why here default is -1 and not 0 ?
-	//require.EqualValues(t, hsr.MinCPUFreq, 0)
+	// require.EqualValues(t, hsr.MinGPU, -1) // @TODO: Why here default is -1 and not 0 ?
+	// require.EqualValues(t, hsr.MinCPUFreq, 0)
 
 	hsr, _, err = HostSizingRequirementsFromStringToAbstract("cpu >= 1, ram >= 2, disk >= 150")
 	if err != nil {
@@ -163,12 +163,12 @@ func Test_HostSizingRequirementsFromStringToAbstract(t *testing.T) {
 	}
 
 	require.EqualValues(t, hsr.MinCores, 1)
-	//require.EqualValues(t, hsr.MaxCores, 0)
+	// require.EqualValues(t, hsr.MaxCores, 0)
 	require.EqualValues(t, hsr.MinRAMSize, 2)
-	//require.EqualValues(t, hsr.MaxRAMSize, 0)
+	// require.EqualValues(t, hsr.MaxRAMSize, 0)
 	require.EqualValues(t, hsr.MinDiskSize, 150)
-	//require.EqualValues(t, hsr.MinGPU, -1) // @TODO: Why here default is -1 and not 0 ?
-	//require.EqualValues(t, hsr.MinCPUFreq, 0)
+	// require.EqualValues(t, hsr.MinGPU, -1) // @TODO: Why here default is -1 and not 0 ?
+	// require.EqualValues(t, hsr.MinCPUFreq, 0)
 
 }
 
