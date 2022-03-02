@@ -41,7 +41,7 @@ type cache struct {
 }
 
 // NewCache creates a new cache
-func NewCache(name string) (*cache, fail.Error) {
+func NewCache(name string) (Cache, fail.Error) {
 	if name == "" {
 		return &cache{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}

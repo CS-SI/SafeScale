@@ -33,7 +33,7 @@ var preservedOutput = os.Stdout
 // Used for tests to capture logrus output
 func LogrusCapture(routine func()) string {
 
-	var log string = ""
+	log := ""
 	r, w, _ := os.Pipe()
 	logrus.SetOutput(w)
 	os.Stdout = w
