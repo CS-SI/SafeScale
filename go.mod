@@ -20,7 +20,6 @@ require (
 	github.com/itchyny/gojq v0.12.6
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
-	github.com/mitchellh/mapstructure v1.4.3
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
 	github.com/oscarpicas/go-dsp v0.1.0
@@ -28,6 +27,7 @@ require (
 	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
+	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.5.2
 	github.com/sethvargo/go-password v0.2.0

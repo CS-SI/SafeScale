@@ -481,7 +481,6 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	}
 
 	v["Hostname"] = instance.GetName() + domain
-
 	v["HostIP"] = instance.privateIP
 	v["PublicIP"] = instance.publicIP
 
@@ -501,60 +500,70 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 		return xerr
 	}
 
-	rgw, xerr := rs.InspectGateway(true)
-	xerr = debug.InjectPlannedFail(xerr)
+	single, xerr := instance.IsSingle()
 	if xerr != nil {
 		return xerr
 	}
-	defer rgw.Released()
+	if single {
+		v["PrimaryGatewayIP"] = ""
+		v["GatewayIP"] = "" // legacy
+		v["PrimaryPublicIP"] = ""
 
-	v["PrimaryGatewayIP"], xerr = rgw.GetPrivateIP()
-	if xerr != nil {
-		return xerr
-	}
+		v["SecondaryGatewayIP"] = ""
+		v["SecondaryPublicIP"] = ""
 
-	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	v["PrimaryPublicIP"], xerr = rgw.GetPublicIP()
-	if xerr != nil {
-		return xerr
-	}
-
-	rgw, xerr = rs.InspectGateway(false)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			v["SecondaryGatewayIP"] = ""
-			v["SecondaryPublicIP"] = ""
-			debug.IgnoreError(xerr)
-		default:
+		v["DefaultRouteIP"] = ""
+	} else {
+		rgw, xerr := rs.InspectGateway(true)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
-	} else {
 		defer rgw.Released()
 
-		v["SecondaryGatewayIP"], xerr = rgw.GetPrivateIP()
+		v["PrimaryGatewayIP"], xerr = rgw.GetPrivateIP()
 		if xerr != nil {
 			return xerr
 		}
 
-		v["SecondaryPublicIP"], xerr = rgw.GetPublicIP()
+		v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
+		v["PrimaryPublicIP"], xerr = rgw.GetPublicIP()
 		if xerr != nil {
 			return xerr
 		}
-	}
 
-	v["EndpointIP"], xerr = rs.GetEndpointIP()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+		rgw, xerr = rs.InspectGateway(false)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				v["SecondaryGatewayIP"] = ""
+				v["SecondaryPublicIP"] = ""
+				debug.IgnoreError(xerr)
+			default:
+				return xerr
+			}
+		} else {
+			defer rgw.Released()
 
-	v["PublicIP"] = v["EndpointIP"]
-	v["DefaultRouteIP"], xerr = rs.GetDefaultRouteIP()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+			v["SecondaryGatewayIP"], xerr = rgw.GetPrivateIP()
+			if xerr != nil {
+				return xerr
+			}
+
+			v["SecondaryPublicIP"], xerr = rgw.GetPublicIP()
+			if xerr != nil {
+				return xerr
+			}
+		}
+
+		v["EndpointIP"], xerr = rs.GetEndpointIP()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		v["PublicIP"] = v["EndpointIP"]
 	}
 
 	return nil
