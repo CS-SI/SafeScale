@@ -20,7 +20,6 @@ require (
 	github.com/itchyny/gojq v0.12.7
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
-	github.com/mitchellh/mapstructure v1.4.3
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
 	github.com/oscarpicas/go-dsp v0.1.0
