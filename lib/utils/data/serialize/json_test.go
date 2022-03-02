@@ -1,6 +1,3 @@
-//go:build !race
-// +build !race
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -34,8 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
-
-// Lorem ipsum dolor sit amet, consectetur adipiscing elit. In et nulla eros. Ut pharetra, arcu at bibendum ullamcorper, leo magna condimentum leo, at rhoncus dui turpis vel ante. Curabitur ac leo vel massa pretium maximus. In sed gravida felis. Etiam lacinia, sem at sollicitudin tempus, tortor dolor porta leo, ut suscipit ex mi eget eros. Praesent id ultricies metus. Morbi condimentum placerat elementum. Morbi et sem ligula.
 
 // LikeFeatures ...
 type LikeFeatures struct {
