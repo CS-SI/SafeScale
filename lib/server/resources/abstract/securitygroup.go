@@ -512,11 +512,11 @@ func (instance *SecurityGroup) Deserialize(buf []byte) (ferr fail.Error) {
 }
 
 // GetNetworkID returns the networkId of the securitygroup
-func (sg *SecurityGroup) GetNetworkID() string {
-	if sg == nil {
+func (instance *SecurityGroup) GetNetworkID() string {
+	if instance == nil {
 		return ""
 	}
-	return sg.Network
+	return instance.Network
 }
 
 // GetName returns the name of the securitygroup
