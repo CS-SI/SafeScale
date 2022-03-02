@@ -57,7 +57,7 @@ func NewErrorListComplete(errors []error, cause error, consequences []error, msg
 
 // ToGRPCStatus returns a grpcstatus struct from ErrorList
 func (el ErrorList) ToGRPCStatus() error {
-	return grpcstatus.Errorf(el.GRPCCode(), el.Error())
+	return grpcstatus.Errorf(el.getGRPCCode(), el.Error())
 }
 
 // AddConsequence ...

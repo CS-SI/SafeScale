@@ -55,7 +55,7 @@ func NewCache(name string) (Cache, fail.Error) {
 }
 
 func (instance *cache) isNull() bool {
-	return instance == nil || instance.cache == nil || instance.name.Load().(string) == ""
+	return instance == nil || instance.name.Load().(string) == "" || instance.cache == nil
 }
 
 // GetID satisfies interface data.Identifiable
@@ -86,6 +86,7 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 		if !ok {
 			return nil, fail.InconsistentError("reserved entry '%s' in %s cache does not have a corresponding cache entry", key, instance.GetName())
 		}
+
 		reservation, ok := ce.Content().(*reservation)
 		if !ok {
 			// May have transitioned from reservation content to real content, first check that there is no more reservation...
@@ -191,9 +192,6 @@ func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, ferr fa
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
-	}
-	if content == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("content")
 	}
 
 	instance.lock.Lock()

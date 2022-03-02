@@ -77,11 +77,6 @@ func extractCallerName() string {
 	var out string
 	toSkip := 3 // skip 3 first calls, being something + consolidateMessage + extractCallerName...
 	for {
-
-		if toSkip >= 6 { // Unlikely to reach this point
-			break
-		}
-
 		if pc, file, line, ok := runtime.Caller(toSkip); ok {
 			if f := runtime.FuncForPC(pc); f != nil {
 				if strings.Contains(f.Name(), "fail.OnExit") {
@@ -93,6 +88,9 @@ func extractCallerName() string {
 			}
 		}
 
+		if toSkip >= 6 { // Unlikely to reach this point
+			break
+		}
 	}
 	return out
 }

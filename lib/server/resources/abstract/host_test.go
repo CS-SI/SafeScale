@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -467,16 +470,42 @@ func TestHostFull_IsNull(t *testing.T) {
 
 }
 
-func TestHostFull_GetID(t *testing.T) {
-
-	var hf *HostFull = nil
-	id := hf.GetID()
-	if id != "" {
-		t.Error("(nil) *Hostfull has no id")
-		t.Fail()
+// waitTimeout waits for the waitgroup for the specified max timeout.
+// Returns true if waiting timed out.
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
 	}
-	hf = NewHostFull()
-	id = hf.GetID()
+}
+
+func TestHostFull_GetID_ThatPanics(t *testing.T) {
+	var panicked error
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer fail.OnPanic(&panicked)
+		var hf *HostFull = nil
+		id := hf.GetID() // this HAS to panic
+		_ = id
+	}()
+	failed := waitTimeout(&wg, 1*time.Second)
+	if failed && panicked == nil { // It never ended
+		t.FailNow()
+	}
+}
+
+func TestHostFull_GetID(t *testing.T) {
+	hf := NewHostFull()
+	id := hf.GetID()
 	if id != "" {
 		t.Error("(empty) *Hostfull has no id")
 		t.Fail()

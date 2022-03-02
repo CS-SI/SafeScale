@@ -48,7 +48,7 @@ func Test_NewAction(t *testing.T) {
 	)
 
 	action := NewAction(officer, arbiter, run, notify, timeout)
-	require.EqualValues(t, reflect.TypeOf(action).String(), "*retry.ActionOptions")
+	require.EqualValues(t, "*retry.action", reflect.TypeOf(action).String())
 
 }
 
@@ -92,33 +92,33 @@ func Test_Action(t *testing.T) {
 func Test_TimeoutSelector(t *testing.T) {
 
 	f := TimeoutSelector(false)
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, "func(retry.action) fail.Error", reflect.TypeOf(f).String())
 
 	f = TimeoutSelector(true)
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, "func(retry.action) fail.Error", reflect.TypeOf(f).String())
 
 }
 
 func Test_DefaultTimeoutSelector(t *testing.T) {
 
 	f := DefaultTimeoutSelector()
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
 
 	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Hard")
 	f = DefaultTimeoutSelector()
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
 
 	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Soft")
 	f = DefaultTimeoutSelector()
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
 
 	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "")
 	f = DefaultTimeoutSelector()
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
 
 	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Banana!")
 	f = DefaultTimeoutSelector()
-	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.ActionOptions) fail.Error")
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
 
 }
 

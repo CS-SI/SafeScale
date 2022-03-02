@@ -14,21 +14,23 @@
  * limitations under the License.
  */
 
-package verdict_test
+package fail
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestEnum_String(t *testing.T) {
+func TestHierarchy(t *testing.T) {
+	var err Error // nolint
+	err = ExecutionError(fmt.Errorf("whatever"))
+	assert.NotNil(t, err)
+}
 
-	require.EqualValues(t, verdict.Done.String(), "Done")
-	require.EqualValues(t, verdict.Retry.String(), "Retry")
-	require.EqualValues(t, verdict.Abort.String(), "Abort")
-	require.EqualValues(t, verdict.Undecided.String(), "Undecided")
-	require.EqualValues(t, verdict.Enum(42).String(), "Enum(42)")
-
+func TestConcreteHierarchy(t *testing.T) {
+	var err *ErrExecution // nolint
+	err = ExecutionError(fmt.Errorf("whatever"))
+	assert.NotNil(t, err)
 }

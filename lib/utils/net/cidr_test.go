@@ -213,7 +213,7 @@ func Test_CIDROverlap(t *testing.T) {
 		},
 	}
 
-	var result bool = false
+	var result = false
 	for i := range tests {
 		result = CIDROverlap(tests[i].ip1, tests[i].ip2)
 		require.EqualValues(t, result, tests[i].result)

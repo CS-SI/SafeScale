@@ -44,9 +44,9 @@ type Try struct {
 	Err   error
 }
 
-type Option func(thing *ActionOptions) error // to set Officer and timeout
+type Option func(thing *action) error // to set Officer and timeout
 
-type ActionOptions struct {
+type action struct {
 	// Officer is used to apply needed delay between 2 tries. If nil, no delay will be used.
 	Officer *Officer
 	// Arbiter is called for every try to determine if next try is wanted
@@ -62,8 +62,8 @@ type ActionOptions struct {
 }
 
 // NewAction is a constructor for action
-func NewAction(officer *Officer, arbiter Arbiter, run func() error, notify Notify, timeout time.Duration) *ActionOptions { // nolint
-	return &ActionOptions{Officer: officer, Arbiter: arbiter, Run: run, Notify: notify, Timeout: timeout, Other: make(map[string]interface{})}
+func NewAction(officer *Officer, arbiter Arbiter, run func() error, notify Notify, timeout time.Duration) *action { // nolint
+	return &action{Officer: officer, Arbiter: arbiter, Run: run, Notify: notify, Timeout: timeout, Other: make(map[string]interface{})}
 }
 
 // Action tries to execute 'run' following verdicts from arbiter, with delay decided by 'officer'.
@@ -90,7 +90,7 @@ func Action(
 
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Officer: officer,
 			Arbiter: arbiter,
 			Run:     run,
@@ -101,15 +101,15 @@ func Action(
 }
 
 // TimeoutSelector chooses between loops with hard timeout or loops with soft timeout
-func TimeoutSelector(hard bool) func(action ActionOptions) fail.Error {
+func TimeoutSelector(hard bool) func(action) fail.Error {
 	if hard {
-		return ActionOptions.loopWithHardTimeout
+		return action.loopWithHardTimeout
 	}
-	return ActionOptions.loopWithSoftTimeout
+	return action.loopWithSoftTimeout
 }
 
 // DefaultTimeoutSelector provides a default selector between hard and soft timeouts
-func DefaultTimeoutSelector() func(action ActionOptions) fail.Error {
+func DefaultTimeoutSelector() func(action) fail.Error {
 	if delayAlgo := os.Getenv("SAFESCALE_TIMEOUT_STYLE"); delayAlgo != "" {
 		switch delayAlgo {
 		case "Hard":
@@ -164,7 +164,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Arbiter: arbiter,
 			Officer: BackoffSelector()(delay),
 			Run:     run,
@@ -200,7 +200,7 @@ func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, 
 	}
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Arbiter: arbiter,
 			Officer: BackoffSelector()(delay),
 			Run:     run,
@@ -226,7 +226,7 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 	} else {
 		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 	}
-	return ActionOptions{
+	return action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
@@ -251,7 +251,7 @@ func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.D
 	} else {
 		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 	}
-	return ActionOptions{
+	return action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
@@ -284,7 +284,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	}
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Arbiter: arbiter,
 			Officer: BackoffSelector()(delay),
 			Run:     run,
@@ -317,7 +317,7 @@ func WhileUnsuccessfulWithAggregator(run func() error, delay time.Duration, time
 	}
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Arbiter: arbiter,
 			Officer: BackoffSelector()(delay),
 			Run:     run,
@@ -466,7 +466,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Arbiter: arbiter,
 			Officer: BackoffSelector()(delay),
 			Run:     run,
@@ -501,7 +501,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 	}
 	selector := DefaultTimeoutSelector()
 	return selector(
-		ActionOptions{
+		action{
 			Arbiter: arbiter,
 			Officer: BackoffSelector()(delay),
 			Run:     run,
@@ -513,7 +513,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 }
 
 // loopWithSoftTimeout executes the tries and stops if the elapsed time is gone beyond the timeout (hence the "soft timeout")
-func (a ActionOptions) loopWithSoftTimeout() (ferr fail.Error) {
+func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 	arbiter := a.Arbiter
 	start := time.Now()
 
@@ -611,7 +611,7 @@ func (a ActionOptions) loopWithSoftTimeout() (ferr fail.Error) {
 }
 
 // loopWithHardTimeout executes the tries and stops at the exact timeout (hence the "hard timeout")
-func (a ActionOptions) loopWithHardTimeout() (ferr fail.Error) {
+func (a action) loopWithHardTimeout() (ferr fail.Error) {
 	timeout := a.Timeout
 	if timeout == 0 {
 		timeout = temporal.OperationTimeout()

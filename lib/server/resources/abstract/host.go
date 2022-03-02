@@ -428,18 +428,12 @@ func (hf *HostFull) OK() bool {
 // GetID returns the ID of the host
 // satisfies interface data.Identifiable
 func (hf *HostFull) GetID() string {
-	if hf == nil || hf.Core == nil {
-		return ""
-	}
 	return hf.Core.ID
 }
 
 // GetName returns the name of the host
 // satisfies interface data.Identifiable
 func (hf *HostFull) GetName() string {
-	if hf == nil || hf.Core == nil {
-		return ""
-	}
 	return hf.Core.Name
 }
 

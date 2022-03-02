@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
 	"google.golang.org/grpc/codes"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
 func waitTimeoutWithoutDeadlock(wg *sync.WaitGroup, timeout time.Duration) bool {
@@ -42,8 +42,10 @@ func waitTimeoutWithoutDeadlock(wg *sync.WaitGroup, timeout time.Duration) bool 
 }
 
 func Test_whateverThatMightDeadlockTheRightWay(t *testing.T) {
-
-	success := tests.TimelimitCapture(func() {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
 		err := &errorCore{
 			message:             "houston, we have a problem",
@@ -61,13 +63,11 @@ func Test_whateverThatMightDeadlockTheRightWay(t *testing.T) {
 		err.lock.Lock()
 		fmt.Println("Luck reaching this line")
 		fmt.Println("but now it doesn't matter, waitTimeoutWithoutDeadlock detects the deadlock and can fail -> show error in test suit instead of crashing")
-
-	}, 1000*time.Millisecond)
-
-	if !success { // It never ended, there is a deadlock with high probability
-		t.Logf("It seems we have a deadlock in function: Test_whateverThatMightDeadlockTheRightWay")
+	}()
+	failed := waitTimeoutWithoutDeadlock(&wg, 1000*time.Millisecond) // the test should take 2,3 ms (without the 2nd lock.Lock()), so waiting 1000 ms is a very safe bet
+	if failed {                                                      // It never ended, there is a deadlock with high probability
+		t.Logf("It seems we have a deadlock in function: Test_whateverThatMightDeadlockTheRightWay, this was expected, no problem")
 	} else {
 		t.FailNow() // In this, test, a deadlock is expected, if we don't detect one -> problem
 	}
-
 }

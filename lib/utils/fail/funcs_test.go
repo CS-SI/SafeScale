@@ -188,9 +188,6 @@ func Test_FromGRPCStatus(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(result).String(), v)
 	}
 
-	result = FromGRPCStatus(errors.New("Any error"))
-	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.errorCore")
-
 }
 
 func Test_ToGRPCStatus(t *testing.T) {
@@ -256,125 +253,11 @@ func Test_Wrap(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.errorCore")
 	require.EqualValues(t, result.Error(), "any error")
 
-	tests := []struct {
-		in          error
-		outtype     string
-		outcontents []string
-	}{
-		{
-			in:          NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")}),
-			outtype:     "*fail.ErrorList",
-			outcontents: []string{"square root of negative number", "can't resolve equation"},
-		},
-		{
-			in:          WarningError(errors.New("math: square root of negative number"), "Compute fail"),
-			outtype:     "*fail.ErrWarning",
-			outcontents: []string{"square root of negative number", "Compute fail"},
-		},
-		{
-			in:          NotFoundError("Compute fail"),
-			outtype:     "*fail.ErrNotFound",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          NotAvailableError("Compute fail"),
-			outtype:     "*fail.ErrNotAvailable",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          DuplicateError("Compute fail"),
-			outtype:     "*fail.ErrDuplicate",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          InvalidRequestError("Compute fail"),
-			outtype:     "*fail.ErrInvalidRequest",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          SyntaxError("Compute fail"),
-			outtype:     "*fail.ErrSyntax",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          NotAuthenticatedError("Compute fail"),
-			outtype:     "*fail.ErrNotAuthenticated",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          ForbiddenError("Compute fail"),
-			outtype:     "*fail.ErrForbidden",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          AbortedError(errors.New("math: square root of negative number"), "Compute fail"),
-			outtype:     "*fail.ErrAborted",
-			outcontents: []string{"square root of negative number", "Compute fail"},
-		},
-		{
-			in:          OverflowError(errors.New("math: square root of negative number"), 30, "Compute fail"),
-			outtype:     "*fail.ErrOverflow",
-			outcontents: []string{"square root of negative number", "Compute fail"},
-		},
-		{
-			in:          OverloadError("Compute fail"),
-			outtype:     "*fail.ErrOverload",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          NotImplementedError("Compute fail"),
-			outtype:     "*fail.ErrNotImplemented",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          RuntimePanicError("%s", "Compute fail"),
-			outtype:     "*fail.ErrRuntimePanic",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          InvalidInstanceError(),
-			outtype:     "*fail.ErrInvalidInstance",
-			outcontents: []string{},
-		},
-		{
-			in:          InvalidParameterError("param", "Compute fail"),
-			outtype:     "*fail.ErrInvalidParameter",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          InvalidInstanceContentError("what", "Compute fail"),
-			outtype:     "*fail.ErrInvalidInstanceContent",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          InconsistentError("Compute fail"),
-			outtype:     "*fail.ErrInconsistent",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          ExecutionError(errors.New("math: square root of negative number"), "Compute fail"),
-			outtype:     "*fail.ErrExecution",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          AlteredNothingError("Compute fail"),
-			outtype:     "*fail.ErrAlteredNothing",
-			outcontents: []string{"Compute fail"},
-		},
-		{
-			in:          UnknownError("Compute fail"),
-			outtype:     "*fail.ErrUnknown",
-			outcontents: []string{"Compute fail"},
-		},
-	}
-	for i := range tests {
-		test := tests[i]
-		result := Wrap(test.in, "any error")
-		require.EqualValues(t, reflect.TypeOf(result).String(), test.outtype)
-		for j := range test.outcontents {
-			require.EqualValues(t, strings.Contains(result.Error(), test.outcontents[j]), true)
-		}
-	}
+	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	result = Wrap(errs, "any error")
+	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
+	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
+	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
 
 }
 

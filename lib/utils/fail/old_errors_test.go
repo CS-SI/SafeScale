@@ -768,7 +768,7 @@ func TestAlteredNothing(t *testing.T) {
 
 		_ = an.Annotate("key", "value")
 
-		_ = an.GRPCCode()
+		_ = an.getGRPCCode()
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
 	if failed && panicked == nil { // It never ended

@@ -58,14 +58,14 @@ func IsNil(something interface{}) bool {
 	}
 
 	if casted, ok := something.(interface{ IsNull() bool }); ok {
-		if casted == nil || fmt.Sprintf("%p", casted) == "0x0" {
+		if casted == nil {
 			return true
 		}
 		return casted.IsNull()
 	}
 
 	if casted, ok := something.(interface{ IsNil() bool }); ok {
-		if casted == nil || fmt.Sprintf("%p", casted) == "0x0" {
+		if casted == nil {
 			return true
 		}
 		return casted.IsNil()
@@ -77,14 +77,13 @@ func IsNil(something interface{}) bool {
 		if !val.IsValid() {
 			return true
 		}
-	} else if theKind == reflect.Struct {
 
-		// Empty structs ?
-		if reflect.ValueOf(something).IsZero() {
-			return true
+		casted, ok := something.(interface{ IsNull() bool })
+		if ok {
+			return casted.IsNull()
 		}
-
-		res, err := hasFieldWithNameAndIsNil(something, EmbeddedErrorStructName) // FIXME, this is an implementation detail tied to our fail.Error design, it shoud NOT be harcoded, it should be here though codegen (importing results in cyclic dependency error)
+	} else if theKind == reflect.Struct {
+		res, err := hasFieldWithNameAndIsNil(something, EmbeddedErrorStructName) // FIXME: this is an implementation detail tied to our fail.Error design, it should NOT be hardcoded, it should be here through codegen (importing results in cyclic dependency error)
 		if err != nil {
 			panic(err) // It should never happen in production code if we test this right.
 		}

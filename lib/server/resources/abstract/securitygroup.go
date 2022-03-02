@@ -299,10 +299,9 @@ type SecurityGroupRules []*SecurityGroupRule
 
 // IndexOfEquivalentRule returns the index of the rule equivalent to the one provided
 func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (int, fail.Error) {
-	// Current instance not a pointer, can't happens
-	//if sgrs == nil {
-	//	return -1, fail.InvalidInstanceError()
-	//}
+	if sgrs == nil {
+		return -1, fail.InvalidInstanceError()
+	}
 	if rule == nil {
 		return -1, fail.InvalidParameterCannotBeNilError("rule")
 	}
@@ -346,10 +345,10 @@ func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
 
 // IndexOfRuleByID returns the index of the rule containing the provider rule ID provided
 func (sgrs SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
-	// --- Can't happens
-	//if sgrs == nil {
-	//	return -1, fail.InvalidInstanceError()
-	//}
+	if sgrs == nil {
+		return -1, fail.InvalidInstanceError()
+	}
+
 	found := false
 	index := -1
 	for k, v := range sgrs {

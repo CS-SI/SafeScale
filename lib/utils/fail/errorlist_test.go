@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -38,27 +37,6 @@ func Test_NewErrorList(t *testing.T) {
 	list = NewErrorList(errs)
 
 	require.EqualValues(t, len(list.(*ErrorList).errors), 1)
-
-}
-
-func Test_NewErrorListComplete(t *testing.T) {
-
-	result := NewErrorListComplete([]error{}, errors.New("Cause"), []error{}, "Any error")
-	require.EqualValues(t, result.Error(), "Any error")
-
-	result = NewErrorListComplete(
-		[]error{
-			WarningError(errors.New("Warning cause"), "Warning cause message"),
-			TimeoutError(errors.New("TimeoutError cause"), 30*time.Second, "TimeoutError cause message"),
-			SyntaxErrorWithCause(errors.New("SyntaxErrorWithCause cause"), []error{}, "SyntaxErrorWithCause cause message"),
-		},
-		errors.New("Cause"),
-		[]error{},
-		"Any error",
-	)
-	require.EqualValues(t, strings.Contains(result.Error(), "Warning cause"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "TimeoutError cause"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "SyntaxErrorWithCause cause"), true)
 
 }
 

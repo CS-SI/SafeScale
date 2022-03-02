@@ -32,7 +32,6 @@ var preservedOutput = os.Stdout
 
 // Used for tests to capture logrus output
 func LogrusCapture(routine func()) string {
-
 	log := ""
 	r, w, _ := os.Pipe()
 	logrus.SetOutput(w)
@@ -43,16 +42,18 @@ func LogrusCapture(routine func()) string {
 	os.Stdout = preservedOutput
 	logrus.SetOutput(preservedOutput)
 
-	w.Close()
+	err := w.Close()
+	if err != nil {
+		return ""
+	}
 
 	var buf bytes.Buffer
-	_, err := io.Copy(&buf, r)
+	_, err = io.Copy(&buf, r)
 	if err == nil {
 		log = buf.String()
 	}
 	fmt.Println(log)
 	return log
-
 }
 
 // Used for tests to run code segment with timelimit

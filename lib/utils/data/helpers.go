@@ -34,6 +34,7 @@ func hasFieldWithNameAndIsNil(iface interface{}, name string) (bool, error) {
 	}
 
 	ifv := reflect.ValueOf(iface)
+
 	fiv := ifv.FieldByName(name)
 	if fiv.IsValid() {
 		switch fiv.Kind() {
