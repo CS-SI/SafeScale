@@ -142,11 +142,9 @@ func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		return false
 	}
 
-	found := false
-
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range instance.Sources {
-		found = false
+		found := false
 		for _, w := range in.Sources {
 			if v == w {
 				found = true
@@ -160,7 +158,7 @@ func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range instance.Targets {
-		found = false
+		found := false
 		for _, w := range in.Targets {
 			if v == w {
 				found = true
