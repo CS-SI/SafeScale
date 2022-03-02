@@ -3,7 +3,6 @@ module github.com/CS-SI/SafeScale/v21
 go 1.16
 
 require (
-	github.com/GeertJohan/go.rice v1.0.2
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go v1.43.6
@@ -43,6 +42,7 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.70.0
 	google.golang.org/grpc v1.44.0
+	google.golang.org/protobuf v1.27.1
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
