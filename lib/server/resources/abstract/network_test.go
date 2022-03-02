@@ -87,6 +87,33 @@ func TestNetwork_Clone(t *testing.T) {
 	}
 }
 
+func TestNetwork_Clone_DNS(t *testing.T) {
+	n := NewNetwork()
+	n.ID = "Network ID"
+	n.Name = "Network Name"
+	n.CIDR = "Network CIDR"
+	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
+	n.Imported = false
+
+	n2, ok := n.Clone().(*Network)
+	if !ok {
+		t.Fail()
+	}
+	assert.Equal(t, n, n2)
+	areEqual := reflect.DeepEqual(n, n2)
+	if !areEqual {
+		t.Error("Clone not restitute values")
+		t.Fail()
+	}
+
+	n.DNSServers[1] = "MEH"
+	areEqual = reflect.DeepEqual(n, n2)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+}
+
 func TestNetwork_Serialize(t *testing.T) {
 
 	var n *Network = nil

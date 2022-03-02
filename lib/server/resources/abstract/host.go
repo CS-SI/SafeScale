@@ -260,17 +260,13 @@ func (hc *HostCore) IsConsistent() bool {
 
 // SetID is used to set ID field
 func (hc *HostCore) SetID(id string) *HostCore {
-	if hc != nil {
-		hc.ID = id
-	}
+	hc.ID = id
 	return hc
 }
 
 // SetName is used to set Name field
 func (hc *HostCore) SetName(name string) *HostCore {
-	if hc != nil {
-		hc.Name = name
-	}
+	hc.Name = name
 	return hc
 }
 
