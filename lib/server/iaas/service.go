@@ -324,6 +324,9 @@ func (instance service) WaitVolumeState(
 func pollVolume(
 	svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
 ) {
+	var crash error
+	defer fail.OnPanic(&crash)
+
 	for {
 		v, err := svc.InspectVolume(volumeID)
 		if err != nil {

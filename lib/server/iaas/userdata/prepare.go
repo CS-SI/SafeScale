@@ -165,7 +165,10 @@ func (ud *Content) Prepare(
 		}
 	}
 
-	// FIXME: Enable debug through env variables
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag != "" {
+		ud.Debug = true
+	}
+
 	ud.BashLibraryDefinition = *bashLibraryDefinition
 	ud.Header = scriptHeader
 	ud.Revision = REV

@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // volume is the part of safescale client handing volumes
@@ -79,6 +80,9 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 
 	volumeDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
 

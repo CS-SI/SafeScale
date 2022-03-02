@@ -429,6 +429,9 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		}
 
 		go func(innerTemplate abstract.HostTemplate) {
+			var crash error
+			defer fail.OnPanic(&crash)
+
 			logrus.Infof("Started scan for template %q", innerTemplate.Name)
 			lerr := handler.analyzeTemplate(innerTemplate)
 			if lerr != nil {

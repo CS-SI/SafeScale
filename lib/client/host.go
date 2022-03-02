@@ -154,6 +154,9 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	hostDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 
 		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {

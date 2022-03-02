@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -81,6 +82,9 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 	)
 
 	bucketDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 		_, err := service.Delete(ctx, &protocol.BucketRequest{Name: aname})
 		if err != nil {

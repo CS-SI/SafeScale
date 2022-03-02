@@ -24,9 +24,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-// share is the part of the safescale client handilng Shares
+// share is the part of the safescale client handling Shares
 type share struct {
 	session *Session
 }
@@ -66,6 +67,9 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 	)
 
 	shareDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 
 		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {

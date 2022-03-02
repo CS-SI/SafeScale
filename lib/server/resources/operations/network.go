@@ -124,7 +124,6 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
-
 	_ = cacheEntry.LockContent()
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)

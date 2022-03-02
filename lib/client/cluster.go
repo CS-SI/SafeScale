@@ -461,6 +461,9 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 	)
 
 	nodeDeleter := func(ref string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 
 		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
