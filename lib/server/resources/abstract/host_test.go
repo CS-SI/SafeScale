@@ -518,16 +518,26 @@ func TestHostFull_GetID(t *testing.T) {
 	}
 }
 
-func TestHostFull_GetName(t *testing.T) {
-
-	var hf *HostFull = nil
-	name := hf.GetName()
-	if name != "" {
-		t.Error("(nil) *Hostfull has no id")
-		t.Fail()
+func TestHostFull_GetName_ThatPanics(t *testing.T) {
+	var panicked error
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer fail.OnPanic(&panicked)
+		var hf *HostFull = nil
+		name := hf.GetName() // this HAS to panic
+		_ = name
+	}()
+	failed := waitTimeout(&wg, 1*time.Second)
+	if failed && panicked == nil { // It never ended
+		t.FailNow()
 	}
-	hf = NewHostFull()
-	name = hf.GetName()
+}
+
+func TestHostFull_GetName(t *testing.T) {
+	hf := NewHostFull()
+	name := hf.GetName()
 	if name != "" {
 		t.Error("(empty) *Hostfull has no id")
 		t.Fail()
@@ -540,23 +550,30 @@ func TestHostFull_GetName(t *testing.T) {
 	}
 }
 
-func TestHostFull_SetName(t *testing.T) {
-
-	var hf *HostFull = nil
-	hf.SetName("OhMyNilPointerName!!!")
-	name := hf.GetName()
-	if name != "" {
-		t.Error("Can't set name to (nil) HostFull")
-		t.Fail()
+func TestHostFull_SetName_ThatPanics(t *testing.T) {
+	var panicked error
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer fail.OnPanic(&panicked)
+		var hf *HostFull = nil
+		hf.SetName("OhMyNilPointerName!!!") // this HAS to panic
+	}()
+	failed := waitTimeout(&wg, 1*time.Second)
+	if failed && panicked == nil { // It never ended
+		t.FailNow()
 	}
-	hf = NewHostFull()
+}
+
+func TestHostFull_SetName(t *testing.T) {
+	hf := NewHostFull()
 	hf.SetName("HostFullName")
-	name = hf.GetName()
+	name := hf.GetName()
 	if name != "HostFullName" {
 		t.Error("Empty HostFull can receive new name")
 		t.Fail()
 	}
-
 }
 
 func TestHostSizingRequirements_LowerThan(t *testing.T) {
