@@ -29,16 +29,16 @@ func Test_Marshal(t *testing.T) {
 		"b": "2",
 		"c": "3",
 	}
-	encoded, err := json.Marshal(data)
+	encoded, err := Marshal(data)
 	var decoded map[string]string
-	err = json.Unmarshal(encoded, &decoded)
+	err = Unmarshal(encoded, &decoded)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 	}
 	require.EqualValues(t, data, decoded)
 
-	formatted, err := json.MarshalIndent(data, "", "    ")
+	formatted, err := MarshalIndent(data, "", "    ")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
