@@ -44,7 +44,6 @@ feature:
                             sfExit
 
             add:
-                #pace: desktop+deps,tigervnc+guacamole,start
                 pace: user,desktop,tigervnc,deps,guacamole,start
                 steps:
                     user:
@@ -106,7 +105,7 @@ feature:
                         timeout: 15
                         run: |
                             URL="https://sourceforge.net/projects/tigervnc/files/stable/1.10.1/tigervnc-1.10.1.x86_64.tar.gz/download"
-                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194
+                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194 "failed to download tigervnc archive"
                             tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195 "failed to extract tigervnc archive"
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
