@@ -24,8 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-var networks = map[string]*net.IPNet{}
-
 // CIDRToIPv4Range converts CIDR to IPv4 range
 func CIDRToIPv4Range(cidr string) (string, string, fail.Error) {
 	start, end, err := CIDRToUInt32Range(cidr)
@@ -84,9 +82,9 @@ func CIDRToUInt32Range(cidr string) (uint32, uint32, fail.Error) {
 
 // IsCIDRRoutable tells if the network is routable
 func IsCIDRRoutable(cidr string) (bool, fail.Error) {
-	first, last, err := CIDRToIPv4Range(cidr)
-	if err != nil {
-		return false, err
+	first, last, xerr := CIDRToIPv4Range(cidr)
+	if xerr != nil {
+		return false, xerr
 	}
 	var splitted []string
 	if strings.Contains(cidr, "/") {
@@ -97,8 +95,23 @@ func IsCIDRRoutable(cidr string) (bool, fail.Error) {
 			"32",
 		}
 	}
-	firstIP, _, _ := net.ParseCIDR(first + "/" + splitted[1])
-	lastIP, _, _ := net.ParseCIDR(last + "/" + splitted[1])
+	firstIP, _, err := net.ParseCIDR(first + "/" + splitted[1])
+	if err != nil {
+		return false, fail.Wrap(err)
+	}
+	lastIP, _, err := net.ParseCIDR(last + "/" + splitted[1])
+	if err != nil {
+		return false, fail.Wrap(err)
+	}
+
+	notRoutables := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+	var networks = map[string]*net.IPNet{}
+
+	for _, n := range notRoutables {
+		_, ipnet, _ := net.ParseCIDR(n)
+		networks[n] = ipnet
+	}
+
 	for _, nr := range networks {
 		if nr.Contains(firstIP) && nr.Contains(lastIP) {
 			return false, nil
@@ -107,7 +120,6 @@ func IsCIDRRoutable(cidr string) (bool, fail.Error) {
 	return true, nil
 }
 
-// CIDROverlap VPL: Not used ? duplicate with DoCIDRsIntersect
 // CIDROverlap tells if the 2 CIDR passed as parameter intersect
 func CIDROverlap(n1, n2 net.IPNet) bool {
 	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
@@ -142,12 +154,17 @@ func (cs CIDRString) IntersectsWith(cidr CIDRString) (bool, error) {
 	return l2r || r2l, nil
 }
 
-// type CIDR net.IPNet
-func init() {
-	notRoutables := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
-
-	for _, n := range notRoutables {
-		_, ipnet, _ := net.ParseCIDR(n)
-		networks[n] = ipnet
+// IntersectsWithAlt tells if the 2 cidr intersects
+func (cs CIDRString) IntersectsWithAlt(cidr CIDRString) (bool, error) {
+	start, end, err := CIDRToUInt32Range(string(cs))
+	if err != nil {
+		return false, err
 	}
+
+	otherStart, otherEnd, err := CIDRToUInt32Range(string(cidr))
+	if err != nil {
+		return false, err
+	}
+
+	return ((start <= otherStart) && (otherStart <= end)) || ((start <= otherEnd) && (otherEnd <= end)), nil
 }

@@ -72,7 +72,7 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter waiter"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter: waiter"), true)
 	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
 
 	// no timeout
@@ -670,19 +670,17 @@ func Test_normalizeURLError(t *testing.T) {
 }
 
 func Test_erz(t *testing.T) {
-
 	result := erz(net.Error(syscall.ECONNREFUSED))
-	require.EqualValues(t, result, 111)
+	require.EqualValues(t, result, syscall.ECONNREFUSED) // hardcoded values were OS-dependent
 
 	result = erz(net.Error(syscall.ECONNRESET))
-	require.EqualValues(t, result, 104)
+	require.EqualValues(t, result, syscall.ECONNRESET)
 
 	result = erz(net.Error(syscall.ECONNABORTED))
-	require.EqualValues(t, result, 103)
+	require.EqualValues(t, result, syscall.ECONNABORTED)
 
 	result = erz(errors.New("Any error"))
 	require.EqualValues(t, result, 0)
-
 }
 
 func Test_IsConnectionReset(t *testing.T) {
