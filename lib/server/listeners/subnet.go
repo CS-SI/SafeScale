@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
@@ -112,6 +113,17 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 
+	// If there is conflict with docker quit
+	cidr := in.GetCidr()
+	thisCidr := netretry.CIDRString(cidr)
+	conflict, err := thisCidr.IntersectsWith("172.17.0.0/16")
+	if err != nil {
+		return nil, err
+	}
+	if conflict {
+		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", cidr, "172.17.0.0/16")
+	}
+
 	req := abstract.SubnetRequest{
 		NetworkID:      networkInstance.GetID(),
 		Name:           in.GetName(),
@@ -121,6 +133,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		DefaultSSHPort: in.GetGateway().GetSshPort(),
 		KeepOnFailure:  in.GetKeepOnFailure(),
 	}
+
 	xerr = subnetInstance.Create(job.Context(), req, gwName, sizing)
 	if xerr != nil {
 		return nil, xerr

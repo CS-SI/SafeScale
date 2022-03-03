@@ -79,6 +79,16 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		cidr = defaultCIDR
 	}
 
+	// If there is conflict with docker quit
+	thisCidr := netretry.CIDRString(cidr)
+	conflict, err := thisCidr.IntersectsWith("172.17.0.0/16")
+	if err != nil {
+		return nil, err
+	}
+	if conflict {
+		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", cidr, "172.17.0.0/16")
+	}
+
 	req := abstract.NetworkRequest{
 		Name:          in.GetName(),
 		CIDR:          cidr,
