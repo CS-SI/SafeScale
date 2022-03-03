@@ -10,8 +10,6 @@ generate:
 	@$(GO) generate -run stringer ./...
 	@echo "package valid" > ./valid/consts.go
 	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go
-	@echo "package data" > ./data/consts.go
-	@grep EmbeddedErrorStructName ./fail/errors.go >> ./data/consts.go
 
 vet:
 	@$(GO) vet ./...

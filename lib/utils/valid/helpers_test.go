@@ -46,6 +46,8 @@ func TestIsNull(t *testing.T) {
 	var ptrOurConcreteErr *fail.ErrNotFound
 	var dlbPtrOurConcreteErr **fail.ErrNotFound
 
+	// TODO: also test fail.ErrorList{}, being a list we might have surprises
+
 	type args struct {
 		something interface{}
 	}
@@ -88,6 +90,8 @@ func TestNotNulls(t *testing.T) {
 	var ourConcreteErr fail.ErrNotFound = *ptrOurConcreteErr
 	var dlbPtrOurConcreteErr **fail.ErrNotFound = &ptrOurConcreteErr
 
+	var emptyStrArray []string
+
 	type brand struct {
 		content string
 	}
@@ -101,7 +105,10 @@ func TestNotNulls(t *testing.T) {
 		want bool
 	}{
 		{"string", args{"whatever"}, false},
-		{"struct", args{brand{}}, true},
+		{"array of string", args{[]string{"whatever"}}, false},
+		{"array of string empty", args{[]string{}}, false},
+		{"array of string empty not initialized", args{emptyStrArray}, false},
+		{"struct", args{brand{}}, false}, // an empty struct is not nil, it's empty, so -> isnil -> false
 		{"ptr struct", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},
