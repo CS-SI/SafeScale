@@ -1,6 +1,3 @@
-//go:build alltests
-// +build alltests
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
