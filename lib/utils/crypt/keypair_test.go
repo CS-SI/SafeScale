@@ -14,34 +14,23 @@
  * limitations under the License.
  */
 
-package propertiesv1
+package crypt
 
 import (
-	"reflect"
 	"testing"
-
-	"github.com/magiconair/properties/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestClusterCompositeV1_Clone(t *testing.T) {
-	ct := newClusterComposite()
-	ct.Tenants = append(ct.Tenants, "google")
-	ct.Tenants = append(ct.Tenants, "amazon")
+func Test_GenerateRSAKeyPair(t *testing.T) {
 
-	clonedCt, ok := ct.Clone().(*ClusterComposite)
-	if !ok {
+	_, _, xerr := GenerateRSAKeyPair("")
+	if xerr == nil {
+		t.Error("Can't generate RSA Key from empty name")
+		t.Fail()
+	}
+	_, _, xerr = GenerateRSAKeyPair("any")
+	if xerr != nil {
+		t.Error(xerr)
 		t.Fail()
 	}
 
-	assert.Equal(t, ct, clonedCt)
-	require.EqualValues(t, ct, clonedCt)
-	clonedCt.Tenants[0] = "choose"
-
-	areEqual := reflect.DeepEqual(ct, clonedCt)
-	if areEqual {
-		t.Error("It's a shallow clone !")
-		t.Fail()
-	}
-	require.NotEqualValues(t, ct, clonedCt)
 }

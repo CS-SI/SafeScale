@@ -17,12 +17,73 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/magiconair/properties/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestClusterCompositeV1_Clone(t *testing.T) {
+	ct := newClusterComposite()
+	ct.Tenants = append(ct.Tenants, "google")
+	ct.Tenants = append(ct.Tenants, "amazon")
+
+	clonedCt, ok := ct.Clone().(*ClusterComposite)
+	if !ok {
+		t.Fail()
+	}
+
+	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
+	clonedCt.Tenants[0] = "choose"
+
+	areEqual := reflect.DeepEqual(ct, clonedCt)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+	require.NotEqualValues(t, ct, clonedCt)
+}
+
+func TestClusterComposite_IsNull(t *testing.T) {
+
+	var cc *ClusterComposite = nil
+	if !cc.IsNull() {
+		t.Error("Nil pointer ClusterComposite is null")
+		t.Fail()
+	}
+	cc = &ClusterComposite{
+		Tenants: make([]string, 0),
+	}
+	if !cc.IsNull() {
+		t.Error("ClusterComposite without at least one tenant is null")
+		t.Fail()
+	}
+	cc = &ClusterComposite{
+		Tenants: []string{"MyWonderTenant"},
+	}
+	if cc.IsNull() {
+		t.Error("ClusterComposite is not null")
+		t.Fail()
+	}
+
+}
+
+func TestClusterComposite_Replace(t *testing.T) {
+
+	var bm *ClusterComposite = nil
+	bm2 := &ClusterComposite{
+		Tenants: []string{"MyWondertenant"},
+	}
+	result := bm.Replace(bm2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Nil pointer can't be replaced")
+		t.Fail()
+	}
+
+}
 
 func TestClusterComposite_Clone(t *testing.T) {
 	ct := newClusterComposite()

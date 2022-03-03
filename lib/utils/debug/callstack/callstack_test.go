@@ -28,7 +28,8 @@ func paradise(count uint) string {
 	return response
 }
 
-func TestDecorateWith(t *testing.T) {
+func Test_DecorateWith(t *testing.T) {
+
 	// 0 and 1 are equivalent by design -> when DecorateWith receives 0, it actually returns 1; receiving 1 also returns 1
 	the := paradise(0)
 	if !strings.Contains(the, "callstack_test.go:12") {
@@ -48,4 +49,5 @@ func TestDecorateWith(t *testing.T) {
 	if !strings.Contains(stars, "callstack_test.go:22") {
 		t.Errorf("3rd check failed")
 	}
+
 }

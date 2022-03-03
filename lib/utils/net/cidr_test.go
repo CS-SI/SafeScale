@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,8 +86,8 @@ func Test_CIDRToUInt32Range(t *testing.T) {
 
 	// Valid
 	ipv4l, ipv4h, err = CIDRToUInt32Range("192.168.0.1/24")
-	require.EqualValues(t, uint64(3232235521), uint64(ipv4l))
-	require.EqualValues(t, uint64(3232235775), uint64(ipv4h))
+	require.EqualValues(t, uint64(ipv4l), uint64(3232235521))
+	require.EqualValues(t, uint64(ipv4h), uint64(3232235775))
 }
 
 func Test_IsCIDRRoutable(t *testing.T) {
@@ -314,6 +314,13 @@ func TestCIDRString_IntersectsWith(t *testing.T) {
 		},
 		{
 			cidr1:               "192.168.0.1/24",
+			cidr2:               "192.168.0.1/28",
+			expectError:         false,
+			expectErrorFragment: "",
+			result:              true,
+		},
+		{
+			cidr1:               "192.168.0.1/28",
 			cidr2:               "192.168.0.1/24",
 			expectError:         false,
 			expectErrorFragment: "",

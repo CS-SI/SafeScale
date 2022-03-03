@@ -140,6 +140,10 @@ func Fibonacci(base time.Duration) *Officer {
 }
 
 func randomInt(min, max int) int {
+	// FIXME: if min > max, it PANICS -> randomInt has to return (int, error)
+	if min == max {
+		return min
+	}
 	mrand.Seed(time.Now().Unix())
 	return mrand.Intn(max-min) + min // nolint
 }

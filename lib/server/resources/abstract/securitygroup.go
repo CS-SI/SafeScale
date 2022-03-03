@@ -74,21 +74,46 @@ func (instance *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 	if len(instance.IDs) != len(in.IDs) {
 		return false
 	}
+
+	found := false
+
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range instance.IDs {
-		if in.IDs[k] != v {
+	for _, v1 := range instance.IDs {
+		found = false
+		for _, v2 := range in.IDs {
+			if v1 == v2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for _, v1 := range instance.Sources {
+		found = false
+		for _, v2 := range in.Sources {
+			if v1 == v2 {
+				found = true
+				break
+			}
+		}
+		if !found {
 			return false
 		}
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range instance.Sources {
-		if v != in.Sources[k] {
-			return false
+	for _, v1 := range instance.Targets {
+		found = false
+		for _, v2 := range in.Targets {
+			if v1 == v2 {
+				found = true
+				break
+			}
 		}
-	}
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range instance.Targets {
-		if v != in.Targets[k] {
+		if !found {
 			return false
 		}
 	}
@@ -278,6 +303,9 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 	if rule == nil {
 		return -1, fail.InvalidParameterCannotBeNilError("rule")
 	}
+	if len(sgrs) == 0 {
+		return -1, fail.NotFoundError("no corresponding rule found")
+	}
 
 	found := false
 	index := -1
@@ -299,6 +327,9 @@ func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
 	var asgr = make(SecurityGroupRules, 0)
 	var cloneRule *SecurityGroupRule
 	for _, v := range sgrs {
+		if v == nil {
+			continue
+		}
 		var ok bool
 		cloneRule, ok = v.Clone().(*SecurityGroupRule)
 		if !ok {
@@ -319,6 +350,9 @@ func (sgrs SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
 	found := false
 	index := -1
 	for k, v := range sgrs {
+		if v == nil {
+			continue
+		}
 		for _, item := range v.IDs {
 			if item == id {
 				found = true
@@ -474,7 +508,15 @@ func (instance *SecurityGroup) Deserialize(buf []byte) (ferr fail.Error) {
 	return nil
 }
 
-// GetName returns the name of the volume
+// GetNetworkID returns the networkId of the securitygroup
+func (instance *SecurityGroup) GetNetworkID() string {
+	if instance == nil {
+		return ""
+	}
+	return instance.Network
+}
+
+// GetName returns the name of the securitygroup
 // Satisfies interface data.Identifiable
 func (instance *SecurityGroup) GetName() string {
 	if instance == nil {
@@ -483,7 +525,7 @@ func (instance *SecurityGroup) GetName() string {
 	return instance.Name
 }
 
-// GetID returns the ID of the volume
+// GetID returns the ID of the securitygroup
 // Satisfies interface data.Identifiable
 func (instance *SecurityGroup) GetID() string {
 	if instance == nil {

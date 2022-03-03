@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package propertiesv3
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,27 +27,63 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
 )
 
-func TestDefaults_Clone(t *testing.T) {
-	ct := newClusterDefaults()
-	ct.Image = "something"
-	ct.GatewaySizing = propertiesv2.HostSizingRequirements{
+func TestClusterDefaults_IsNull(t *testing.T) {
+
+	var cd *ClusterDefaults = nil
+	if !cd.IsNull() {
+		t.Error("ClusterDefaults nil pointer is null")
+		t.Fail()
+	}
+	cd = newClusterDefaults()
+	if !cd.IsNull() {
+		t.Error("Empty ClusterDefaults is null")
+		t.Fail()
+	}
+	cd.GatewaySizing = propertiesv2.HostSizingRequirements{
 		MinCores: 3,
 		MinGPU:   1,
 	}
+	if cd.IsNull() {
+		t.Error("ClusterNetwork is not null")
+		t.Fail()
+	}
 
-	clonedCt, ok := ct.Clone().(*ClusterDefaults)
+}
+
+func TestClusterDefaults_Replace(t *testing.T) {
+	var cd *ClusterDefaults = nil
+	cd2 := newClusterDefaults()
+	result := cd.Replace(cd2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("ClusterDefaults nil pointer can't be replace")
+		t.Fail()
+	}
+}
+
+func TestClusterDefaults_Clone(t *testing.T) {
+	cd := newClusterDefaults()
+	cd.Image = "something"
+	cd.GatewaySizing = propertiesv2.HostSizingRequirements{
+		MinCores: 3,
+		MinGPU:   1,
+	}
+	cd.FeatureParameters = []string{"FeatureParam1", "FeatureParam2", "FeatureParam3"}
+
+	clonedCd, ok := cd.Clone().(*ClusterDefaults)
 	if !ok {
 		t.Fail()
 	}
 
-	assert.Equal(t, ct, clonedCt)
-	require.EqualValues(t, ct, clonedCt)
-	clonedCt.GatewaySizing.MinCores = 7
+	assert.Equal(t, cd, clonedCd)
+	require.EqualValues(t, cd, clonedCd)
+	clonedCd.GatewaySizing.MinCores = 7
 
-	areEqual := reflect.DeepEqual(ct, clonedCt)
+	areEqual := reflect.DeepEqual(cd, clonedCd)
 	if areEqual {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
-	require.NotEqualValues(t, ct, clonedCt)
+	require.NotEqualValues(t, cd, clonedCd)
+	require.EqualValues(t, len(clonedCd.FeatureParameters), 3)
+
 }

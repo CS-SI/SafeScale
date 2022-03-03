@@ -142,6 +142,11 @@ func (instance *location) IsNull() bool {
 
 // Connect connects to an Object Storage location
 func (instance *location) connect() fail.Error {
+
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	// FIXME: GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
 	var config stow.ConfigMap
 

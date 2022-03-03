@@ -17,12 +17,95 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHostNetwork_IsNull(t *testing.T) {
+
+	var hn *HostNetwork = nil
+	if !hn.IsNull() {
+		t.Error("HostNetwork nil pointer is null")
+		t.Fail()
+	}
+	hn = NewHostNetwork()
+	if !hn.IsNull() {
+		t.Error("Empty HostNetwork is null")
+		t.Fail()
+	}
+	hn = &HostNetwork{
+		IsGateway:               false,
+		DefaultGatewayID:        "DefaultGatewayID",
+		DefaultGatewayPrivateIP: "DefaultGatewayPrivateIP",
+		DefaultNetworkID:        "DefaultNetworkID",
+		NetworksByID: map[string]string{
+			"ID": "Network",
+		},
+		NetworksByName: map[string]string{
+			"Name": "Network",
+		},
+		PublicIPv4: "PublicIPv4",
+		PublicIPv6: "PublicIPv6",
+		IPv4Addresses: map[string]string{
+			"Ipv4": "Network",
+		},
+		IPv6Addresses: map[string]string{
+			"Ipv6": "Network",
+		},
+	}
+	if hn.IsNull() {
+		t.Error("HostNetwork is not null")
+		t.Fail()
+	}
+
+}
+
+func TestHostNetwork_Reset(t *testing.T) {
+
+	hn := &HostNetwork{
+		IsGateway:               false,
+		DefaultGatewayID:        "DefaultGatewayID",
+		DefaultGatewayPrivateIP: "DefaultGatewayPrivateIP",
+		DefaultNetworkID:        "DefaultNetworkID",
+		NetworksByID: map[string]string{
+			"ID": "Network",
+		},
+		NetworksByName: map[string]string{
+			"Name": "Network",
+		},
+		PublicIPv4: "PublicIPv4",
+		PublicIPv6: "PublicIPv6",
+		IPv4Addresses: map[string]string{
+			"Ipv4": "Network",
+		},
+		IPv6Addresses: map[string]string{
+			"Ipv6": "Network",
+		},
+	}
+	hn.Reset()
+
+	if len(hn.NetworksByID) > 0 {
+		t.Error("HostNetwork reset fail to empty NetworksByID")
+		t.Fail()
+	}
+	if len(hn.NetworksByName) > 0 {
+		t.Error("HostNetwork reset fail to empty NetworksByName")
+		t.Fail()
+	}
+	if len(hn.IPv4Addresses) > 0 {
+		t.Error("HostNetwork reset fail to empty IPv4Addresses")
+		t.Fail()
+	}
+	if len(hn.IPv6Addresses) > 0 {
+		t.Error("HostNetwork reset fail to empty IPv6Addresses")
+		t.Fail()
+	}
+
+}
 
 func TestHostNetwork_Clone(t *testing.T) {
 	ct := &HostNetwork{
@@ -50,4 +133,16 @@ func TestHostNetwork_Clone(t *testing.T) {
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)
+}
+
+func TestHostNetwork_Replace(t *testing.T) {
+
+	var hn *HostNetwork = nil
+	hn2 := NewHostNetwork()
+	result := hn.Replace(hn2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Can't replace nil pointer")
+		t.Fail()
+	}
+
 }

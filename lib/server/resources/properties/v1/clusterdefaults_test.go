@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,7 +27,66 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 )
 
-func TestDefaults_Clone(t *testing.T) {
+func TestClusterDefaults_IsNull(t *testing.T) {
+
+	var cd *ClusterDefaults = nil
+	if !cd.IsNull() {
+		t.Error("Nil pointer ClusterDefaults is null")
+		t.Fail()
+	}
+	cd = &ClusterDefaults{
+		GatewaySizing: abstract.HostEffectiveSizing{},
+		MasterSizing:  abstract.HostEffectiveSizing{},
+		NodeSizing:    abstract.HostEffectiveSizing{},
+		Image:         "",
+	}
+	if !cd.IsNull() {
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null => is null")
+		t.Fail()
+	}
+	cd.GatewaySizing.Cores = 1
+	if cd.IsNull() {
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null =>  is null")
+		t.Fail()
+	}
+	cd.GatewaySizing.Cores = 0
+	cd.MasterSizing.Cores = 1
+	if cd.IsNull() {
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null =>  is null")
+		t.Fail()
+	}
+	cd.MasterSizing.Cores = 0
+	cd.NodeSizing.Cores = 1
+	if cd.IsNull() {
+		t.Error("ClusterDefaults needs (GatewaySizing, MasterSizing or NodeSizing not null) to be not null =>  is null")
+		t.Fail()
+	}
+}
+
+func TestClusterDefaults_Replace(t *testing.T) {
+
+	var cd *ClusterDefaults = nil
+	cd2 := &ClusterDefaults{
+		GatewaySizing: abstract.HostEffectiveSizing{
+			Cores: 1,
+		},
+		MasterSizing: abstract.HostEffectiveSizing{
+			Cores: 1,
+		},
+		NodeSizing: abstract.HostEffectiveSizing{
+			Cores: 1,
+		},
+		Image: "",
+	}
+	result := cd.Replace(cd2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("ClusterDefaults Nil pointer can't be replaced")
+		t.Fail()
+	}
+
+}
+
+func TestClusterDefaults_Clone(t *testing.T) {
 	ct := newClusterDefaults()
 	ct.Image = "something"
 	ct.GatewaySizing = abstract.HostEffectiveSizing{

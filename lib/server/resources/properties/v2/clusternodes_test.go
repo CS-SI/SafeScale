@@ -17,6 +17,7 @@
 package propertiesv2
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -24,30 +25,86 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNodes_Clone(t *testing.T) {
-	node := &ClusterNode{
-		ID:        "",
-		Name:      "Something",
-		PublicIP:  "",
-		PrivateIP: "",
+func TestClusterNodes_IsNull(t *testing.T) {
+
+	var cn *ClusterNodes = nil
+	if !cn.IsNull() {
+		t.Error("ClusterNodes nil pointer is null")
+		t.Fail()
+	}
+	cn = newClusterNodes()
+	if !cn.IsNull() {
+		t.Error("Empty ClusterNodes is null")
+		t.Fail()
+	}
+	cn.Masters = []*ClusterNode{
+		{
+			ID:          "ClusterNode ID",
+			NumericalID: 1,
+			Name:        "ClusterNode Name",
+			PublicIP:    "ClusterNode PublicIP",
+			PrivateIP:   "ClusterNode PrivateIP",
+		},
+	}
+	if cn.IsNull() {
+		t.Error("ClusterNodes is not null")
+		t.Fail()
+	}
+}
+
+func TestClusterNodes_Replace(t *testing.T) {
+	var cn *ClusterNodes = nil
+	cn2 := newClusterNodes()
+	result := cn.Replace(cn2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("ClusterNodes nil pointer can't be replace")
+		t.Fail()
+	}
+}
+
+func TestClusterNodes_Clone(t *testing.T) {
+
+	cns := &ClusterNodes{
+		Masters: []*ClusterNode{
+			{
+				ID:        "ClusterNode ID1",
+				Name:      "ClusterNode Master",
+				PublicIP:  "ClusterNode PublicIP1",
+				PrivateIP: "ClusterNode PrivateIP1",
+			},
+		},
+		PublicNodes: []*ClusterNode{
+			{
+				ID:        "ClusterNode ID2",
+				Name:      "ClusterNode Public",
+				PublicIP:  "ClusterNode PublicIP2",
+				PrivateIP: "ClusterNode PrivateIP2",
+			},
+		},
+		PrivateNodes: []*ClusterNode{
+			{
+				ID:        "ClusterNode ID3",
+				Name:      "ClusterNode Private",
+				PublicIP:  "ClusterNode PublicIP3",
+				PrivateIP: "ClusterNode PrivateIP3",
+			},
+		},
+		GlobalLastIndex: 3,
 	}
 
-	ct := newClusterNodes()
-	ct.PrivateNodes = append(ct.PrivateNodes, node)
-
-	clonedCt, ok := ct.Clone().(*ClusterNodes)
+	clonedCns, ok := cns.Clone().(*ClusterNodes)
 	if !ok {
 		t.Fail()
 	}
 
-	assert.Equal(t, ct, clonedCt)
-	require.EqualValues(t, ct, clonedCt)
-	clonedCt.PrivateNodes[0].Name = "Else"
+	assert.Equal(t, cns, clonedCns)
+	require.EqualValues(t, cns, clonedCns)
+	clonedCns.Masters[0].Name = "ClusterNode Master Else"
 
-	areEqual := reflect.DeepEqual(ct, clonedCt)
+	areEqual := reflect.DeepEqual(cns, clonedCns)
 	if areEqual {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
-	require.NotEqualValues(t, ct, clonedCt)
+	require.NotEqualValues(t, cns, clonedCns)
 }

@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,7 +27,48 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 )
 
-func TestControlPlane_Clone(t *testing.T) {
+func TestClusterControlplane_IsNull(t *testing.T) {
+
+	var cc *ClusterControlplane = nil
+	if !cc.IsNull() {
+		t.Error("Nil pointer ClusterControlplane is null")
+		t.Fail()
+	}
+	cc = &ClusterControlplane{
+		VirtualIP: nil,
+	}
+	if !cc.IsNull() {
+		t.Error("ClusterControlplane nil VirtualIP is null")
+		t.Fail()
+	}
+	cc = &ClusterControlplane{
+		VirtualIP: &abstract.VirtualIP{
+			ID: "MyVirtualIP ID",
+		},
+	}
+	if cc.IsNull() {
+		t.Error("ClusterControlplane is not null")
+		t.Fail()
+	}
+}
+
+func TestClusterControlplane_Replace(t *testing.T) {
+
+	var cc *ClusterControlplane = nil
+	cc2 := &ClusterControlplane{
+		VirtualIP: &abstract.VirtualIP{
+			ID: "MyVirtualIP ID",
+		},
+	}
+	result := cc.Replace(cc2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Nil pointer can't be replaced")
+		t.Fail()
+	}
+
+}
+
+func TestClusterControlplane_Clone(t *testing.T) {
 	vip := abstract.NewVirtualIP()
 	hc := abstract.NewHostCore()
 	hc.Name = "whatever"

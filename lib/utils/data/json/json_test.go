@@ -14,11 +14,36 @@
  * limitations under the License.
  */
 
-package empty
+package json
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestEmpty(t *testing.T) {
+func Test_Marshal(t *testing.T) {
+
+	data := map[string]string{
+		"a": "1",
+		"b": "2",
+		"c": "3",
+	}
+	encoded, err := json.Marshal(data)
+	var decoded map[string]string
+	err = json.Unmarshal(encoded, &decoded)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	require.EqualValues(t, data, decoded)
+
+	formatted, err := json.MarshalIndent(data, "", "    ")
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	expected := "{\n    \"a\": \"1\",\n    \"b\": \"2\",\n    \"c\": \"3\"\n}"
+	require.EqualValues(t, string(formatted), expected)
+
 }

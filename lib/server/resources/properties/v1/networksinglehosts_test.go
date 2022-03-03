@@ -17,12 +17,47 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNetworkSingleHosts_IsNull(t *testing.T) {
+
+	var nsh *NetworkSingleHosts = nil
+	if !nsh.IsNull() {
+		t.Error("NetworkSingleHosts nil pointer is null")
+		t.Fail()
+	}
+	nsh = NewNetworkSingleHosts()
+	if !nsh.IsNull() {
+		t.Error("Empty NetworkSingleHosts is null")
+		t.Fail()
+	}
+	nsh.FreeSlots = []FreeCIDRSlot{
+		{
+			First: 0,
+			Last:  0,
+		},
+	}
+	if nsh.IsNull() {
+		t.Error("NetworkSingleHosts is not null")
+		t.Fail()
+	}
+}
+
+func TestNetworkSingleHosts_Replace(t *testing.T) {
+	var nsh *NetworkSingleHosts = nil
+	nsh2 := NewNetworkSingleHosts()
+	result := nsh.Replace(nsh2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("NetworkSingleHosts nil pointer can't be replace")
+		t.Fail()
+	}
+}
 
 func TestNetworkSingleHosts_Clone(t *testing.T) {
 	ct := NewNetworkSingleHosts()
@@ -78,4 +113,59 @@ func TestNetworkSingleHosts_ReserveSlot(t *testing.T) {
 		t.Error("content is unexpected!")
 		t.Fail()
 	}
+}
+
+func TestNetworkSingleHosts_FreeSlot(t *testing.T) {
+
+	nsh := NewNetworkSingleHosts()
+	nsh.FreeSlots = []FreeCIDRSlot{
+		{First: 3, Last: 5},
+	}
+	nsh.FreeSlot(2)
+	if len(nsh.FreeSlots) != 1 || nsh.FreeSlots[0].First != 2 {
+		t.Error("Fail to free slot 0")
+		t.Fail()
+	}
+	nsh.FreeSlot(6)
+	if len(nsh.FreeSlots) != 1 || nsh.FreeSlots[0].Last != 6 {
+		t.Error("Fail to free slot 6")
+		t.Fail()
+	}
+	nsh.FreeSlot(0)
+	if len(nsh.FreeSlots) != 2 || nsh.FreeSlots[0].First != 0 {
+		t.Error("Fail to free slot 0")
+		t.Fail()
+	}
+	nsh.FreeSlot(8)
+	if len(nsh.FreeSlots) != 3 || nsh.FreeSlots[2].Last != 8 {
+		t.Error("Fail to free slot 8")
+		t.Fail()
+	}
+	nsh.FreeSlots = []FreeCIDRSlot{
+		{First: 3, Last: 5},
+		{First: 9, Last: 11},
+	}
+	nsh.FreeSlot(7)
+	if len(nsh.FreeSlots) != 2 || nsh.FreeSlots[0].Last != 7 {
+		t.Error("Fail to free slot 7")
+		t.Fail()
+	}
+	nsh.FreeSlots = []FreeCIDRSlot{
+		{First: 0, Last: 1},
+		{First: 1, Last: 2},
+		{First: 2, Last: 3},
+		{First: 3, Last: 4},
+		{First: 4, Last: 5},
+		{First: 5, Last: 6},
+		{First: 6, Last: 7},
+		{First: 7, Last: 8},
+		{First: 8, Last: 9},
+		{First: 9, Last: 10},
+	}
+	nsh.FreeSlot(0)
+	if len(nsh.FreeSlots) != 1 {
+		t.Error("FreeSlot merged invalid")
+		t.Fail()
+	}
+
 }

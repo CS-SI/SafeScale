@@ -62,7 +62,8 @@ type Network struct {
 // NewNetwork initializes a new instance of Network
 func NewNetwork() *Network {
 	nn := &Network{
-		Tags: make(map[string]string),
+		DNSServers: make([]string, 0),
+		Tags:       make(map[string]string),
 	}
 	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nn.Tags["ManagedBy"] = "safescale"
@@ -88,11 +89,10 @@ func (n *Network) Replace(p data.Clonable) data.Clonable {
 	if n == nil || p == nil {
 		return n
 	}
-
 	// FIXME: Replace should also return an error
 	src, _ := p.(*Network) // nolint
 	*n = *src
-	n.DNSServers = make([]string, 0, len(src.DNSServers))
+	n.DNSServers = make([]string, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
 	return n
 }

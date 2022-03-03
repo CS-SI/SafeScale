@@ -21,10 +21,6 @@ import (
 	"reflect"
 )
 
-// NOTE: This lib/utils/valid/helpers.go and lib/utils/data/helpers.go are duplicates, tests are in lib/utils/valid
-// problem is that depending on who invokes this code it results in a cyclic dependency error
-// when it's fixed only one will remain
-
 func hasFieldWithNameAndIsNil(iface interface{}, name string) (bool, error) {
 	if iface == nil { // this can happen
 		return false, nil
@@ -61,6 +57,13 @@ func IsNil(something interface{}) bool {
 		if casted == nil {
 			return true
 		}
+
+		// comparing to "0x0" might bring surprises like "0x0000000000"
+		var num *int // this is 0x0
+		if fmt.Sprintf("%p", casted) == fmt.Sprintf("%p", num) {
+			return true
+		}
+
 		return casted.IsNull()
 	}
 
@@ -68,6 +71,13 @@ func IsNil(something interface{}) bool {
 		if casted == nil {
 			return true
 		}
+
+		// comparing to "0x0" might bring surprises like "0x0000000000"
+		var num *int // this is 0x0
+		if fmt.Sprintf("%p", casted) == fmt.Sprintf("%p", num) {
+			return true
+		}
+
 		return casted.IsNil()
 	}
 

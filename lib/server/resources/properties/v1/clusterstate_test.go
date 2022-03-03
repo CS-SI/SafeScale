@@ -17,8 +17,10 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +28,47 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 )
 
-func TestState_Clone(t *testing.T) {
+func TestClusterState_IsNull(t *testing.T) {
+
+	var cs *ClusterState = nil
+	if !cs.IsNull() {
+		t.Error("Nil pointer ClusterState is null")
+		t.Fail()
+	}
+	cs = &ClusterState{
+		State:                clusterstate.Created,
+		StateCollectInterval: 0 * time.Second,
+	}
+	if !cs.IsNull() {
+		t.Error("ClusterState with StateCollectInterval=0 is null")
+		t.Fail()
+	}
+	cs.StateCollectInterval = -40 * time.Second
+	if !cs.IsNull() {
+		t.Error("ClusterState with StateCollectInterval<0 is null")
+		t.Fail()
+	}
+	cs.StateCollectInterval = 40 * time.Second
+	if cs.IsNull() {
+		t.Error("ClusterState is not null")
+		t.Fail()
+	}
+
+}
+
+func TestClusterState_Replace(t *testing.T) {
+
+	var cs *ClusterState = nil
+	cs2 := newClusterState()
+	result := cs.Replace(cs2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Ca,'t replace ClusterState nil pointer")
+		t.Fail()
+	}
+
+}
+
+func TestClusterState_Clone(t *testing.T) {
 	ct := newClusterState()
 	ct.State = clusterstate.Created
 

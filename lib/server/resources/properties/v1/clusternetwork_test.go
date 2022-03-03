@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -24,7 +25,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNetwork_Clone(t *testing.T) {
+func TestClusterNetwork_IsNull(t *testing.T) {
+
+	var cn *ClusterNetwork = nil
+	if !cn.IsNull() {
+		t.Error("Nil pointer ClusterNetwork is null")
+		t.Fail()
+	}
+	cn = &ClusterNetwork{
+		NetworkID: "",
+		GatewayID: "",
+		GatewayIP: "",
+		PublicIP:  "",
+		CIDR:      "",
+	}
+	if !cn.IsNull() {
+		t.Error("ClusterFeatures without NetworkID or GatewayID null")
+		t.Fail()
+	}
+	cn = &ClusterNetwork{
+		NetworkID: "ClusterNetwork networkId",
+		GatewayID: "",
+		GatewayIP: "",
+		PublicIP:  "",
+		CIDR:      "",
+	}
+	if cn.IsNull() {
+		t.Error("ClusterFeatures is not null")
+		t.Fail()
+	}
+
+}
+
+func TestClusterNetwork_Replace(t *testing.T) {
+
+	var cn *ClusterNetwork = nil
+	cn2 := &ClusterNetwork{
+		NetworkID: "ClusterNetwork networkId",
+		GatewayID: "",
+		GatewayIP: "",
+		PublicIP:  "",
+		CIDR:      "",
+	}
+	result := cn.Replace(cn2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("ClusterNetwork nil pointer can't be replaced")
+		t.Fail()
+	}
+
+}
+
+func TestClusterNetwork_Clone(t *testing.T) {
 	ct := newClusterNetwork()
 	ct.GatewayID = "None"
 

@@ -17,14 +17,98 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func TestVolumeDescription_IsNull(t *testing.T) {
+
+	var vd *VolumeDescription = nil
+	if !vd.IsNull() {
+		t.Error("VolumeDescription nil pointer is null")
+		t.Fail()
+	}
+	vd = NewVolumeDescription()
+	if !vd.IsNull() {
+		t.Error("Empty VolumeDescription is null")
+		t.Fail()
+	}
+	vd.Purpose = "VolumeDescription Purpose"
+	if vd.IsNull() {
+		t.Error("VolumeDescription is not null")
+		t.Fail()
+	}
+}
+
+func TestVolumeDescription_Replace(t *testing.T) {
+	var ssg *VolumeDescription = nil
+	ssg2 := NewVolumeDescription()
+	result := ssg.Replace(ssg2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("VolumeDescription nil pointer can't be replace")
+		t.Fail()
+	}
+}
+
+func TestVolumeDescription_Clone(t *testing.T) {
+
+	vd := &VolumeDescription{
+		Purpose: "VolumeDescription Purpose",
+		Created: time.Now(),
+	}
+	clonedVd, ok := vd.Clone().(*VolumeDescription)
+	if !ok {
+		t.Fail()
+	}
+
+	assert.Equal(t, vd, clonedVd)
+	require.EqualValues(t, vd, clonedVd)
+	clonedVd.Purpose = "VolumeDescription Purpose2"
+
+	areEqual := reflect.DeepEqual(vd, clonedVd)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+	require.NotEqualValues(t, vd, clonedVd)
+}
+
+func TestVolumeAttachments_IsNull(t *testing.T) {
+
+	var ssg *VolumeAttachments = nil
+	if !ssg.IsNull() {
+		t.Error("VolumeAttachments nil pointer is null")
+		t.Fail()
+	}
+	ssg = NewVolumeAttachments()
+	if !ssg.IsNull() {
+		t.Error("Empty VolumeAttachments is null")
+		t.Fail()
+	}
+	ssg.Hosts["ID"] = "Host"
+	if ssg.IsNull() {
+		t.Error("VolumeAttachments is not null")
+		t.Fail()
+	}
+}
+
+func TestVolumeAttachments_Replace(t *testing.T) {
+	var ssg *VolumeAttachments = nil
+	ssg2 := NewVolumeAttachments()
+	result := ssg.Replace(ssg2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("VolumeAttachments nil pointer can't be replace")
+		t.Fail()
+	}
+}
+
 func TestVolumeAttachments_Clone(t *testing.T) {
+
 	ct := NewVolumeAttachments()
 	ct.Shareable = true
 	ct.Hosts = map[string]string{"id1": "host1"}
