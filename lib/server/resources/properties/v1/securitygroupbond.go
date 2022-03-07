@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
@@ -40,20 +42,24 @@ func (sgb *SecurityGroupBond) IsNull() bool {
 }
 
 // Clone ...
-func (sgb SecurityGroupBond) Clone() data.Clonable {
+func (sgb SecurityGroupBond) Clone() (data.Clonable, error) {
 	return NewSecurityGroupBond().Replace(&sgb)
 }
 
 // Replace ...
-func (sgb *SecurityGroupBond) Replace(p data.Clonable) data.Clonable {
+func (sgb *SecurityGroupBond) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if sgb == nil || p == nil {
-		return sgb
+		return sgb, nil
 	}
 
-	src, _ := p.(*SecurityGroupBond) // FIXME: Replace should also return an error
+	src, ok := p.(*SecurityGroupBond)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SecurityGroupBond")
+	}
+
 	*sgb = *src
-	return sgb
+	return sgb, nil
 }
 
 // Note: no need to register this property, it is not used directly (component of other properties)

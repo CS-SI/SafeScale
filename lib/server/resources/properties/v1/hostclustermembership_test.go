@@ -75,7 +75,7 @@ func TestHostClusterMembership_Replace(t *testing.T) {
 		t.Fail()
 	}
 	hcm2 := NewHostClusterMembership()
-	result := hcm.Replace(hcm2)
+	result, _ := hcm.Replace(hcm2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("HostClusterMembership nil pointer can't be replaced")
 		t.Fail()
@@ -88,7 +88,12 @@ func TestHostClusterMembership_Clone(t *testing.T) {
 	cm := NewHostClusterMembership()
 	cm.Cluster = "HostClusterMembership Cluster"
 
-	clonedCm, ok := cm.Clone().(*HostClusterMembership)
+	cloned, err := cm.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCm, ok := cloned.(*HostClusterMembership)
 	if !ok {
 		t.Fail()
 	}

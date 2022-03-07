@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -42,23 +44,25 @@ func (c *ClusterComposite) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (c ClusterComposite) Clone() data.Clonable {
+func (c ClusterComposite) Clone() (data.Clonable, error) {
 	return newClusterComposite().Replace(&c)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (c *ClusterComposite) Replace(p data.Clonable) data.Clonable {
+func (c *ClusterComposite) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if c == nil || p == nil {
-		return c
+		return c, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterComposite) // nolint
+	src, ok := p.(*ClusterComposite)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterComposite")
+	}
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)
-	return c
+	return c, nil
 }
 
 func init() {

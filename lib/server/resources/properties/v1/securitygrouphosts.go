@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -46,29 +48,38 @@ func (sgh *SecurityGroupHosts) IsNull() bool {
 }
 
 // Clone ...
-func (sgh *SecurityGroupHosts) Clone() data.Clonable {
+func (sgh *SecurityGroupHosts) Clone() (data.Clonable, error) {
 	return NewSecurityGroupHosts().Replace(sgh)
 }
 
 // Replace ...
-func (sgh *SecurityGroupHosts) Replace(p data.Clonable) data.Clonable {
+func (sgh *SecurityGroupHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if sgh == nil || p == nil {
-		return sgh
+		return sgh, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*SecurityGroupHosts) // nolint
+	src, ok := p.(*SecurityGroupHosts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SecurityGroupHosts")
+	}
+
 	sgh.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		// FIXME: Replace should also return an error
-		sgh.ByID[k], _ = v.Clone().(*SecurityGroupBond) // nolint
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		sgh.ByID[k], ok = cloned.(*SecurityGroupBond)
+		if !ok {
+			return nil, fmt.Errorf("cloned is not a *SecurityGroupBond")
+		}
 	}
 	sgh.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		sgh.ByName[k] = v
 	}
-	return sgh
+	return sgh, nil
 }
 
 func init() {

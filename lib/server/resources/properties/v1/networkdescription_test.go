@@ -48,7 +48,7 @@ func TestNetworkDescription_IsNull(t *testing.T) {
 func TestNetworkDescription_Replace(t *testing.T) {
 	var nd *NetworkDescription = nil
 	nd2 := NewNetworkDescription()
-	result := nd.Replace(nd2)
+	result, _ := nd.Replace(nd2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("NetworkDescription nil pointer can't be replace")
 		t.Fail()
@@ -62,7 +62,13 @@ func TestNetworkDescription_Clone(t *testing.T) {
 		Created: time.Now(),
 		Domain:  "NetworkDescription Domain",
 	}
-	clonedNs, ok := nd.Clone().(*NetworkDescription)
+
+	cloned, err := nd.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedNs, ok := cloned.(*NetworkDescription)
 	if !ok {
 		t.Fail()
 	}

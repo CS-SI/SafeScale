@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
@@ -61,23 +62,25 @@ func (v *Volume) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (v Volume) Clone() data.Clonable {
+func (v Volume) Clone() (data.Clonable, error) {
 	return NewVolume().Replace(&v)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
-func (v *Volume) Replace(p data.Clonable) data.Clonable {
+func (v *Volume) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if v == nil || p == nil {
-		return v
+		return v, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*Volume) // nolint
+	src, ok := p.(*Volume) // nolint
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Volume")
+	}
 	*v = *src
-	return v
+	return v, nil
 }
 
 // OK ...

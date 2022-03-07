@@ -47,7 +47,7 @@ func TestSubnetHosts_IsNull(t *testing.T) {
 func TestSubnetHosts_Replace(t *testing.T) {
 	var snh *SubnetHosts = nil
 	snh2 := NewSubnetHosts()
-	result := snh.Replace(snh2)
+	result, _ := snh.Replace(snh2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("SubnetHosts nil pointer can't be replace")
 		t.Fail()
@@ -64,7 +64,12 @@ func TestSubnetHosts_Clone(t *testing.T) {
 			"Name": "ID",
 		},
 	}
-	clonedSnh, ok := snh.Clone().(*SubnetHosts)
+	cloned, err := snh.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedSnh, ok := cloned.(*SubnetHosts)
 	if !ok {
 		t.Fail()
 	}

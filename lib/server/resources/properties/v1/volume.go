@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumeproperty"
@@ -46,19 +47,24 @@ func (vd *VolumeDescription) IsNull() bool {
 }
 
 // Clone ...
-func (vd VolumeDescription) Clone() data.Clonable {
+func (vd VolumeDescription) Clone() (data.Clonable, error) {
 	return NewVolumeDescription().Replace(&vd)
 }
 
 // Replace ...
-func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
+func (vd *VolumeDescription) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if vd == nil || p == nil {
-		return vd
+		return vd, nil
 	}
 
-	*vd = *p.(*VolumeDescription)
-	return vd
+	cloned, ok := p.(*VolumeDescription)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *VolumeDescription")
+	}
+
+	*vd = *cloned
+	return vd, nil
 }
 
 // VolumeAttachments contains host ids where the volume is attached
@@ -84,25 +90,28 @@ func (va *VolumeAttachments) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (va VolumeAttachments) Clone() data.Clonable {
+func (va VolumeAttachments) Clone() (data.Clonable, error) {
 	return NewVolumeAttachments().Replace(&va)
 }
 
 // Replace ... (data.Clonable interface)
-func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
+func (va *VolumeAttachments) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if va == nil || p == nil {
-		return va
+		return va, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*VolumeAttachments) // nolint
+	src, ok := p.(*VolumeAttachments)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *VolumeAttachments")
+	}
+
 	*va = *src
 	va.Hosts = make(map[string]string, len(src.Hosts))
 	for k, v := range src.Hosts {
 		va.Hosts[k] = v
 	}
-	return va
+	return va, nil
 }
 
 func init() {

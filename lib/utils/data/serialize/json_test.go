@@ -53,17 +53,20 @@ func (f *LikeFeatures) IsNull() bool {
 	return f == nil || (len(f.Installed) == 0 && len(f.Disabled) == 0)
 }
 
-func (f LikeFeatures) Clone() data.Clonable {
+func (f LikeFeatures) Clone() (data.Clonable, error) {
 	return newLikeFeatures().Replace(&f)
 }
 
-func (f *LikeFeatures) Replace(p data.Clonable) data.Clonable {
+func (f *LikeFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if f == nil || p == nil {
-		return f
+		return f, nil
 	}
 
-	src := p.(*LikeFeatures)
+	src, ok := p.(*LikeFeatures)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *LikeFeatures")
+	}
 	f.Installed = make(map[string]string, len(src.Installed))
 	for k, v := range src.Installed {
 		f.Installed[k] = v
@@ -72,7 +75,7 @@ func (f *LikeFeatures) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}
-	return f
+	return f, nil
 }
 
 func TestJsonProperty_IsNull(t *testing.T) {
@@ -88,7 +91,7 @@ func TestJsonProperty_Replace(t *testing.T) {
 	var jp *jsonProperty = nil
 	var data data.Clonable = nil
 
-	result := jp.Replace(data)
+	result, _ := jp.Replace(data)
 	require.EqualValues(t, fmt.Sprintf("%p", result), "0x0")
 	require.EqualValues(t, fmt.Sprintf("%p", jp), "0x0")
 

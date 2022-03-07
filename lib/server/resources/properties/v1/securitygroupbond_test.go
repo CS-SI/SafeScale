@@ -48,7 +48,7 @@ func TestSecurityGroupBond_Replace(t *testing.T) {
 
 	var sgb *SecurityGroupBond = nil
 	sgb2 := NewSecurityGroupBond()
-	result := sgb.Replace(sgb2)
+	result, _ := sgb.Replace(sgb2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("SecurityGroupBond nil pointer can't be replace")
 		t.Fail()
@@ -64,7 +64,13 @@ func TestSecurityGroupBond__Clone(t *testing.T) {
 		Disabled:   false,
 		FromSubnet: false,
 	}
-	clonedSgb, ok := sgb.Clone().(*SecurityGroupBond)
+
+	cloned, err := sgb.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedSgb, ok := cloned.(*SecurityGroupBond)
 	if !ok {
 		t.Fail()
 	}

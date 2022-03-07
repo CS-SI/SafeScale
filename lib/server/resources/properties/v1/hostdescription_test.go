@@ -56,7 +56,12 @@ func TestHostdescription_Clone(t *testing.T) {
 		Domain:  "Hostdescription Domain",
 	}
 
-	cloneHd, ok := hd.Clone().(*HostDescription)
+	cloned, err := hd.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	cloneHd, ok := cloned.(*HostDescription)
 	if !ok {
 		t.Fail()
 	}
@@ -77,7 +82,7 @@ func TestHostdescription_Replace(t *testing.T) {
 
 	var hd *HostDescription = nil
 	var hd2 = NewHostDescription()
-	result := hd.Replace(hd2)
+	result, _ := hd.Replace(hd2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Nil pointer HostDescription can't be replaced")
 		t.Fail()
@@ -98,7 +103,7 @@ func TestHostdescription_Replace(t *testing.T) {
 		Tenant:  "Hostdescription Tenant2",
 		Domain:  "Hostdescription Domain2",
 	}
-	result = hd.Replace(hd2)
+	result, _ = hd.Replace(hd2)
 	areEqual := reflect.DeepEqual(result, hd2)
 	if !areEqual {
 		t.Error("Replace does not restitute values")

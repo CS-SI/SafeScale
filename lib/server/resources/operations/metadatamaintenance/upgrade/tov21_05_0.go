@@ -1222,7 +1222,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				_ = networkV3.Replace(config)
+				_, _ = networkV3.Replace(config)
 				return nil
 			})
 		}
@@ -1385,7 +1385,7 @@ func (tv toV21_05_0) cleanupDeprecatedHostMetadata(svc iaas.Service) fail.Error 
 						return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
-					_ = hostNetworkingV1.Replace(&propertiesv1.HostNetwork{})
+					_, _ = hostNetworkingV1.Replace(&propertiesv1.HostNetwork{})
 					return nil
 				})
 				innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -1401,7 +1401,7 @@ func (tv toV21_05_0) cleanupDeprecatedHostMetadata(svc iaas.Service) fail.Error 
 						return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
-					_ = hostSizingV1.Replace(&propertiesv1.HostSizing{})
+					_, _ = hostSizingV1.Replace(&propertiesv1.HostSizing{})
 					return nil
 				})
 				innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -1437,7 +1437,7 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 					if !ok {
 						return fail.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-					_ = nodesV2.Replace(&propertiesv2.ClusterNodes{})
+					_, _ = nodesV2.Replace(&propertiesv2.ClusterNodes{})
 					return nil
 				})
 				if innerXErr != nil {
@@ -1452,7 +1452,7 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 						return fail.InconsistentError("'*propertiesv1.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
-					_ = nodesV1.Replace(&propertiesv1.ClusterNodes{})
+					_, _ = nodesV1.Replace(&propertiesv1.ClusterNodes{})
 					return nil
 				})
 				innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -1468,7 +1468,7 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
-						_ = networkV1.Replace(&propertiesv1.ClusterNetwork{})
+						_, _ = networkV1.Replace(&propertiesv1.ClusterNetwork{})
 						return nil
 					})
 					innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -1482,7 +1482,7 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 						if !ok {
 							return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
-						_ = networkV2.Replace(&propertiesv2.ClusterNetwork{})
+						_, _ = networkV2.Replace(&propertiesv2.ClusterNetwork{})
 						return nil
 					})
 					innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -1498,7 +1498,7 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-					_ = defaultsV1.Replace(&propertiesv1.ClusterDefaults{})
+					_, _ = defaultsV1.Replace(&propertiesv1.ClusterDefaults{})
 					return nil
 				})
 			}

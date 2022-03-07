@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -48,21 +50,23 @@ func (hcm *HostClusterMembership) IsNull() bool {
 }
 
 // Clone ...
-func (hcm HostClusterMembership) Clone() data.Clonable {
+func (hcm HostClusterMembership) Clone() (data.Clonable, error) {
 	return NewHostClusterMembership().Replace(&hcm)
 }
 
 // Replace ...
-func (hcm *HostClusterMembership) Replace(p data.Clonable) data.Clonable {
+func (hcm *HostClusterMembership) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if hcm == nil || p == nil {
-		return hcm
+		return hcm, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostClusterMembership) // nolint
+	src, ok := p.(*HostClusterMembership)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostClusterMembership")
+	}
 	*hcm = *src
-	return hcm
+	return hcm, nil
 }
 
 func init() {

@@ -78,7 +78,7 @@ func TestClusterDefaults_Replace(t *testing.T) {
 		},
 		Image: "",
 	}
-	result := cd.Replace(cd2)
+	result, _ := cd.Replace(cd2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("ClusterDefaults Nil pointer can't be replaced")
 		t.Fail()
@@ -94,7 +94,12 @@ func TestClusterDefaults_Clone(t *testing.T) {
 		GPUType: "NVidia",
 	}
 
-	clonedCt, ok := ct.Clone().(*ClusterDefaults)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterDefaults)
 	if !ok {
 		t.Fail()
 	}

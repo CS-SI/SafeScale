@@ -42,7 +42,11 @@ func (r propertyTypeRegistry) Lookup(module, key string) bool {
 // ZeroValue returns a zeroed value corresponding to module and key (if it exists)
 func (r propertyTypeRegistry) ZeroValue(module, key string) data.Clonable {
 	if zeroValue, found := r[module][key]; found {
-		return zeroValue.Clone()
+		zv, err := zeroValue.Clone()
+		if err != nil {
+			panic(err)
+		}
+		return zv
 	}
 
 	panic(fmt.Sprintf("Missing match for key '%s' in module '%s' and go type! Please use PropertyTypeRegistry.Register!", key, module))

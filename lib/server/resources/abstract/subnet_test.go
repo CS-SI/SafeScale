@@ -56,7 +56,7 @@ func TestSubnet_NewSubnet(t *testing.T) {
 func TestSubnet_Replace(t *testing.T) {
 
 	var s *Subnet = nil
-	replaced := s.Replace(NewSubnet())
+	replaced, _ := s.Replace(NewSubnet())
 	if fmt.Sprintf("%p", replaced) != "0x0" {
 		t.Error("Can't replace nil pointer")
 		t.Fail()
@@ -81,7 +81,12 @@ func TestSubnet_Clone(t *testing.T) {
 	s.DefaultSSHPort = 42
 	s.SingleHostCIDRIndex = 14
 
-	sc, ok := s.Clone().(*Subnet)
+	at, err := s.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	sc, ok := at.(*Subnet)
 	if !ok {
 		t.Fail()
 	}
@@ -115,7 +120,7 @@ func TestSubnet_Serialize(t *testing.T) {
 	s.Domain = "Subnet Domain"
 	s.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	s.GatewayIDs = []string{"GatewayID1", "GatewayID2", "GatewayID3"}
-	//s.VIP = NewVirtualIP() //DeepEqual does not work with pointer
+	// s.VIP = NewVirtualIP() //DeepEqual does not work with pointer
 	s.IPVersion = ipversion.IPv4
 	s.GWSecurityGroupID = "Subnet GWSecurityGroupID"
 	s.PublicIPSecurityGroupID = "Subnet PublicIPSecurityGroupID"
@@ -166,7 +171,12 @@ func TestVirtualIP_Clone(t *testing.T) {
 	v.Hosts = []*HostCore{NewHostCore(), NewHostCore(), NewHostCore()}
 	v.NetworkID = "VirtualIP NetworkID"
 
-	v2, ok := v.Clone().(*VirtualIP)
+	at, err := v.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	v2, ok := at.(*VirtualIP)
 	if !ok {
 		t.Fail()
 	}
@@ -272,7 +282,7 @@ func TestVirtualIP_Replace(t *testing.T) {
 
 	var v *VirtualIP = nil
 	v2 := NewVirtualIP()
-	replaced := v.Replace(v2)
+	replaced, _ := v.Replace(v2)
 	if fmt.Sprintf("%p", replaced) != "0x0" {
 		t.Error("Can't replace to nil pointer")
 		t.Fail()

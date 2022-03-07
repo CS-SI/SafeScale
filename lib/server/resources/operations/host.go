@@ -1108,7 +1108,7 @@ func (instance *Host) Create(
 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
+			_, _ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
 			creator := ""
 			hostname, _ := os.Hostname()
 			if curUser, err := user.Current(); err != nil {
@@ -3016,14 +3016,22 @@ func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, ferr
 					}
 
 					if item, ok := sharesV1.ByID[shareRef]; ok {
-						hostShare, ok = item.Clone().(*propertiesv1.HostShare)
+						cloned, cerr := item.Clone()
+						if cerr != nil {
+							return fail.Wrap(cerr)
+						}
+						hostShare, ok = cloned.(*propertiesv1.HostShare)
 						if !ok {
 							return fail.InconsistentError("item should be a *propertiesv1.HostShare")
 						}
 						return nil
 					}
 					if item, ok := sharesV1.ByName[shareRef]; ok {
-						hostShare, ok = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
+						cloned, cerr := sharesV1.ByID[item].Clone()
+						if cerr != nil {
+							return fail.Wrap(cerr)
+						}
+						hostShare, ok = cloned.(*propertiesv1.HostShare)
 						if !ok {
 							return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
 						}

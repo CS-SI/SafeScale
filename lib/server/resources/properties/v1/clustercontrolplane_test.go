@@ -60,7 +60,7 @@ func TestClusterControlplane_Replace(t *testing.T) {
 			ID: "MyVirtualIP ID",
 		},
 	}
-	result := cc.Replace(cc2)
+	result, _ := cc.Replace(cc2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Nil pointer can't be replaced")
 		t.Fail()
@@ -77,7 +77,12 @@ func TestClusterControlplane_Clone(t *testing.T) {
 	ct := newClusterControlPlane()
 	ct.VirtualIP = vip
 
-	clonedCt, ok := ct.Clone().(*ClusterControlplane)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterControlplane)
 	if !ok {
 		t.Fail()
 	}

@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
@@ -49,19 +50,24 @@ func (hd *HostDescription) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (hd HostDescription) Clone() data.Clonable {
+func (hd HostDescription) Clone() (data.Clonable, error) {
 	return NewHostDescription().Replace(&hd)
 }
 
 // Replace ... (data.Clonable interface)
-func (hd *HostDescription) Replace(p data.Clonable) data.Clonable {
+func (hd *HostDescription) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if hd == nil || p == nil {
-		return hd
+		return hd, nil
 	}
 
-	*hd = *p.(*HostDescription)
-	return hd
+	casted, ok := p.(*HostDescription)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostDescription")
+	}
+
+	*hd = *casted
+	return hd, nil
 }
 
 func init() {

@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
@@ -60,22 +61,25 @@ func (nsh *NetworkSingleHosts) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (nsh NetworkSingleHosts) Clone() data.Clonable {
+func (nsh NetworkSingleHosts) Clone() (data.Clonable, error) {
 	return NewNetworkSingleHosts().Replace(&nsh)
 }
 
 // Replace ... (data.Clonable interface)
-func (nsh *NetworkSingleHosts) Replace(p data.Clonable) data.Clonable {
+func (nsh *NetworkSingleHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if nsh == nil || p == nil {
-		return nsh
+		return nsh, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*NetworkSingleHosts) // nolint
+	src, ok := p.(*NetworkSingleHosts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *NetworkSingleHosts")
+	}
+
 	nsh.FreeSlots = make([]FreeCIDRSlot, len(src.FreeSlots))
 	copy(nsh.FreeSlots, src.FreeSlots)
-	return nsh
+	return nsh, nil
 }
 
 // ReserveSlot returns the first free slot and remove it from list

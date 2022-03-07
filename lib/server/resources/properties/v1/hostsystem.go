@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -44,21 +46,24 @@ func (hs *HostSystem) IsNull() bool {
 }
 
 // Clone ...
-func (hs HostSystem) Clone() data.Clonable {
+func (hs HostSystem) Clone() (data.Clonable, error) {
 	return NewHostSystem().Replace(&hs)
 }
 
 // Replace ...
-func (hs *HostSystem) Replace(p data.Clonable) data.Clonable {
+func (hs *HostSystem) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if hs == nil || p == nil {
-		return hs
+		return hs, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostSystem) // nolint
+	src, ok := p.(*HostSystem)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostSystem")
+	}
+
 	*hs = *src
-	return hs
+	return hs, nil
 }
 
 func init() {

@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -43,19 +45,22 @@ func (sh *SubnetHosts) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (sh SubnetHosts) Clone() data.Clonable {
+func (sh SubnetHosts) Clone() (data.Clonable, error) {
 	return NewSubnetHosts().Replace(&sh)
 }
 
 // Replace ... (data.Clonable interface)
-func (sh *SubnetHosts) Replace(p data.Clonable) data.Clonable {
+func (sh *SubnetHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if sh == nil || p == nil {
-		return sh
+		return sh, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*SubnetHosts) // nolint
+	src, ok := p.(*SubnetHosts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SubnetHosts")
+	}
+
 	sh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		sh.ByID[k] = v
@@ -64,7 +69,7 @@ func (sh *SubnetHosts) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByName {
 		sh.ByName[k] = v
 	}
-	return sh
+	return sh, nil
 }
 
 func init() {

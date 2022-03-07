@@ -18,6 +18,7 @@ package serialize
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
@@ -40,25 +41,32 @@ func (jp *jsonProperty) IsNull() bool {
 	return jp == nil || valid.IsNil(jp.Shielded)
 }
 
-func (jp jsonProperty) Clone() data.Clonable {
+func (jp jsonProperty) Clone() (data.Clonable, error) {
 	newP := &jsonProperty{}
 	return newP.Replace(&jp)
 }
 
-func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
+func (jp *jsonProperty) Replace(clonable data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	// Indeed, and that also means that not doing it here is a mistake, Clone() should use a replace function that don't use isNull(), and EVERYBODY else should use a Replace function that does use isNull
 	if jp == nil || clonable == nil {
-		return jp // FIXME: This is a problem, this means that mistakes go unnoticed
+		return jp, nil // FIXME: This is a problem, this means that mistakes go unnoticed
 	}
 
 	srcP, ok := clonable.(*jsonProperty)
 	if !ok {
-		return jp // FIXME: Again, mistakes go unnoticed, if we pick the wrong clonable nobody notices, Replace signature should return (data.Clonable, error)
+		return nil, fmt.Errorf("clonable is not a *jsonProperty")
 	}
+
 	*jp = *srcP
-	jp.Shielded = srcP.Shielded.Clone()
-	return jp
+
+	var err error
+	jp.Shielded, err = srcP.Shielded.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	return jp, nil
 }
 
 // JSONProperties ...
@@ -104,18 +112,23 @@ func (x *JSONProperties) hasKey(key string) (*jsonProperty, bool) {
 	return jsp, found
 }
 
-func (x *JSONProperties) storeZero(key string) *jsonProperty {
+func (x *JSONProperties) storeZero(key string) (*jsonProperty, error) {
 	x.Lock()
 	defer x.Unlock()
 
 	zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+	nsh, err := shielded.NewShielded(zeroValue)
+	if err != nil {
+		return nil, err
+	}
+
 	item := &jsonProperty{
-		Shielded: shielded.NewShielded(zeroValue),
+		Shielded: nsh,
 		module:   x.module,
 		key:      key,
 	}
 	x.Properties[key] = item
-	return item
+	return item, nil
 }
 
 // Count returns the number of properties available
@@ -156,12 +169,20 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		found bool
 	)
 
+	var err error
 	item, found = x.hasKey(key)
 	if !found {
-		item = x.storeZero(key)
+		item, err = x.storeZero(key)
+		if err != nil {
+			return fail.Wrap(err)
+		}
 	}
 
-	clone := item.Clone()
+	clone, err := item.Clone()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
 	cloned, ok := clone.(*jsonProperty)
 	if !ok {
 		return fail.InconsistentError("clone is expected to be a *jsonProperty and it's not: %v", clone)
@@ -210,15 +231,19 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 
 	if item, found = x.Properties[key]; !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+		nsh, err := shielded.NewShielded(zeroValue)
+		if err != nil {
+			return fail.Wrap(err)
+		}
 		item = &jsonProperty{
-			Shielded: shielded.NewShielded(zeroValue),
+			Shielded: nsh,
 			module:   x.module,
 			key:      key,
 		}
 		x.Properties[key] = item
 	}
 
-	clone := item.Clone()
+	clone, _ := item.Clone()
 	castedClone, ok := clone.(*jsonProperty)
 	if !ok {
 		return fail.InconsistentError("failed to cast clone to '*jsonProperty'")
@@ -229,7 +254,7 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		return xerr
 	}
 
-	_ = item.Replace(clone)
+	_, _ = item.Replace(clone)
 	return nil
 }
 
@@ -315,8 +340,12 @@ func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
 	for k, v := range unjsoned {
 		if prop, ok = x.Properties[k]; !ok {
 			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, k)
+			nsh, err := shielded.NewShielded(zeroValue)
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			item := &jsonProperty{
-				Shielded: shielded.NewShielded(zeroValue),
+				Shielded: nsh,
 				module:   x.module,
 				key:      k,
 			}

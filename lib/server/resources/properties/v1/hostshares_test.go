@@ -50,7 +50,7 @@ func TestHostShare_Replace(t *testing.T) {
 
 	var hs *HostShare = nil
 	hs2 := NewHostShare()
-	result := hs.Replace(hs2)
+	result, _ := hs.Replace(hs2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("HostShare nil pointer can't be replace")
 		t.Fail()
@@ -69,7 +69,12 @@ func TestHostShare_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHs, ok := hs.Clone().(*HostShare)
+	cloned, err := hs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHs, ok := cloned.(*HostShare)
 	if !ok {
 		t.Fail()
 	}
@@ -123,7 +128,7 @@ func TestHostShares_Replace(t *testing.T) {
 
 	var hs *HostShares = nil
 	hs2 := NewHostShares()
-	result := hs.Replace(hs2)
+	result, _ := hs.Replace(hs2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("HostShares nil pointer can't be replace")
 		t.Fail()
@@ -149,7 +154,12 @@ func TestHostShares_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHs, ok := hs.Clone().(*HostShares)
+	cloned, err := hs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHs, ok := cloned.(*HostShares)
 	if !ok {
 		t.Fail()
 	}

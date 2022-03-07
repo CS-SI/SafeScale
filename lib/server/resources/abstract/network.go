@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
@@ -78,23 +79,26 @@ func (n *Network) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n Network) Clone() data.Clonable {
+func (n Network) Clone() (data.Clonable, error) {
 	return NewNetwork().Replace(&n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *Network) Replace(p data.Clonable) data.Clonable {
+func (n *Network) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
-		return n
+		return n, nil
 	}
-	// FIXME: Replace should also return an error
-	src, _ := p.(*Network) // nolint
+
+	src, ok := p.(*Network)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Network")
+	}
 	*n = *src
 	n.DNSServers = make([]string, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
-	return n
+	return n, nil
 }
 
 // OK ...

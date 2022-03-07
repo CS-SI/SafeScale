@@ -51,7 +51,7 @@ func TestHostVolumes_Replace(t *testing.T) {
 
 	var hs *HostVolumes = nil
 	hs2 := NewHostVolumes()
-	result := hs.Replace(hs2)
+	result, _ := hs.Replace(hs2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("HostVolumes nil pointer can't be replace")
 		t.Fail()
@@ -74,7 +74,7 @@ func TestHostVolumes_Replace(t *testing.T) {
 			"ID": "Devices",
 		},
 	}
-	result = hs2.Replace(hs)
+	result, _ = hs2.Replace(hs)
 	areEqual := reflect.DeepEqual(result, hs)
 	if !areEqual {
 		t.Error("Replace does not restitute values")
@@ -103,7 +103,12 @@ func TestHostVolumes_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHs, ok := hs.Clone().(*HostVolumes)
+	cloned, err := hs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHs, ok := cloned.(*HostVolumes)
 	if !ok {
 		t.Fail()
 	}

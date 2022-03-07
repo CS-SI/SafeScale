@@ -290,14 +290,14 @@ func TestHostCore_Replace(t *testing.T) {
 	hc1.LastState = hoststate.Unknown
 
 	var hc2 *HostCore = nil
-	replaced := hc2.Replace(hc1)
+	replaced, _ := hc2.Replace(hc1)
 
 	if fmt.Sprintf("%p", replaced) != "0x0" {
 		t.Error("Can't Replace nil pointer")
 		t.Fail()
 	}
 
-	replaced = hc2.Replace(hc1)
+	replaced, _ = hc2.Replace(hc1)
 	if fmt.Sprintf("%p", replaced) != "0x0" {
 		t.Error("Can't Replace nil data.Clonable pointer")
 		t.Fail()
@@ -817,7 +817,12 @@ func TestHostCore_Clone(t *testing.T) {
 	h := NewHostCore()
 	h.Name = "host"
 
-	hc, ok := h.Clone().(*HostCore)
+	at, err := h.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	hc, ok := at.(*HostCore)
 	if !ok {
 		t.Fail()
 	}

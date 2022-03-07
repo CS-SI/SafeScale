@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -55,19 +57,22 @@ func (n *ClusterNodes) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (n ClusterNodes) Clone() data.Clonable {
+func (n ClusterNodes) Clone() (data.Clonable, error) {
 	return newClusterNodes().Replace(&n)
 }
 
 // Replace ... (data.Clonable interface)
-func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
+func (n *ClusterNodes) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
-		return n
+		return n, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterNodes) // nolint
+	src, ok := p.(*ClusterNodes)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterNodes")
+	}
+
 	*n = *src
 	n.Masters = make([]*ClusterNode, len(src.Masters))
 	for k, v := range src.Masters {
@@ -86,7 +91,7 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 		newNode := *v
 		n.PrivateNodes[k] = &newNode
 	}
-	return n
+	return n, nil
 }
 
 func init() {

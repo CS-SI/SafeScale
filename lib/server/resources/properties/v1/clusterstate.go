@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
@@ -44,20 +45,25 @@ func (s *ClusterState) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s ClusterState) Clone() data.Clonable {
+func (s ClusterState) Clone() (data.Clonable, error) {
 	return newClusterState().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (s *ClusterState) Replace(p data.Clonable) data.Clonable {
+func (s *ClusterState) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if s == nil || p == nil {
-		return s
+		return s, nil
 	}
 
-	*s = *p.(*ClusterState)
-	return s
+	casted, ok := p.(*ClusterState)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterState")
+	}
+
+	*s = *casted
+	return s, nil
 }
 
 func init() {

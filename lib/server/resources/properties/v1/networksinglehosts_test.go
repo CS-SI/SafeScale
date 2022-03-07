@@ -52,7 +52,7 @@ func TestNetworkSingleHosts_IsNull(t *testing.T) {
 func TestNetworkSingleHosts_Replace(t *testing.T) {
 	var nsh *NetworkSingleHosts = nil
 	nsh2 := NewNetworkSingleHosts()
-	result := nsh.Replace(nsh2)
+	result, _ := nsh.Replace(nsh2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("NetworkSingleHosts nil pointer can't be replace")
 		t.Fail()
@@ -63,7 +63,12 @@ func TestNetworkSingleHosts_Clone(t *testing.T) {
 	ct := NewNetworkSingleHosts()
 	ct.FreeSlots = append(ct.FreeSlots, FreeCIDRSlot{1, 5})
 
-	clonedCt, ok := ct.Clone().(*NetworkSingleHosts)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*NetworkSingleHosts)
 	if !ok {
 		t.Fail()
 	}

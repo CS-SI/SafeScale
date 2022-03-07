@@ -63,7 +63,7 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 			"Feature2": {},
 		},
 	}
-	result := hif.Replace(hif2)
+	result, _ := hif.Replace(hif2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Nil pointer can't be replaced")
 		t.Fail()
@@ -74,7 +74,7 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature2": {},
 		},
 	}
-	result = hif2.Replace(hif)
+	result, _ = hif2.Replace(hif)
 	areEqual := reflect.DeepEqual(hif.RequiredBy, result.(*HostInstalledFeature).RequiredBy)
 	if !areEqual {
 		t.Error("Replace does not restitute RequiredBy values")
@@ -86,7 +86,7 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature4": {},
 		},
 	}
-	result = hif2.Replace(hif)
+	result, _ = hif2.Replace(hif)
 	areEqual = reflect.DeepEqual(hif.Requires, result.(*HostInstalledFeature).Requires)
 	if !areEqual {
 		t.Error("Replace does not restitute Requires values")
@@ -106,7 +106,12 @@ func TestHostInstalledFeature_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHif, ok := hif.Clone().(*HostInstalledFeature)
+	cloned, err := hif.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHif, ok := cloned.(*HostInstalledFeature)
 	if !ok {
 		t.Fail()
 	}
@@ -192,7 +197,12 @@ func TestHostFeatures_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHf, ok := hf.Clone().(*HostFeatures)
+	cloned, err := hf.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHf, ok := cloned.(*HostFeatures)
 	if !ok {
 		t.Fail()
 	}
@@ -217,7 +227,7 @@ func TestHostFeatures_Replace(t *testing.T) {
 			},
 		},
 	}
-	result := hf.Replace(hf2)
+	result, _ := hf.Replace(hf2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Nil pointer can't be replaced")
 		t.Fail()
@@ -234,7 +244,7 @@ func TestHostFeatures_Replace(t *testing.T) {
 			},
 		},
 	}
-	result = hf2.Replace(hf)
+	result, _ = hf2.Replace(hf)
 	areEqual := reflect.DeepEqual(hf, result.(*HostFeatures))
 	if !areEqual {
 		t.Error("Replace does not restitute values")

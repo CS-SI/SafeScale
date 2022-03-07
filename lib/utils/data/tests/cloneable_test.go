@@ -29,7 +29,15 @@ func TestEasyCloneable(t *testing.T) {
 	a.Content = "easy"
 	a.Rumba = 9
 
-	b := a.Clone().(*StructWithoutPointers)
+	at, err := a.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, ok := at.(*StructWithoutPointers)
+	if !ok {
+		t.Error("invalid cast")
+	}
 
 	a.Rumba = 3
 	ieq := reflect.DeepEqual(a, b)
@@ -77,7 +85,15 @@ func TestDefectiveCloneableImplementation(t *testing.T) {
 		"key2": "value2",
 	}
 
-	b := a.Clone().(*StructWithPointersAndDefectiveReplace)
+	at, err := a.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, ok := at.(*StructWithPointersAndDefectiveReplace)
+	if !ok {
+		t.Error("Invalid cast")
+	}
 
 	a.Rumba = 3
 	ieq := reflect.DeepEqual(a, b)
@@ -102,7 +118,15 @@ func TestValidCloneableImplementation(t *testing.T) {
 		"key2": "value2",
 	}
 
-	b := a.Clone().(*StructWithPointersAndCorrectReplace)
+	at, err := a.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, ok := at.(*StructWithPointersAndCorrectReplace)
+	if !ok {
+		t.Error("Invalid cast")
+	}
 
 	a.Rumba = 3
 	ieq := reflect.DeepEqual(a, b)

@@ -47,7 +47,7 @@ func TestNetworkSubnets_IsNull(t *testing.T) {
 func TestNetworkSubnets_Replace(t *testing.T) {
 	var ns *NetworkSubnets = nil
 	ns2 := NewNetworkSubnets()
-	result := ns.Replace(ns2)
+	result, _ := ns.Replace(ns2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("NetworkSubnets nil pointer can't be replace")
 		t.Fail()
@@ -64,7 +64,12 @@ func TestNetworkSubnets_Clone(t *testing.T) {
 		},
 	}
 
-	clonedNs, ok := ns.Clone().(*NetworkSubnets)
+	cloned, err := ns.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedNs, ok := cloned.(*NetworkSubnets)
 	if !ok {
 		t.Fail()
 	}

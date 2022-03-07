@@ -32,10 +32,15 @@ type Shielded struct {
 }
 
 // NewShielded creates a new protected data from a cloned witness
-func NewShielded(witness data.Clonable) *Shielded {
-	return &Shielded{
-		witness: witness.Clone(),
+func NewShielded(witness data.Clonable) (*Shielded, error) {
+	cloned, err := witness.Clone()
+	if err != nil {
+		return nil, err
 	}
+
+	return &Shielded{
+		witness: cloned,
+	}, nil
 }
 
 // IsNull ...
@@ -45,8 +50,12 @@ func (instance *Shielded) IsNull() bool {
 }
 
 // Clone ...
-func (instance *Shielded) Clone() *Shielded {
-	return NewShielded(instance.witness.Clone())
+func (instance *Shielded) Clone() (*Shielded, error) {
+	cloned, err := instance.witness.Clone()
+	if err != nil {
+		return nil, err
+	}
+	return NewShielded(cloned)
 }
 
 // Inspect is used to lock a clonable for read
@@ -67,7 +76,12 @@ func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Er
 		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
-	return inspector(instance.witness.Clone())
+	cloned, err := instance.witness.Clone()
+	if err != nil {
+		return fail.InconsistentErrorWithCause(err, nil, "d.witness", "cannot be cloned")
+	}
+
+	return inspector(cloned)
 }
 
 // Alter allows to update a cloneable using a write lock
@@ -92,12 +106,20 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (ferr fa
 	}
 
 	var xerr fail.Error
-	clone := instance.witness.Clone()
+	clone, err := instance.witness.Clone()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
 	if xerr = alterer(clone); xerr != nil {
 		return xerr
 	}
 
-	_ = instance.witness.Replace(clone)
+	_, err = instance.witness.Replace(clone)
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
 	return nil
 }
 

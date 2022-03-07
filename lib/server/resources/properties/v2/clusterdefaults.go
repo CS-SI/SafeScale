@@ -17,6 +17,8 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -47,20 +49,25 @@ func (cd *ClusterDefaults) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cd ClusterDefaults) Clone() data.Clonable {
+func (cd ClusterDefaults) Clone() (data.Clonable, error) {
 	return newClusterDefaults().Replace(&cd)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
+func (cd *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if cd == nil || p == nil {
-		return cd
+		return cd, nil
 	}
 
-	*cd = *p.(*ClusterDefaults)
-	return cd
+	cloned, ok := p.(*ClusterDefaults)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterDefaults")
+	}
+
+	*cd = *cloned
+	return cd, nil
 }
 
 func init() {

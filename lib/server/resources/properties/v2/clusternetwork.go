@@ -17,6 +17,8 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
@@ -54,20 +56,25 @@ func (n *ClusterNetwork) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n ClusterNetwork) Clone() data.Clonable {
+func (n ClusterNetwork) Clone() (data.Clonable, error) {
 	return newClusterNetwork().Replace(&n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *ClusterNetwork) Replace(p data.Clonable) data.Clonable {
+func (n *ClusterNetwork) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
-		return n
+		return n, nil
 	}
 
-	*n = *p.(*ClusterNetwork)
-	return n
+	cloned, ok := p.(*ClusterNetwork)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterNetwork")
+	}
+
+	*n = *cloned
+	return n, nil
 }
 
 func init() {

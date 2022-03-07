@@ -48,7 +48,7 @@ func TestVolumeDescription_IsNull(t *testing.T) {
 func TestVolumeDescription_Replace(t *testing.T) {
 	var ssg *VolumeDescription = nil
 	ssg2 := NewVolumeDescription()
-	result := ssg.Replace(ssg2)
+	result, _ := ssg.Replace(ssg2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("VolumeDescription nil pointer can't be replace")
 		t.Fail()
@@ -61,7 +61,12 @@ func TestVolumeDescription_Clone(t *testing.T) {
 		Purpose: "VolumeDescription Purpose",
 		Created: time.Now(),
 	}
-	clonedVd, ok := vd.Clone().(*VolumeDescription)
+
+	cloned, err := vd.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+	clonedVd, ok := cloned.(*VolumeDescription)
 	if !ok {
 		t.Fail()
 	}
@@ -100,7 +105,7 @@ func TestVolumeAttachments_IsNull(t *testing.T) {
 func TestVolumeAttachments_Replace(t *testing.T) {
 	var ssg *VolumeAttachments = nil
 	ssg2 := NewVolumeAttachments()
-	result := ssg.Replace(ssg2)
+	result, _ := ssg.Replace(ssg2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("VolumeAttachments nil pointer can't be replace")
 		t.Fail()
@@ -113,7 +118,12 @@ func TestVolumeAttachments_Clone(t *testing.T) {
 	ct.Shareable = true
 	ct.Hosts = map[string]string{"id1": "host1"}
 
-	clonedCt, ok := ct.Clone().(*VolumeAttachments)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*VolumeAttachments)
 	if !ok {
 		t.Fail()
 	}

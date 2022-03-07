@@ -47,7 +47,7 @@ func TestClusterNetwork_IsNull(t *testing.T) {
 func TestClusterNetwork_Replace(t *testing.T) {
 	var cn *ClusterNetwork = nil
 	cn2 := newClusterNetwork()
-	result := cn.Replace(cn2)
+	result, _ := cn.Replace(cn2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("ClusterNetwork nil pointer can't be replace")
 		t.Fail()
@@ -58,7 +58,12 @@ func TestClusterNetwork_Clone(t *testing.T) {
 	ct := newClusterNetwork()
 	ct.GatewayID = "None"
 
-	clonedCt, ok := ct.Clone().(*ClusterNetwork)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterNetwork)
 	if !ok {
 		t.Fail()
 	}

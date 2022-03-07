@@ -85,7 +85,7 @@ func TestHostSizing_IsNull(t *testing.T) {
 func TestHostSizing_Replace(t *testing.T) {
 	var hs *HostSizing = nil
 	hs2 := NewHostSizing()
-	result := hs.Replace(hs2)
+	result, _ := hs.Replace(hs2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("HostSizing nil pointer can't be replace")
 		t.Fail()
@@ -115,7 +115,12 @@ func TestHostSizing_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHs, ok := hs.Clone().(*HostSizing)
+	cloned, err := hs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHs, ok := cloned.(*HostSizing)
 	if !ok {
 		t.Fail()
 	}

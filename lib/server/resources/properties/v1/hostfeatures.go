@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -48,20 +50,23 @@ func (hif *HostInstalledFeature) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hif *HostInstalledFeature) Clone() data.Clonable {
+func (hif *HostInstalledFeature) Clone() (data.Clonable, error) {
 	return NewHostInstalledFeature().Replace(hif)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
+func (hif *HostInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if hif == nil || p == nil {
-		return hif
+		return hif, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostInstalledFeature) // nolint
+	src, ok := p.(*HostInstalledFeature)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostInstalledFeature")
+	}
+
 	hif.HostContext = src.HostContext
 	hif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
 	for k := range src.RequiredBy {
@@ -71,7 +76,7 @@ func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
 	for k := range src.Requires {
 		hif.Requires[k] = struct{}{}
 	}
-	return hif
+	return hif, nil
 }
 
 // HostFeatures ...
@@ -103,24 +108,27 @@ func (hf *HostFeatures) IsNull() bool {
 }
 
 // Clone ...  (data.Clonable interface)
-func (hf HostFeatures) Clone() data.Clonable {
+func (hf HostFeatures) Clone() (data.Clonable, error) {
 	return NewHostFeatures().Replace(&hf)
 }
 
 // Replace ...  (data.Clonable interface)
-func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
+func (hf *HostFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if hf == nil || p == nil {
-		return hf
+		return hf, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostFeatures) // nolint
+	src, ok := p.(*HostFeatures)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostFeatures")
+	}
+
 	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
 		hf.Installed[k] = v
 	}
-	return hf
+	return hf, nil
 }
 
 func init() {

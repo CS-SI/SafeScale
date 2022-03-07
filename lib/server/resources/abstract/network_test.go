@@ -52,7 +52,7 @@ func TestNetwork_Replace(t *testing.T) {
 
 	var n1 *Network = nil
 	var n2 *Network = nil
-	result := n1.Replace(n2)
+	result, _ := n1.Replace(n2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Can't replace nil pointer")
 		t.Fail()
@@ -68,7 +68,12 @@ func TestNetwork_Clone(t *testing.T) {
 	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	n.Imported = false
 
-	n2, ok := n.Clone().(*Network)
+	at, err := n.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	n2, ok := at.(*Network)
 	if !ok {
 		t.Fail()
 	}
@@ -95,7 +100,12 @@ func TestNetwork_Clone_DNS(t *testing.T) {
 	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	n.Imported = false
 
-	n2, ok := n.Clone().(*Network)
+	at, err := n.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	n2, ok := at.(*Network)
 	if !ok {
 		t.Fail()
 	}

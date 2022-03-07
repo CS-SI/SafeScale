@@ -49,7 +49,7 @@ func TestHostSystem_Replace(t *testing.T) {
 
 	var hs *HostSystem = nil
 	hs2 := NewHostSystem()
-	result := hs.Replace(hs2)
+	result, _ := hs.Replace(hs2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("HostSystem nil pointer can't be replace")
 		t.Fail()
@@ -66,7 +66,12 @@ func TestHostSystem_Clone(t *testing.T) {
 		HostName: "HostSystem HostName",
 	}
 
-	clonedHs, ok := hs.Clone().(*HostSystem)
+	cloned, err := hs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHs, ok := cloned.(*HostSystem)
 	if !ok {
 		t.Fail()
 	}

@@ -117,7 +117,12 @@ func TestHostNetwork_Clone(t *testing.T) {
 		IPv6Addresses:    map[string]string{"id1": "2001:db8:3333:4444:5555:6666:7777:8888"},
 	}
 
-	clonedCt, ok := ct.Clone().(*HostNetwork)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*HostNetwork)
 	if !ok {
 		t.Fail()
 	}
@@ -139,7 +144,7 @@ func TestHostNetwork_Replace(t *testing.T) {
 
 	var hn *HostNetwork = nil
 	hn2 := NewHostNetwork()
-	result := hn.Replace(hn2)
+	result, _ := hn.Replace(hn2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Can't replace nil pointer")
 		t.Fail()

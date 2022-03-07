@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/bucketproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -82,19 +84,22 @@ func (bm *BucketMounts) IsNull() bool {
 }
 
 // Clone ...  (data.Clonable interface)
-func (bm *BucketMounts) Clone() data.Clonable {
+func (bm *BucketMounts) Clone() (data.Clonable, error) {
 	return NewBucketMounts().Replace(bm)
 }
 
 // Replace ...  (data.Clonable interface)
-func (bm *BucketMounts) Replace(p data.Clonable) data.Clonable {
+func (bm *BucketMounts) Replace(p data.Clonable) (data.Clonable, error) {
 	// Note: do not validate with IsNull(), it's allowed to replace a null value...
 	if bm == nil || p == nil {
-		return bm
+		return bm, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*BucketMounts) // nolint
+	src, ok := p.(*BucketMounts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *BucketMounts")
+	}
+
 	bm.ByHostID = make(map[string]string, len(src.ByHostID))
 	for k, v := range src.ByHostID {
 		bm.ByHostID[k] = v
@@ -103,7 +108,7 @@ func (bm *BucketMounts) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByHostName {
 		bm.ByHostName[k] = v
 	}
-	return bm
+	return bm, nil
 }
 
 func init() {

@@ -97,11 +97,16 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		return NullCore(), err
 	}
 
+	protected, cerr := shielded.NewShielded(instance)
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
 	c := MetadataCore{
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		shielded:   shielded.NewShielded(instance),
+		shielded:   protected,
 		observers:  map[string]observer.Observer{},
 	}
 	switch kind {
@@ -335,7 +340,11 @@ func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
 	myself.lock.Lock()
 	defer myself.lock.Unlock()
 
-	myself.shielded = shielded.NewShielded(clonable)
+	var cerr error
+	myself.shielded, cerr = shielded.NewShielded(clonable)
+	if cerr != nil {
+		return fail.Wrap(cerr)
+	}
 	myself.loaded = true
 
 	xerr = myself.updateIdentity()

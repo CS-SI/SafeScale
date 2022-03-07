@@ -65,7 +65,7 @@ func TestNetworkHosts_IsNull(t *testing.T) {
 func TestNetworkHosts_Replace(t *testing.T) {
 	var nd *NetworkHosts = nil
 	nd2 := NewNetworkHosts()
-	result := nd.Replace(nd2)
+	result, _ := nd.Replace(nd2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("NetworkHosts nil pointer can't be replace")
 		t.Fail()
@@ -82,7 +82,13 @@ func TestNetworkHosts_Clone(t *testing.T) {
 			"Name": "NetworkHosts",
 		},
 	}
-	clonedNh, ok := nh.Clone().(*NetworkHosts)
+
+	cloned, err := nh.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedNh, ok := cloned.(*NetworkHosts)
 	if !ok {
 		t.Fail()
 	}

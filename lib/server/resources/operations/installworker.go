@@ -1186,10 +1186,16 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now submits all the rules to reverse proxy
-	primaryGatewayVariables := w.variables.Clone()
+	primaryGatewayVariables, cerr := w.variables.FakeClone()
+	if cerr != nil {
+		return fail.Wrap(cerr)
+	}
 	var secondaryGatewayVariables data.Map
 	if secondaryKongController != nil {
-		secondaryGatewayVariables = w.variables.Clone()
+		secondaryGatewayVariables, cerr = w.variables.FakeClone()
+		if cerr != nil {
+			return fail.Wrap(cerr)
+		}
 	}
 	for _, r := range rules {
 		if r == nil {

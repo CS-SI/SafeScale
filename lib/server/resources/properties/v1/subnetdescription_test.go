@@ -48,7 +48,7 @@ func TestSubnetDescription_IsNull(t *testing.T) {
 func TestSubnetDescription_Replace(t *testing.T) {
 	var sd *SubnetDescription = nil
 	sd2 := NewSubnetDescription()
-	result := sd.Replace(sd2)
+	result, _ := sd.Replace(sd2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("SubnetDescription nil pointer can't be replace")
 		t.Fail()
@@ -62,7 +62,13 @@ func TestSubnetDescription_Clone(t *testing.T) {
 		Created: time.Now(),
 		Domain:  "SubnetDescription Domain",
 	}
-	clonedSd, ok := sd.Clone().(*SubnetDescription)
+
+	cloned, err := sd.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedSd, ok := cloned.(*SubnetDescription)
 	if !ok {
 		t.Fail()
 	}

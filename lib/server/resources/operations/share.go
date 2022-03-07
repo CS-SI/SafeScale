@@ -91,24 +91,27 @@ func (si *ShareIdentity) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (si ShareIdentity) Clone() data.Clonable {
+func (si ShareIdentity) Clone() (data.Clonable, error) {
 	newShareItem := si
-	return &newShareItem
+	return &newShareItem, nil
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 // may panic
-func (si *ShareIdentity) Replace(p data.Clonable) data.Clonable {
+func (si *ShareIdentity) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if si == nil || p == nil {
-		return si
+		return si, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ShareIdentity) // nolint
+	src, ok := p.(*ShareIdentity)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ShareIdentity")
+	}
+
 	*si = *src
-	return si
+	return si, nil
 }
 
 // Share contains information to maintain in Object Storage a list of shared folders
@@ -771,7 +774,11 @@ func (instance *Share) Mount(
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			cloned, cerr := hostSharesV1.ByID[shareID].Clone()
+			if cerr != nil {
+				return fail.Wrap(cerr)
+			}
+			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}
@@ -971,7 +978,17 @@ func (instance *Share) Mount(
 		return nil, xerr
 	}
 
-	return mount.Clone().(*propertiesv1.HostRemoteMount), nil
+	cloned, cerr := mount.Clone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
+	casted, ok := cloned.(*propertiesv1.HostRemoteMount)
+	if !ok {
+		return nil, fail.InconsistentError("cloned is not a *propertiesv1.HostRemoteMount")
+	}
+
+	return casted, nil
 }
 
 // Unmount unmounts a Share from local directory of a host
@@ -1193,7 +1210,12 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, objserver.GetName())
 			}
 
-			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			cloned, cerr := hostSharesV1.ByID[shareID].Clone()
+			if cerr != nil {
+				return fail.Wrap(cerr)
+			}
+
+			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}

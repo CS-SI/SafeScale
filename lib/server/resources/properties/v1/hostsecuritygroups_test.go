@@ -65,7 +65,12 @@ func TestHostSecurityGroups_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHsg, ok := hsg.Clone().(*HostSecurityGroups)
+	cloned, err := hsg.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHsg, ok := cloned.(*HostSecurityGroups)
 	if !ok {
 		t.Fail()
 	}
@@ -86,7 +91,7 @@ func TestHostSecurityGroups_Replace(t *testing.T) {
 
 	var hsg *HostSecurityGroups = nil
 	hsg2 := NewHostSecurityGroups()
-	result := hsg.Replace(hsg2)
+	result, _ := hsg.Replace(hsg2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Can't replace nil pointer")
 		t.Fail()

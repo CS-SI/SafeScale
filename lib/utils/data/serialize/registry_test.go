@@ -32,16 +32,17 @@ type Item struct {
 func (e Item) IsNull() bool {
 	return false
 }
-func (e Item) Clone() data.Clonable {
+func (e Item) Clone() (data.Clonable, error) {
 	var v data.Clonable = &Item{value: e.value}
-	return v
+	return v, nil
 }
-func (e Item) Replace(i data.Clonable) data.Clonable {
+func (e Item) Replace(i data.Clonable) (data.Clonable, error) {
 	r, ok := i.(*Item)
-	if ok {
-		e.value = r.value
+	if !ok {
+		return nil, fmt.Errorf("i is not a *Item")
 	}
-	return e
+	e.value = r.value
+	return e, nil
 }
 func (e Item) Value() string {
 	return e.value

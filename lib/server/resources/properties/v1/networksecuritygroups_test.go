@@ -47,7 +47,7 @@ func TestNetworkSecurityGroups_IsNull(t *testing.T) {
 func TestNetworkSecurityGroups_Replace(t *testing.T) {
 	var nsg *NetworkSecurityGroups = nil
 	nsg2 := NewNetworkSecurityGroups()
-	result := nsg.Replace(nsg2)
+	result, _ := nsg.Replace(nsg2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("NetworkSecurityGroups nil pointer can't be replace")
 		t.Fail()
@@ -64,7 +64,13 @@ func TestNetworkSecurityGroups_Clone(t *testing.T) {
 			"Name": "NetworkSecurityGroups",
 		},
 	}
-	clonedNsg, ok := nsg.Clone().(*NetworkSecurityGroups)
+
+	cloned, err := nsg.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedNsg, ok := cloned.(*NetworkSecurityGroups)
 	if !ok {
 		t.Fail()
 	}

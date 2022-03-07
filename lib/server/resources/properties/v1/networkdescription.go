@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
@@ -46,19 +47,24 @@ func (nd *NetworkDescription) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (nd NetworkDescription) Clone() data.Clonable {
+func (nd NetworkDescription) Clone() (data.Clonable, error) {
 	return NewNetworkDescription().Replace(&nd)
 }
 
 // Replace ... (data.Clonable interface)
-func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
+func (nd *NetworkDescription) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if nd == nil || p == nil {
-		return nd
+		return nd, nil
 	}
 
-	*nd = *p.(*NetworkDescription)
-	return nd
+	casted, ok := p.(*NetworkDescription)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *NetworkDescription")
+	}
+
+	*nd = *casted
+	return nd, nil
 }
 
 func init() {
