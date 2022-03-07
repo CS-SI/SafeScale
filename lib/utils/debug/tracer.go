@@ -168,8 +168,8 @@ func (instance *tracer) buildMessage(extra uint) string {
 	}
 
 	// Note: this value is very important, it makes sure the internal calls of this package would not interfere with the real caller we want to catch
-	//       badly set and you will get a line number that does not match with the one corresponding to the call
-	var skipCallers int = 2 + int(extra)
+	//       badly set, and you will get a line number that does not match with the one corresponding to the call
+	skipCallers := 2 + int(extra)
 
 	message := instance.taskSig
 	if _, _, line, ok := runtime.Caller(skipCallers); ok {
