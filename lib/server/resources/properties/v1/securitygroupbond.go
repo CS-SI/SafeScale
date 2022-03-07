@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup
@@ -48,9 +49,8 @@ func (sgb SecurityGroupBond) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (sgb *SecurityGroupBond) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if sgb == nil || p == nil {
-		return sgb, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*SecurityGroupBond)

@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostDescription contains description information for the host
@@ -56,9 +57,8 @@ func (hd HostDescription) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (hd *HostDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hd == nil || p == nil {
-		return hd, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*HostDescription)

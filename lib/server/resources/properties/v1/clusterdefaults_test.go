@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -78,11 +77,11 @@ func TestClusterDefaults_Replace(t *testing.T) {
 		},
 		Image: "",
 	}
-	result, _ := cd.Replace(cd2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("ClusterDefaults Nil pointer can't be replaced")
-		t.Fail()
+	result, err := cd.Replace(cd2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

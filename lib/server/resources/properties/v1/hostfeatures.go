@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostInstalledFeature ...
@@ -57,9 +58,8 @@ func (hif *HostInstalledFeature) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (hif *HostInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hif == nil || p == nil {
-		return hif, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*HostInstalledFeature)
@@ -114,9 +114,8 @@ func (hf HostFeatures) Clone() (data.Clonable, error) {
 
 // Replace ...  (data.Clonable interface)
 func (hf *HostFeatures) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hf == nil || p == nil {
-		return hf, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*HostFeatures)

@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkSecurityGroups contains a list of security groups owned by the Network
@@ -53,9 +54,8 @@ func (nsg NetworkSecurityGroups) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if nsg == nil || p == nil {
-		return nsg, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*NetworkSecurityGroups)

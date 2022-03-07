@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SecurityGroupSubnets contains information about attached subnets to a security group
@@ -54,9 +55,8 @@ func (sgn SecurityGroupSubnets) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (sgn *SecurityGroupSubnets) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if sgn == nil || p == nil {
-		return sgn, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*SecurityGroupSubnets)

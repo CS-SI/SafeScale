@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterComposite ...
@@ -51,9 +52,8 @@ func (c ClusterComposite) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (c *ClusterComposite) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if c == nil || p == nil {
-		return c, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterComposite)

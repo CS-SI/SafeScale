@@ -203,12 +203,18 @@ func TestClusterIdentity_Replace(t *testing.T) {
 	cluster.Keypair = kp1
 
 	// Nil cluster, nil data
-	result, _ := emptyCluster.Replace(emptyData)
-	require.EqualValues(t, emptyCluster, result)
+	result, xerr := emptyCluster.Replace(emptyData)
+	if xerr == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
 
 	// Filled cluster, nil data
-	result, _ = cluster.Replace(emptyData)
-	require.EqualValues(t, cluster, result)
+	result, xerr = cluster.Replace(emptyData)
+	if xerr == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
 
 	// Filled cluster, filled data
 	cluster2 := NewClusterIdentity()

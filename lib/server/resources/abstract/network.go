@@ -86,9 +86,8 @@ func (n Network) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (n *Network) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
-		return n, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*Network)

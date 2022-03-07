@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SubnetDescription contains additional information describing the subnet, in V1
@@ -53,9 +54,8 @@ func (sd SubnetDescription) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (sd *SubnetDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if sd == nil || p == nil {
-		return sd, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*SubnetDescription)

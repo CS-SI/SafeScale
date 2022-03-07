@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostShare describes a filesystem exported from the host
@@ -60,9 +61,8 @@ func (hs HostShare) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (hs *HostShare) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hs == nil || p == nil {
-		return hs, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*HostShare)
@@ -110,9 +110,8 @@ func (hs HostShares) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (hs *HostShares) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hs == nil || p == nil {
-		return hs, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*HostShares)

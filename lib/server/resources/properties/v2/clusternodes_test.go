@@ -17,7 +17,6 @@
 package propertiesv2
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -55,11 +54,11 @@ func TestClusterNodes_IsNull(t *testing.T) {
 func TestClusterNodes_Replace(t *testing.T) {
 	var cn *ClusterNodes = nil
 	cn2 := newClusterNodes()
-	result, _ := cn.Replace(cn2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("ClusterNodes nil pointer can't be replace")
-		t.Fail()
+	result, err := cn.Replace(cn2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestClusterNodes_Clone(t *testing.T) {

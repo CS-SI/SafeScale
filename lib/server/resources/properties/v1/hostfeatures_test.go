@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -63,11 +62,11 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 			"Feature2": {},
 		},
 	}
-	result, _ := hif.Replace(hif2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := hif.Replace(hif2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 	hif = &HostInstalledFeature{
 		RequiredBy: map[string]struct{}{
 			"ParentFeature1": {},
@@ -227,11 +226,11 @@ func TestHostFeatures_Replace(t *testing.T) {
 			},
 		},
 	}
-	result, _ := hf.Replace(hf2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := hf.Replace(hf2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 	hf = &HostFeatures{
 		Installed: map[string]*HostInstalledFeature{
 			"Feature": {

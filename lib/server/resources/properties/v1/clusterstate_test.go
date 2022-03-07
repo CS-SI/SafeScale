@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -60,11 +59,11 @@ func TestClusterState_Replace(t *testing.T) {
 
 	var cs *ClusterState = nil
 	cs2 := newClusterState()
-	result, _ := cs.Replace(cs2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Ca,'t replace ClusterState nil pointer")
-		t.Fail()
+	result, err := cs.Replace(cs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

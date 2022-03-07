@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -48,11 +47,11 @@ func TestSubnetDescription_IsNull(t *testing.T) {
 func TestSubnetDescription_Replace(t *testing.T) {
 	var sd *SubnetDescription = nil
 	sd2 := NewSubnetDescription()
-	result, _ := sd.Replace(sd2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("SubnetDescription nil pointer can't be replace")
-		t.Fail()
+	result, err := sd.Replace(sd2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestSubnetDescription_Clone(t *testing.T) {

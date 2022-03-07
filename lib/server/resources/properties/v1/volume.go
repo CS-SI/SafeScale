@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
@@ -53,9 +54,8 @@ func (vd VolumeDescription) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (vd *VolumeDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if vd == nil || p == nil {
-		return vd, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	cloned, ok := p.(*VolumeDescription)
@@ -96,9 +96,8 @@ func (va VolumeAttachments) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (va *VolumeAttachments) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if va == nil || p == nil {
-		return va, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*VolumeAttachments)

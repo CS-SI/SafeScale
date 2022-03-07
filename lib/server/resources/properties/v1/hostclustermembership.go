@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostClusterMembership ...
@@ -56,9 +57,8 @@ func (hcm HostClusterMembership) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (hcm *HostClusterMembership) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hcm == nil || p == nil {
-		return hcm, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*HostClusterMembership)

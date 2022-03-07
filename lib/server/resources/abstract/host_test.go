@@ -17,7 +17,6 @@
 package abstract
 
 import (
-	"fmt"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -280,7 +279,6 @@ func TestHostCore_NewHostCore(t *testing.T) {
 }
 
 func TestHostCore_Replace(t *testing.T) {
-
 	hc1 := NewHostCore()
 	hc1.ID = "HostCore ID"
 	hc1.Name = "HostCore Name"
@@ -290,19 +288,28 @@ func TestHostCore_Replace(t *testing.T) {
 	hc1.LastState = hoststate.Unknown
 
 	var hc2 *HostCore = nil
-	replaced, _ := hc2.Replace(hc1)
-
-	if fmt.Sprintf("%p", replaced) != "0x0" {
-		t.Error("Can't Replace nil pointer")
-		t.Fail()
+	replaced, err := hc2.Replace(hc1)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, replaced)
+}
 
-	replaced, _ = hc2.Replace(hc1)
-	if fmt.Sprintf("%p", replaced) != "0x0" {
-		t.Error("Can't Replace nil data.Clonable pointer")
-		t.Fail()
+func TestHostCore_ReverseReplace(t *testing.T) {
+	hc1 := NewHostCore()
+	hc1.ID = "HostCore ID"
+	hc1.Name = "HostCore Name"
+	hc1.PrivateKey = "HostCore PrivateKey"
+	hc1.SSHPort = 42
+	hc1.Password = "HostCore Password"
+	hc1.LastState = hoststate.Unknown
+
+	var hc2 *HostCore = nil
+	replaced, err := hc1.Replace(hc2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
-
+	require.Nil(t, replaced)
 }
 
 func TestHostCore_Serialize(t *testing.T) {

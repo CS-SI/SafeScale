@@ -58,9 +58,8 @@ func (f LikeFeatures) Clone() (data.Clonable, error) {
 }
 
 func (f *LikeFeatures) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if f == nil || p == nil {
-		return f, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*LikeFeatures)
@@ -91,17 +90,52 @@ func TestJsonProperty_Replace(t *testing.T) {
 	var jp *jsonProperty = nil
 	var data data.Clonable = nil
 
-	result, _ := jp.Replace(data)
-	require.EqualValues(t, fmt.Sprintf("%p", result), "0x0")
-	require.EqualValues(t, fmt.Sprintf("%p", jp), "0x0")
+	_, err := jp.Replace(data)
+	if err == nil {
+		t.FailNow()
+	} else {
+		t.Log(err)
+	}
+}
 
+func TestJsonPropertyRealReplace(t *testing.T) {
+	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
+	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
+
+	clusters, _ := NewJSONProperties("clusters")
+	assert.NotNil(t, clusters)
+
+	err := clusters.Alter("first", func(clonable data.Clonable) fail.Error {
+		thing := clonable.(*LikeFeatures)
+		thing.Installed["Loren"] = "Ipsum"
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	allbad, _ := NewJSONProperties("clusters")
+	assert.NotNil(t, allbad)
+
+	err = allbad.Alter("first", func(clonable data.Clonable) fail.Error {
+		thing := clonable.(*LikeFeatures)
+		thing.Disabled["Wonderland"] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestNewJSONProperties(t *testing.T) {
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 
-	clusters, _ := NewJSONProperties("clusters")
+	clusters, err := NewJSONProperties("clusters")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	assert.NotNil(t, clusters)
 }
 
@@ -109,11 +143,15 @@ func TestLockForReadDoesNotChange(t *testing.T) {
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 
-	clusters, _ := NewJSONProperties("clusters")
+	clusters, err := NewJSONProperties("clusters")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 
 	assert.NotNil(t, clusters)
 
-	err := clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
+	err = clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil

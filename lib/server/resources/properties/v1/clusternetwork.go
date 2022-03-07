@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -54,9 +55,8 @@ func (n ClusterNetwork) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (n *ClusterNetwork) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
-		return n, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*ClusterNetwork)

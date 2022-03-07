@@ -1291,7 +1291,10 @@ func (tv toV21_05_0) upgradeClusterDefaultsPropertyIfNeeded(instance *operations
 					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				defaultsV2.Replace(converters.ClusterDefaultsPropertyV1ToV2(defaultsV1))
+				_, err := defaultsV2.Replace(converters.ClusterDefaultsPropertyV1ToV2(defaultsV1))
+				if err != nil {
+					return fail.Wrap(err)
+				}
 				return nil
 			})
 		})

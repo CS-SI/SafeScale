@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkHosts contains information about hosts connected to the network
@@ -58,9 +59,8 @@ func (nh NetworkHosts) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (nh *NetworkHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if nh == nil || p == nil {
-		return nh, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*NetworkHosts)

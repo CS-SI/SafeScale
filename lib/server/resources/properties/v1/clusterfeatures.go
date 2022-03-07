@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterInstalledFeature ...
@@ -58,9 +59,8 @@ func (cif ClusterInstalledFeature) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (cif *ClusterInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if cif == nil || p == nil {
-		return cif, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterInstalledFeature)
@@ -111,9 +111,8 @@ func (f ClusterFeatures) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (f *ClusterFeatures) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if f == nil || p == nil {
-		return f, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterFeatures)

@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -54,9 +55,8 @@ func (hlm HostLocalMount) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (hlm *HostLocalMount) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hlm == nil || p == nil {
-		return hlm, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*HostLocalMount)
@@ -97,13 +97,14 @@ func (hrm *HostRemoteMount) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (hrm *HostRemoteMount) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hrm == nil || p == nil {
-		return hrm, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostRemoteMount) // nolint
+	src, ok := p.(*HostRemoteMount)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostRemoteMount")
+	}
 	*hrm = *src
 	return hrm, nil
 }

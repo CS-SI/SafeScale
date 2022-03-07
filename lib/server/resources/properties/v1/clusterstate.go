@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterState contains the bare minimum information about the state of a cluster
@@ -52,9 +53,8 @@ func (s ClusterState) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (s *ClusterState) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if s == nil || p == nil {
-		return s, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*ClusterState)

@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -54,11 +53,11 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 	cif2 := &ClusterInstalledFeature{
 		Name: "Feature Name",
 	}
-	result, _ := cif.Replace(cif2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := cif.Replace(cif2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 	cif = &ClusterInstalledFeature{
 		Name: "Feature Name 2",
 		RequiredBy: map[string]struct{}{
@@ -150,11 +149,11 @@ func TestClusterFeatures_Replace(t *testing.T) {
 	var cif *ClusterFeatures = nil
 	cif2 := newClusterFeatures()
 
-	result, _ := cif.Replace(cif2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := cif.Replace(cif2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

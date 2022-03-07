@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -48,11 +47,11 @@ func TestNetworkDescription_IsNull(t *testing.T) {
 func TestNetworkDescription_Replace(t *testing.T) {
 	var nd *NetworkDescription = nil
 	nd2 := NewNetworkDescription()
-	result, _ := nd.Replace(nd2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("NetworkDescription nil pointer can't be replace")
-		t.Fail()
+	result, err := nd.Replace(nd2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestNetworkDescription_Clone(t *testing.T) {

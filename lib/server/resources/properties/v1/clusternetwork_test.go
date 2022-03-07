@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -67,11 +66,11 @@ func TestClusterNetwork_Replace(t *testing.T) {
 		PublicIP:  "",
 		CIDR:      "",
 	}
-	result, _ := cn.Replace(cn2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("ClusterNetwork nil pointer can't be replaced")
-		t.Fail()
+	result, err := cn.Replace(cn2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

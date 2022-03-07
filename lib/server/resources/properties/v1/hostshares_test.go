@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -50,11 +49,11 @@ func TestHostShare_Replace(t *testing.T) {
 
 	var hs *HostShare = nil
 	hs2 := NewHostShare()
-	result, _ := hs.Replace(hs2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("HostShare nil pointer can't be replace")
-		t.Fail()
+	result, err := hs.Replace(hs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 
@@ -128,11 +127,11 @@ func TestHostShares_Replace(t *testing.T) {
 
 	var hs *HostShares = nil
 	hs2 := NewHostShares()
-	result, _ := hs.Replace(hs2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("HostShares nil pointer can't be replace")
-		t.Fail()
+	result, err := hs.Replace(hs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

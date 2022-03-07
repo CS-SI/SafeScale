@@ -100,9 +100,8 @@ func (si ShareIdentity) Clone() (data.Clonable, error) {
 // satisfies interface data.Clonable
 // may panic
 func (si *ShareIdentity) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if si == nil || p == nil {
-		return si, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ShareIdentity)

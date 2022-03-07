@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -47,11 +46,11 @@ func TestNetworkSubnets_IsNull(t *testing.T) {
 func TestNetworkSubnets_Replace(t *testing.T) {
 	var ns *NetworkSubnets = nil
 	ns2 := NewNetworkSubnets()
-	result, _ := ns.Replace(ns2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("NetworkSubnets nil pointer can't be replace")
-		t.Fail()
+	result, err := ns.Replace(ns2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestNetworkSubnets_Clone(t *testing.T) {

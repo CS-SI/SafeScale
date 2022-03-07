@@ -23,6 +23,7 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterDefaults ...
@@ -58,9 +59,8 @@ func (cd ClusterDefaults) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (cd *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if cd == nil || p == nil {
-		return cd, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterDefaults)

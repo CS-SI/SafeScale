@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 const (
@@ -67,9 +68,8 @@ func (nsh NetworkSingleHosts) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (nsh *NetworkSingleHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if nsh == nil || p == nil {
-		return nsh, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*NetworkSingleHosts)

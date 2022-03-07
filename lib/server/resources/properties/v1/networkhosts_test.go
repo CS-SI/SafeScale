@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -65,11 +64,11 @@ func TestNetworkHosts_IsNull(t *testing.T) {
 func TestNetworkHosts_Replace(t *testing.T) {
 	var nd *NetworkHosts = nil
 	nd2 := NewNetworkHosts()
-	result, _ := nd.Replace(nd2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("NetworkHosts nil pointer can't be replace")
-		t.Fail()
+	result, err := nd.Replace(nd2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestNetworkHosts_Clone(t *testing.T) {

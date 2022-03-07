@@ -47,10 +47,8 @@ func (jp jsonProperty) Clone() (data.Clonable, error) {
 }
 
 func (jp *jsonProperty) Replace(clonable data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
-	// Indeed, and that also means that not doing it here is a mistake, Clone() should use a replace function that don't use isNull(), and EVERYBODY else should use a Replace function that does use isNull
 	if jp == nil || clonable == nil {
-		return jp, nil // FIXME: This is a problem, this means that mistakes go unnoticed
+		return nil, fail.InvalidInstanceError()
 	}
 
 	srcP, ok := clonable.(*jsonProperty)
@@ -254,7 +252,10 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		return xerr
 	}
 
-	_, _ = item.Replace(clone)
+	_, err := item.Replace(clone)
+	if err != nil {
+		return fail.Wrap(err)
+	}
 	return nil
 }
 
@@ -303,7 +304,7 @@ func (x *JSONProperties) Serialize() (_ []byte, ferr fail.Error) {
 	}
 	r, jserr := json.Marshal(mapped)
 	if jserr != nil {
-		return nil, fail.NewError(jserr.Error())
+		return nil, fail.Wrap(jserr)
 	}
 	return r, nil
 }
@@ -329,7 +330,7 @@ func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
 			return fail.SyntaxError(jserr.Error())
 		default:
 			logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
-			return fail.NewError(jserr.Error())
+			return fail.Wrap(jserr)
 		}
 	}
 

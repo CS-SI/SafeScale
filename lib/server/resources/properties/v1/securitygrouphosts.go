@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SecurityGroupHosts contains information about attached hosts to a security group
@@ -54,9 +55,8 @@ func (sgh *SecurityGroupHosts) Clone() (data.Clonable, error) {
 
 // Replace ...
 func (sgh *SecurityGroupHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if sgh == nil || p == nil {
-		return sgh, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*SecurityGroupHosts)

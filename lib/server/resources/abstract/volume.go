@@ -70,9 +70,8 @@ func (v Volume) Clone() (data.Clonable, error) {
 //
 // satisfies interface data.Clonable
 func (v *Volume) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if v == nil || p == nil {
-		return v, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*Volume) // nolint

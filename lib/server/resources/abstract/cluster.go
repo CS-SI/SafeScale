@@ -83,12 +83,11 @@ func (instance ClusterIdentity) Clone() (data.Clonable, error) {
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
 func (instance *ClusterIdentity) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if instance == nil || p == nil {
-		return instance, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterIdentity) // nolint
+	src, ok := p.(*ClusterIdentity)
 	if !ok {
 		return nil, fmt.Errorf("p is not a *ClusterIdentity")
 	}

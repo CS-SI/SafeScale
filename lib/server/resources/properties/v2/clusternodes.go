@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterNode describes a node in the cluster
@@ -70,9 +71,8 @@ func (n ClusterNodes) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (n *ClusterNodes) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
-		return n, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterNodes)

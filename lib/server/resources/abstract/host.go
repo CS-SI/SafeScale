@@ -284,13 +284,12 @@ func (hc HostCore) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (hc *HostCore) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if hc == nil || p == nil {
-		return hc, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	cloned, ok := p.(*HostCore)
-	if !ok {
+	if !ok || cloned == nil {
 		return nil, fmt.Errorf("p is not a *HostCore")
 	}
 	*hc = *cloned

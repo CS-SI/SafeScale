@@ -264,9 +264,8 @@ func (instance *Feature) Clone() (data.Clonable, error) {
 // satisfies interface data.Clonable
 // may panic
 func (instance *Feature) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with IsNull(), it's allowed to clone a null value...
 	if instance == nil || p == nil {
-		return instance, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*Feature)

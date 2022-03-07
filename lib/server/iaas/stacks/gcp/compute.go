@@ -722,9 +722,12 @@ func (s stack) ListHosts(detailed bool) (_ abstract.HostList, ferr fail.Error) {
 		nhost := abstract.NewHostCore()
 		nhost.ID = strconv.FormatUint(v.Id, 10)
 		nhost.Name = v.Name
-		nhost.LastState, _ = stateConvert(v.Status)
-		// FIXME: Also populate tags
+		nhost.LastState, xerr = stateConvert(v.Status)
+		if xerr != nil {
+			return nil, xerr
+		}
 
+		// FIXME: Also populate tags
 		var hostFull *abstract.HostFull
 		if detailed {
 			hostFull, xerr = s.InspectHost(nhost)
@@ -733,7 +736,7 @@ func (s stack) ListHosts(detailed bool) (_ abstract.HostList, ferr fail.Error) {
 			}
 		} else {
 			hostFull = abstract.NewHostFull()
-			hostFull.Core.Replace(nhost)
+			hostFull.Core = nhost
 		}
 
 		// FIXME: Populate host, what's missing ?

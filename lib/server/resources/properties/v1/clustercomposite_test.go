@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -82,11 +81,11 @@ func TestClusterComposite_Replace(t *testing.T) {
 	bm2 := &ClusterComposite{
 		Tenants: []string{"MyWondertenant"},
 	}
-	result, _ := bm.Replace(bm2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := bm.Replace(bm2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

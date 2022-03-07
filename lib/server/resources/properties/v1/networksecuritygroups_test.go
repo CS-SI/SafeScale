@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -47,11 +46,11 @@ func TestNetworkSecurityGroups_IsNull(t *testing.T) {
 func TestNetworkSecurityGroups_Replace(t *testing.T) {
 	var nsg *NetworkSecurityGroups = nil
 	nsg2 := NewNetworkSecurityGroups()
-	result, _ := nsg.Replace(nsg2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("NetworkSecurityGroups nil pointer can't be replace")
-		t.Fail()
+	result, err := nsg.Replace(nsg2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestNetworkSecurityGroups_Clone(t *testing.T) {

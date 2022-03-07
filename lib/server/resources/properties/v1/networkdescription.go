@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -53,9 +54,8 @@ func (nd NetworkDescription) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (nd *NetworkDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if nd == nil || p == nil {
-		return nd, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*NetworkDescription)

@@ -22,45 +22,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/bucketproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-// // BucketMount stores information about the mount of a Bucket
-// // not FROZEN yet
-// type BucketMount struct {
-// 	HostID    string `json:"host_id"`    // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
-// 	MountPath string `json:"mount_path"` // Path is the mount point of the device
-// }
-//
-// // NewBucketMount ...
-// func NewBucketMount() *BucketMount {
-// 	return &BucketMount{}
-// }
-//
-// // IsNull ...
-// // satisfies interface data.Clonable
-// func (bm *BucketMount) IsNull() bool {
-// 	return bm == nil || bm.HostID == ""
-// }
-//
-// // Clone ...
-// // satisfies interface data.Clonable
-// func (bm BucketMount) Clone() data.Clonable {
-// 	return NewBucketMount().Replace(&bm)
-// }
-//
-// // Replace ...
-// func (bm *BucketMount) Replace(p data.Clonable) data.Clonable {
-// 	// Do not test with isNull(), it's allowed to clone a null value...
-// 	if bm == nil || p == nil {
-// 		return bm
-// 	}
-//
-// 	src := p.(*BucketMount)
-// 	*bm = *src
-// 	return bm
-// }
-
-// BucketMounts contains information about hosts that havec mounted the bucket
+// BucketMounts contains information about hosts that have mounted the bucket
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
@@ -90,9 +55,8 @@ func (bm *BucketMounts) Clone() (data.Clonable, error) {
 
 // Replace ...  (data.Clonable interface)
 func (bm *BucketMounts) Replace(p data.Clonable) (data.Clonable, error) {
-	// Note: do not validate with IsNull(), it's allowed to replace a null value...
 	if bm == nil || p == nil {
-		return bm, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*BucketMounts)

@@ -91,9 +91,8 @@ func (s Subnet) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable
 func (s *Subnet) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if s == nil || p == nil {
-		return s, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*Subnet)
@@ -205,9 +204,8 @@ func (vip VirtualIP) Clone() (data.Clonable, error) {
 // Replace ...
 // satisfies interface data.Clonable interface
 func (vip *VirtualIP) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if vip == nil || p == nil {
-		return vip, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*VirtualIP)

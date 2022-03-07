@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SubnetHosts contains information about hosts attached to the subnet
@@ -51,9 +52,8 @@ func (sh SubnetHosts) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (sh *SubnetHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if sh == nil || p == nil {
-		return sh, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*SubnetHosts)

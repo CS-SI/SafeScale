@@ -17,11 +17,11 @@
 package abstract
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNetwork_NewNetwork(t *testing.T) {
@@ -52,11 +52,11 @@ func TestNetwork_Replace(t *testing.T) {
 
 	var n1 *Network = nil
 	var n2 *Network = nil
-	result, _ := n1.Replace(n2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace nil pointer")
-		t.Fail()
+	result, err := n1.Replace(n2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 

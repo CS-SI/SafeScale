@@ -17,7 +17,6 @@
 package abstract
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -56,11 +55,11 @@ func TestSubnet_NewSubnet(t *testing.T) {
 func TestSubnet_Replace(t *testing.T) {
 
 	var s *Subnet = nil
-	replaced, _ := s.Replace(NewSubnet())
-	if fmt.Sprintf("%p", replaced) != "0x0" {
-		t.Error("Can't replace nil pointer")
-		t.Fail()
+	replaced, err := s.Replace(NewSubnet())
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, replaced)
 
 }
 
@@ -282,10 +281,10 @@ func TestVirtualIP_Replace(t *testing.T) {
 
 	var v *VirtualIP = nil
 	v2 := NewVirtualIP()
-	replaced, _ := v.Replace(v2)
-	if fmt.Sprintf("%p", replaced) != "0x0" {
-		t.Error("Can't replace to nil pointer")
-		t.Fail()
+	replaced, err := v.Replace(v2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, replaced)
 
 }

@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -48,11 +47,11 @@ func TestVolumeDescription_IsNull(t *testing.T) {
 func TestVolumeDescription_Replace(t *testing.T) {
 	var ssg *VolumeDescription = nil
 	ssg2 := NewVolumeDescription()
-	result, _ := ssg.Replace(ssg2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("VolumeDescription nil pointer can't be replace")
-		t.Fail()
+	result, err := ssg.Replace(ssg2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestVolumeDescription_Clone(t *testing.T) {
@@ -105,11 +104,11 @@ func TestVolumeAttachments_IsNull(t *testing.T) {
 func TestVolumeAttachments_Replace(t *testing.T) {
 	var ssg *VolumeAttachments = nil
 	ssg2 := NewVolumeAttachments()
-	result, _ := ssg.Replace(ssg2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("VolumeAttachments nil pointer can't be replace")
-		t.Fail()
+	result, err := ssg.Replace(ssg2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestVolumeAttachments_Clone(t *testing.T) {

@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterDefaults contains default information used by the cluster after initial creation
@@ -56,9 +57,8 @@ func (d ClusterDefaults) Clone() (data.Clonable, error) {
 
 // Replace ... (data.Clonable interface)
 func (d *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
-	// Do not test with isNull(), it's allowed to clone a null value...
 	if d == nil || p == nil {
-		return d, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*ClusterDefaults)

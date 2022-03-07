@@ -69,7 +69,7 @@ func (instance ObjectStorageBucket) Clone() (data.Clonable, error) {
 // satisfies interface data.Clonable
 func (instance *ObjectStorageBucket) Replace(p data.Clonable) (data.Clonable, error) {
 	if instance == nil || p == nil {
-		return instance, nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	casted, ok := p.(*ObjectStorageBucket)

@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -60,11 +59,11 @@ func TestClusterControlplane_Replace(t *testing.T) {
 			ID: "MyVirtualIP ID",
 		},
 	}
-	result, _ := cc.Replace(cc2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := cc.Replace(cc2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 
