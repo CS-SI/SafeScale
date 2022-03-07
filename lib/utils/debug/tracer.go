@@ -19,7 +19,6 @@ package debug
 import (
 	"path/filepath"
 	"runtime"
-	godebug "runtime/debug"
 	"strconv"
 	"strings"
 
@@ -79,16 +78,6 @@ func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 	}
 	t.callerParams = strings.TrimSpace(message)
 
-	// Build the message to trace
-	// VPL: my version
-	// if pc, file, line, ok := runtime.Caller(1); ok {
-	//	if f := runtime.FuncForPC(pc); f != nil {
-	//		t.funcName = f.Name()
-	//		filename := strings.Replace(file, debug.sourceFilePartToRemove(), "", 1)
-	//		t.inOutMessage = fmt.Sprintf("%s %s%s [%s:%d]", t.taskSig, filepath.Base(t.funcName), message, filename, line)
-	//	}
-	// }
-	// VPL: la version d'Oscar
 	if pc, file, _, ok := runtime.Caller(1); ok {
 		t.fileName = callstack.SourceFilePathUpdater()(file)
 		if f := runtime.FuncForPC(pc); f != nil {
@@ -115,7 +104,7 @@ func (instance *tracer) EnteringMessage() string {
 	if valid.IsNil(instance) {
 		return ""
 	}
-	return goingInPrefix + instance.buildMessage()
+	return goingInPrefix + instance.buildMessage(0)
 }
 
 // WithStopwatch will add a measure of duration between GoingIn and Exiting.
@@ -135,7 +124,7 @@ func (instance *tracer) Entering() Tracer {
 		}
 		if instance.enabled {
 			instance.inDone = true
-			msg := goingInPrefix + instance.buildMessage()
+			msg := goingInPrefix + instance.buildMessage(0)
 			if msg != "" {
 				logrus.Tracef(msg)
 			}
@@ -149,7 +138,7 @@ func (instance *tracer) ExitingMessage() string {
 	if valid.IsNil(instance) {
 		return ""
 	}
-	return goingOutPrefix + instance.buildMessage()
+	return goingOutPrefix + instance.buildMessage(0)
 }
 
 // Exiting logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
@@ -160,7 +149,7 @@ func (instance *tracer) Exiting() Tracer {
 		}
 		if instance.enabled {
 			instance.outDone = true
-			msg := goingOutPrefix + instance.buildMessage()
+			msg := goingOutPrefix + instance.buildMessage(0)
 			if instance.sw != nil {
 				msg += " (duration: " + instance.sw.String() + ")"
 			}
@@ -173,14 +162,14 @@ func (instance *tracer) Exiting() Tracer {
 }
 
 // buildMessage builds the message with available information from stack trace
-func (instance *tracer) buildMessage() string {
+func (instance *tracer) buildMessage(extra uint) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
 
 	// Note: this value is very important, it makes sure the internal calls of this package would not interfere with the real caller we want to catch
 	//       badly set and you will get a line number that does not match with the one corresponding to the call
-	const skipCallers int = 2
+	var skipCallers int = 2 + int(extra)
 
 	message := instance.taskSig
 	if _, _, line, ok := runtime.Caller(skipCallers); ok {
@@ -191,13 +180,13 @@ func (instance *tracer) buildMessage() string {
 
 // TraceMessage returns a string containing a trace message
 func (instance *tracer) TraceMessage(msg ...interface{}) string {
-	return "--- " + instance.buildMessage() + ": " + strprocess.FormatStrings(msg...)
+	return "--- " + instance.buildMessage(1) + ": " + strprocess.FormatStrings(msg...)
 }
 
 // Trace traces a message
 func (instance *tracer) Trace(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
-		message := instance.TraceMessage(msg...)
+		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
 		if message != "" {
 			logrus.Tracef(message)
 		}
@@ -208,17 +197,12 @@ func (instance *tracer) Trace(msg ...interface{}) Tracer {
 // TraceAsError traces a message with error level
 func (instance *tracer) TraceAsError(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
-		message := instance.TraceMessage(msg...)
+		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
 		if message != "" {
 			logrus.Errorf(message)
 		}
 	}
 	return instance
-}
-
-// TraceCallStack logs the call stack as a trace (displayed only if tracing is enabled)
-func (instance *tracer) TraceCallStack() Tracer {
-	return instance.Trace("%s", string(godebug.Stack()))
 }
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
