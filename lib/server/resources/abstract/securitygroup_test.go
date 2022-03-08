@@ -257,13 +257,15 @@ func TestSecurityGroupRule_TargetsConcernGroups(t *testing.T) {
 }
 
 func Test_concernsGroups(t *testing.T) {
-
-	// @TODO: No err, wtf ?!?
-	// cidrs := []string{"256.0.0.0/0"}
-	// result, err := concernsGroups(cidrs)
-
-	cidrs := []string{"127.0.0.0/8", "SecurityGroupName"}
+	cidrs := []string{"256.0.0.0/0"}
 	_, err := concernsGroups(cidrs)
+	if err == nil {
+		t.Error("Invalid CIDRs MUST also be considered as errors")
+		t.FailNow()
+	}
+
+	cidrs = []string{"127.0.0.0/8", "SecurityGroupName"}
+	_, err = concernsGroups(cidrs)
 	if err == nil {
 		t.Error("No, cannot mix CIDR and SG name")
 		t.Fail()

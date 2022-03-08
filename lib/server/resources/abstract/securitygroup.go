@@ -20,6 +20,7 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
@@ -192,13 +193,26 @@ func (instance *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
 }
 
 func concernsGroups(in []string) (bool, fail.Error) {
-	var cidrFound, idFound int
+	// this assumes in is a list of identifiers + valid cidrs.
+	// but it can also be identifiers + valid cidrs + invalid cidrs.
+
+	// that matches for things like 333.825.7.320/53, clearly invalid CIDRs, but cidrs; sg ids don't follow this format
+	ipRegexp := regexp.MustCompile("^(([0-9]?[0-9][0-9]?)\\.){3}([0-9]?[0-9][0-9]?)/[0-9]{1,2}$")
+
+	var cidrFound, idFound, invalidCidrs int
 	for _, v := range in {
-		if _, _, err := net.ParseCIDR(v); err != nil {
-			idFound++
+		if _, _, err := net.ParseCIDR(v); err != nil { // it's NOT a valid cidr
+			if ipRegexp.Match([]byte(v)) { // but it kinda follows CIDR format
+				invalidCidrs++
+			} else { // else, it has to be an identifier
+				idFound++
+			}
 		} else {
 			cidrFound++
 		}
+	}
+	if invalidCidrs > 0 {
+		return false, fail.InvalidRequestError("in should be either a list of VALID CIDRs or list of Security Group IDs, we found an INVALID CIDR")
 	}
 	if cidrFound > 0 && idFound > 0 {
 		return false, fail.InvalidRequestError("cannot mix CIDRs and Security Group IDs in source/target of rule")

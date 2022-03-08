@@ -1423,7 +1423,7 @@ func (instance *task) Abortable() (bool, fail.Error) {
 // Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitly a subtask.
 func (instance *task) DisarmAbortSignal() func() {
 	if valid.IsNil(instance) {
-		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
+		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.") // FIXME: return error
 		return func() {}
 	}
 
