@@ -356,7 +356,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case *retry.ErrStopRetry:
+		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 			return nullAHF, nullUD, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return nullAHF, nullUD, fail.Wrap(fail.Cause(retryErr), "timeout")

@@ -585,7 +585,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
-				func() (innerErr error) {
+				func() (extErr error) {
 					var hr *http.Response
 					hr, r.Err = s.ComputeClient.Post( // nolint
 						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
@@ -593,6 +593,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 						},
 					)
 					defer closer(hr)
+					var innerErr error
 					server, innerErr = r.Extract()
 					xerr := normalizeError(innerErr)
 					if xerr != nil {
@@ -617,7 +618,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				normalizeError,
 			)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+					return retry.StopRetryError(innerXErr, "stopping creation retries")
+				default:
+					return innerXErr
+				}
 			}
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
