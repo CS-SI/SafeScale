@@ -120,21 +120,16 @@ type Share struct {
 	lock sync.RWMutex
 }
 
-// ShareNullValue returns a *Share representing a null value
-func ShareNullValue() *Share {
-	return &Share{MetadataCore: NullCore()}
-}
-
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {
-		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return ShareNullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &Share{
@@ -152,10 +147,10 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
-		return ShareNullValue(), fail.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	timings, xerr := svc.Timings()
@@ -180,18 +175,18 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return ShareNullValue(), fail.NotFoundError("failed to find a Share '%s'", ref)
+			return nil, fail.NotFoundError("failed to find a Share '%s'", ref)
 		default:
-			return ShareNullValue(), xerr
+			return nil, xerr
 		}
 	}
 
 	var ok bool
 	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
-		return ShareNullValue(), fail.InconsistentError("cache content should be a resources.Share", ref)
+		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
 	if rs == nil {
-		return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
+		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
 	_ = cacheEntry.LockContent()
@@ -240,7 +235,9 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -364,12 +361,10 @@ func (instance *Share) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		newShareName := instance.GetName()
-		if newShareName != "" {
-			return fail.NotAvailableError("already carrying Share '%s'", newShareName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

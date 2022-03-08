@@ -111,11 +111,6 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 	return instance, nil
 }
 
-// HostNullValue returns a *host corresponding to ShareNullValue
-func HostNullValue() *Host {
-	return &Host{MetadataCore: NullCore()}
-}
-
 // LoadHost ...
 func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -411,7 +406,9 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -834,12 +831,10 @@ func (instance *Host) Create(
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		hostname := instance.GetName()
-		if hostname != "" {
-			return nil, fail.NotAvailableError("already carrying Host '%s'", hostname)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return nil, fail.NotAvailableError("already carrying information")
 		}
-		return nil, fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -1540,7 +1535,7 @@ func (instance *Host) setSecurityGroups(
 
 func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure bool) {
 	if errorPtr == nil {
-		logrus.Errorf("trying to call a cancel function from a nil error; cancel not run")
+		logrus.Errorf("trying to call a cancel function from a nil error; cancel not run") // FIXME: return error
 		return
 	}
 	if *errorPtr != nil && !keepOnFailure {

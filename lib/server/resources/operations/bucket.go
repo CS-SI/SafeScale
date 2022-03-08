@@ -22,9 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
@@ -41,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -151,7 +149,9 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -351,7 +351,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf(xerr.Error())
+		return "", xerr
 	}
 	return res, nil
 }
@@ -364,12 +364,10 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		bucketName := instance.GetName()
-		if bucketName != "" {
-			return fail.NotAvailableError("already carrying Share '%s'", bucketName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("s", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

@@ -196,7 +196,7 @@ func (r results) ResultsOfUnit(unitName string) resources.UnitResults {
 		if urs != nil {
 			rurs, ok := urs.(*unitResults)
 			if !ok {
-				logrus.Errorf("failed to cast urs to '*unitResults'")
+				logrus.Errorf("failed to cast urs to '*unitResults'") // FIXME: return error
 				return &unitResults{}
 			}
 			for k, v := range *rurs {

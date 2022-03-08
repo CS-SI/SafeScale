@@ -56,21 +56,16 @@ type Network struct {
 	lock sync.RWMutex
 }
 
-// NullValue returns a *Network representing a null value
-func NullValue() *Network {
-	return &Network{MetadataCore: NullCore()}
-}
-
 // NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {
-		return NullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, networkKind, networksFolderName, &abstract.Network{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &Network{
@@ -172,13 +167,13 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		networkName := instance.GetName()
-		if networkName != "" {
-			return fail.NotAvailableError("already carrying Network '%s'", networkName)
+
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
+
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -293,7 +288,9 @@ func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	identifiable, ok := clonable.(data.Identifiable)
 	if !ok {
@@ -351,7 +348,9 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

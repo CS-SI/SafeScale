@@ -81,11 +81,6 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 	return instance, nil
 }
 
-// SecurityGroupNullValue returns a *SecurityGroup corresponding to ShareNullValue
-func SecurityGroupNullValue() *SecurityGroup {
-	return &SecurityGroup{MetadataCore: NullCore()}
-}
-
 // lookupSecurityGroup returns true if security group exists, false otherwise
 func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 	if svc == nil {
@@ -213,7 +208,9 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -323,12 +320,10 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		sgName := instance.GetName()
-		if sgName != "" {
-			return fail.NotAvailableError("already carrying SecurityGroup '%s'", sgName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

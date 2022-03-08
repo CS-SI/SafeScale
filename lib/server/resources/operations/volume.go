@@ -61,22 +61,16 @@ type volume struct {
 	lock sync.RWMutex
 }
 
-// VolumeNullValue returns an instance of share corresponding to its null value.
-// The idea is to avoid nil pointer using VolumeNullValue()
-func VolumeNullValue() *volume { // nolint
-	return &volume{MetadataCore: NullCore()}
-}
-
 // NewVolume creates an instance of Volume
 func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 	if svc == nil {
-		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return VolumeNullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &volume{
@@ -90,10 +84,10 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
-		return VolumeNullValue(), fail.InvalidParameterCannotBeEmptyStringError("ref")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
 	timings, xerr := svc.Timings()
@@ -104,7 +98,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 	volumeCache, xerr := svc.GetCache(volumeKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return VolumeNullValue(), xerr
+		return nil, xerr
 	}
 
 	options := iaas.CacheMissOption(
@@ -118,9 +112,9 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return VolumeNullValue(), fail.NotFoundError("failed to find Volume '%s'", ref)
+			return nil, fail.NotFoundError("failed to find Volume '%s'", ref)
 		default:
-			return VolumeNullValue(), xerr
+			return nil, xerr
 		}
 	}
 
@@ -179,7 +173,9 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -445,12 +441,10 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		volumeName := instance.GetName()
-		if volumeName != "" {
-			return fail.NotAvailableError("already carrying Subnet '%s'", volumeName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")

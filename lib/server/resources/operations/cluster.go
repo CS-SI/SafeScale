@@ -273,7 +273,9 @@ func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	identifiable, ok := clonable.(data.Identifiable)
 	if !ok {
@@ -336,12 +338,10 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		clusterName := instance.GetName()
-		if clusterName != "" {
-			return fail.NotAvailableError("already carrying Cluster '%s'", clusterName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

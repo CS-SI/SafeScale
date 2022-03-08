@@ -76,7 +76,7 @@ type Subnet struct {
 
 // NullSubnet returns a *Subnet representing null value
 func NullSubnet() *Subnet {
-	return &Subnet{MetadataCore: NullCore()}
+	return &Subnet{MetadataCore: nil}
 }
 
 // ListSubnets returns a list of available subnets
@@ -452,12 +452,10 @@ func (instance *Subnet) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		subnetName := instance.GetName()
-		if subnetName != "" {
-			return fail.NotAvailableError("already carrying Subnet '%s'", subnetName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -1080,7 +1078,7 @@ func (instance *Subnet) InspectGateway(primary bool) (_ resources.Host, ferr fai
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
-		return HostNullValue(), fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	instance.lock.Lock()
@@ -2130,13 +2128,14 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 }
 
 // InspectGatewaySecurityGroup returns the instance of SecurityGroup in Subnet related to external access on gateways
-func (instance *Subnet) InspectGatewaySecurityGroup() (sgInstance resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) InspectGatewaySecurityGroup() (_ resources.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	sgInstance = SecurityGroupNullValue()
 	if instance == nil || valid.IsNil(instance) {
-		return sgInstance, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var sgInstance resources.SecurityGroup
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2155,13 +2154,14 @@ func (instance *Subnet) InspectGatewaySecurityGroup() (sgInstance resources.Secu
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
-func (instance *Subnet) InspectInternalSecurityGroup() (sg resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) InspectInternalSecurityGroup() (_ resources.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	sg = SecurityGroupNullValue()
 	if instance == nil || valid.IsNil(instance) {
-		return sg, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var sg resources.SecurityGroup
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2180,13 +2180,14 @@ func (instance *Subnet) InspectInternalSecurityGroup() (sg resources.SecurityGro
 }
 
 // InspectPublicIPSecurityGroup returns the instance of SecurityGroup in Subnet for Hosts with Public IP (which does not apply on gateways)
-func (instance *Subnet) InspectPublicIPSecurityGroup() (sg resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) InspectPublicIPSecurityGroup() (_ resources.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	sg = SecurityGroupNullValue()
 	if instance == nil || valid.IsNil(instance) {
-		return sg, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var sg resources.SecurityGroup
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()

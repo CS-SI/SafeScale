@@ -392,7 +392,7 @@ func (instance *Subnet) createPublicIPSecurityGroup(
 // Starting from here, delete the Security Group if exiting with error
 func (instance *Subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
 	if errorPtr == nil {
-		logrus.Errorf("trying to undo an action based on the content of a nil fail.Error; undo cannot be run")
+		logrus.Errorf("trying to undo an action based on the content of a nil fail.Error; undo cannot be run") // FIXME: return error
 		return
 	}
 	if *errorPtr != nil && !keepOnFailure {
