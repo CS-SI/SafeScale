@@ -87,7 +87,12 @@ func (instance *Subnet) unsafeGetDefaultRouteIP() (ip string, ferr fail.Error) {
 			if innerErr != nil {
 				return innerErr
 			}
-			defer hostInstance.Released()
+			defer func() {
+				issue := hostInstance.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
+			}()
 
 			var inErr fail.Error
 			ip, inErr = hostInstance.GetPrivateIP()

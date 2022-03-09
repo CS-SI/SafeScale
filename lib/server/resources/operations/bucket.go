@@ -39,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -415,7 +416,11 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 		}
 	}
 	if bucketInstance != nil {
-		bucketInstance.Released()
+		issue := bucketInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
@@ -562,7 +567,12 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -825,7 +835,10 @@ func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 
 				//goland:noinspection GoDeferInLoop
 				defer func(i resources.Host) { // nolint
-					i.Released()
+					issue := i.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(hostInstance)
 
 				out.Mounts = append(out.Mounts, &protocol.BucketMount{

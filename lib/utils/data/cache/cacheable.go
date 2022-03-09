@@ -26,6 +26,6 @@ import (
 type Cacheable interface { // FIXME: return error
 	observer.Observable // FIXME: also return error
 
-	Released()  // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
-	Destroyed() // Destroyed tells cache handler the instance has been deleted and MUST be removed from cache
+	Released() error  // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
+	Destroyed() error // Destroyed tells cache handler the instance has been deleted and MUST be removed from cache
 }

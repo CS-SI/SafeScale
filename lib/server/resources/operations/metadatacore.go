@@ -33,7 +33,6 @@ import (
 	serializer "github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
@@ -1000,46 +999,45 @@ func (myself *MetadataCore) deserialize(buf []byte) (ferr fail.Error) {
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (myself *MetadataCore) Released() {
+func (myself *MetadataCore) Released() error {
 	if valid.IsNil(myself) {
-		logrus.Errorf(callstack.DecorateWith("", "Released called on an invalid instance", "cannot be nil or null value", 0)) // FIXME: return error
-		return
+		return fail.InvalidInstanceError()
 	}
 
 	myself.lock.RLock()
 	defer myself.lock.RUnlock()
 
-	myself.released()
+	return myself.released()
 }
 
 // released is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: must be called after locking the instance
-func (myself *MetadataCore) released() {
+func (myself *MetadataCore) released() error {
 	id, ok := myself.id.Load().(string)
 	if !ok {
-		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
-		return
+		return fail.InconsistentError("field 'id' is not set with string")
 	}
 
 	for _, v := range myself.observers {
 		v.MarkAsFreed(id)
 	}
+	return nil
 }
 
 // Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (myself *MetadataCore) Destroyed() {
+func (myself *MetadataCore) Destroyed() error {
 	if valid.IsNil(myself) {
-		logrus.Warnf("Destroyed called on an invalid instance")
-		return
+		return fail.InvalidInstanceError()
 	}
 
 	myself.lock.RLock()
 	defer myself.lock.RUnlock()
 
 	myself.destroyed()
+	return nil
 }
 
 // destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.

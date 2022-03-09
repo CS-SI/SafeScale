@@ -256,7 +256,7 @@ func (instance *Cluster) IsNull() bool {
 }
 
 // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
-func (instance *Cluster) Released() {
+func (instance *Cluster) Released() error {
 	if instance.randomDelayTask != nil {
 		// Stops task generating random delays
 		if err := instance.randomDelayTask.Abort(); err != nil {
@@ -264,7 +264,7 @@ func (instance *Cluster) Released() {
 		}
 	}
 
-	instance.MetadataCore.Released()
+	return instance.MetadataCore.Released()
 }
 
 // carry ...
@@ -3314,7 +3314,7 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 	logrus.Debugf("Joining nodes to Cluster...")
 
 	// Joins to Cluster is done sequentially, experience shows too many join at the same time
-	// may fail (depending of the Cluster Flavor)
+	// may fail (depending on the Cluster Flavor)
 	if instance.makers.JoinNodeToCluster != nil {
 		for _, v := range nodes {
 			hostInstance, xerr := LoadHost(instance.Service(), v.ID)
@@ -3325,7 +3325,10 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 
 			//goland:noinspection ALL
 			defer func(i resources.Host) { // nolint
-				i.Released()
+				issue := i.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(hostInstance)
 
 			xerr = instance.makers.JoinNodeToCluster(instance, hostInstance)

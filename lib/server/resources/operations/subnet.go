@@ -544,7 +544,12 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
 		}
-		defer sg.Released()
+		defer func() {
+			issue := sg.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		if innerXErr = sg.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, sg.GetName(), host.GetName())
@@ -578,7 +583,10 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
 			}
-			sg.Released()
+			err := sg.Released()
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			return nil
 		})
 	}
@@ -719,7 +727,11 @@ func (instance *Subnet) checkUnicity(req abstract.SubnetRequest) fail.Error {
 		}
 	}
 
-	resSubnet.Released()
+	err := resSubnet.Released()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
 	return fail.DuplicateError("Subnet '%s' already exists", req.Name)
 }
 
@@ -1124,7 +1136,12 @@ func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, ferr fail.Er
 		if rgw, inErr = LoadHost(svc, id); inErr != nil {
 			return inErr
 		}
-		defer rgw.Released()
+		defer func() {
+			issue := rgw.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		if ip, inErr = rgw.GetPublicIP(); inErr != nil {
 			return inErr
@@ -1169,7 +1186,10 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, ferr fail.Error) {
 
 			//goland:noinspection ALL
 			defer func(hostInstance resources.Host) {
-				hostInstance.Released()
+				issue := hostInstance.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(rgw)
 
 			ip, inErr := rgw.GetPublicIP()
@@ -1281,7 +1301,10 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
-						hostInstance.Released()
+						err := hostInstance.Released()
+						if err != nil {
+							return fail.Wrap(err)
+						}
 						hostList = append(hostList, k)
 					}
 				}
@@ -1430,13 +1453,12 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 }
 
 // Released overloads core.Released() to release the parent Network instance
-func (instance *Subnet) Released() {
+func (instance *Subnet) Released() error {
 	if instance == nil || valid.IsNil(instance) {
-		return
+		return fail.InvalidInstanceError()
 	}
 
-	// instance.parentNetwork.Released()
-	instance.MetadataCore.Released()
+	return instance.MetadataCore.Released()
 }
 
 // InspectNetwork returns the Network instance owning the Subnet
@@ -1541,7 +1563,10 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(
 		} else {
 			//goland:noinspection ALL
 			defer func(sgInstance resources.SecurityGroup) {
-				sgInstance.Released()
+				issue := sgInstance.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(sgInstance)
 
 			xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)

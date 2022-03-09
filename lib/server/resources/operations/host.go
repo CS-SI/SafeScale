@@ -883,7 +883,10 @@ func (instance *Host) Create(
 			return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)
 		}
 	} else {
-		hostInstance.Released()
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)
 	}
 
@@ -1384,7 +1387,12 @@ func (instance *Host) setSecurityGroups(
 				if innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), defaultAbstractSubnet.PublicIPSecurityGroupID)
 				}
-				defer pubipsg.Released()
+				defer func() {
+					issue := pubipsg.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
+				}()
 
 				innerXErr = pubipsg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 				if innerXErr != nil {
@@ -1431,7 +1439,10 @@ func (instance *Host) setSecurityGroups(
 
 						//goland:noinspection ALL
 						defer func(item resources.Subnet) {
-							item.Released()
+							issue := item.Released()
+							if issue != nil {
+								logrus.Warn(issue)
+							}
 						}(subnetInstance)
 
 						sgName := sg.GetName()
@@ -1449,9 +1460,12 @@ func (instance *Host) setSecurityGroups(
 									errors = append(errors, derr)
 								} else {
 									derr = sg.UnbindFromHost(context.Background(), instance)
-									sg.Released()
 									if derr != nil {
 										errors = append(errors, derr)
+									}
+									issue := sg.Released()
+									if issue != nil {
+										logrus.Warn(issue)
 									}
 								}
 							}
@@ -1481,7 +1495,10 @@ func (instance *Host) setSecurityGroups(
 				}
 				//goland:noinspection ALL
 				defer func(subnetInstance resources.Subnet) {
-					subnetInstance.Released()
+					issue := subnetInstance.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(otherSubnetInstance)
 
 				var otherAbstractSubnet *abstract.Subnet
@@ -1508,7 +1525,10 @@ func (instance *Host) setSecurityGroups(
 
 					//goland:noinspection ALL
 					defer func(sgInstance resources.SecurityGroup) {
-						sgInstance.Released()
+						issue := sgInstance.Released()
+						if issue != nil {
+							logrus.Warn(issue)
+						}
 					}(lansg)
 
 					innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
@@ -2199,7 +2219,12 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			return nil, nil, xerr
 		}
 	}
-	defer networkInstance.Released()
+	defer func() {
+		issue := networkInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	// Check if Subnet exists
 	var (
@@ -2286,7 +2311,10 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			return nil, nil, xerr
 		}
 	} else {
-		subnetInstance.Released()
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return nil, nil, fail.DuplicateError("there is already a Subnet named '%s'", singleHostRequest.ResourceName)
 	}
 
@@ -2436,7 +2464,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 							debug.IgnoreError(inErr)
 							continue
 						}
-						instance.Released()
+						issue := instance.Released()
+						if issue != nil {
+							logrus.Warn(issue)
+						}
 						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 					}
 				}
@@ -2517,7 +2548,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 				//goland:noinspection ALL
 				defer func(item resources.Share) {
-					item.Released()
+					issue := item.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(shareInstance)
 
 				// Retrieve data about the server serving the Share
@@ -2559,7 +2593,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 			//goland:noinspection ALL
 			defer func(item resources.Share) {
-				item.Released()
+				issue := item.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(shareInstance)
 
 			loopErr = shareInstance.Unmount(ctx, instance)
@@ -2615,7 +2652,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 						}
 						//goland:noinspection ALL
 						defer func(item resources.Subnet) {
-							item.Released()
+							issue := item.Released()
+							if issue != nil {
+								logrus.Warn(issue)
+							}
 						}(subnetInstance)
 
 						loopErr = subnetInstance.DetachHost(ctx, hostID)
@@ -2660,7 +2700,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 				//goland:noinspection ALL
 				defer func(sgInstance resources.SecurityGroup) {
-					sgInstance.Released()
+					issue := sgInstance.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(sgInstance)
 
 				derr = sgInstance.UnbindFromHost(ctx, instance)

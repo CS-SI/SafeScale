@@ -487,14 +487,15 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
 			debug.IgnoreError(xerr)
-			break // nolint
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
 	} else {
-		existing.Released()
+		issue := existing.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
@@ -504,9 +505,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
 			debug.IgnoreError(xerr)
-			break // nolint
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume name '%s' is already used", req.Name)
 		}
@@ -1323,7 +1322,10 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 
 		//goland:noinspection ALL
 		defer func(item resources.Host) {
-			item.Released()
+			issue := item.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(hostInstance)
 
 		vols, _ := hostInstance.(*Host).unsafeGetVolumes()

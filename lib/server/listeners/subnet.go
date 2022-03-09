@@ -105,7 +105,12 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 
-	defer networkInstance.Released()
+	defer func() {
+		issue := networkInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	subnetInstance, xerr := subnetfactory.New(job.Service())
 	if xerr != nil {
@@ -126,7 +131,12 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	xerr = networkInstance.AdoptSubnet(job.Context(), subnetInstance)
 	if xerr != nil {
@@ -184,7 +194,10 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		}
 
 		networkID = networkInstance.GetID()
-		networkInstance.Released()
+		err := networkInstance.Released()
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
 	}
 	list, xerr := subnetfactory.List(job.Context(), job.Service(), networkID, in.GetAll())
 	if xerr != nil {
@@ -238,7 +251,12 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 		return nil, xerr
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	return subnetInstance.ToProtocol()
 }
@@ -320,7 +338,12 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	}
 
 	if networkInstance != nil {
-		defer networkInstance.Released()
+		defer func() {
+			issue := networkInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		xerr = networkInstance.AbandonSubnet(job.Context(), subnetID)
 		if xerr != nil {
@@ -376,14 +399,24 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -449,7 +482,12 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	var subnetInstance resources.Subnet
 	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
@@ -466,7 +504,13 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		}
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
+
 	xerr = subnetInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 	if xerr != nil {
 		return empty, xerr
@@ -519,14 +563,24 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	xerr = subnetInstance.EnableSecurityGroup(job.Context(), sgInstance)
 	if xerr != nil {
@@ -580,14 +634,24 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, xerr
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	xerr = subnetInstance.DisableSecurityGroup(job.Context(), sgInstance)
 	if xerr != nil {
@@ -637,7 +701,12 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 		return nil, xerr
 	}
 
-	defer subnetInstance.Released()
+	defer func() {
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	bonds, xerr := subnetInstance.ListSecurityGroups(job.Context(), state)
 	if xerr != nil {

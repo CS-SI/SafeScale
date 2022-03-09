@@ -344,34 +344,6 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		list = featuresV1.Installed
-	// 		return nil
-	// 	})
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
-	//
-	// out := make([]resources.Feature, 0, len(list))
-	// for k := range list {
-	// 	item, xerr := NewFeature(instance.Service(), k)
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return emptySlice, xerr
-	// 	}
-	//
-	// 	out = append(out, item)
-	// }
-	// return out, nil
 	return nil, fail.NotImplementedError()
 }
 
@@ -388,22 +360,6 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	defer instance.lock.RUnlock()
 
 	list := instance.InstalledFeatures()
-	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		list = featuresV1.Installed
-	// 		return nil
-	// 	})
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
 
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
@@ -519,7 +475,12 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 		if xerr != nil {
 			return xerr
 		}
-		defer rgw.Released()
+		defer func() {
+			issue := rgw.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		v["PrimaryGatewayIP"], xerr = rgw.GetPrivateIP()
 		if xerr != nil {
@@ -544,7 +505,12 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 				return xerr
 			}
 		} else {
-			defer rgw.Released()
+			defer func() {
+				issue := rgw.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
+			}()
 
 			v["SecondaryGatewayIP"], xerr = rgw.GetPrivateIP()
 			if xerr != nil {

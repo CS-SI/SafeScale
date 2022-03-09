@@ -68,12 +68,15 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// good, continue
+			debug.IgnoreError(xerr)
 		default:
 			return nil, xerr
 		}
 	} else {
-		existing.Released()
+		issue := existing.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return nil, fail.DuplicateError("a Cluster named '%s' already exist", req.Name)
 	}
 
@@ -2097,7 +2100,10 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(host)
 
 		_, xerr = tg.Start(
@@ -2787,7 +2793,10 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 
 	//goland:noinspection ALL
 	defer func(item resources.Host) {
-		item.Released()
+		issue := item.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}(hostInstance)
 
 	// Docker and docker-compose installation is mandatory on all nodes

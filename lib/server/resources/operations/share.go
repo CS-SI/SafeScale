@@ -1317,7 +1317,10 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, ferr fail.Error
 		}
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(h)
 
 		mounts, xerr := h.GetMounts()
