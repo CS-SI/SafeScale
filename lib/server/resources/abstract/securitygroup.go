@@ -197,7 +197,7 @@ func concernsGroups(in []string) (bool, fail.Error) {
 	// but it can also be identifiers + valid cidrs + invalid cidrs.
 
 	// that matches for things like 333.825.7.320/53, clearly invalid CIDRs, but cidrs; sg ids don't follow this format
-	ipRegexp := regexp.MustCompile("^(([0-9]?[0-9][0-9]?)\\.){3}([0-9]?[0-9][0-9]?)/[0-9]{1,2}$")
+	ipRegexp := regexp.MustCompile("^(([0-9]?[0-9][0-9]?)\\.){3}([0-9]?[0-9][0-9]?)/[0-9]{1,2}$") // nolint
 
 	var cidrFound, idFound, invalidCidrs int
 	for _, v := range in {
