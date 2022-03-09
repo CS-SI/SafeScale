@@ -71,7 +71,7 @@ func (instance *Subnet) taskCreateGateway(
 
 	hostSizing := castedParams.sizing
 
-	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
+	logrus.Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
 	svc := instance.Service()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true

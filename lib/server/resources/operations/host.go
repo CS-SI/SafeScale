@@ -396,6 +396,7 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 	return userName, nil
 }
 
+// IsNull ...
 func (instance *Host) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
@@ -909,25 +910,24 @@ func (instance *Host) Create(
 		)
 	}
 
-	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
-	templateQuery := hostDef.Template
-	if templateQuery == "" {
-		templateQuery = hostReq.TemplateRef
-		if templateQuery == "" {
-			tmpl, xerr := svc.FindTemplateBySizing(hostDef)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
+	// select new template based on hostDef and hostReq
+	{
+		newHostDef := hostDef
+		if newHostDef.Template == "" {
+			newHostDef.Template = hostReq.TemplateRef
+			if hostReq.TemplateID != "" {
+				newHostDef.Template = hostReq.TemplateID
 			}
-
-			hostDef.Template = tmpl.ID
 		}
+		tmpl, xerr := svc.FindTemplateBySizing(newHostDef)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")
+		}
+
+		hostDef.Template = tmpl.ID
 	}
 
-	if hostDef.Template == "" {
-		return nil, fail.NotFoundError("failed to find template to match requested sizing")
-	}
-	hostReq.TemplateRef = templateQuery
 	hostReq.TemplateID = hostDef.Template
 
 	// If hostDef.Image is not explicitly defined, find an image ID corresponding to the content of hostDef.ImageRef
@@ -1642,16 +1642,6 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 	return nil
 }
 
-func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
-	template, xerr := instance.Service().FindTemplateBySizing(hostDef)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	return template.ID, nil
-}
-
 func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
 	// assume yes
 	result := true
@@ -2114,7 +2104,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
 		}
 
-		// execute userdata.PHASE5_FINAL script to final install/configure of the Host (no need to reboot)
+		// execute userdata.PHASE5_FINAL script to finalize install/configure of the Host (no need to reboot)
 		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

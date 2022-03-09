@@ -21,10 +21,12 @@ package converters
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,8 +140,7 @@ func Test_HostSizingRequirementsFromStringToAbstract(t *testing.T) {
 	for sizing, errName := range invalids {
 		_, _, err = HostSizingRequirementsFromStringToAbstract(sizing)
 		if err == nil {
-			t.Error(fmt.Sprintf("Expect %s error", errName))
-			t.Fail()
+			t.Error(fmt.Sprintf("In %s, Expect %s error", sizing, errName))
 		}
 	}
 
@@ -182,8 +183,7 @@ func Test_NodeCountFromStringToInteger(t *testing.T) {
 	for sizing, errName := range invalids {
 		_, err = NodeCountFromStringToInteger(sizing)
 		if err == nil {
-			t.Error(fmt.Sprintf("Expect %s error", errName))
-			t.Fail()
+			t.Error(fmt.Sprintf("%s failed: Expected %s error", sizing, errName))
 		}
 	}
 	invalids = map[string]string{
@@ -369,7 +369,7 @@ func TestSizingToken_Validate(t *testing.T) {
 	tests := []sizingTokenTest{
 		{
 			sizingToken:   nil,
-			errorExpected: "Not full sizingToken is invalid",
+			errorExpected: "token is not complete",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -378,7 +378,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", "~", "1"},
 				pos:     3,
 			},
-			errorExpected: "count can only use =",
+			errorExpected: "'count' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -387,7 +387,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"template", "~", "any"},
 				pos:     3,
 			},
-			errorExpected: "template can only use =",
+			errorExpected: "'template' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -396,7 +396,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "~", "1go"},
 				pos:     3,
 			},
-			errorExpected: "expect valid number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -405,7 +405,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "~", "1go"},
 				pos:     3,
 			},
-			errorExpected: "expect valid number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -450,7 +450,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "=", "[1024-2048-4096]"},
 				pos:     3,
 			},
-			errorExpected: "Value isn't a valid interval",
+			errorExpected: "'ram' token isn't a valid interval",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -459,7 +459,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "=", "[e-14]"},
 				pos:     3,
 			},
-			errorExpected: "Invalid value, min interval is not a number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -468,7 +468,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "=", "[1-f]"},
 				pos:     3,
 			},
-			errorExpected: "Invalid value, max interval is not a number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -477,7 +477,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "=", "e"},
 				pos:     3,
 			},
-			errorExpected: "Value is nort a number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -495,7 +495,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", "<", "3"},
 				pos:     3,
 			},
-			errorExpected: "count can only use =",
+			errorExpected: "'count' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -504,7 +504,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"template", "<", "tplName"},
 				pos:     3,
 			},
-			errorExpected: "template can only use =",
+			errorExpected: "'template' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -513,7 +513,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", "<", "any"},
 				pos:     3,
 			},
-			errorExpected: "value is not a number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -549,7 +549,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", "<=", "3"},
 				pos:     3,
 			},
-			errorExpected: "count only can use =",
+			errorExpected: "'count' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -567,7 +567,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", ">", "0"},
 				pos:     3,
 			},
-			errorExpected: "count only can use =",
+			errorExpected: "'count' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -576,7 +576,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"template", ">", "tplName"},
 				pos:     3,
 			},
-			errorExpected: "template only can use =",
+			errorExpected: "'template' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -585,7 +585,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"ram", ">", "1go"},
 				pos:     3,
 			},
-			errorExpected: "value is not a number",
+			errorExpected: "'ram' isn't a valid number",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -621,7 +621,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", ">=", "1"},
 				pos:     3,
 			},
-			errorExpected: "count can only use =",
+			errorExpected: "'count' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -630,7 +630,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", "ge", "1"},
 				pos:     3,
 			},
-			errorExpected: "count can only use =",
+			errorExpected: "'count' can only use '='",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -639,7 +639,7 @@ func TestSizingToken_Validate(t *testing.T) {
 				members: []string{"count", "!=", "1"},
 				pos:     3,
 			},
-			errorExpected: "operation not suported",
+			errorExpected: "operator '!=' of token 'count' is not supported",
 			expectMin:     "",
 			expectMax:     "",
 		},
@@ -648,23 +648,20 @@ func TestSizingToken_Validate(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		min, max, err := test.sizingToken.Validate()
-
-		fmt.Println(test.sizingToken.String(), err, min, max)
-
 		if test.errorExpected == "" && err != nil {
 			t.Error(err)
-			t.Fail()
-		} else {
-			if test.errorExpected != "" && err == nil {
-				t.Error(fmt.Sprintf("Expect error \"%s\"", test.errorExpected))
-				t.Fail()
-			}
+		}
+		if test.errorExpected != "" && err == nil {
+			t.Error(fmt.Sprintf("Expect error \"%s\"", test.errorExpected))
 		}
 		if test.errorExpected == "" {
 			if min != test.expectMin || max != test.expectMax {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s], expect [%s, %s]", min, max, test.expectMin, test.expectMax))
-				t.Fail()
-
+			}
+		}
+		if test.errorExpected != "" {
+			if min != test.expectMin || max != test.expectMax || !strings.Contains(err.Error(), test.errorExpected) {
+				t.Error(fmt.Sprintf("Invalid returned value [%s, %s, %s], expect [%s, %s, %s]", min, max, err.Error(), test.expectMin, test.expectMax, test.errorExpected))
 			}
 		}
 	}
@@ -711,6 +708,11 @@ func TestRequest_parseSizingString(t *testing.T) {
 			ramExpected:   "",
 		},
 		{
+			request:       "ram = 5.3",
+			errorExpected: "",
+			ramExpected:   "ram = 5.3",
+		},
+		{
 			request:       "ram === 5",
 			errorExpected: "",
 			ramExpected:   "ram = =",
@@ -725,18 +727,47 @@ func TestRequest_parseSizingString(t *testing.T) {
 
 		if test.errorExpected == "" && err != nil {
 			t.Error(err)
-			t.Fail()
-		} else {
-			if test.errorExpected != "" && err == nil {
-				t.Error(fmt.Sprintf("Expect error \"%s\"", test.errorExpected))
-				t.Fail()
-			}
+		}
+		if test.errorExpected != "" && err == nil {
+			t.Error(fmt.Sprintf("Expect error \"%s\"", test.errorExpected))
 		}
 		if test.errorExpected == "" && result["ram"].String() != test.ramExpected {
 			t.Error(fmt.Sprintf("Return \"%s\" but expect \"%s\"", result["ram"], test.ramExpected))
-			t.Fail()
 		}
-
+		if test.errorExpected != "" && result["ram"].String() != test.ramExpected {
+			t.Error(fmt.Sprintf("Return \"%s\" but expect \"%s\"", result["ram"], test.ramExpected))
+		}
 	}
+}
 
+func Test_parseSizingString(t *testing.T) {
+	hear_me_roar := "template=e2-medium,gpu = -1, disk >= 22"
+	thing, err := parseSizingString(hear_me_roar)
+	if err != nil {
+		t.Error(err)
+	}
+	for k, v := range thing {
+		_, _, err = v.Validate()
+		if err != nil {
+			t.Errorf("what is the problem with %s ?: %v", k, err)
+			t.FailNow()
+		}
+	}
+	t.Log(spew.Sdump(thing))
+}
+
+func Test_parseSizingString_disk(t *testing.T) {
+	hear_me_roar := "template=e2-medium"
+	thing, err := parseSizingString(hear_me_roar)
+	if err != nil {
+		t.Error(err)
+	}
+	for k, v := range thing {
+		_, _, err = v.Validate()
+		if err != nil {
+			t.Errorf("what is the problem with %s ?: %v", k, err)
+			t.FailNow()
+		}
+	}
+	t.Log(spew.Sdump(thing))
 }

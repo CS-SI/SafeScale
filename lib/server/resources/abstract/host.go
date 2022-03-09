@@ -173,7 +173,7 @@ type HostRequest struct {
 	KeyPair          *KeyPair            // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
 	SSHPort          uint32              // contains the port to use for SSH
 	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
-	DiskSize         int                 // DiskSize allows to ask for a specific size for system disk (in GB)
+	DiskSize         int                 // DiskSize allows asking for a specific size for system disk (in GB)
 	Single           bool                // Single tells if the Host is single
 	PublicIP         bool                // PublicIP a flag telling if the host must have a public IP
 	IsGateway        bool                // IsGateway tells if the host will act as a gateway
