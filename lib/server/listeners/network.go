@@ -164,7 +164,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		}
 	}
 
-	err := networkInstance.Released()
+	err = networkInstance.Released()
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
