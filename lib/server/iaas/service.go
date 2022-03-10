@@ -409,19 +409,17 @@ func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequireme
 
 	// if we want a specific template and there is a match, we take it
 	if sizing.Template != "" {
+		// if match by name, we take it
 		if ft, xerr := instance.FindTemplateByName(sizing.Template); xerr == nil {
 			return ft, nil
 		}
-	}
 
-	if sizing.Template != "" {
+		// match by ID is also valid
 		if ft, xerr := instance.FindTemplateByID(sizing.Template); xerr == nil {
 			return ft, nil
 		}
-	}
 
-	// if we reached this point with a template in mind, it means that was not available, so we issue a warning about it
-	if sizing.Template != "" {
+		// if we reached this point with a template in mind, it means that was not available, so we issue a warning about it
 		logrus.Warnf("template %s not found", sizing.Template)
 	}
 
