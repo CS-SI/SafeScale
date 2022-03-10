@@ -1077,16 +1077,18 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	)
 
 	// inventory attached volumes
-	for _, attVol := range vm.BlockDeviceMappings {
-		if attVol != nil && attVol.Ebs != nil && attVol.Ebs.VolumeId != nil {
-			volume := aws.StringValue(attVol.Ebs.VolumeId)
-			if volume != "" {
-				attachedVolumes = append(attachedVolumes, volume)
+	if vm != nil {
+		for _, attVol := range vm.BlockDeviceMappings {
+			if attVol != nil && attVol.Ebs != nil && attVol.Ebs.VolumeId != nil {
+				volume := aws.StringValue(attVol.Ebs.VolumeId)
+				if volume != "" {
+					attachedVolumes = append(attachedVolumes, volume)
+				}
 			}
 		}
-	}
 
-	keyPairName = aws.StringValue(vm.KeyName)
+		keyPairName = aws.StringValue(vm.KeyName)
+	}
 
 	// Stop instance forcibly
 	xerr = s.StopHost(ahf, false)
