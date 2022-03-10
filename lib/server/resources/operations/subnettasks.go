@@ -71,7 +71,7 @@ func (instance *Subnet) taskCreateGateway(
 
 	hostSizing := castedParams.sizing
 
-	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
+	logrus.Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
 	svc := instance.Service()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
@@ -94,8 +94,10 @@ func (instance *Subnet) taskCreateGateway(
 		}
 
 		// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
-		if id := rgw.GetID(); id != "" {
-			as.GatewayIDs = append(as.GatewayIDs, id)
+		if rgw.IsTaken() {
+			if id := rgw.GetID(); id != "" {
+				as.GatewayIDs = append(as.GatewayIDs, id)
+			}
 		}
 		return nil
 	})

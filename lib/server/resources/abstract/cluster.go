@@ -18,6 +18,7 @@ package abstract
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
@@ -75,27 +76,28 @@ func (instance *ClusterIdentity) IsNull() bool {
 
 // Clone makes a copy of the instance
 // satisfies interface data.Clonable
-func (instance ClusterIdentity) Clone() data.Clonable {
+func (instance ClusterIdentity) Clone() (data.Clonable, error) {
 	return NewClusterIdentity().Replace(&instance)
 }
 
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
-func (instance *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (instance *ClusterIdentity) Replace(p data.Clonable) (data.Clonable, error) {
 	if instance == nil || p == nil {
-		return instance
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME, Replace should also return an error
-	src, _ := p.(*ClusterIdentity) // nolint
+	src, ok := p.(*ClusterIdentity)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterIdentity")
+	}
 	*instance = *src
 	instance.Keypair = nil
 	if src.Keypair != nil {
 		instance.Keypair = &KeyPair{}
 		*instance.Keypair = *src.Keypair
 	}
-	return instance
+	return instance, nil
 }
 
 // GetName returns the name of the cluster

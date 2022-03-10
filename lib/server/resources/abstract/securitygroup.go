@@ -18,7 +18,9 @@ package abstract
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 	"net"
+	"regexp"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
@@ -26,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	"github.com/sirupsen/logrus"
 )
 
 // SecurityGroupRule represents a rule of a SecurityGroup
@@ -192,13 +193,26 @@ func (instance *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
 }
 
 func concernsGroups(in []string) (bool, fail.Error) {
-	var cidrFound, idFound int
+	// this assumes in is a list of identifiers + valid cidrs.
+	// but it can also be identifiers + valid cidrs + invalid cidrs.
+
+	// that matches for things like 333.825.7.320/53, clearly invalid CIDRs, but cidrs; sg ids don't follow this format
+	ipRegexp := regexp.MustCompile("^(([0-9]?[0-9][0-9]?)\\.){3}([0-9]?[0-9][0-9]?)/[0-9]{1,2}$") // nolint
+
+	var cidrFound, idFound, invalidCidrs int
 	for _, v := range in {
-		if _, _, err := net.ParseCIDR(v); err != nil {
-			idFound++
+		if _, _, err := net.ParseCIDR(v); err != nil { // it's NOT a valid cidr
+			if ipRegexp.Match([]byte(v)) { // but it kinda follows CIDR format
+				invalidCidrs++
+			} else { // else, it has to be an identifier
+				idFound++
+			}
 		} else {
 			cidrFound++
 		}
+	}
+	if invalidCidrs > 0 {
+		return false, fail.InvalidRequestError("in should be either a list of VALID CIDRs or list of Security Group IDs, we found an INVALID CIDR")
 	}
 	if cidrFound > 0 && idFound > 0 {
 		return false, fail.InvalidRequestError("cannot mix CIDRs and Security Group IDs in source/target of rule")
@@ -268,20 +282,23 @@ func NewSecurityGroupRule() *SecurityGroupRule {
 // Clone does a deep-copy of the SecurityGroup
 //
 // satisfies interface data.Clonable
-func (instance *SecurityGroupRule) Clone() data.Clonable {
+func (instance *SecurityGroupRule) Clone() (data.Clonable, error) {
 	return NewSecurityGroupRule().Replace(instance)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (instance *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
+func (instance *SecurityGroupRule) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value
 	if instance == nil || p == nil {
-		return instance
+		return instance, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*SecurityGroupRule) // nolint
+	src, ok := p.(*SecurityGroupRule)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SecurityGroupRule")
+	}
+
 	*instance = *src
 	instance.IDs = make([]string, len(src.IDs))
 	copy(instance.IDs, src.IDs)
@@ -289,7 +306,7 @@ func (instance *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
 	copy(instance.Sources, src.Sources)
 	instance.Targets = make([]string, len(src.Targets))
 	copy(instance.Targets, src.Targets)
-	return instance
+	return instance, nil
 }
 
 // SecurityGroupRules ...
@@ -323,22 +340,27 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 }
 
 // Clone does a deep-copy of the SecurityGroupRules
-func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
+func (sgrs SecurityGroupRules) Clone() (SecurityGroupRules, error) {
 	var asgr = make(SecurityGroupRules, 0)
 	var cloneRule *SecurityGroupRule
 	for _, v := range sgrs {
 		if v == nil {
 			continue
 		}
+
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+
 		var ok bool
-		cloneRule, ok = v.Clone().(*SecurityGroupRule)
+		cloneRule, ok = cloned.(*SecurityGroupRule)
 		if !ok {
-			logrus.Warnf("this is not a *SecurityGroupRule: %v", v.Clone())
-			continue
+			return nil, fmt.Errorf("this is not a *SecurityGroupRule: %v", cloned)
 		}
 		asgr = append(asgr, cloneRule)
 	}
-	return asgr
+	return asgr, nil
 }
 
 // IndexOfRuleByID returns the index of the rule containing the provider rule ID provided
@@ -457,23 +479,31 @@ func NewSecurityGroup() *SecurityGroup {
 
 // Clone does a deep-copy of the SecurityGroup
 // satisfies interface data.Clonable
-func (instance SecurityGroup) Clone() data.Clonable {
+func (instance SecurityGroup) Clone() (data.Clonable, error) {
 	return NewSecurityGroup().Replace(&instance)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (instance *SecurityGroup) Replace(p data.Clonable) data.Clonable {
+func (instance *SecurityGroup) Replace(p data.Clonable) (data.Clonable, error) {
 	// Do not test with isNull(), it's allowed to clone a null value
 	if instance == nil || p == nil {
-		return instance
+		return instance, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*SecurityGroup) // nolint
+	src, ok := p.(*SecurityGroup)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SecurityGroup")
+	}
 	*instance = *src
-	instance.Rules = src.Rules.Clone()
-	return instance
+
+	var err error
+	instance.Rules, err = src.Rules.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	return instance, nil
 }
 
 // Serialize serializes instance into bytes (output json code)

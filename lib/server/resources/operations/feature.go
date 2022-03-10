@@ -172,7 +172,12 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.E
 				return nil, fail.NotFoundError("failed to find a Feature named '%s'", name)
 			}
 
-			casted, ok = allEmbeddedFeaturesMap[name].Clone().(*Feature)
+			cloned, cerr := allEmbeddedFeaturesMap[name].Clone()
+			if cerr != nil {
+				return nil, fail.Wrap(cerr)
+			}
+
+			casted, ok = cloned.(*Feature)
 			if !ok {
 				return nil, fail.NewError("embedded feature should be a *Feature")
 			}
@@ -216,8 +221,14 @@ func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, fer
 	if _, ok := allEmbeddedFeaturesMap[name]; !ok {
 		return casted, fail.NotFoundError("failed to find a Feature named '%s'", name)
 	}
+
+	cloned, cerr := allEmbeddedFeaturesMap[name].Clone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
 	var ok bool
-	casted, ok = allEmbeddedFeaturesMap[name].Clone().(*Feature)
+	casted, ok = cloned.(*Feature)
 	if !ok {
 		return nil, fail.NewError("feature is not a *Feature")
 	}
@@ -244,7 +255,7 @@ func (instance *Feature) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (instance *Feature) Clone() data.Clonable {
+func (instance *Feature) Clone() (data.Clonable, error) {
 	res := FeatureNullValue()
 	return res.Replace(instance)
 }
@@ -252,25 +263,22 @@ func (instance *Feature) Clone() data.Clonable {
 // Replace ...
 // satisfies interface data.Clonable
 // may panic
-func (instance *Feature) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+func (instance *Feature) Replace(p data.Clonable) (data.Clonable, error) {
 	if instance == nil || p == nil {
-		return instance
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*Feature) // nolint
-	// VPL: Not used yet, need to think if we should return an error or panic, or something else
-	// src, ok := p.(*Feature)
-	// if !ok {
-	// 	panic("failed to cast p to '*Feature'")
-	// }
+	src, ok := p.(*Feature)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Feature")
+	}
+
 	*instance = *src
 	instance.installers = make(map[installmethod.Enum]Installer, len(src.installers))
 	for k, v := range src.installers {
 		instance.installers[k] = v
 	}
-	return instance
+	return instance, nil
 }
 
 // GetName returns the display name of the Feature, with error handling
@@ -430,7 +438,10 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	}
 
 	logrus.Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
-	myV := v.Clone()
+	myV, cerr := v.FakeClone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
 
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)
@@ -544,7 +555,10 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	}
 
 	// 'v' may be updated by concurrent tasks, so use copy of it
-	myV := v.Clone()
+	myV, cerr := v.FakeClone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
 
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)
@@ -651,7 +665,10 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
-	myV := v.Clone()
+	myV, cerr := v.FakeClone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
 
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)

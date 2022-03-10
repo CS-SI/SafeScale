@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostVolume contains information about attached volume
@@ -63,19 +66,21 @@ func (hv *HostVolumes) IsNull() bool {
 }
 
 // Clone ...
-func (hv HostVolumes) Clone() data.Clonable {
+func (hv HostVolumes) Clone() (data.Clonable, error) {
 	return NewHostVolumes().Replace(&hv)
 }
 
 // Replace ...
-func (hv *HostVolumes) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hv *HostVolumes) Replace(p data.Clonable) (data.Clonable, error) {
 	if hv == nil || p == nil {
-		return hv
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostVolumes) // nolint
+	src, ok := p.(*HostVolumes)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostVolumes")
+	}
+
 	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
 	for k, v := range src.VolumesByID {
 		hv.VolumesByID[k] = v
@@ -92,7 +97,7 @@ func (hv *HostVolumes) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.DevicesByID {
 		hv.DevicesByID[k] = v
 	}
-	return hv
+	return hv, nil
 }
 
 func init() {

@@ -56,6 +56,7 @@ type Service interface {
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
+	FindTemplateByID(string) (*abstract.HostTemplate, fail.Error)
 	GetProviderName() (string, fail.Error)
 	GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
@@ -393,9 +394,45 @@ func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate,
 	return nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
 }
 
+// FindTemplateByID returns the template by its ID
+func (instance service) FindTemplateByID(id string) (*abstract.HostTemplate, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	allTemplates, err := instance.Provider.ListTemplates(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range allTemplates {
+		i := i
+		if i.ID == id {
+			return &i, nil
+		}
+	}
+	return nil, fail.NotFoundError(fmt.Sprintf("template with id '%s' not found", id))
+}
+
 // FindTemplateBySizing returns an abstracted template corresponding to the Host Sizing Requirements
 func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
 	useScannerDB := sizing.MinGPU > 0 || sizing.MinCPUFreq > 0
+
+	// if we want a specific template and there is a match, we take it
+	if sizing.Template != "" {
+		// if match by name, we take it
+		if ft, xerr := instance.FindTemplateByName(sizing.Template); xerr == nil {
+			return ft, nil
+		}
+
+		// match by ID is also valid
+		if ft, xerr := instance.FindTemplateByID(sizing.Template); xerr == nil {
+			return ft, nil
+		}
+
+		// if we reached this point with a template in mind, it means that was not available, so we issue a warning about it
+		logrus.Warnf("template %s not found", sizing.Template)
+	}
+
 	templates, xerr := instance.ListTemplatesBySizing(sizing, useScannerDB)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")

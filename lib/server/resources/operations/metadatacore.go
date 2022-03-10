@@ -33,7 +33,6 @@ import (
 	serializer "github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
@@ -52,8 +51,9 @@ const (
 
 // MetadataCore contains the core functions of a persistent object
 type MetadataCore struct {
-	id   atomic.Value
-	name atomic.Value
+	id    atomic.Value
+	name  atomic.Value
+	taken atomic.Value
 
 	lock       sync.RWMutex
 	shielded   *shielded.Shielded
@@ -67,41 +67,42 @@ type MetadataCore struct {
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
-func NullCore() *MetadataCore {
-	return &MetadataCore{kind: NullMetadataKind}
-}
-
 // NewCore creates an instance of MetadataCore
 func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return NullCore(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if kind == "" {
-		return NullCore(), fail.InvalidParameterError("kind", "cannot be empty string")
+		return nil, fail.InvalidParameterError("kind", "cannot be empty string")
 	}
 	if path == "" {
-		return NullCore(), fail.InvalidParameterError("path", "cannot be empty string")
+		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
 	fld, xerr := NewMetadataFolder(svc, path)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullCore(), xerr
+		return nil, xerr
 	}
 
 	props, err := serializer.NewJSONProperties("resources." + kind)
 	err = debug.InjectPlannedFail(err)
 	if err != nil {
-		return NullCore(), err
+		return nil, err
+	}
+
+	protected, cerr := shielded.NewShielded(instance)
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
 	}
 
 	c := MetadataCore{
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		shielded:   shielded.NewShielded(instance),
+		shielded:   protected,
 		observers:  map[string]observer.Observer{},
 	}
 	switch kind {
@@ -110,66 +111,53 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	default:
 		c.kindSplittedStore = true
 	}
+	c.taken.Store(false)
+
 	return &c, nil
 }
 
 // IsNull returns true if the MetadataCore instance represents the null value for MetadataCore
 func (myself *MetadataCore) IsNull() bool {
-	return myself == nil || (myself.kind == "" || myself.kind == NullMetadataKind || valid.IsNil(myself.folder) || (myself.getID() == NullMetadataID && myself.getName() == NullMetadataName))
+	return myself == nil || myself.kind == "" || myself.kind == NullMetadataKind
 }
 
 // Service returns the iaas.Service used to create/load the persistent object
 func (myself *MetadataCore) Service() iaas.Service {
-	if myself == nil {
-		return nil
-	}
-
 	return myself.folder.Service()
 }
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
 func (myself *MetadataCore) GetID() string {
-	if myself == nil || valid.IsNil(myself) {
-		return NullMetadataID
-	}
-
 	return myself.getID()
 }
 
 func (myself *MetadataCore) getID() string {
-	id, ok := myself.id.Load().(string)
-	if !ok {
-		return NullMetadataID
-	}
-
+	id := myself.id.Load().(string) // nolint, better panic than error-hiding
 	return id
 }
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
 func (myself *MetadataCore) GetName() string {
-	if myself == nil || valid.IsNil(myself) {
-		return NullMetadataName
-	}
-
 	return myself.getName()
 }
 
 func (myself *MetadataCore) getName() string {
-	name, ok := myself.name.Load().(string)
-	if !ok {
-		return NullMetadataName
-	}
-
+	name := myself.name.Load().(string) // nolint, better panic than error-hiding
 	return name
+}
+
+func (myself *MetadataCore) IsTaken() bool {
+	taken, ok := myself.taken.Load().(bool)
+	if !ok {
+		return false
+	}
+	return taken
 }
 
 // GetKind returns the kind of object served
 func (myself *MetadataCore) GetKind() string {
-	if myself == nil {
-		return NullMetadataKind
-	}
 	return myself.kind
 }
 
@@ -178,7 +166,7 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Erro
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -207,11 +195,11 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Erro
 
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// change thru time).
+// change through time).
 func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -236,7 +224,7 @@ func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.I
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -270,7 +258,7 @@ func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.I
 			}
 		}
 	}
-	// Reload reloads data from objectstorage to be sure to have the last revision
+	// Reload reloads data from object storage to be sure to have the last revision
 	if doReload {
 		xerr = myself.reload()
 		xerr = debug.InjectPlannedFail(xerr)
@@ -320,7 +308,9 @@ func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(myself) {
-		return fail.InvalidRequestError("cannot carry, already carries something")
+		if myself.IsTaken() {
+			return fail.InvalidRequestError("cannot carry, already carries something")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -335,7 +325,11 @@ func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
 	myself.lock.Lock()
 	defer myself.lock.Unlock()
 
-	myself.shielded = shielded.NewShielded(clonable)
+	var cerr error
+	myself.shielded, cerr = shielded.NewShielded(clonable)
+	if cerr != nil {
+		return fail.Wrap(cerr)
+	}
 	myself.loaded = true
 
 	xerr = myself.updateIdentity()
@@ -370,6 +364,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 				myself.id.Store(ident.GetName())
 			}
 			myself.name.Store(ident.GetName())
+			myself.taken.Store(true)
 
 			return nil
 		})
@@ -377,6 +372,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 
 	myself.name.Store(NullMetadataName)
 	myself.id.Store(NullMetadataID)
+	myself.taken.Store(true)
 
 	// notify observers there has been changed in the instance
 	err := myself.notifyObservers()
@@ -627,7 +623,7 @@ func (myself *MetadataCore) write() fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (myself *MetadataCore) Reload() (ferr fail.Error) {
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -730,7 +726,7 @@ func (myself *MetadataCore) reload() (ferr fail.Error) {
 func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if myself == nil {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -754,7 +750,7 @@ func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (
 func (myself *MetadataCore) Delete() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -867,7 +863,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 
 // Serialize serializes instance into bytes (output json code)
 func (myself *MetadataCore) Serialize() (_ []byte, ferr fail.Error) {
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -932,7 +928,7 @@ func (myself *MetadataCore) serialize() (_ []byte, ferr fail.Error) {
 func (myself *MetadataCore) Deserialize(buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1003,46 +999,45 @@ func (myself *MetadataCore) deserialize(buf []byte) (ferr fail.Error) {
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (myself *MetadataCore) Released() {
-	if myself == nil || valid.IsNil(myself) {
-		logrus.Errorf(callstack.DecorateWith("", "Released called on an invalid instance", "cannot be nil or null value", 0))
-		return
+func (myself *MetadataCore) Released() error {
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
 	}
 
 	myself.lock.RLock()
 	defer myself.lock.RUnlock()
 
-	myself.released()
+	return myself.released()
 }
 
 // released is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: must be called after locking the instance
-func (myself *MetadataCore) released() {
+func (myself *MetadataCore) released() error {
 	id, ok := myself.id.Load().(string)
 	if !ok {
-		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
-		return
+		return fail.InconsistentError("field 'id' is not set with string")
 	}
 
 	for _, v := range myself.observers {
 		v.MarkAsFreed(id)
 	}
+	return nil
 }
 
 // Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (myself *MetadataCore) Destroyed() {
-	if myself == nil || valid.IsNil(myself) {
-		logrus.Warnf("Destroyed called on an invalid instance")
-		return
+func (myself *MetadataCore) Destroyed() error {
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
 	}
 
 	myself.lock.RLock()
 	defer myself.lock.RUnlock()
 
 	myself.destroyed()
+	return nil
 }
 
 // destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
@@ -1063,7 +1058,7 @@ func (myself *MetadataCore) destroyed() {
 // AddObserver ...
 // satisfies interface data.Observable
 func (myself *MetadataCore) AddObserver(o observer.Observer) error {
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if o == nil {
@@ -1086,7 +1081,7 @@ func (myself *MetadataCore) AddObserver(o observer.Observer) error {
 // NotifyObservers sends a signal to all registered Observers to notify change
 // Satisfies interface data.Observable
 func (myself *MetadataCore) NotifyObservers() error {
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1112,7 +1107,7 @@ func (myself *MetadataCore) notifyObservers() error {
 
 // RemoveObserver ...
 func (myself *MetadataCore) RemoveObserver(name string) error {
-	if myself == nil || valid.IsNil(myself) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

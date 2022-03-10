@@ -17,7 +17,6 @@
 package propertiesv3
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -53,11 +52,11 @@ func TestClusterDefaults_IsNull(t *testing.T) {
 func TestClusterDefaults_Replace(t *testing.T) {
 	var cd *ClusterDefaults = nil
 	cd2 := newClusterDefaults()
-	result := cd.Replace(cd2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("ClusterDefaults nil pointer can't be replace")
-		t.Fail()
+	result, err := cd.Replace(cd2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestClusterDefaults_Clone(t *testing.T) {
@@ -69,7 +68,12 @@ func TestClusterDefaults_Clone(t *testing.T) {
 	}
 	cd.FeatureParameters = []string{"FeatureParam1", "FeatureParam2", "FeatureParam3"}
 
-	clonedCd, ok := cd.Clone().(*ClusterDefaults)
+	cloned, err := cd.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCd, ok := cloned.(*ClusterDefaults)
 	if !ok {
 		t.Fail()
 	}

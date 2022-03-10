@@ -81,11 +81,6 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 	return instance, nil
 }
 
-// SecurityGroupNullValue returns a *SecurityGroup corresponding to ShareNullValue
-func SecurityGroupNullValue() *SecurityGroup {
-	return &SecurityGroup{MetadataCore: NullCore()}
-}
-
 // lookupSecurityGroup returns true if security group exists, false otherwise
 func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 	if svc == nil {
@@ -111,7 +106,11 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 			return false, xerr
 		}
 	}
-	sgInstance.Released()
+	err := sgInstance.Released()
+	if err != nil {
+		return false, fail.Wrap(err)
+	}
+
 	return true, nil
 }
 
@@ -213,7 +212,9 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -323,12 +324,10 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		sgName := instance.GetName()
-		if sgName != "" {
-			return fail.NotAvailableError("already carrying SecurityGroup '%s'", sgName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -473,13 +472,17 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		if xerr != nil {
 			return xerr
 		}
-		defer networkInstance.Released()
+
+		defer func() {
+			issue := networkInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
 		})
-
-		// this error and the error defined in line 324 are NOT the same error, even if they have the same local name
 		if xerr != nil {
 			return xerr
 		}
@@ -624,7 +627,10 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 
 			//goland:noinspection ALL
 			defer func(h resources.Host) {
-				h.Released()
+				issue := h.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(hostInstance)
 
 			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", hostInstance.GetName())))
@@ -733,6 +739,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// consider a missing subnet as a successful operation and continue the loop
+						debug.IgnoreError(xerr)
 						continue
 					default:
 						return xerr
@@ -741,7 +748,10 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 
 				//goland:noinspection GoDeferInLoop
 				defer func(in resources.Subnet) {
-					in.Released()
+					issue := in.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(subnetInstance)
 
 				xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

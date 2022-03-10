@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -47,11 +46,11 @@ func TestSecurityGroupSubnets_IsNull(t *testing.T) {
 func TestSecurityGroupSubnets_Replace(t *testing.T) {
 	var sgs *SecurityGroupSubnets = nil
 	sgs2 := NewSecurityGroupSubnets()
-	result := sgs.Replace(sgs2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("SecurityGroupSubnets nil pointer can't be replace")
-		t.Fail()
+	result, err := sgs.Replace(sgs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestSecurityGroupSubnets_Clone(t *testing.T) {
@@ -69,7 +68,13 @@ func TestSecurityGroupSubnets_Clone(t *testing.T) {
 			"Name": "ID",
 		},
 	}
-	clonedSgs, ok := sgs.Clone().(*SecurityGroupSubnets)
+
+	cloned, err := sgs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedSgs, ok := cloned.(*SecurityGroupSubnets)
 	if !ok {
 		t.Fail()
 	}

@@ -1,0 +1,74 @@
+{
+  "id": "",
+  "name": "",
+  "status": "",
+  "tags": null,
+  "container_format": "",
+  "disk_format": "",
+  "min_disk": 0,
+  "min_ram": 0,
+  "owner": "",
+  "protected": false,
+  "visibility": "",
+  "os_hidden": false,
+  "checksum": "",
+  "metadata": null,
+  "Properties": {
+    "image": {
+      "OS-EXT-IMG-SIZE:size": 2,
+      "created": "2019-03-08T14:27:03Z",
+      "id": "0249222b-c9be-419b-a953-f47e91c3fc81",
+      "links": [
+        {
+          "href": "https://ecs.eu-west-0.prod-cloud-ocb.orange-business.com/v2/0e311da8b4244c61be8e593ce67cbc2f/images/0249222b-c9be-419b-a953-f47e91c3fc81",
+          "rel": "self"
+        },
+        {
+          "href": "https://ecs.eu-west-0.prod-cloud-ocb.orange-business.com/0e311da8b4244c61be8e593ce67cbc2f/images/0249222b-c9be-419b-a953-f47e91c3fc81",
+          "rel": "bookmark"
+        },
+        {
+          "href": "https://ecs.eu-west-0.prod-cloud-ocb.orange-business.com/images/0249222b-c9be-419b-a953-f47e91c3fc81",
+          "rel": "alternate",
+          "type": "application/vnd.openstack.image"
+        }
+      ],
+      "metadata": {
+        "__account_code": "linux",
+        "__backup_id": "",
+        "__data_origin": "file,pcsimseu-west-0:Ubuntu 18.04 v4.qcow2",
+        "__description": "This image is provided by and supported by Orange Business Services. It is free, only the consumption is charged",
+        "__image_provide": "Orange Business Services",
+        "__image_size": "2561032192",
+        "__image_source_type": "uds",
+        "__imagetype": "gold",
+        "__isregistered": "true",
+        "__lazyloading": "true",
+        "__originalimagename": "0249222b-c9be-419b-a953-f47e91c3fc81",
+        "__os_bit": "64",
+        "__os_type": "Linux",
+        "__os_version": "Ubuntu 18.04 server 64bit",
+        "__platform": "Ubuntu",
+        "__productcode": "",
+        "__root_origin": "file",
+        "__support_highperformance": "true",
+        "__support_kvm": "true",
+        "__support_kvm_hi1822_hiovs": "true",
+        "__support_xen": "true",
+        "hw_firmware_type": "bios",
+        "virtual_env_type": "FusionCompute"
+      },
+      "minDisk": 40,
+      "minRam": 1024,
+      "name": "OBS Ubuntu 18.04",
+      "progress": 100,
+      "status": "ACTIVE",
+      "updated": "2020-04-30T10:53:37Z"
+    }
+  },
+  "created_at": "0001-01-01T00:00:00Z",
+  "updated_at": "0001-01-01T00:00:00Z",
+  "file": "",
+  "schema": "",
+  "virtual_size": 0
+}

@@ -19,6 +19,7 @@ package converters
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
@@ -305,7 +306,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				NodeOptions:    "",
 				Force:          false,
 			},
-			expectError: "count can only use =",
+			expectError: "'count' can only use '='",
 		},
 		{
 			ClusterCreateRequest: &protocol.ClusterCreateRequest{
@@ -327,7 +328,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				NodeOptions:    "",
 				Force:          false,
 			},
-			expectError: "count can only use =",
+			expectError: "'count' can only use '='",
 		},
 		{
 			ClusterCreateRequest: &protocol.ClusterCreateRequest{
@@ -349,7 +350,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				NodeOptions:    "",
 				Force:          false,
 			},
-			expectError: "count can only use =",
+			expectError: "'count' can only use '='",
 		},
 		{
 			ClusterCreateRequest: &protocol.ClusterCreateRequest{
@@ -379,12 +380,15 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 		test := tests[i]
 		_, xerr := ClusterRequestFromProtocolToAbstract(test.ClusterCreateRequest)
 		if test.expectError == "" && xerr != nil {
-			t.Error(xerr)
-			t.Fail()
+			t.Errorf("test %d failed: %v", i, xerr)
 		}
 		if test.expectError != "" && xerr == nil {
-			t.Error(fmt.Sprintf("Expect error: %s", test.expectError))
-			t.Fail()
+			t.Errorf(fmt.Sprintf("test %d failed: Expect error: %s", i, test.expectError))
+		}
+		if test.expectError != "" && xerr != nil {
+			if !strings.Contains(xerr.Error(), test.expectError) {
+				t.Errorf("test %d failed: expected %s and happened %s", i, test.expectError, xerr.Error())
+			}
 		}
 	}
 

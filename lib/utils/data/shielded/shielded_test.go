@@ -36,7 +36,11 @@ func TestTakiTaki(t *testing.T) {
 	a.Rumba = 9
 	a.Content = "Bailame como si fuera la ultima vez"
 
-	armored := NewShielded(a)
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	takitaki, err := concurrency.NewTask()
@@ -105,7 +109,11 @@ func TestCriminal(t *testing.T) {
 	a.Rumba = 9
 	a.Content = "tu me robaste el corazon como un criminaaal"
 
-	armored := NewShielded(a)
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 
 	criminal, err := concurrency.NewTask()
 	if err != nil {
@@ -192,7 +200,11 @@ func TestSerialize(t *testing.T) {
 	a.Rumba = 9
 	a.Content = "Bailame como si fuera la ultima vez"
 
-	armored := NewShielded(a)
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	content, err := armored.Serialize()
@@ -210,10 +222,18 @@ func TestSerializeDeserialize(t *testing.T) {
 	assert.NotNil(t, a)
 
 	b := datatests.NewStructWithoutPointers()
-	gotForYou := NewShielded(b)
+	gotForYou, err := NewShielded(b)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	assert.NotNil(t, gotForYou)
 
-	armored := NewShielded(a)
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	assert.NotNil(t, armored)
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 

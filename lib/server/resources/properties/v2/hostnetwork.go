@@ -17,9 +17,12 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostNetworking contains network information related to Host
@@ -65,20 +68,22 @@ func (hn *HostNetworking) Reset() {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hn HostNetworking) Clone() data.Clonable {
+func (hn HostNetworking) Clone() (data.Clonable, error) {
 	return NewHostNetworking().Replace(&hn)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (hn *HostNetworking) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hn *HostNetworking) Replace(p data.Clonable) (data.Clonable, error) {
 	if hn == nil || p == nil {
-		return hn
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostNetworking) // nolint
+	src, ok := p.(*HostNetworking)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostNetworking")
+	}
+
 	*hn = *src
 	hn.SubnetsByID = make(map[string]string, len(src.SubnetsByID))
 	for k, v := range src.SubnetsByID {
@@ -96,7 +101,7 @@ func (hn *HostNetworking) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.IPv6Addresses {
 		hn.IPv6Addresses[k] = v
 	}
-	return hn
+	return hn, nil
 }
 
 func init() {

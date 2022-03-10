@@ -908,7 +908,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
-		case *retry.ErrStopRetry:
+		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			cause := fail.Cause(xerr)

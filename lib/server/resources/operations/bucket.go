@@ -22,9 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
@@ -41,6 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -151,7 +150,9 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -351,7 +352,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf(xerr.Error())
+		return "", xerr
 	}
 	return res, nil
 }
@@ -364,12 +365,10 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		bucketName := instance.GetName()
-		if bucketName != "" {
-			return fail.NotAvailableError("already carrying Share '%s'", bucketName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("s", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -417,7 +416,11 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 		}
 	}
 	if bucketInstance != nil {
-		bucketInstance.Released()
+		issue := bucketInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
@@ -564,7 +567,12 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -827,7 +835,10 @@ func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 
 				//goland:noinspection GoDeferInLoop
 				defer func(i resources.Host) { // nolint
-					i.Released()
+					issue := i.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(hostInstance)
 
 				out.Mounts = append(out.Mounts, &protocol.BucketMount{

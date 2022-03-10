@@ -30,7 +30,12 @@ func TestClusterIdentity_Clone(t *testing.T) {
 	c := NewClusterIdentity()
 	c.Name = "cluster"
 
-	cc, ok := c.Clone().(*ClusterIdentity)
+	cloned, err := c.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	cc, ok := cloned.(*ClusterIdentity)
 	if !ok {
 		t.Fail()
 	}
@@ -198,12 +203,18 @@ func TestClusterIdentity_Replace(t *testing.T) {
 	cluster.Keypair = kp1
 
 	// Nil cluster, nil data
-	result := emptyCluster.Replace(emptyData)
-	require.EqualValues(t, emptyCluster, result)
+	result, xerr := emptyCluster.Replace(emptyData)
+	if xerr == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
 
 	// Filled cluster, nil data
-	result = cluster.Replace(emptyData)
-	require.EqualValues(t, cluster, result)
+	result, xerr = cluster.Replace(emptyData)
+	if xerr == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
 
 	// Filled cluster, filled data
 	cluster2 := NewClusterIdentity()
@@ -213,7 +224,7 @@ func TestClusterIdentity_Replace(t *testing.T) {
 	require.NoError(t, err)
 	cluster2.Keypair = kp2
 
-	result = cluster.Replace(cluster2)
+	result, _ = cluster.Replace(cluster2)
 	require.EqualValues(t, result, cluster2)
 	require.EqualValues(t, result.(*ClusterIdentity).Keypair, kp2)
 	require.EqualValues(t, result.(*ClusterIdentity).GetName(), cluster2.Name)

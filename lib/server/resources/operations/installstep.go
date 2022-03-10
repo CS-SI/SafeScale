@@ -421,7 +421,12 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 	is.Worker.startTime = time.Now()
 
 	var xerr fail.Error
-	clonedV = v.Clone()
+	var cerr error
+	clonedV, cerr = v.FakeClone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
 	clonedV["HostIP"], xerr = host.GetPrivateIP()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -610,7 +615,10 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 // realizeVariables replaces any template occurring in every variable
 func realizeVariables(variables data.Map) (data.Map, fail.Error) {
-	cloneV := variables.Clone()
+	cloneV, cerr := variables.FakeClone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
 
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok && variable != "" {

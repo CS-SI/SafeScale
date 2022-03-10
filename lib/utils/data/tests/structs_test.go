@@ -127,6 +127,6 @@ func TestStructWithPointersAndCorrectReplace_Replace(t *testing.T) {
 
 	var s *StructWithPointersAndCorrectReplace = nil
 	var c data.Clonable = nil
-	_ = s.Replace(c)
+	_, _ = s.Replace(c)
 
 }

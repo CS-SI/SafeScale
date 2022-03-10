@@ -17,7 +17,6 @@
 package abstract
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -55,12 +54,11 @@ func TestVolume_NewVolume(t *testing.T) {
 func TestVolume_Replace(t *testing.T) {
 
 	var v *Volume = nil
-	replaced := v.Replace(NewVolume())
-	if fmt.Sprintf("%p", replaced) != "0x0" {
-		t.Error("Can't replace to nil pointer")
-		t.Fail()
+	replaced, err := v.Replace(NewVolume())
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
-
+	require.Nil(t, replaced)
 }
 
 func TestVolume_Clone(t *testing.T) {
@@ -71,7 +69,12 @@ func TestVolume_Clone(t *testing.T) {
 	v.Speed = volumespeed.Cold
 	v.State = volumestate.Unknown
 
-	vc, ok := v.Clone().(*Volume)
+	cloned, err := v.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	vc, ok := cloned.(*Volume)
 	if !ok {
 		t.Fail()
 	}

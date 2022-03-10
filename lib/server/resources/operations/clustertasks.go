@@ -62,18 +62,23 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 	ctx := task.Context()
 
+	logrus.Warnf("This is the cluster creation request: %s", spew.Sdump(req))
+
 	// Check if Cluster exists in metadata; if yes, error
 	existing, xerr := LoadCluster(ctx, instance.Service(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// good, continue
+			debug.IgnoreError(xerr)
 		default:
 			return nil, xerr
 		}
 	} else {
-		existing.Released()
+		issue := existing.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return nil, fail.DuplicateError("a Cluster named '%s' already exist", req.Name)
 	}
 
@@ -139,6 +144,9 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	if req.NodesDef.Image == "" {
 		req.NodesDef.Image = req.OS
 	}
+
+	// logrus.Warnf("This is the cluster creation request before determination: %s", spew.Sdump(req))
+
 	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -543,16 +551,12 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 
-	if mastersDef.Equals(*gatewaysDef) {
-		mastersDef.Template = gatewaysDef.Template
-	} else {
-		tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, nil, nil, xerr
-		}
-		mastersDef.Template = tmpl.ID
+	tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, nil, nil, xerr
 	}
+	mastersDef.Template = tmpl.ID
 
 	// Determine node sizing
 	if instance.makers.DefaultNodeSizing != nil {
@@ -578,18 +582,12 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 
-	if nodesDef.Equals(*gatewaysDef) { // nolint
-		nodesDef.Template = gatewaysDef.Template
-	} else if nodesDef.Equals(*mastersDef) {
-		nodesDef.Template = mastersDef.Template
-	} else {
-		tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, nil, nil, xerr
-		}
-		nodesDef.Template = tmpl.ID
+	tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, nil, nil, xerr
 	}
+	nodesDef.Template = tmpl.ID
 
 	// Updates property
 	xerr = instance.Alter(
@@ -2097,7 +2095,10 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(host)
 
 		_, xerr = tg.Start(
@@ -2787,7 +2788,10 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 
 	//goland:noinspection ALL
 	defer func(item resources.Host) {
-		item.Released()
+		issue := item.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}(hostInstance)
 
 	// Docker and docker-compose installation is mandatory on all nodes

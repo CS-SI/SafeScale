@@ -220,9 +220,12 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 
 // NodeCountFromStringToInteger extracts initial node count from string
 func NodeCountFromStringToInteger(in string) (int, fail.Error) {
+	if in == "" {
+		return 0, nil
+	}
+
 	tokens, xerr := parseSizingString(in)
 	xerr = debug.InjectPlannedFail(xerr)
-
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -463,13 +466,68 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 	return "", "", fail.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
 }
 
-// parseSizingString transforms a string to a list of tokens
+func merge(ms ...map[string]*sizingToken) map[string]*sizingToken {
+	res := map[string]*sizingToken{}
+
+	for _, m := range ms {
+		for k, v := range m {
+			res[k] = v
+		}
+	}
+	return res
+}
+
 func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
+	var parsed []map[string]*sizingToken
+
+	if strings.Contains(request, ",") {
+		fragments := strings.Split(request, ",")
+		for _, frag := range fragments {
+			apa, err := newParseSizingString(frag)
+			if err != nil {
+				return nil, err
+			}
+			parsed = append(parsed, apa)
+		}
+	} else {
+		apa, err := newParseSizingString(request)
+		if err != nil {
+			return nil, err
+		}
+		parsed = append(parsed, apa)
+	}
+	return merge(parsed...), nil
+}
+
+// parseSizingString transforms a string to a list of tokens
+func newParseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 	var (
 		s       scanner.Scanner
 		tokens  = map[string]*sizingToken{}
 		mytoken *sizingToken
 	)
+
+	if request == "" {
+		return nil, fail.NewError("empty string")
+	}
+
+	// this handles the specific case "template=whatever", the code a few lines below expect numeric comparisons and does not behave the same way
+	cleaned := strings.TrimSpace(request)
+	cleaned = strings.ReplaceAll(cleaned, " ", "")
+	if strings.HasPrefix(cleaned, "template=") {
+		if strings.Contains(cleaned, "=") {
+			frag := strings.Split(cleaned, "=")
+			if len(frag) == 2 {
+				tokens["template"] = &sizingToken{
+					members: []string{"template", "=", frag[1]},
+					pos:     3,
+				}
+				return tokens, nil
+			}
+		}
+		return nil, fail.SyntaxError("unexpected format: '%s', only 'template=YourTemplateNameHere' is allowed", request)
+	}
+
 	s.Init(strings.NewReader(request))
 	// s.Mode = scanner.ScanInts | scanner.ScanFloats | scanner.ScanChars | scanner.ScanRawStrings
 

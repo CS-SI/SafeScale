@@ -523,7 +523,12 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 		}
 	}
 
-	defer rs.Released() // mark the instance as released at the end of the function, for cache considerations
+	defer func() {
+		issue := rs.Released() // mark the instance as released at the end of the function, for cache considerations
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	gw, xerr := rs.InspectGateway(true)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -690,7 +695,10 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		//goland:noinspection GoDeferInLoop
 		defer func(hlist []resources.Host) {
 			for _, v := range hlist {
-				v.Released()
+				issue := v.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}
 		}(hostsList)
 
@@ -998,7 +1006,6 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 						msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s", w.action.String(), p.stepName, key)
 					}
 
-					logrus.Errorf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}
 			}
@@ -1168,7 +1175,12 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer subnetInstance.Released() // mark instance as released at the end of the function, for cache considerations
+	defer func() {
+		issue := subnetInstance.Released() // mark instance as released at the end of the function, for cache considerations
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	primaryKongController, xerr := NewKongController(ctx, w.service, subnetInstance, true)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1186,10 +1198,16 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now submits all the rules to reverse proxy
-	primaryGatewayVariables := w.variables.Clone()
+	primaryGatewayVariables, cerr := w.variables.FakeClone()
+	if cerr != nil {
+		return fail.Wrap(cerr)
+	}
 	var secondaryGatewayVariables data.Map
 	if secondaryKongController != nil {
-		secondaryGatewayVariables = w.variables.Clone()
+		secondaryGatewayVariables, cerr = w.variables.FakeClone()
+		if cerr != nil {
+			return fail.Wrap(cerr)
+		}
 	}
 	for _, r := range rules {
 		if r == nil {
@@ -1209,7 +1227,10 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		//goland:noinspection ALL
 		defer func(list []resources.Host) {
 			for _, v := range list {
-				v.Released()
+				issue := v.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}
 		}(hosts)
 
@@ -1586,7 +1607,12 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	defer rs.Released() // mark instance as released at the end of the function, for cache considerations
+	defer func() {
+		issue := rs.Released() // mark instance as released at the end of the function, for cache considerations
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	forFeature := " for Feature '" + w.feature.GetName() + "'"
 
@@ -1619,7 +1645,12 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 			}
 
 			//goland:noinspection ALL
-			defer gwSG.Released()
+			defer func() {
+				issue := gwSG.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
+			}()
 
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
@@ -1828,30 +1859,57 @@ func (w worker) interpretRuleTargets(rule map[interface{}]interface{}) stepTarge
 // Terminate cleans up resources
 func (w *worker) Terminate() {
 	for _, v := range w.allGateways {
-		v.Released()
+		issue := v.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	for _, v := range w.allMasters {
-		v.Released()
+		issue := v.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	for _, v := range w.allNodes {
-		v.Released()
+		issue := v.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	for _, v := range w.concernedGateways {
-		v.Released()
+		issue := v.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	for _, v := range w.concernedMasters {
-		v.Released()
+		issue := v.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	for _, v := range w.concernedNodes {
-		v.Released()
+		issue := v.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	if w.availableGateway != nil {
-		w.availableGateway.Released()
+		issue := w.availableGateway.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	if w.availableMaster != nil {
-		w.availableMaster.Released()
+		issue := w.availableMaster.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 	if w.availableNode != nil {
-		w.availableNode.Released()
+		issue := w.availableNode.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 	}
 }

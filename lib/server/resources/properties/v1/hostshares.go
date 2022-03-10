@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostShare describes a filesystem exported from the host
@@ -52,19 +55,20 @@ func (hs *HostShare) IsNull() bool {
 }
 
 // Clone ...
-func (hs HostShare) Clone() data.Clonable {
+func (hs HostShare) Clone() (data.Clonable, error) {
 	return NewHostShare().Replace(&hs)
 }
 
 // Replace ...
-func (hs *HostShare) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hs *HostShare) Replace(p data.Clonable) (data.Clonable, error) {
 	if hs == nil || p == nil {
-		return hs
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostShare) // nolint
+	src, ok := p.(*HostShare)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostShare")
+	}
 	*hs = *src
 	hs.ClientsByID = make(map[string]string, len(src.ClientsByID))
 	for k, v := range src.ClientsByID {
@@ -74,7 +78,7 @@ func (hs *HostShare) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ClientsByName {
 		hs.ClientsByName[k] = v
 	}
-	return hs
+	return hs, nil
 }
 
 // HostShares contains information about the shares of the host
@@ -100,19 +104,20 @@ func (hs *HostShares) IsNull() bool {
 }
 
 // Clone ...
-func (hs HostShares) Clone() data.Clonable {
+func (hs HostShares) Clone() (data.Clonable, error) {
 	return NewHostShares().Replace(&hs)
 }
 
 // Replace ...
-func (hs *HostShares) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hs *HostShares) Replace(p data.Clonable) (data.Clonable, error) {
 	if hs == nil || p == nil {
-		return hs
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostShares) // nolint
+	src, ok := p.(*HostShares)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostShares")
+	}
 	hs.ByID = make(map[string]*HostShare, len(src.ByID))
 	for k, v := range src.ByID {
 		hs.ByID[k] = v
@@ -121,7 +126,7 @@ func (hs *HostShares) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByName {
 		hs.ByName[k] = v
 	}
-	return hs
+	return hs, nil
 }
 
 func init() {

@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterInstalledFeature ...
@@ -49,20 +52,22 @@ func (cif *ClusterInstalledFeature) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cif ClusterInstalledFeature) Clone() data.Clonable {
+func (cif ClusterInstalledFeature) Clone() (data.Clonable, error) {
 	return NewClusterInstalledFeature().Replace(&cif)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (cif *ClusterInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
 	if cif == nil || p == nil {
-		return cif
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterInstalledFeature) // nolint
+	src, ok := p.(*ClusterInstalledFeature)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterInstalledFeature")
+	}
+
 	cif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
 	for k := range src.RequiredBy {
 		cif.RequiredBy[k] = struct{}{}
@@ -71,7 +76,7 @@ func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
 	for k := range src.Requires {
 		cif.Requires[k] = struct{}{}
 	}
-	return cif
+	return cif, nil
 }
 
 // ClusterFeatures ...
@@ -99,30 +104,38 @@ func (f *ClusterFeatures) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (f ClusterFeatures) Clone() data.Clonable {
+func (f ClusterFeatures) Clone() (data.Clonable, error) {
 	return newClusterFeatures().Replace(&f)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (f *ClusterFeatures) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (f *ClusterFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 	if f == nil || p == nil {
-		return f
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterFeatures) // nolint
+	src, ok := p.(*ClusterFeatures)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterFeatures")
+	}
+
 	f.Installed = make(map[string]*ClusterInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
-		// FIXME: Replace should also return an error
-		f.Installed[k], _ = v.Clone().(*ClusterInstalledFeature) // nolint
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		f.Installed[k], ok = cloned.(*ClusterInstalledFeature)
+		if !ok {
+			return nil, fmt.Errorf("cloned is not a *ClusterInstalledFeature")
+		}
 	}
 	f.Disabled = make(map[string]struct{}, len(src.Disabled))
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}
-	return f
+	return f, nil
 }
 
 func init() {

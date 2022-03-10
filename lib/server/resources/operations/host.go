@@ -111,11 +111,6 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 	return instance, nil
 }
 
-// HostNullValue returns a *host corresponding to ShareNullValue
-func HostNullValue() *Host {
-	return &Host{MetadataCore: NullCore()}
-}
-
 // LoadHost ...
 func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -401,6 +396,7 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 	return userName, nil
 }
 
+// IsNull ...
 func (instance *Host) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
@@ -411,7 +407,9 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -834,12 +832,10 @@ func (instance *Host) Create(
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		hostname := instance.GetName()
-		if hostname != "" {
-			return nil, fail.NotAvailableError("already carrying Host '%s'", hostname)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return nil, fail.NotAvailableError("already carrying information")
 		}
-		return nil, fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -888,7 +884,10 @@ func (instance *Host) Create(
 			return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)
 		}
 	} else {
-		hostInstance.Released()
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)
 	}
 
@@ -911,26 +910,26 @@ func (instance *Host) Create(
 		)
 	}
 
-	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
-	templateQuery := hostDef.Template
-	if templateQuery == "" {
-		templateQuery = hostReq.TemplateRef
-		if templateQuery == "" {
-			tmpl, xerr := svc.FindTemplateBySizing(hostDef)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
+	// select new template based on hostDef and hostReq
+	{
+		newHostDef := hostDef
+		if newHostDef.Template == "" {
+			newHostDef.Template = hostReq.TemplateRef
+			if hostReq.TemplateID != "" {
+				newHostDef.Template = hostReq.TemplateID
 			}
+		}
+		tmpl, xerr := svc.FindTemplateBySizing(newHostDef)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")
+		}
 
 			hostDef.Template = tmpl.ID
 			templateQuery = tmpl.Name
 		}
 	}
 
-	if hostDef.Template == "" {
-		return nil, fail.NotFoundError("failed to find template to match requested sizing")
-	}
-	hostReq.TemplateRef = templateQuery
 	hostReq.TemplateID = hostDef.Template
 
 	// If hostDef.Image is not explicitly defined, find an image ID corresponding to the content of hostDef.ImageRef
@@ -1106,9 +1105,16 @@ func (instance *Host) Create(
 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
+			var err error
+			_, err = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			creator := ""
-			hostname, _ := os.Hostname()
+			hostname, err := os.Hostname()
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			if curUser, err := user.Current(); err != nil {
 				creator = "unknown@" + hostname
 			} else {
@@ -1387,7 +1393,12 @@ func (instance *Host) setSecurityGroups(
 				if innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), defaultAbstractSubnet.PublicIPSecurityGroupID)
 				}
-				defer pubipsg.Released()
+				defer func() {
+					issue := pubipsg.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
+				}()
 
 				innerXErr = pubipsg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 				if innerXErr != nil {
@@ -1434,7 +1445,10 @@ func (instance *Host) setSecurityGroups(
 
 						//goland:noinspection ALL
 						defer func(item resources.Subnet) {
-							item.Released()
+							issue := item.Released()
+							if issue != nil {
+								logrus.Warn(issue)
+							}
 						}(subnetInstance)
 
 						sgName := sg.GetName()
@@ -1452,9 +1466,12 @@ func (instance *Host) setSecurityGroups(
 									errors = append(errors, derr)
 								} else {
 									derr = sg.UnbindFromHost(context.Background(), instance)
-									sg.Released()
 									if derr != nil {
 										errors = append(errors, derr)
+									}
+									issue := sg.Released()
+									if issue != nil {
+										logrus.Warn(issue)
 									}
 								}
 							}
@@ -1484,7 +1501,10 @@ func (instance *Host) setSecurityGroups(
 				}
 				//goland:noinspection ALL
 				defer func(subnetInstance resources.Subnet) {
-					subnetInstance.Released()
+					issue := subnetInstance.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(otherSubnetInstance)
 
 				var otherAbstractSubnet *abstract.Subnet
@@ -1511,7 +1531,10 @@ func (instance *Host) setSecurityGroups(
 
 					//goland:noinspection ALL
 					defer func(sgInstance resources.SecurityGroup) {
-						sgInstance.Released()
+						issue := sgInstance.Released()
+						if issue != nil {
+							logrus.Warn(issue)
+						}
 					}(lansg)
 
 					innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
@@ -1538,7 +1561,7 @@ func (instance *Host) setSecurityGroups(
 
 func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure bool) {
 	if errorPtr == nil {
-		logrus.Errorf("trying to call a cancel function from a nil error; cancel not run")
+		logrus.Errorf("trying to call a cancel function from a nil error; cancel not run") // FIXME: return error
 		return
 	}
 	if *errorPtr != nil && !keepOnFailure {
@@ -1623,16 +1646,6 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 		}
 	}
 	return nil
-}
-
-func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
-	template, xerr := instance.Service().FindTemplateBySizing(hostDef)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	return template.ID, nil
 }
 
 func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
@@ -2097,7 +2110,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
 		}
 
-		// execute userdata.PHASE5_FINAL script to final install/configure of the Host (no need to reboot)
+		// execute userdata.PHASE5_FINAL script to finalize install/configure of the Host (no need to reboot)
 		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -2202,7 +2215,12 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			return nil, nil, xerr
 		}
 	}
-	defer networkInstance.Released()
+	defer func() {
+		issue := networkInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	// Check if Subnet exists
 	var (
@@ -2289,7 +2307,10 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			return nil, nil, xerr
 		}
 	} else {
-		subnetInstance.Released()
+		issue := subnetInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return nil, nil, fail.DuplicateError("there is already a Subnet named '%s'", singleHostRequest.ResourceName)
 	}
 
@@ -2439,7 +2460,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 							debug.IgnoreError(inErr)
 							continue
 						}
-						instance.Released()
+						issue := instance.Released()
+						if issue != nil {
+							logrus.Warn(issue)
+						}
 						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 					}
 				}
@@ -2520,7 +2544,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 				//goland:noinspection ALL
 				defer func(item resources.Share) {
-					item.Released()
+					issue := item.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(shareInstance)
 
 				// Retrieve data about the server serving the Share
@@ -2562,7 +2589,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 			//goland:noinspection ALL
 			defer func(item resources.Share) {
-				item.Released()
+				issue := item.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(shareInstance)
 
 			loopErr = shareInstance.Unmount(ctx, instance)
@@ -2618,7 +2648,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 						}
 						//goland:noinspection ALL
 						defer func(item resources.Subnet) {
-							item.Released()
+							issue := item.Released()
+							if issue != nil {
+								logrus.Warn(issue)
+							}
 						}(subnetInstance)
 
 						loopErr = subnetInstance.DetachHost(ctx, hostID)
@@ -2663,7 +2696,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 				//goland:noinspection ALL
 				defer func(sgInstance resources.SecurityGroup) {
-					sgInstance.Released()
+					issue := sgInstance.Released()
+					if issue != nil {
+						logrus.Warn(issue)
+					}
 				}(sgInstance)
 
 				derr = sgInstance.UnbindFromHost(ctx, instance)
@@ -3014,14 +3050,22 @@ func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, ferr
 					}
 
 					if item, ok := sharesV1.ByID[shareRef]; ok {
-						hostShare, ok = item.Clone().(*propertiesv1.HostShare)
+						cloned, cerr := item.Clone()
+						if cerr != nil {
+							return fail.Wrap(cerr)
+						}
+						hostShare, ok = cloned.(*propertiesv1.HostShare)
 						if !ok {
 							return fail.InconsistentError("item should be a *propertiesv1.HostShare")
 						}
 						return nil
 					}
 					if item, ok := sharesV1.ByName[shareRef]; ok {
-						hostShare, ok = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
+						cloned, cerr := sharesV1.ByID[item].Clone()
+						if cerr != nil {
+							return fail.Wrap(cerr)
+						}
+						hostShare, ok = cloned.(*propertiesv1.HostShare)
 						if !ok {
 							return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
 						}

@@ -91,24 +91,26 @@ func (si *ShareIdentity) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (si ShareIdentity) Clone() data.Clonable {
+func (si ShareIdentity) Clone() (data.Clonable, error) {
 	newShareItem := si
-	return &newShareItem
+	return &newShareItem, nil
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 // may panic
-func (si *ShareIdentity) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (si *ShareIdentity) Replace(p data.Clonable) (data.Clonable, error) {
 	if si == nil || p == nil {
-		return si
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ShareIdentity) // nolint
+	src, ok := p.(*ShareIdentity)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ShareIdentity")
+	}
+
 	*si = *src
-	return si
+	return si, nil
 }
 
 // Share contains information to maintain in Object Storage a list of shared folders
@@ -118,21 +120,16 @@ type Share struct {
 	lock sync.RWMutex
 }
 
-// ShareNullValue returns a *Share representing a null value
-func ShareNullValue() *Share {
-	return &Share{MetadataCore: NullCore()}
-}
-
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {
-		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return ShareNullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &Share{
@@ -150,10 +147,10 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
-		return ShareNullValue(), fail.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	timings, xerr := svc.Timings()
@@ -178,18 +175,18 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return ShareNullValue(), fail.NotFoundError("failed to find a Share '%s'", ref)
+			return nil, fail.NotFoundError("failed to find a Share '%s'", ref)
 		default:
-			return ShareNullValue(), xerr
+			return nil, xerr
 		}
 	}
 
 	var ok bool
 	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
-		return ShareNullValue(), fail.InconsistentError("cache content should be a resources.Share", ref)
+		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
 	if rs == nil {
-		return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
+		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
 	_ = cacheEntry.LockContent()
@@ -238,7 +235,9 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -362,12 +361,10 @@ func (instance *Share) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		newShareName := instance.GetName()
-		if newShareName != "" {
-			return fail.NotAvailableError("already carrying Share '%s'", newShareName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -771,7 +768,11 @@ func (instance *Share) Mount(
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			cloned, cerr := hostSharesV1.ByID[shareID].Clone()
+			if cerr != nil {
+				return fail.Wrap(cerr)
+			}
+			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}
@@ -971,7 +972,17 @@ func (instance *Share) Mount(
 		return nil, xerr
 	}
 
-	return mount.Clone().(*propertiesv1.HostRemoteMount), nil
+	cloned, cerr := mount.Clone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
+	casted, ok := cloned.(*propertiesv1.HostRemoteMount)
+	if !ok {
+		return nil, fail.InconsistentError("cloned is not a *propertiesv1.HostRemoteMount")
+	}
+
+	return casted, nil
 }
 
 // Unmount unmounts a Share from local directory of a host
@@ -1193,7 +1204,12 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, objserver.GetName())
 			}
 
-			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			cloned, cerr := hostSharesV1.ByID[shareID].Clone()
+			if cerr != nil {
+				return fail.Wrap(cerr)
+			}
+
+			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}
@@ -1301,7 +1317,10 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, ferr fail.Error
 		}
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(h)
 
 		mounts, xerr := h.GetMounts()

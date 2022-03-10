@@ -52,12 +52,11 @@ func TestHostLocalMount_Replace(t *testing.T) {
 		FileSystem: "",
 		Options:    "",
 	}
-	result := mnt.Replace(mnt2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace nil pointer")
-		t.Fail()
-
+	result, err := mnt.Replace(mnt2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 
@@ -89,7 +88,13 @@ func TestHostRemoteMount_Clone(t *testing.T) {
 		FileSystem: "HostRemoteMount FileSystem",
 		Options:    "HostRemoteMount Options",
 	}
-	clonedHrm, ok := hrm.Clone().(*HostRemoteMount)
+
+	cloned, err := hrm.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHrm, ok := cloned.(*HostRemoteMount)
 	if !ok {
 		t.Fail()
 	}
@@ -116,12 +121,11 @@ func TestHostRemoteMount_Replace(t *testing.T) {
 		FileSystem: "HostRemoteMount FileSystem",
 		Options:    "HostRemoteMount Options",
 	}
-	result := hrm.Replace(hrm2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace nil pointer")
-		t.Fail()
-
+	result, err := hrm.Replace(hrm2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 	hrm = &HostRemoteMount{
 		ShareID:    "HostRemoteMount ShareID2",
 		Export:     "HostRemoteMount Export2",
@@ -130,7 +134,7 @@ func TestHostRemoteMount_Replace(t *testing.T) {
 		Options:    "HostRemoteMount Options2",
 	}
 
-	result = hrm.Replace(hrm2)
+	result, _ = hrm.Replace(hrm2)
 	areEqual := reflect.DeepEqual(result, hrm2)
 	if !areEqual {
 		t.Error("Replace does not retitute values")
@@ -166,7 +170,12 @@ func TestHostMounts_Clone(t *testing.T) {
 	mounts.LocalMountsByPath["/share/my-data"].Device = "/dev/sdc"
 	mounts.LocalMountsByPath["/share/my-data"].FileSystem = "ext4"
 
-	clonedMounts, ok := mounts.Clone().(*HostMounts)
+	cloned, err := mounts.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedMounts, ok := cloned.(*HostMounts)
 	if !ok {
 		t.Fail()
 	}
@@ -187,7 +196,7 @@ func TestHostMounts_Replace(t *testing.T) {
 
 	var mnt *HostMounts = nil
 	mnt2 := NewHostMounts()
-	result := mnt.Replace(mnt2)
+	result, _ := mnt.Replace(mnt2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Can't replace nil pointer")
 		t.Fail()
@@ -224,7 +233,7 @@ func TestHostMounts_Replace(t *testing.T) {
 			"Bucket3": "Mount3",
 		},
 	}
-	result = mnt2.Replace(mnt)
+	result, _ = mnt2.Replace(mnt)
 
 	areEqual := reflect.DeepEqual(result, mnt)
 	if !areEqual {

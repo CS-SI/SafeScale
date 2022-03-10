@@ -84,16 +84,13 @@ func (instance *MetadataFolder) IsNull() bool {
 
 // Service returns the service used by the MetadataFolder
 func (instance MetadataFolder) Service() iaas.Service {
-	if valid.IsNil(instance) {
-		return iaas.NullService()
-	}
 	return instance.service
 }
 
 // GetBucket returns the bucket used by the MetadataFolder to store Object Storage
 func (instance MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
-		return abstract.ObjectStorageBucket{}, nil
+		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 
 	bucket, xerr := instance.service.GetMetadataBucket()
@@ -115,9 +112,6 @@ func (instance MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.E
 
 // Path returns the base path of the MetadataFolder
 func (instance MetadataFolder) Path() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
 	return instance.path
 }
 

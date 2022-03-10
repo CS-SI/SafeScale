@@ -17,12 +17,14 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterState contains the bare minimum information about the state of a cluster
@@ -44,20 +46,24 @@ func (s *ClusterState) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s ClusterState) Clone() data.Clonable {
+func (s ClusterState) Clone() (data.Clonable, error) {
 	return newClusterState().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (s *ClusterState) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (s *ClusterState) Replace(p data.Clonable) (data.Clonable, error) {
 	if s == nil || p == nil {
-		return s
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*s = *p.(*ClusterState)
-	return s
+	casted, ok := p.(*ClusterState)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterState")
+	}
+
+	*s = *casted
+	return s, nil
 }
 
 func init() {

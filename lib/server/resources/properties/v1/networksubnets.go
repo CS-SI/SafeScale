@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkSubnets contains additional information describing the subnets in a network, in V1
@@ -46,19 +49,21 @@ func (nd *NetworkSubnets) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (nd NetworkSubnets) Clone() data.Clonable {
+func (nd NetworkSubnets) Clone() (data.Clonable, error) {
 	return NewNetworkSubnets().Replace(&nd)
 }
 
 // Replace ... (data.Clonable interface)
-func (nd *NetworkSubnets) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (nd *NetworkSubnets) Replace(p data.Clonable) (data.Clonable, error) {
 	if nd == nil || p == nil {
-		return nd
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*NetworkSubnets) // nolint
+	src, ok := p.(*NetworkSubnets)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *NetworkSubnets")
+	}
+
 	nd.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		nd.ByID[k] = v
@@ -67,7 +72,7 @@ func (nd *NetworkSubnets) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByName {
 		nd.ByName[k] = v
 	}
-	return nd
+	return nd, nil
 }
 
 func init() {

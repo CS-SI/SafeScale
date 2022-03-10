@@ -204,8 +204,6 @@ func TestErrorCore_CauseFormatter(t *testing.T) {
 	}
 	_ = err.setCauseFormatter(nil)
 
-	// @TODO: Makes infiniteloop not possible here
-
 	err = &errorCore{
 		message:             "houston, we have a problem",
 		cause:               errors.New("math: can't divide by zero"),
@@ -217,9 +215,9 @@ func TestErrorCore_CauseFormatter(t *testing.T) {
 		lock:                &sync.RWMutex{},
 	}
 	_ = err.setCauseFormatter(func(e Error) string {
-		return fmt.Sprintf("MyWonderCause: %s", e.Error()) // <- makes infinite loop when parent call .Error(), quite fun -__-
+		return fmt.Sprintf("MyWonderCause: %s", e.Error())
 	})
-	_ = err.Error() // BOOM
+	_ = err.Error()
 
 	err = &errorCore{
 		message:             "houston, we have a problem",

@@ -35,6 +35,14 @@ func Test_AnonymousMapToStringMap(t *testing.T) {
 
 }
 
+/*
+func Test_MapIsCloneable(t *testing.T) {
+	var aclo Clonable
+	aclo = NewMap()
+	_ = aclo
+}
+*/
+
 func Test_NewMap(t *testing.T) {
 
 	m := NewMap()
@@ -49,7 +57,10 @@ func TestMap_Clone(t *testing.T) {
 		"1": "second",
 		"2": "third",
 	}
-	c := m.Clone()
+	c, err := m.FakeClone()
+	if err != nil {
+		t.Error(err)
+	}
 	areEqual := reflect.DeepEqual(m, c)
 	if !areEqual {
 		t.Error("Clone not restitute values")
@@ -77,7 +88,7 @@ func TestMap_Replace(t *testing.T) {
 		"1": "second",
 		"2": "third",
 	}
-	m.Replace(m1)
+	m.Replace(&m1)
 	areEqual := reflect.DeepEqual(m, m1)
 	if !areEqual {
 		t.Error("Replace not restitute values")

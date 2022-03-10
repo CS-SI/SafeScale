@@ -35,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/sirupsen/logrus"
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
@@ -468,7 +469,10 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(node)
 
 		_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
