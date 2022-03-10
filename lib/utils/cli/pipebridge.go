@@ -66,7 +66,10 @@ func NewStdoutBridge(pipe io.ReadCloser) (*StdoutBridge, fail.Error) {
 
 // Print outputs the string to stdout
 func (outp *StdoutBridge) Print(data interface{}) {
-	_, _ = io.WriteString(os.Stdout, data.(string))
+	_, err := io.WriteString(os.Stdout, data.(string))
+	if err != nil {
+		debug.IgnoreError(err)
+	}
 }
 
 // StderrBridge is a OutputPipe outputting on stderr
@@ -89,7 +92,10 @@ func NewStderrBridge(pipe io.ReadCloser) (*StderrBridge, fail.Error) {
 
 // Print outputs the string to stderr
 func (errp *StderrBridge) Print(data interface{}) {
-	_, _ = io.WriteString(os.Stderr, data.(string))
+	_, err := io.WriteString(os.Stderr, data.(string))
+	if err != nil {
+		debug.IgnoreError(err)
+	}
 }
 
 // PipeBridgeController is the controller of the bridges of pipe
