@@ -145,7 +145,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		req.NodesDef.Image = req.OS
 	}
 
-	logrus.Warnf("This is the cluster creation request before determination: %s", spew.Sdump(req))
+	// logrus.Warnf("This is the cluster creation request before determination: %s", spew.Sdump(req))
 
 	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(req)
 	xerr = debug.InjectPlannedFail(xerr)
