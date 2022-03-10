@@ -18,6 +18,7 @@ package abstract
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
@@ -58,7 +59,7 @@ func (instance ObjectStorageBucket) OK() bool {
 // Clone does a deep-copy of the Host
 //
 // satisfies interface data.Clonable
-func (instance ObjectStorageBucket) Clone() data.Clonable {
+func (instance ObjectStorageBucket) Clone() (data.Clonable, error) {
 	newB := NewObjectStorageBucket()
 	return newB.Replace(&instance)
 }
@@ -66,13 +67,18 @@ func (instance ObjectStorageBucket) Clone() data.Clonable {
 // Replace ...
 //
 // satisfies interface data.Clonable
-func (instance *ObjectStorageBucket) Replace(p data.Clonable) data.Clonable {
+func (instance *ObjectStorageBucket) Replace(p data.Clonable) (data.Clonable, error) {
 	if instance == nil || p == nil {
-		return instance
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*instance = *p.(*ObjectStorageBucket)
-	return instance
+	casted, ok := p.(*ObjectStorageBucket)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ObjectStorageBucket")
+	}
+
+	*instance = *casted
+	return instance, nil
 }
 
 // Serialize serializes Host 'instance' into bytes (output json code)

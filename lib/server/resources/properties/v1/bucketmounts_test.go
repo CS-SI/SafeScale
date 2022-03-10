@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -58,12 +57,10 @@ func TestBucketMounts_Replace(t *testing.T) {
 
 	var bm *BucketMounts = nil
 	bm2 := NewBucketMounts()
-	result := bm.Replace(bm2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	_, err := bm.Replace(bm2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
-
 }
 
 func TestBucketMounts_Clone(t *testing.T) {
@@ -71,7 +68,12 @@ func TestBucketMounts_Clone(t *testing.T) {
 	mounts.ByHostID["i18930"] = "/buckets/my-bucket"
 	mounts.ByHostName["my-server"] = "/buckets/my-bucket"
 
-	clonedMounts, ok := mounts.Clone().(*BucketMounts)
+	cloned, err := mounts.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedMounts, ok := cloned.(*BucketMounts)
 	if !ok {
 		t.Fail()
 	}

@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -54,11 +53,11 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 	cif2 := &ClusterInstalledFeature{
 		Name: "Feature Name",
 	}
-	result := cif.Replace(cif2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := cif.Replace(cif2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 	cif = &ClusterInstalledFeature{
 		Name: "Feature Name 2",
 		RequiredBy: map[string]struct{}{
@@ -66,7 +65,7 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature2": {},
 		},
 	}
-	result = cif2.Replace(cif)
+	result, _ = cif2.Replace(cif)
 	areEqual := reflect.DeepEqual(cif.RequiredBy, result.(*ClusterInstalledFeature).RequiredBy)
 	if !areEqual {
 		t.Error("Replace does not restitute RequiredBy values")
@@ -79,7 +78,7 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature4": {},
 		},
 	}
-	result = cif2.Replace(cif)
+	result, _ = cif2.Replace(cif)
 	areEqual = reflect.DeepEqual(cif.Requires, result.(*ClusterInstalledFeature).Requires)
 	if !areEqual {
 		t.Error("Replace does not restitute Requires values")
@@ -92,7 +91,12 @@ func TestClusterInstalledFeature_Clone(t *testing.T) {
 	ct := NewClusterInstalledFeature()
 	ct.Requires["something"] = struct{}{}
 
-	clonedCt, ok := ct.Clone().(*ClusterInstalledFeature)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterInstalledFeature)
 	if !ok {
 		t.Fail()
 	}
@@ -145,11 +149,11 @@ func TestClusterFeatures_Replace(t *testing.T) {
 	var cif *ClusterFeatures = nil
 	cif2 := newClusterFeatures()
 
-	result := cif.Replace(cif2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := cif.Replace(cif2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 
@@ -159,7 +163,12 @@ func TestClusterFeatures_Clone(t *testing.T) {
 	ct.Installed["fair"].Requires["something"] = struct{}{}
 	ct.Disabled["kind"] = struct{}{}
 
-	clonedCt, ok := ct.Clone().(*ClusterFeatures)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterFeatures)
 	if !ok {
 		t.Fail()
 	}

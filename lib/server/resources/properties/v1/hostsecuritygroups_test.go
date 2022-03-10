@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -65,7 +64,12 @@ func TestHostSecurityGroups_Clone(t *testing.T) {
 		},
 	}
 
-	clonedHsg, ok := hsg.Clone().(*HostSecurityGroups)
+	cloned, err := hsg.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedHsg, ok := cloned.(*HostSecurityGroups)
 	if !ok {
 		t.Fail()
 	}
@@ -86,10 +90,10 @@ func TestHostSecurityGroups_Replace(t *testing.T) {
 
 	var hsg *HostSecurityGroups = nil
 	hsg2 := NewHostSecurityGroups()
-	result := hsg.Replace(hsg2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace nil pointer")
-		t.Fail()
+	result, err := hsg.Replace(hsg2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }

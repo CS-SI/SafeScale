@@ -17,9 +17,12 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
@@ -96,25 +99,27 @@ func (hs *HostSizing) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (hs HostSizing) Clone() data.Clonable {
+func (hs HostSizing) Clone() (data.Clonable, error) {
 	return NewHostSizing().Replace(&hs)
 }
 
 // Replace ...
-func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hs *HostSizing) Replace(p data.Clonable) (data.Clonable, error) {
 	if hs == nil || p == nil {
-		return hs
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostSizing) // nolint
+	src, ok := p.(*HostSizing)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostSizing")
+	}
+
 	hs.RequestedSize = NewHostSizingRequirements()
 	*hs.RequestedSize = *src.RequestedSize
 	hs.AllocatedSize = NewHostEffectiveSizing()
 	*hs.AllocatedSize = *src.AllocatedSize
 	hs.Template = src.Template
-	return hs
+	return hs, nil
 }
 
 func init() {

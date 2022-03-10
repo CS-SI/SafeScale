@@ -94,8 +94,10 @@ func (instance *Subnet) taskCreateGateway(
 		}
 
 		// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
-		if id := rgw.GetID(); id != "" {
-			as.GatewayIDs = append(as.GatewayIDs, id)
+		if rgw.IsTaken() {
+			if id := rgw.GetID(); id != "" {
+				as.GatewayIDs = append(as.GatewayIDs, id)
+			}
 		}
 		return nil
 	})

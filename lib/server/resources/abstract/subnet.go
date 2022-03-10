@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -83,20 +84,24 @@ func (s *Subnet) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s Subnet) Clone() data.Clonable {
+func (s Subnet) Clone() (data.Clonable, error) {
 	return NewSubnet().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (s *Subnet) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (s *Subnet) Replace(p data.Clonable) (data.Clonable, error) {
 	if s == nil || p == nil {
-		return s
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*s = *p.(*Subnet)
-	return s
+	casted, ok := p.(*Subnet)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Subnet")
+	}
+
+	*s = *casted
+	return s, nil
 }
 
 // OK ...
@@ -192,24 +197,30 @@ func (vip *VirtualIP) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (vip VirtualIP) Clone() data.Clonable {
+func (vip VirtualIP) Clone() (data.Clonable, error) {
 	return NewVirtualIP().Replace(&vip)
 }
 
 // Replace ...
 // satisfies interface data.Clonable interface
-func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (vip *VirtualIP) Replace(p data.Clonable) (data.Clonable, error) {
 	if vip == nil || p == nil {
-		return vip
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*VirtualIP) // nolint
+	src, ok := p.(*VirtualIP)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *VirtualIP")
+	}
+
 	*vip = *src
 	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))
 	for _, v := range src.Hosts {
-		vip.Hosts = append(vip.Hosts, v.Clone().(*HostCore))
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		vip.Hosts = append(vip.Hosts, cloned.(*HostCore))
 	}
-	return vip
+	return vip, nil
 }

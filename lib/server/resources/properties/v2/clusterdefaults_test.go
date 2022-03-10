@@ -17,7 +17,6 @@
 package propertiesv2
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -47,11 +46,11 @@ func TestClusterDefault_IsNull(t *testing.T) {
 func TestClusterDefault_Replace(t *testing.T) {
 	var sgs *ClusterDefaults = nil
 	sgs2 := newClusterDefaults()
-	result := sgs.Replace(sgs2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("ClusterDefaults nil pointer can't be replace")
-		t.Fail()
+	result, err := sgs.Replace(sgs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 }
 
 func TestClusterDefault_Clone(t *testing.T) {
@@ -62,7 +61,12 @@ func TestClusterDefault_Clone(t *testing.T) {
 		MinGPU:   1,
 	}
 
-	clonedCt, ok := ct.Clone().(*ClusterDefaults)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterDefaults)
 	if !ok {
 		t.Fail()
 	}

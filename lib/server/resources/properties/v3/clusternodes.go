@@ -17,9 +17,12 @@
 package propertiesv3
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterNode describes a node in the cluster
@@ -75,20 +78,22 @@ func (n *ClusterNodes) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n ClusterNodes) Clone() data.Clonable {
+func (n ClusterNodes) Clone() (data.Clonable, error) {
 	return newClusterNodes().Replace(&n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (n *ClusterNodes) Replace(p data.Clonable) (data.Clonable, error) {
 	if n == nil || p == nil {
-		return n
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterNodes) // nolint
+	src, ok := p.(*ClusterNodes)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterNodes")
+	}
+
 	*n = *src
 
 	n.Masters = make([]uint, len(src.Masters))
@@ -123,7 +128,7 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 		n.ByNumericalID[k] = &node
 	}
 
-	return n
+	return n, nil
 }
 
 func init() {

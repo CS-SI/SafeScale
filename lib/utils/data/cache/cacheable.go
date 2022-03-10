@@ -23,9 +23,9 @@ import (
 //go:generate minimock -o ../mocks/mock_cacheable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/cache.Cacheable
 
 // Cacheable is the interface a struct must satisfy to be able to be cached
-type Cacheable interface {
-	observer.Observable
+type Cacheable interface { // FIXME: return error
+	observer.Observable // FIXME: also return error
 
-	Released()  // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
-	Destroyed() // Destroyed tells cache handler the instance has been deleted and MUST be removed from cache
+	Released() error  // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
+	Destroyed() error // Destroyed tells cache handler the instance has been deleted and MUST be removed from cache
 }

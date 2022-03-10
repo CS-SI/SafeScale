@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
@@ -90,7 +91,12 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		defer hostInstance.Released()
+		defer func() {
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		return empty, fail.NotImplementedError()
 	case protocol.FeatureTargetType_FT_CLUSTER:
@@ -99,7 +105,12 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		defer clusterInstance.Released()
+		defer func() {
+			issue := clusterInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		var list []resources.Feature
 		if in.GetInstalledOnly() {
@@ -175,7 +186,12 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 			return nil, xerr
 		}
 
-		defer hostInstance.Released()
+		defer func() {
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		return nil, fail.NotImplementedError()
 
@@ -185,7 +201,12 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 			return nil, xerr
 		}
 
-		defer clusterInstance.Released()
+		defer func() {
+			issue := clusterInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		return nil, fail.NotImplementedError()
 	}
@@ -256,7 +277,12 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 			return nil, xerr
 		}
 
-		defer hostInstance.Released()
+		defer func() {
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		return nil, fail.NotImplementedError()
 
@@ -266,7 +292,12 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 			return nil, xerr
 		}
 
-		defer clusterInstance.Released()
+		defer func() {
+			issue := clusterInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		return nil, fail.NotImplementedError()
 	}
@@ -335,7 +366,12 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 			return empty, xerr
 		}
 
-		defer hostInstance.Released()
+		defer func() {
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		results, xerr := feat.Check(job.Context(), hostInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -352,7 +388,12 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 			return empty, xerr
 		}
 
-		defer clusterInstance.Released()
+		defer func() {
+			issue := clusterInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		results, xerr := feat.Check(job.Context(), clusterInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -429,7 +470,12 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 			return empty, xerr
 		}
 
-		defer hostInstance.Released()
+		defer func() {
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		results, xerr := feat.Add(job.Context(), hostInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -446,7 +492,12 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 			return empty, xerr
 		}
 
-		defer clusterInstance.Released()
+		defer func() {
+			issue := clusterInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		results, xerr := feat.Add(job.Context(), clusterInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -508,7 +559,12 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 			return empty, xerr
 		}
 
-		defer hostInstance.Released()
+		defer func() {
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		results, xerr := feat.Remove(job.Context(), hostInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -525,7 +581,12 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 			return empty, xerr
 		}
 
-		defer clusterInstance.Released()
+		defer func() {
+			issue := clusterInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		results, xerr := feat.Remove(job.Context(), clusterInstance, featureVariables, featureSettings)
 		if xerr != nil {

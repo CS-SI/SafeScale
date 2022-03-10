@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -30,7 +29,12 @@ func TestClusterCompositeV1_Clone(t *testing.T) {
 	ct.Tenants = append(ct.Tenants, "google")
 	ct.Tenants = append(ct.Tenants, "amazon")
 
-	clonedCt, ok := ct.Clone().(*ClusterComposite)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterComposite)
 	if !ok {
 		t.Fail()
 	}
@@ -77,11 +81,11 @@ func TestClusterComposite_Replace(t *testing.T) {
 	bm2 := &ClusterComposite{
 		Tenants: []string{"MyWondertenant"},
 	}
-	result := bm.Replace(bm2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Nil pointer can't be replaced")
-		t.Fail()
+	result, err := bm.Replace(bm2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 
@@ -90,7 +94,12 @@ func TestClusterComposite_Clone(t *testing.T) {
 	ct.Tenants = append(ct.Tenants, "google")
 	ct.Tenants = append(ct.Tenants, "amazon")
 
-	clonedCt, ok := ct.Clone().(*ClusterComposite)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterComposite)
 	if !ok {
 		t.Fail()
 	}

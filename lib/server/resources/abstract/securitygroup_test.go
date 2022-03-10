@@ -124,13 +124,13 @@ func TestSecurityGroupRule_EqualTo(t *testing.T) {
 		t.Fail()
 	}
 	sgr2.IDs = []string{"c", "b", "a"}
-	sgr2.Sources = []string{"Source1", "Source2"} //"Source3"}
+	sgr2.Sources = []string{"Source1", "Source2"} // "Source3"}
 	if sgr.EqualTo(sgr2) {
 		t.Error("No, not equals")
 		t.Fail()
 	}
 	sgr2.Sources = []string{"Source1", "Source3", "Source2"}
-	sgr2.Targets = []string{"Target1", "Target2"} //"Target3"
+	sgr2.Targets = []string{"Target1", "Target2"} // "Target3"
 	if sgr.EqualTo(sgr2) {
 		t.Error("No, not equals")
 		t.Fail()
@@ -257,13 +257,15 @@ func TestSecurityGroupRule_TargetsConcernGroups(t *testing.T) {
 }
 
 func Test_concernsGroups(t *testing.T) {
-
-	//@TODO: No err, wtf ?!?
-	//cidrs := []string{"256.0.0.0/0"}
-	//result, err := concernsGroups(cidrs)
-
-	cidrs := []string{"127.0.0.0/8", "SecurityGroupName"}
+	cidrs := []string{"256.0.0.0/0"}
 	_, err := concernsGroups(cidrs)
+	if err == nil {
+		t.Error("Invalid CIDRs MUST also be considered as errors")
+		t.FailNow()
+	}
+
+	cidrs = []string{"127.0.0.0/8", "SecurityGroupName"}
+	_, err = concernsGroups(cidrs)
 	if err == nil {
 		t.Error("No, cannot mix CIDR and SG name")
 		t.Fail()
@@ -370,7 +372,7 @@ func TestSecurityGroupRule_Replace(t *testing.T) {
 		Sources:   []string{"Earth"},
 		Targets:   []string{"Hell"},
 	}
-	result := sgr1.Replace(sgr2)
+	result, _ := sgr1.Replace(sgr2)
 	if fmt.Sprintf("%p", result) != "0x0" {
 		t.Error("Can't Replace a nil SecurityGroupRule pointer")
 		t.Fail()
@@ -682,7 +684,11 @@ func TestSecurityGroup_SetNetworkID(t *testing.T) {
 func TestSecurityGroupRules_Clone(t *testing.T) {
 
 	var sgrs SecurityGroupRules = SecurityGroupRules{nil}
-	clone := sgrs.Clone()
+	clone, err := sgrs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
 	areEqual := reflect.DeepEqual(sgrs, clone)
 	if areEqual {
 		t.Error("Clone must not keep nil (wring values) in list")
@@ -723,7 +729,10 @@ func TestSecurityGroupRules_Clone(t *testing.T) {
 			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
 		},
 	}
-	clone = sgrs.Clone()
+	clone, err = sgrs.Clone()
+	if err != nil {
+		t.Error(err)
+	}
 	areEqual = reflect.DeepEqual(sgrs, clone)
 	fmt.Println(sgrs, clone, areEqual)
 	if !areEqual {
@@ -787,7 +796,12 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		},
 	}
 
-	sgc, ok := sg.Clone().(*SecurityGroup)
+	at, err := sg.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	sgc, ok := at.(*SecurityGroup)
 	if !ok {
 		t.Fail()
 	}
@@ -813,7 +827,12 @@ func TestSecurityGroup_Clone(t *testing.T) {
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
 
-	sgc, ok = sg.Clone().(*SecurityGroup)
+	at, err = sg.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	sgc, ok = at.(*SecurityGroup)
 	if !ok {
 		t.Fail()
 	}
@@ -885,14 +904,14 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
 
 	var sgc *SecurityGroup = nil
-	sgcr := sgc.Replace(sg)
+	sgcr, _ := sgc.Replace(sg)
 	if fmt.Sprintf("%p", sgcr) != "0x0" {
 		t.Error("Can't replace a nil pointer")
 		t.Fail()
 	}
 
 	sgc = NewSecurityGroup()
-	sgcr = sgc.Replace(sg)
+	sgcr, _ = sgc.Replace(sg)
 
 	assert.Equal(t, sgc, sgcr)
 	var clob data.Clonable

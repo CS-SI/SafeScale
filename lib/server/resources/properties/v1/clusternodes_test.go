@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -46,11 +45,12 @@ func TestClusterNodes_Replace(t *testing.T) {
 		PrivateLastIndex: 0,
 		PublicLastIndex:  0,
 	}
-	result := cn.Replace(cn2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace ClusterNodes nil pointer")
-		t.Fail()
+	result, err := cn.Replace(cn2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
+
 	cn = &ClusterNodes{}
 	cn2 = &ClusterNodes{
 		Masters: []*ClusterNode{
@@ -101,7 +101,7 @@ func TestClusterNodes_Replace(t *testing.T) {
 	}
 
 	// Check for clusternode pointer transfert
-	result = cn.Replace(cn2)
+	result, _ = cn.Replace(cn2)
 	rcn := result.(*ClusterNodes)
 	areEqual := reflect.DeepEqual(cn2.Masters, rcn.Masters)
 	if !areEqual {
@@ -132,7 +132,12 @@ func TestClusterNodes_Clone(t *testing.T) {
 	ct := newClusterNodes()
 	ct.PrivateNodes = append(ct.PrivateNodes, node)
 
-	clonedCt, ok := ct.Clone().(*ClusterNodes)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterNodes)
 	if !ok {
 		t.Fail()
 	}

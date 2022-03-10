@@ -277,20 +277,23 @@ func (hc *HostCore) OK() bool {
 
 // Clone does a deep-copy of the Host
 // satisfies interface data.Clonable
-func (hc HostCore) Clone() data.Clonable {
+func (hc HostCore) Clone() (data.Clonable, error) {
 	return NewHostCore().Replace(&hc)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hc *HostCore) Replace(p data.Clonable) (data.Clonable, error) {
 	if hc == nil || p == nil {
-		return hc
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*hc = *p.(*HostCore)
-	return hc
+	cloned, ok := p.(*HostCore)
+	if !ok || cloned == nil {
+		return nil, fmt.Errorf("p is not a *HostCore")
+	}
+	*hc = *cloned
+	return hc, nil
 }
 
 // Serialize serializes Host instance into bytes (output json code)

@@ -30,12 +30,12 @@ type SomeData struct {
 }
 
 func (sd *SomeData) IsNull() bool {
-	return sd == nil || sd.Name == ""
+	return sd == nil
 }
 
 func TestIsNull(t *testing.T) {
 	v := &SomeData{}
-	require.True(t, v.IsNull())
+	require.False(t, v.IsNull())
 
 	v.Name = "data"
 	require.False(t, v.IsNull())

@@ -17,7 +17,6 @@
 package abstract
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -60,11 +59,11 @@ func TestObjectStorageBucket_Replace(t *testing.T) {
 
 	var o1 *ObjectStorageBucket = nil
 	var o2 *ObjectStorageBucket = nil
-	result := o1.Replace(o2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace nil ObjectStorageBucket")
-		t.Fail()
+	result, err := o1.Replace(o2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
 	}
+	require.Nil(t, result)
 
 }
 
@@ -72,7 +71,12 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 	b := NewObjectStorageBucket()
 	b.Name = "host"
 
-	bc, ok := b.Clone().(*ObjectStorageBucket)
+	at, err := b.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	bc, ok := at.(*ObjectStorageBucket)
 	if !ok {
 		t.Fail()
 	}

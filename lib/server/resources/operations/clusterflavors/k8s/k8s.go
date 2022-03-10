@@ -141,7 +141,12 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 			return xerr
 		}
 
-		defer selectedMaster.Released()
+		defer func() {
+			issue := selectedMaster.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 	}
 
 	// Drain pods from node
