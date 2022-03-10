@@ -1106,9 +1106,16 @@ func (instance *Host) Create(
 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			_, _ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
+			var err error
+			_, err = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			creator := ""
-			hostname, _ := os.Hostname()
+			hostname, err := os.Hostname()
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			if curUser, err := user.Current(); err != nil {
 				creator = "unknown@" + hostname
 			} else {

@@ -63,7 +63,7 @@ type blockDevice struct {
 	// BootIndex is the boot index. It defaults to 0.
 	BootIndex string `json:"boot_index,omitempty"`
 
-	// DeleteOnTermination specifies whether or not to delete the attached volume
+	// DeleteOnTermination specifies whether to delete the attached volume
 	// when the server is deleted. Defaults to `false`.
 	DeleteOnTermination bool `json:"delete_on_termination"`
 
@@ -98,8 +98,6 @@ func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, e
 	}
 
 	if len(opts.BlockDevice) == 0 {
-		err := gophercloud.ErrMissingInput{}
-		err.Argument = "bootfromvolume.CreateOptsExt.BlockDevice"
 		return nil, fail.InvalidInstanceContentError("opts.BlockDevice", "cannot be empty slice")
 	}
 
@@ -519,6 +517,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		diskSize = 10
 	}
 
+	logrus.Warnf("Trying to create a machine with disk size: %d Gb", diskSize)
+	if diskSize < 11 {
+		logrus.Warnf("It seems a fuckup: %s", spew.Sdump(rim))
+	}
+
 	// Select usable availability zone
 	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
@@ -769,6 +772,80 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	return true, nil
 }
 
+// FIXME: Remove this function later
+func extractImageTheLongWay(in *images.Image) (_ abstract.Image, ferr fail.Error) { // nolint
+	defer fail.OnPanic(&ferr)
+
+	properties := in.Properties
+	imagev, ok := properties["image"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'image' not found")
+	}
+	image, ok := imagev.(map[string]interface{})
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid cast")
+	}
+
+	dv, ok := image["minDisk"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'minDisk' not found")
+	}
+	d, ok := dv.(float64)
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid new format")
+	}
+
+	idv, ok := image["id"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'id' not found")
+	}
+
+	id, ok := idv.(string)
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid new format")
+	}
+
+	namev, ok := image["name"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'name' not found")
+	}
+
+	name, ok := namev.(string)
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid new format")
+	}
+
+	out := abstract.Image{
+		ID:       id,
+		Name:     name,
+		DiskSize: int64(d),
+	}
+
+	return out, nil
+}
+
+func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	// following code will eventually break or panic
+	// FIXME: Write function that can search external structs without panicking, like jq for json
+	// so we can write something like searchInStruct(in.Properties, ".Properties.image.minDisk")
+
+	properties := in.Properties
+	image := properties["image"].(map[string]interface{})
+	d := image["minDisk"].(float64)
+	id := image["id"].(string)
+	name := image["name"].(string)
+
+	out := abstract.Image{
+		ID:       id,
+		Name:     name,
+		DiskSize: int64(d),
+	}
+
+	return out, nil
+}
+
 // InspectImage returns the Image referenced by id
 func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	nullAI := abstract.Image{}
@@ -784,9 +861,13 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 
 	var img *images.Image
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			img, innerErr = images.Get(s.ComputeClient, id).Extract()
-			return innerErr
+		func() error {
+			aimg, innerErr := images.Get(s.ComputeClient, id).Extract()
+			if innerErr != nil {
+				return innerErr
+			}
+			img = aimg
+			return nil
 		},
 		NormalizeError,
 	)
@@ -794,11 +875,27 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 		return nullAI, xerr
 	}
 
-	out := abstract.Image{
-		ID:       img.ID,
-		Name:     img.Name,
-		DiskSize: int64(img.MinDiskGigabytes),
+	if img == nil {
+		return nullAI, fail.UnknownError("get image information didn't fail, but it was nil")
 	}
+
+	if img.ID == id {
+		out := abstract.Image{
+			ID:       img.ID,
+			Name:     img.Name,
+			DiskSize: int64(img.MinDiskGigabytes),
+		}
+		return out, nil
+	}
+
+	// if we are here this means that image description is not truly compatible with openstack
+	out, err := extractImage(img)
+	if err != nil {
+		// probably image internals has changed, dump image description
+		logrus.Warnf("this image description is invalid: %s", spew.Sdump(img))
+		return nullAI, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
+	}
+
 	return out, nil
 }
 
