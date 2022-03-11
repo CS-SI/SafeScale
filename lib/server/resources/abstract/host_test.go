@@ -17,7 +17,6 @@
 package abstract
 
 import (
-	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -85,39 +84,16 @@ func TestKeyPair_NewKeyPair(t *testing.T) {
 }
 
 func Test_almostEqual(t *testing.T) {
+	var a float32 = 0.1
+	var b float32 = 0.2
+	var c float32 = 0.3
 
-	var pow float32 = float32(rand.Intn(65535))
-	var min float32 = 0.0
-	var max float32 = float32(pow)
-	var mid float32 = 0.0
-	var limit int16 = 64 // Can't be > 2 ^ 32
+	var d float32 = 0.1
+	var e float32 = 0.2
+	var f float32 = 0.3
 
-	for {
-
-		// Dichotomic sqrt
-		mid = (min + max) / 2
-		if mid*mid >= pow {
-			max = mid
-		} else {
-			min = mid
-		}
-
-		if almostEqual(mid*mid, pow) {
-			break
-		}
-
-		// Process deep limit
-		limit--
-		if limit <= 0 {
-			break
-		}
-	}
-
-	if limit == 0 {
-		t.Error("almostEqual as unreachable limit (over 2^64)")
-		t.Fail()
-	}
-
+	require.True(t, almostEqual(c, a+b))
+	require.True(t, almostEqual(f, d+e))
 }
 
 func TestHostSizingRequirements_Equals(t *testing.T) {
