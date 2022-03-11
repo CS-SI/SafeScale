@@ -216,7 +216,6 @@ func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (cac
 		return nil, xerr
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement)
 	if xerr = clusterInstance.Read(name); xerr != nil {
 		return nil, xerr
 	}

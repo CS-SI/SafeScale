@@ -1268,9 +1268,6 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	// FIXME: OPP Time to mark this as Started in metadata
-	// If not, there should be a prior defer that marks this as a failure.
-
 	if !valid.IsNil(ahf) {
 		if !valid.IsNil(ahf.Core) {
 			derr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
