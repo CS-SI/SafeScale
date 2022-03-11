@@ -925,9 +925,7 @@ func (instance *Host) Create(
 			return nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")
 		}
 
-			hostDef.Template = tmpl.ID
-			templateQuery = tmpl.Name
-		}
+		hostDef.Template = tmpl.ID
 	}
 
 	hostReq.TemplateID = hostDef.Template
@@ -3705,6 +3703,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 	var (
 		ahc           *abstract.HostCore
 		hostSizingV1  *propertiesv1.HostSizing
+		hostSizingV2  *propertiesv1.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string
 	)

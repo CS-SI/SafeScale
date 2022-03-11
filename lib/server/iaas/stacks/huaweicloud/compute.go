@@ -772,7 +772,7 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	return true, nil
 }
 
-// FIXME: Remove this function later
+// FIXME: Remove this function later when searchInStruct is ready
 func extractImageTheLongWay(in *images.Image) (_ abstract.Image, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 
@@ -832,10 +832,10 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 	// so we can write something like searchInStruct(in.Properties, ".Properties.image.minDisk")
 
 	properties := in.Properties
-	image := properties["image"].(map[string]interface{})
-	d := image["minDisk"].(float64)
-	id := image["id"].(string)
-	name := image["name"].(string)
+	image := properties["image"].(map[string]interface{}) // nolint
+	d := image["minDisk"].(float64)                       // nolint
+	id := image["id"].(string)                            // nolint
+	name := image["name"].(string)                        // nolint
 
 	out := abstract.Image{
 		ID:       id,
