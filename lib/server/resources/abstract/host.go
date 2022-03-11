@@ -87,8 +87,8 @@ func almostEqual(a, b float32) bool {
 	return math.Abs(float64(a-b)) <= 1e-6
 }
 
-func almostEqual64(a, b float64) bool {
-	return math.Abs(float64(a-b)) <= 1e-6
+func almostEqual64(a, b float64) bool { // nolint
+	return math.Abs(a-b) <= 1e-6
 }
 
 func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {

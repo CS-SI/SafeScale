@@ -3793,7 +3793,6 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 	var (
 		ahc           *abstract.HostCore
 		hostSizingV1  *propertiesv1.HostSizing
-		hostSizingV2  *propertiesv1.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string
 	)
@@ -3846,7 +3845,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 		StateLabel:          ahc.LastState.String(),
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
-		Template:            hostSizingV2.Template,
+		Template:            hostSizingV1.Template,
 	}
 	return ph, nil
 }
