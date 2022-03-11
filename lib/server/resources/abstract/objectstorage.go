@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,12 @@ package abstract
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)
@@ -38,49 +40,54 @@ func NewObjectStorageBucket() *ObjectStorageBucket {
 }
 
 // IsConsistent tells if host struct is consistent
-func (osb ObjectStorageBucket) IsConsistent() bool {
+func (instance ObjectStorageBucket) IsConsistent() bool {
 	result := true
-	result = result && osb.ID != ""
-	result = result && osb.Name != ""
+	result = result && instance.ID != ""
+	result = result && instance.Name != ""
 	return result
 }
 
-func (osb *ObjectStorageBucket) IsNull() bool {
-	return osb == nil || osb.Name == ""
+func (instance *ObjectStorageBucket) IsNull() bool {
+	return instance == nil || instance.Name == ""
 }
 
 // OK ...
-func (osb ObjectStorageBucket) OK() bool {
-	return osb.IsConsistent()
+func (instance ObjectStorageBucket) OK() bool {
+	return instance.IsConsistent()
 }
 
 // Clone does a deep-copy of the Host
 //
 // satisfies interface data.Clonable
-func (osb ObjectStorageBucket) Clone() data.Clonable {
+func (instance ObjectStorageBucket) Clone() (data.Clonable, error) {
 	newB := NewObjectStorageBucket()
-	return newB.Replace(&osb)
+	return newB.Replace(&instance)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
-func (osb *ObjectStorageBucket) Replace(p data.Clonable) data.Clonable {
-	if osb == nil || p == nil {
-		return osb
-	}
-
-	*osb = *p.(*ObjectStorageBucket)
-	return osb
-}
-
-// Serialize serializes Host instance into bytes (output json code)
-func (osb *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
-	if osb.IsNull() {
+func (instance *ObjectStorageBucket) Replace(p data.Clonable) (data.Clonable, error) {
+	if instance == nil || p == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	r, jserr := json.Marshal(osb)
+	casted, ok := p.(*ObjectStorageBucket)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ObjectStorageBucket")
+	}
+
+	*instance = *casted
+	return instance, nil
+}
+
+// Serialize serializes Host 'instance' into bytes (output json code)
+func (instance *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	r, jserr := json.Marshal(instance)
 	if jserr != nil {
 		return nil, fail.NewError(jserr.Error())
 	}
@@ -88,9 +95,9 @@ func (osb *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and instantiates an ObjectStorageItem
-func (osb *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
-	// Note: Do not validate with .IsNull(), osb may be a null value of ObjectStorageBucket when deserializing
-	if osb == nil {
+func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
+	// Note: Do not validate with .IsNull(), instance may be a null value of ObjectStorageBucket when deserializing
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
@@ -102,7 +109,7 @@ func (osb *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
 
-	if jserr := json.Unmarshal(buf, osb); jserr != nil {
+	if jserr := json.Unmarshal(buf, instance); jserr != nil {
 		switch jserr.(type) {
 		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
@@ -115,20 +122,20 @@ func (osb *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 
 // GetName name returns the name of the host
 // Satisfies interface data.Identifiable
-func (osb ObjectStorageBucket) GetName() string {
-	if osb.IsNull() {
+func (instance ObjectStorageBucket) GetName() string {
+	if valid.IsNil(instance) {
 		return ""
 	}
-	return osb.Name
+	return instance.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (osb ObjectStorageBucket) GetID() string {
-	if osb.IsNull() {
+func (instance ObjectStorageBucket) GetID() string {
+	if valid.IsNil(instance) {
 		return ""
 	}
-	return osb.ID
+	return instance.ID
 }
 
 // ObjectStorageItemMetadata ...

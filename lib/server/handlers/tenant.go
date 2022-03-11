@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,8 @@ import (
 	"sync"
 	"time"
 
-	scribble "github.com/nanobox-io/golang-scribble"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -421,11 +422,16 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		localTarget := targetTemplate
 
 		fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + tenantName + "#" + localTarget.Name + ".json")
-		if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
-			break
+		if _, err := os.Stat(fileCandidate); err != nil {
+			if !os.IsNotExist(err) {
+				break
+			}
 		}
 
 		go func(innerTemplate abstract.HostTemplate) {
+			var crash error
+			defer fail.OnPanic(&crash)
+
 			logrus.Infof("Started scan for template %q", innerTemplate.Name)
 			lerr := handler.analyzeTemplate(innerTemplate)
 			if lerr != nil {
@@ -507,7 +513,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 5*temporal.GetContextTimeout())
+	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}
@@ -540,7 +546,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	return nil
 }
 
-func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	var resultList []*protocol.ScanResult
@@ -570,7 +576,7 @@ func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.
 	return &protocol.ScanResultList{Results: resultList}, xerr
 }
 
-func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Error) {
+func (handler *tenantHandler) checkScannable() (isScannable bool, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	params, xerr := svc.GetTenantParameters()
@@ -588,7 +594,7 @@ func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Erro
 	return isScannable, xerr
 }
 
-func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
+func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
 	err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
 		return fail.ConvertError(err)
@@ -625,7 +631,7 @@ func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 	return nil
 }
 
-func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
+func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ConvertError(err)
 	}
@@ -662,12 +668,14 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 	return nil
 }
 
-func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
+func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
 	task := handler.job.Task()
 	svc := handler.job.Service()
+
+	var xerr fail.Error
 	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 
@@ -687,12 +695,14 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 	return network, xerr
 }
 
-func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
+func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, ferr fail.Error) {
 	task := handler.job.Task()
 	svc := handler.job.Service()
+
+	var xerr fail.Error
 	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 		subnet, xerr = subnetfactory.New(svc)
@@ -718,7 +728,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 	return subnet, xerr
 }
 
-func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
+func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {
 	str := strings.TrimSpace(output)
 
 	tokens := strings.Split(str, "î")
@@ -798,7 +808,7 @@ func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
 	return &info, nil
 }
 
-func (handler *tenantHandler) collect() (xerr fail.Error) {
+func (handler *tenantHandler) collect() (ferr fail.Error) {
 	svc := handler.job.Service()
 
 	authOpts, xerr := svc.GetAuthenticationOptions()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ImageHandler
+//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ImageHandler
 
 // TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -48,8 +48,8 @@ func NewImageHandler(job server.Job) ImageHandler {
 }
 
 // List returns the image list
-func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *imageHandler) List(all bool) (images []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -60,21 +60,21 @@ func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.
 
 	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	return handler.job.Service().ListImages(all)
 }
 
 // Select selects the image that best fits osname
-func (handler *imageHandler) Select(osname string) (image *abstract.Image, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *imageHandler) Select(osname string) (image *abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
-func (handler *imageHandler) Filter(osname string) (image []abstract.Image, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *imageHandler) Filter(osname string) (image []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented")
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,10 @@ func NewStdoutBridge(pipe io.ReadCloser) (*StdoutBridge, fail.Error) {
 
 // Print outputs the string to stdout
 func (outp *StdoutBridge) Print(data interface{}) {
-	_, _ = io.WriteString(os.Stdout, data.(string))
+	_, err := io.WriteString(os.Stdout, data.(string))
+	if err != nil {
+		debug.IgnoreError(err)
+	}
 }
 
 // StderrBridge is a OutputPipe outputting on stderr
@@ -89,7 +92,10 @@ func NewStderrBridge(pipe io.ReadCloser) (*StderrBridge, fail.Error) {
 
 // Print outputs the string to stderr
 func (errp *StderrBridge) Print(data interface{}) {
-	_, _ = io.WriteString(os.Stderr, data.(string))
+	_, err := io.WriteString(os.Stderr, data.(string))
+	if err != nil {
+		debug.IgnoreError(err)
+	}
 }
 
 // PipeBridgeController is the controller of the bridges of pipe
@@ -248,8 +254,8 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")

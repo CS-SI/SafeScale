@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -238,8 +238,8 @@ func (s stack) rpcDeleteServer(id string) fail.Error {
 }
 
 // rpcCreatePort creates a port
-func (s stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, xerr fail.Error) {
-	xerr = stacks.RetryableRemoteCall(
+func (s stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, ferr fail.Error) {
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
 			return innerErr
@@ -308,14 +308,14 @@ func (s stack) rpcUpdatePort(id string, options ports.UpdateOpts) fail.Error {
 }
 
 // rpcGetPort returns port information from its ID
-func (s stack) rpcGetPort(id string) (port *ports.Port, xerr fail.Error) {
+func (s stack) rpcGetPort(id string) (port *ports.Port, ferr fail.Error) {
 	nullPort := &ports.Port{}
 
 	if id == "" {
 		return nullPort, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
 			return innerErr

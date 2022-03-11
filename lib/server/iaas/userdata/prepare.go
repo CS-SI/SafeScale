@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -71,6 +72,7 @@ type Content struct {
 	GatewayHAKeepalivedPassword string                        // contains the password to use in keepalived configurations
 	ProviderName                string
 	BuildSubnetworks            bool
+	Debug                       bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -109,7 +111,10 @@ func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as
 }
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string) fail.Error {
+func (ud *Content) Prepare(
+	options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
+	timings temporal.Timings,
+) fail.Error {
 	if ud == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -145,7 +150,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		dnsList = []string{"1.1.1.1"}
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		return xerr
 	}
@@ -158,6 +163,10 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 			scriptHeader = "set -Eeuxo pipefail"
 			exitOnErrorHeader = "echo 'PROVISIONING_ERROR: 222'"
 		}
+	}
+
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag != "" {
+		ud.Debug = true
 	}
 
 	ud.BashLibraryDefinition = *bashLibraryDefinition

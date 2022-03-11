@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 // safescale ssh connect host2
@@ -43,7 +40,7 @@ type SSHListener struct {
 	protocol.UnimplementedSshServiceServer
 }
 
-// Run executes an ssh command an a host
+// Run executes an ssh command on a host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot run by ssh")
@@ -56,11 +53,6 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	hostRef := in.GetHost().GetName()
@@ -84,15 +76,25 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	timings, xerr := job.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	retcode, stdout, stderr, xerr := hostInstance.Run(
-		job.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
+		job.Context(), command, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -118,11 +120,6 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	var (
@@ -171,20 +168,30 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	timings, xerr := job.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	if pull {
 		retcode, stdout, stderr, xerr = hostInstance.Pull(
-			job.Context(), hostPath, localPath, temporal.GetLongOperationTimeout(),
+			job.Context(), hostPath, localPath, timings.HostLongOperationTimeout(),
 		)
 	} else {
 		retcode, stdout, stderr, xerr = hostInstance.Push(
-			job.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout(),
+			job.Context(), localPath, hostPath, in.Owner, in.Mode, timings.HostLongOperationTimeout(),
 		)
 	}
 	if xerr != nil {

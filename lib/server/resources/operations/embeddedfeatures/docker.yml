@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2022, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ feature:
         cluster: all
 
     parameters:
-        - DockerComposeVersion=1.27.4
+        - DockerComposeVersion=latest # docker-compose version to install
 
     install:
         bash:
@@ -183,9 +183,10 @@ feature:
                             op=-1
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
-                                VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
-                                [ $op -ne 0 ] && sfFail 206 "error getting last docker-compose version"
+                                VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq -r .name") && op=$? || true
+                                [ $op -ne 0 ] && sfFail 206 "error getting latest docker-compose version"
                             fi
+                            echo "docker-compose version=$VERSION"
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || sfFail 207 "error downloading last docker-compose ${VERSION}"
                             chmod +x docker-compose && mv docker-compose /usr/bin

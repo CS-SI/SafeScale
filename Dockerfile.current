@@ -1,4 +1,4 @@
-FROM ubuntu:bionic as builder
+FROM ubuntu:focal as builder
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -14,7 +14,7 @@ ENV PROTOVERSION 3.17.3
 # Install Standard packages
 # -----------------
 RUN apt-get update -y \
-&& apt-get install -y --allow-unauthenticated \
+&& apt-get install -y --allow-unauthenticated --no-install-recommends \
 locales \
 sudo \
 locate \
@@ -29,13 +29,12 @@ jq \
 iproute2 \
 iputils-ping \
 openssh-server \
-python3.6 \
-python3-pip --no-install-recommends \
+python3 \
+python3-pip \
 && apt-get autoclean -y \
 && apt-get autoremove -y \
 && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y locales
 # Set the locale
 RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen
 ENV LANG en_US.UTF-8
@@ -83,6 +82,7 @@ ENV BUILD_ENV docker
 
 RUN apk update && \
     apk add --no-cache \
+    nano \
     curl \
     wget \
     openssl \
@@ -97,3 +97,5 @@ RUN apk add --no-cache bash
 
 COPY --from=builder /exported/safescaled /exported/safescaled
 COPY --from=builder /exported/safescale /exported/safescale
+COPY --from=builder /exported/go.mod /exported/go.mod
+COPY --from=builder /exported/go.sum /exported/go.sum

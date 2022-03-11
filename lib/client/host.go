@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import (
 
 // host is the safescale client part handling hosts
 type host struct {
-	// session is not used currently
 	session *Session
 }
 
@@ -155,6 +154,9 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	hostDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 
 		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {
@@ -232,6 +234,46 @@ func (h host) ListFeatures(hostRef string, all bool, duration time.Duration) (*p
 		return nil, err
 	}
 	return result, nil
+}
+
+// InspectFeature ...
+func (h host) InspectFeature(hostRef, featureName string, embedded bool, duration time.Duration) (*protocol.FeatureDetailResponse, error) {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	req := &protocol.FeatureDetailRequest{
+		TargetType: protocol.FeatureTargetType_FT_HOST,
+		TargetRef:  &protocol.Reference{Name: hostRef},
+		Name:       featureName,
+		Embedded:   embedded,
+	}
+	service := protocol.NewFeatureServiceClient(h.session.connection)
+	return service.Inspect(ctx, req)
+}
+
+// ExportFeature ...
+func (h host) ExportFeature(hostRef, featureName string, embedded bool, duration time.Duration) (*protocol.FeatureExportResponse, error) {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	req := &protocol.FeatureDetailRequest{
+		TargetType: protocol.FeatureTargetType_FT_HOST,
+		TargetRef:  &protocol.Reference{Name: hostRef},
+		Name:       featureName,
+		Embedded:   embedded,
+	}
+	service := protocol.NewFeatureServiceClient(h.session.connection)
+	return service.Export(ctx, req)
 }
 
 // CheckFeature ...

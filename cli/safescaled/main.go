@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/makholm/covertool/pkg/exit"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
+	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
@@ -40,7 +42,6 @@ import (
 	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
 )
 
 var profileCloseFunc = func() {}
@@ -63,6 +64,9 @@ func work(c *cli.Context) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		<-signalCh
 		cleanup(true)
 	}()
@@ -235,7 +239,8 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		// Sets profiling
 		if c.IsSet("profile") {
 			what := c.String("profile")
@@ -264,7 +269,8 @@ func main() {
 		return nil
 	}
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		work(c)
 		return nil
 	}

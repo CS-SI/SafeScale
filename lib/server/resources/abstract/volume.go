@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
@@ -61,23 +62,24 @@ func (v *Volume) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (v Volume) Clone() data.Clonable {
+func (v Volume) Clone() (data.Clonable, error) {
 	return NewVolume().Replace(&v)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
-func (v *Volume) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (v *Volume) Replace(p data.Clonable) (data.Clonable, error) {
 	if v == nil || p == nil {
-		return v
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*Volume) // nolint
+	src, ok := p.(*Volume) // nolint
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Volume")
+	}
 	*v = *src
-	return v
+	return v, nil
 }
 
 // OK ...
@@ -101,12 +103,12 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and restores a Volume
-func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
+func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 	if v == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, v))
 }
 
@@ -155,7 +157,10 @@ func (va *VolumeAttachment) IsNull() bool {
 }
 
 // OK ...
-func (va VolumeAttachment) OK() bool {
+func (va *VolumeAttachment) OK() bool {
+	if va == nil {
+		return false
+	}
 	result := true
 	result = result && va.ID != ""
 	result = result && va.Name != ""

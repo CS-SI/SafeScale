@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -72,6 +73,8 @@ type stack struct {
 
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
+
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -81,11 +84,11 @@ func NullStack() *stack { // nolint
 
 // New authenticates and return interface stack
 //goland:noinspection GoExportedFuncWithUnexportedType
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return stack{}, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
+		return nil, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
 	if auth.DomainName == "" && auth.DomainID == "" {
@@ -114,7 +117,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
 	}
 
-	s := stack{
+	s := &stack{
 		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
 
 		authOpts: auth,
@@ -140,9 +143,9 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAuthenticated:
-			return stack{}, fail.NotAuthenticatedError("authentication failed")
+			return nil, fail.NotAuthenticatedError("authentication failed")
 		default:
-			return stack{}, xerr
+			return nil, xerr
 		}
 	}
 
@@ -157,7 +160,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		NormalizeError,
 	)
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Compute API
@@ -172,10 +175,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 	default:
-		return stack{}, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
+		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
 	}
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Network API
@@ -190,10 +193,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 	default:
-		return stack{}, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Volume API
@@ -217,10 +220,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 	default:
-		return stack{}, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
+		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
 	}
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Get provider network ID from network service
@@ -234,7 +237,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 		if xerr != nil {
-			return stack{}, xerr
+			return nil, xerr
 		}
 	}
 
@@ -246,7 +249,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			// continue
 			debug.IgnoreError(xerr)
 		default:
-			return stack{}, xerr
+			return nil, xerr
 		}
 	} else if len(validAvailabilityZones) != 0 {
 		var validZones []string
@@ -260,7 +263,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			}
 		}
 		if !zoneIsValidInput {
-			return stack{}, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
 		}
 
 	}
@@ -275,7 +278,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return stack{}, commRetryErr
+		return nil, commRetryErr
 	}
 
 	s.authOpts = auth
@@ -283,26 +286,29 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 	s.IdentityClient = identity
 	s.cfgOpts.UseFloatingIP = true
 
+	s.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+
 	// Initializes the VPC
 	xerr = s.initVPC()
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	return s, nil
 }
 
 // ListRegions ...
-func (s stack) ListRegions() (list []string, xerr fail.Error) {
+func (s stack) ListRegions() (list []string, ferr fail.Error) {
 	var emptySlice []string
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
 				// ParentRegionID: "RegionOne",
@@ -329,9 +335,9 @@ func (s stack) ListRegions() (list []string, xerr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
+func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -343,7 +349,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 	// Try to get template
 	var flv *flavors.Flavor
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -366,7 +372,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -382,7 +388,7 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 // InspectKeyPair returns the key pair identified by id
 func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -408,7 +414,7 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 // Returned list can be empty
 func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	var emptySlice []abstract.KeyPair
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -449,7 +455,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s stack) DeleteKeyPair(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -472,7 +478,7 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 
 // BindSecurityGroupToSubnet binds a security group to a subnet
 func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if subnetID != "" {
@@ -491,7 +497,7 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
 func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if subnetID == "" {
@@ -510,7 +516,7 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -519,7 +525,7 @@ func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -570,7 +576,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -621,7 +627,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -651,7 +657,7 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
 func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
@@ -666,7 +672,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 
 // StopHost stops the host identified by id
 func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -686,7 +692,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 
 // StartHost starts the host identified by id
 func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -706,7 +712,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 
 // RebootHost reboots unconditionally the host identified by id
 func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -736,7 +742,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 // ResizeHost ...
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -754,9 +760,9 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	nullServer := &servers.Server{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullServer, fail.InvalidInstanceError()
 	}
 
@@ -767,6 +773,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullServer, xerr
+	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
@@ -825,7 +836,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				)
 			}
 		},
-		temporal.GetMinDelay(),
+		timings.SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -854,7 +865,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	nullAHC := abstract.NewHostCore()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHC, fail.InvalidInstanceError()
 	}
 
@@ -890,7 +901,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
@@ -917,7 +928,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -938,10 +949,10 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -950,7 +961,12 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = temporal.GetOperationTimeout()
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	timeout := timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -967,7 +983,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		temporal.GetDefaultDelay(),
+		timings.NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -988,7 +1004,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
@@ -1017,7 +1033,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAVA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -1051,7 +1067,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 // ListVolumeAttachments lists available volume attachment
 func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	var emptySlice []abstract.VolumeAttachment
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -1091,7 +1107,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -1152,4 +1168,15 @@ func (s *stack) initVPC() fail.Error {
 		}
 	}
 	return nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
+	if valid.IsNil(s) {
+		return temporal.NewTimings(), fail.InvalidInstanceError()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings, nil
 }

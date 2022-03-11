@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ type Subnet interface {
 	GetGatewayPublicIPs() ([]string, fail.Error)                                                                                 // returns the gateway IPs of the Subnet
 	GetDefaultRouteIP() (string, fail.Error)                                                                                     // returns the private IP of the default route of the Subnet
 	GetEndpointIP() (string, fail.Error)                                                                                         // returns the public IP to reach the Subnet from Internet
+	GetCIDR() (string, fail.Error)                                                                                               // return the CIDR
 	GetState() (subnetstate.Enum, fail.Error)                                                                                    // gives the current state of the Subnet
 	HasVirtualIP() (bool, fail.Error)                                                                                            // tells if the Subnet is using a VIP as default route
 	InspectGateway(primary bool) (Host, fail.Error)                                                                              // returns the gateway related to Subnet

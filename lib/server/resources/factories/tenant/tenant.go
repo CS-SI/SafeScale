@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 )
 
-// Tenant structure to handle name and GetService for a tenant
+// Tenant structure to handle name and Service for a tenant
 type Tenant struct {
 	Name    string
 	Service iaas.Service

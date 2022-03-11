@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostDescription contains description information for the host
@@ -49,19 +51,23 @@ func (hd *HostDescription) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (hd HostDescription) Clone() data.Clonable {
+func (hd HostDescription) Clone() (data.Clonable, error) {
 	return NewHostDescription().Replace(&hd)
 }
 
 // Replace ... (data.Clonable interface)
-func (hd *HostDescription) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hd *HostDescription) Replace(p data.Clonable) (data.Clonable, error) {
 	if hd == nil || p == nil {
-		return hd
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*hd = *p.(*HostDescription)
-	return hd
+	casted, ok := p.(*HostDescription)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostDescription")
+	}
+
+	*hd = *casted
+	return hd, nil
 }
 
 func init() {

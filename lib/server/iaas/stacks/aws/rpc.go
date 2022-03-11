@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	req "github.com/aws/aws-sdk-go/aws/request"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -1217,36 +1218,109 @@ func (s stack) rpcDescribeRegions(names []*string) ([]*ec2.Region, fail.Error) {
 	return resp.Regions, nil
 }
 
-func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
+func rpcDescribeImagesByOwner(s stack, ids []*string, filters []*ec2.Filter) ([]*ec2.Image, fail.Error) {
 	var request ec2.DescribeImagesInput
 	if len(ids) > 0 {
 		request.ImageIds = ids
-	} else {
-		request.Filters = []*ec2.Filter{
-			{
-				Name:   aws.String("architecture"),
-				Values: []*string{aws.String("x86_64")},
-			},
-			{
-				Name:   aws.String("state"),
-				Values: []*string{aws.String("available")},
-			},
-		}
-
-		// Added filtering by owner-id
-		request.Filters = append(request.Filters, createFilters()...)
 	}
+	request.Filters = filters
+
+	countDecodingProblems := 0
+
 	var resp *ec2.DescribeImagesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.EC2Service.DescribeImages(&request)
-			return err
+			if err != nil {
+				if awe, ok := err.(awserr.Error); ok {
+					if awe.Code() == req.ErrCodeSerialization {
+						countDecodingProblems++
+						if countDecodingProblems > 1 {
+							return retry.StopRetryError(err, "too many decoding errors")
+						}
+					}
+				}
+
+				return err
+			}
+
+			return nil
 		},
 		normalizeError,
 	)
 	if xerr != nil {
 		return []*ec2.Image{}, xerr
 	}
+
+	return resp.Images, nil
+}
+
+func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
+	var request ec2.DescribeImagesInput
+	if len(ids) > 0 {
+		request.ImageIds = ids
+	}
+
+	request.Filters = []*ec2.Filter{}
+	// Default filters
+	request.Filters = append(request.Filters, createFilters()...)
+	// Added filtering by owner-id
+	request.Filters = append(request.Filters, filterOwners(s)...)
+
+	countDecodingProblems := 0
+	var decodingProblems bool
+
+	var resp *ec2.DescribeImagesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeImages(&request)
+			if err != nil {
+				if awe, ok := err.(awserr.Error); ok {
+					if awe.Code() == "SerializationError" {
+						decodingProblems = true
+						countDecodingProblems++
+						if countDecodingProblems > 1 {
+							return retry.StopRetryError(err, "too many decoding errors")
+						}
+					}
+				}
+
+				return err
+			}
+
+			// no error, forget about decoding problems
+			decodingProblems = false
+
+			return nil
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		if !decodingProblems {
+			return []*ec2.Image{}, xerr
+		}
+	}
+
+	// either we had decoding problems or everything is ok
+	if decodingProblems {
+		for _, owner := range filterOwners(s) {
+			var filters []*ec2.Filter
+			filters = append(filters, createFilters()...)
+			filters = append(filters, owner)
+			newImages, err := rpcDescribeImagesByOwner(s, ids, filters)
+			if err != nil {
+				continue
+			}
+
+			if len(newImages) > 0 {
+				resp.Images = append(resp.Images, newImages...)
+			}
+		}
+
+		return resp.Images, nil
+	}
+
+	// everything ok
 	return resp.Images, nil
 }
 
@@ -1527,6 +1601,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 		SpotPrice: price, // FIXME: Round up
 		Type:      aws.String("one-time"),
 	}
+
 	var resp *ec2.RequestSpotInstancesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
@@ -1544,7 +1619,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nullInstance, xerr
@@ -1678,6 +1753,17 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		},
 		UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),
 	}
+
+	if diskSize != 0 {
+		request.BlockDeviceMappings = []*ec2.BlockDeviceMapping{
+			{
+				DeviceName: aws.String("/dev/sda1"),
+				Ebs: &ec2.EbsBlockDevice{
+					VolumeSize: aws.Int64(int64(diskSize)),
+				},
+			}}
+	}
+
 	var resp *ec2.Reservation
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
@@ -1737,6 +1823,11 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	var nics []*string
 	for _, v := range instance.NetworkInterfaces {
 		// Detach and release Elastic IP from the network interface if needed
@@ -1774,7 +1865,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		InstanceIds: []*string{instance.InstanceId},
 	}
 	var resp *ec2.TerminateInstancesOutput
-	xerr := stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.TerminateInstances(&request)
 			return innerErr
@@ -1821,8 +1912,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostCleanupTimeout(),
+		timings.NormalDelay(),
+		timings.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1830,8 +1921,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId,
-				temporal.GetHostCleanupTimeout(),
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

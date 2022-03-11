@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -196,7 +196,7 @@ func (r results) ResultsOfUnit(unitName string) resources.UnitResults {
 		if urs != nil {
 			rurs, ok := urs.(*unitResults)
 			if !ok {
-				logrus.Errorf("failed to cast urs to '*unitResults'")
+				logrus.Errorf("failed to cast urs to '*unitResults'") // FIXME: return error
 				return &unitResults{}
 			}
 			for k, v := range *rurs {

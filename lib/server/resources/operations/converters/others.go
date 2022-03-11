@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -185,7 +185,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		}
 	}
 	if t, ok := tokens["disk"]; ok {
-		min, _, xerr := t.Validate()
+		min, max, xerr := t.Validate()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
@@ -195,7 +195,15 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 			out.MinDiskSize, err = strconv.Atoi(min)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return nil, 0, fail.SyntaxError("invalid value '%s' for 'disk'", min)
+				return nil, 0, fail.SyntaxError("invalid min value '%s' for 'disk'", min)
+			}
+		}
+
+		if max != "" {
+			out.MaxDiskSize, err = strconv.Atoi(max)
+			err = debug.InjectPlannedError(err)
+			if err != nil {
+				return nil, 0, fail.SyntaxError("invalid max value '%s' for 'disk'", max)
 			}
 		}
 	}
@@ -212,9 +220,12 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 
 // NodeCountFromStringToInteger extracts initial node count from string
 func NodeCountFromStringToInteger(in string) (int, fail.Error) {
+	if in == "" {
+		return 0, nil
+	}
+
 	tokens, xerr := parseSizingString(in)
 	xerr = debug.InjectPlannedFail(xerr)
-
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -250,6 +261,9 @@ func newSizingToken() *sizingToken {
 
 // Push sets an item of the token based on its current content
 func (t *sizingToken) Push(item string) fail.Error {
+	if t == nil {
+		return fail.InconsistentError("sizingToken is nil")
+	}
 	if t.IsFull() {
 		return fail.NotAvailableError("token is full")
 	}
@@ -262,7 +276,7 @@ func (t *sizingToken) Push(item string) fail.Error {
 
 // IsFull tells if the token is full
 func (t *sizingToken) IsFull() bool {
-	return t.pos >= 3
+	return t != nil && t.pos >= 3
 }
 
 // GetKeyword returns the keyword member of the token (pos == 0)
@@ -275,7 +289,7 @@ func (t *sizingToken) GetKeyword() (string, fail.Error) {
 
 // GetOperator returns the operator member of the token (pos == 1)
 func (t *sizingToken) GetOperator() (string, fail.Error) {
-	if t.pos > 1 {
+	if t != nil && t.pos > 1 {
 		return t.members[1], nil
 	}
 	return "", fail.InvalidRequestError("operator is not set in token")
@@ -291,6 +305,9 @@ func (t *sizingToken) GetValue() (string, fail.Error) {
 
 // String returns a string representing the token
 func (t *sizingToken) String() string {
+	if t == nil {
+		return ""
+	}
 	return strings.Join(t.members, " ")
 }
 
@@ -449,13 +466,68 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 	return "", "", fail.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
 }
 
-// parseSizingString transforms a string to a list of tokens
+func merge(ms ...map[string]*sizingToken) map[string]*sizingToken {
+	res := map[string]*sizingToken{}
+
+	for _, m := range ms {
+		for k, v := range m {
+			res[k] = v
+		}
+	}
+	return res
+}
+
 func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
+	var parsed []map[string]*sizingToken
+
+	if strings.Contains(request, ",") {
+		fragments := strings.Split(request, ",")
+		for _, frag := range fragments {
+			apa, err := newParseSizingString(frag)
+			if err != nil {
+				return nil, err
+			}
+			parsed = append(parsed, apa)
+		}
+	} else {
+		apa, err := newParseSizingString(request)
+		if err != nil {
+			return nil, err
+		}
+		parsed = append(parsed, apa)
+	}
+	return merge(parsed...), nil
+}
+
+// parseSizingString transforms a string to a list of tokens
+func newParseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 	var (
 		s       scanner.Scanner
 		tokens  = map[string]*sizingToken{}
 		mytoken *sizingToken
 	)
+
+	if request == "" {
+		return nil, fail.NewError("empty string")
+	}
+
+	// this handles the specific case "template=whatever", the code a few lines below expect numeric comparisons and does not behave the same way
+	cleaned := strings.TrimSpace(request)
+	cleaned = strings.ReplaceAll(cleaned, " ", "")
+	if strings.HasPrefix(cleaned, "template=") {
+		if strings.Contains(cleaned, "=") {
+			frag := strings.Split(cleaned, "=")
+			if len(frag) == 2 {
+				tokens["template"] = &sizingToken{
+					members: []string{"template", "=", frag[1]},
+					pos:     3,
+				}
+				return tokens, nil
+			}
+		}
+		return nil, fail.SyntaxError("unexpected format: '%s', only 'template=YourTemplateNameHere' is allowed", request)
+	}
+
 	s.Init(strings.NewReader(request))
 	// s.Mode = scanner.ScanInts | scanner.ScanFloats | scanner.ScanChars | scanner.ScanRawStrings
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package shielded
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,7 +36,11 @@ func TestTakiTaki(t *testing.T) {
 	a.Rumba = 9
 	a.Content = "Bailame como si fuera la ultima vez"
 
-	armored := NewShielded(a)
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	takitaki, err := concurrency.NewTask()
@@ -104,7 +109,11 @@ func TestCriminal(t *testing.T) {
 	a.Rumba = 9
 	a.Content = "tu me robaste el corazon como un criminaaal"
 
-	armored := NewShielded(a)
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 
 	criminal, err := concurrency.NewTask()
 	if err != nil {
@@ -176,7 +185,7 @@ func TestCriminal(t *testing.T) {
 	// fmt.Println(a.Rumba)
 	err = armored.Inspect(func(clonable data.Clonable) fail.Error {
 		take := clonable.(*datatests.StructWithoutPointers).Rumba
-		_ = take // Here take may be 9 or 10, depending of who enters the lock 1st, the 2 readers or the writer
+		_ = take // Here take may be 9 or 10, depending on who enters the lock 1st, the 2 readers or the writer
 		return nil
 	})
 	if err != nil {
@@ -184,4 +193,63 @@ func TestCriminal(t *testing.T) {
 	}
 
 	assert.Equal(t, 9, a.Rumba)
+}
+
+func TestSerialize(t *testing.T) {
+	a := datatests.NewStructWithoutPointers()
+	a.Rumba = 9
+	a.Content = "Bailame como si fuera la ultima vez"
+
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
+
+	content, err := armored.Serialize()
+	assert.Nil(t, err)
+	assert.NotNil(t, content)
+
+	assert.True(t, strings.Contains(string(content), "Content"))
+	assert.True(t, strings.Contains(string(content), "vez"))
+}
+
+func TestSerializeDeserialize(t *testing.T) {
+	a := datatests.NewStructWithoutPointers()
+	a.Rumba = 9
+	a.Content = "Bailame como si fuera la ultima vez"
+	assert.NotNil(t, a)
+
+	b := datatests.NewStructWithoutPointers()
+	gotForYou, err := NewShielded(b)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	assert.NotNil(t, gotForYou)
+
+	armored, err := NewShielded(a)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	assert.NotNil(t, armored)
+	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
+
+	content, err := armored.Serialize()
+	assert.Nil(t, err)
+	assert.NotNil(t, content)
+
+	err = gotForYou.Deserialize(content)
+	assert.Nil(t, err)
+
+	err = gotForYou.Inspect(func(clonable data.Clonable) fail.Error {
+		take := clonable.(*datatests.StructWithoutPointers).Content
+		trumba := clonable.(*datatests.StructWithoutPointers).Rumba
+		assert.Equal(t, "Bailame como si fuera la ultima vez", take)
+		assert.Equal(t, 9, trumba)
+		return nil
+	})
+	assert.Nil(t, err)
 }

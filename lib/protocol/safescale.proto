@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -343,6 +343,7 @@ message HostSizing {
 	int32 min_disk_size = 5;
 	int32 gpu_count = 6;
 	float min_cpu_freq = 7;
+	int32 max_disk_size = 8;
 }
 
 message HostDefinition {
@@ -374,6 +375,9 @@ enum HostState {
 	HS_ERROR = 4; 			// host is in error state
 	HS_TERMINATED = 5; 	// host is terminated (in AWS, it's like DELETED)
 	HS_UNKNOWN = 6; 		// status is unknown
+	HS_ANY = 7; 		// status is unknown
+	HS_FAILED = 8; 		// status is unknown
+	HS_DELETED = 9; 		// status is unknown
 }
 
 message Host {
@@ -786,10 +790,11 @@ message ClusterCreateRequest {
 	string node_sizing = 11;
 	string domain = 12;
 	string tenant_id = 13;
-	string gateway_options = 14;    // to store options for gateways than does not concern sizing (like ssh port for example)
-	string master_options = 15;     // same as gateway_options for masters
-	string node_options = 16;       // same as gateway_options for nodes
-	bool force = 17; // ignore cluster sizing recommendations
+	string gateway_options = 14;     // to store options for gateways than does not concern sizing (like ssh port for example)
+	string master_options = 15;      // same as gateway_options for masters
+	string node_options = 16;        // same as gateway_options for nodes
+	bool force = 17;                 // ignore cluster sizing recommendations
+	repeated string parameters = 18; // contains optional parameters for automatically installed Features
 }
 
 message ClusterResizeRequest {
@@ -800,6 +805,7 @@ message ClusterResizeRequest {
 	bool dry_run = 5;
 	string tenant_id = 6;
 	bool keep_on_failure = 7;
+	repeated string parameters = 8;
 }
 
 message ClusterDeleteRequest  {
@@ -819,8 +825,8 @@ message ClusterIdentity {
 
 message ClusterHostOptions {
 	uint32 ssh_port = 1;
-	string host_name_pattern = 2; // contains the string pattern used to define the host name (where mandatory %d
-								  // corresponds to host index in cluster) [Not used yet]
+	string host_name_pattern = 2; // contains the string pattern used to define the host name (where mandatory
+	                              // corresponds to host index in cluster) [Not used yet]
 }
 
 message ClusterDefaults {
@@ -831,6 +837,7 @@ message ClusterDefaults {
 	ClusterHostOptions gateway_options = 5;
 	ClusterHostOptions master_options = 6;
 	ClusterHostOptions node_options = 7;
+	repeated string feature_parameters = 8;
 }
 
 message ClusterControlplane {
@@ -912,12 +919,6 @@ enum FeatureTargetType {
 	FT_CLUSTER = 2;
 }
 
-message FeatureListRequest {
-	FeatureTargetType target_type = 1;
-	Reference target_ref = 2;
-	bool installed_only = 3;
-}
-
 message FeatureResponse {
 	string name = 1;
 	string file_name = 3;
@@ -925,8 +926,32 @@ message FeatureResponse {
 	repeated string requires = 5;
 }
 
+message FeatureListRequest {
+	FeatureTargetType target_type = 1;
+	Reference target_ref = 2;
+	bool installed_only = 3;
+}
+
 message FeatureListResponse {
 	repeated FeatureResponse features = 1;
+}
+
+message FeatureDetailRequest {
+	FeatureTargetType target_type = 1;
+	Reference target_ref = 2;
+	string name = 3;
+	bool embedded = 4;
+}
+
+message FeatureDetailResponse {
+	bool eligible = 1;
+	bool installed = 2;
+	repeated string dependencies = 3;
+	repeated string parameters = 4;
+}
+
+message FeatureExportResponse {
+	repeated string export = 1;
 }
 
 message FeatureSettings {
@@ -948,6 +973,8 @@ message FeatureActionRequest {
 
 service FeatureService {
 	rpc List(FeatureListRequest) returns (FeatureListResponse){}
+	rpc Inspect(FeatureDetailRequest) returns (FeatureDetailResponse){}
+	rpc Export(FeatureDetailRequest) returns (FeatureExportResponse){}
 	rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}

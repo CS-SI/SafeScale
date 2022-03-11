@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server"
@@ -45,12 +46,11 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const protocolSeparator = ":"
 
-//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.SSHHandler
+//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.SSHHandler
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
@@ -74,8 +74,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -94,7 +94,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	host, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
@@ -195,7 +195,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
 		if isGateway {
-			if host.GetState() != hoststate.Started {
+			hs, err := host.GetState()
+			if err != nil {
+				return nil, fail.Wrap(err, "cannot retrieve host properties")
+			}
+			if hs != hoststate.Started {
 				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
 			}
 		}
@@ -281,7 +285,9 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (xerr fail.Error) {
+func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -295,7 +301,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	ssh, xerr := handler.GetConfig(hostParam)
 	if xerr != nil {
@@ -306,8 +312,8 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
 	if handler == nil {
@@ -326,7 +332,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
@@ -341,17 +347,26 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return invalid, "", "", xerr
 	}
 
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			if handler.job.Aborted() {
+			isAborted, err := handler.job.Aborted()
+			if err != nil {
+				return err
+			}
+			if isAborted {
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
+			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
 			return xerr
 		},
-		temporal.GetMinDelay(),
-		temporal.GetHostTimeout(),
+		timings.SmallDelay(),
+		timings.HostOperationTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
@@ -362,7 +377,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
 	// Create the command
@@ -374,11 +389,11 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	defer func() {
 		derr := sshCmd.Close()
 		if derr != nil {
-			if xerr == nil {
-				xerr = derr
+			if xerr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 				return
 			}
-			_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+			xerr = derr
 		}
 	}()
 
@@ -431,8 +446,8 @@ func getMD5Hash(text string) string {
 }
 
 // Copy copies file/directory from/to remote host
-func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if handler == nil {
@@ -451,7 +466,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	hostName := ""
 	var upload bool
@@ -510,9 +525,14 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		stdout, stderr string
 	)
 	retcode := -1
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, temporal.GetLongOperationTimeout())
+			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -542,9 +562,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					return fail.WarningError(finnerXerr, "cannot create md5 command")
 				}
 
-				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-					crcCtx, outputs.COLLECT, temporal.GetLongOperationTimeout(),
-				)
+				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, timings.HostLongOperationTimeout())
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -560,17 +578,14 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					return fail.WarningError(finnerXerr, "unexpected return code of md5 command")
 				}
 				if !strings.Contains(fstdout, md5hash) {
-					logrus.Warnf(
-						"WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
-						fstdout, fstderr, md5hash,
-					)
+					logrus.Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
 					return fail.NewError("wrong md5 of '%s'", remotePath)
 				}
 				return nil
 			}
 			checksumErr := crcCheck()
 			if checksumErr != nil {
-				if _, ok := checksumErr.(*fail.ErrWarning); !ok || checksumErr.IsNull() {
+				if _, ok := checksumErr.(*fail.ErrWarning); !ok || valid.IsNil(checksumErr) {
 					return checksumErr
 				}
 				logrus.Warnf(checksumErr.Error())
@@ -582,8 +597,8 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		2*temporal.GetLongOperationTimeout(),
+		timings.NormalDelay(),
+		2*timings.HostLongOperationTimeout(),
 	)
 	return retcode, stdout, stderr, xerr
 }

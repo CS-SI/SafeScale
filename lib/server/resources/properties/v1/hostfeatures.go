@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostInstalledFeature ...
@@ -35,33 +38,35 @@ type HostInstalledFeature struct {
 // NewHostInstalledFeature ...
 func NewHostInstalledFeature() *HostInstalledFeature {
 	return &HostInstalledFeature{
-		RequiredBy: map[string]struct{}{},
-		Requires:   map[string]struct{}{},
+		RequiredBy: make(map[string]struct{}),
+		Requires:   make(map[string]struct{}),
 	}
 }
 
 // IsNull ...
 // satisfies interface data.Clonable
 func (hif *HostInstalledFeature) IsNull() bool {
-	return hif == nil || (len(hif.RequiredBy) == 0 && len(hif.Requires) == 0)
+	return hif == nil || (len(hif.RequiredBy) == 0 && len(hif.Requires) == 0) || hif.RequiredBy == nil || hif.Requires == nil
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hif HostInstalledFeature) Clone() data.Clonable {
-	return NewClusterInstalledFeature().Replace(&hif)
+func (hif *HostInstalledFeature) Clone() (data.Clonable, error) {
+	return NewHostInstalledFeature().Replace(hif)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hif *HostInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
 	if hif == nil || p == nil {
-		return hif
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostInstalledFeature) // nolint
+	src, ok := p.(*HostInstalledFeature)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostInstalledFeature")
+	}
+
 	hif.HostContext = src.HostContext
 	hif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
 	for k := range src.RequiredBy {
@@ -71,7 +76,7 @@ func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
 	for k := range src.Requires {
 		hif.Requires[k] = struct{}{}
 	}
-	return hif
+	return hif, nil
 }
 
 // HostFeatures ...
@@ -103,24 +108,26 @@ func (hf *HostFeatures) IsNull() bool {
 }
 
 // Clone ...  (data.Clonable interface)
-func (hf HostFeatures) Clone() data.Clonable {
+func (hf HostFeatures) Clone() (data.Clonable, error) {
 	return NewHostFeatures().Replace(&hf)
 }
 
 // Replace ...  (data.Clonable interface)
-func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hf *HostFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 	if hf == nil || p == nil {
-		return hf
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostFeatures) // nolint
+	src, ok := p.(*HostFeatures)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostFeatures")
+	}
+
 	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
 		hf.Installed[k] = v
 	}
-	return hf
+	return hf, nil
 }
 
 func init() {

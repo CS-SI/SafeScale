@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package openstack
 import (
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	volumesv1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
@@ -34,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -88,9 +88,9 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
@@ -177,7 +177,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -216,7 +216,7 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var emptySlice []abstract.Volume
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -256,10 +256,10 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -268,7 +268,12 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = temporal.GetOperationTimeout()
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	var timeout = timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -285,7 +290,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		temporal.GetDefaultDelay(),
+		timings.NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -306,7 +311,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
@@ -335,7 +340,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAVA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -369,7 +374,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 // ListVolumeAttachments lists available volume attachment
 func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	var emptySlice []abstract.VolumeAttachment
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -407,13 +412,13 @@ func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 	return vs, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fail.Error) {
+func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {

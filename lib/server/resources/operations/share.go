@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	uuid "github.com/satori/go.uuid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -78,8 +78,8 @@ func (si ShareIdentity) Serialize() ([]byte, fail.Error) {
 
 // Deserialize ...
 // satisfies interface data.Serializable
-func (si *ShareIdentity) Deserialize(buf []byte) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+func (si *ShareIdentity) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, si))
 }
 
@@ -91,24 +91,26 @@ func (si *ShareIdentity) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (si ShareIdentity) Clone() data.Clonable {
+func (si ShareIdentity) Clone() (data.Clonable, error) {
 	newShareItem := si
-	return &newShareItem
+	return &newShareItem, nil
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 // may panic
-func (si *ShareIdentity) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (si *ShareIdentity) Replace(p data.Clonable) (data.Clonable, error) {
 	if si == nil || p == nil {
-		return si
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ShareIdentity) // nolint
+	src, ok := p.(*ShareIdentity)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ShareIdentity")
+	}
+
 	*si = *src
-	return si
+	return si, nil
 }
 
 // Share contains information to maintain in Object Storage a list of shared folders
@@ -118,21 +120,16 @@ type Share struct {
 	lock sync.RWMutex
 }
 
-// ShareNullValue returns a *Share representing a null value
-func ShareNullValue() *Share {
-	return &Share{MetadataCore: NullCore()}
-}
-
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {
-		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return ShareNullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &Share{
@@ -150,10 +147,15 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
-		return ShareNullValue(), fail.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	shareCache, xerr := svc.GetCache(shareKind)
@@ -164,7 +166,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
-		temporal.GetMetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -173,18 +175,18 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return ShareNullValue(), fail.NotFoundError("failed to find a Share '%s'", ref)
+			return nil, fail.NotFoundError("failed to find a Share '%s'", ref)
 		default:
-			return ShareNullValue(), xerr
+			return nil, xerr
 		}
 	}
 
 	var ok bool
 	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
-		return ShareNullValue(), fail.InconsistentError("cache content should be a resources.Share", ref)
+		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
 	if rs == nil {
-		return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
+		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
 	_ = cacheEntry.LockContent()
@@ -224,7 +226,7 @@ func onShareCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry creates metadata and add Volume to service cache
@@ -232,8 +234,10 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	if !valid.IsNil(instance) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -243,13 +247,18 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -283,8 +292,8 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through shares MetadataFolder and executes a callback for each entry
-func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -342,7 +351,7 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 func (instance *Share) Create(
 	ctx context.Context,
 	shareName string,
-	server resources.Host, path string,
+	server resources.Host, spath string,
 	options string,
 	/*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (ferr fail.Error) {
@@ -352,12 +361,10 @@ func (instance *Share) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
-		shareName := instance.GetName()
-		if shareName != "" {
-			return fail.NotAvailableError("already carrying Share '%s'", shareName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -404,7 +411,7 @@ func (instance *Share) Create(
 	}
 
 	// Sanitize path
-	sharePath, xerr := sanitize(path)
+	sharePath, xerr := sanitize(spath)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -419,7 +426,7 @@ func (instance *Share) Create(
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
+			if _, found := serverMountsV1.RemoteMountsByPath[spath]; found {
 				return fail.InvalidRequestError(fmt.Sprintf("path to export '%s' is a mounted Share", sharePath))
 			}
 
@@ -451,7 +458,7 @@ func (instance *Share) Create(
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	nfsServer, xerr := nfs.NewServer(sshConfig)
+	nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -599,15 +606,15 @@ func (instance *Share) Create(
 
 // unsafeGetServer returns the Host acting as Share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
-func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) unsafeGetServer() (_ resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostID, hostName string
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -622,7 +629,7 @@ func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	server, xerr := LoadHost(svc, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -638,10 +645,10 @@ func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
 
 // GetServer returns the Host acting as Share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
-func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) GetServer() (_ resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -649,7 +656,7 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	var hostID, hostName string
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -664,7 +671,7 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	server, xerr := LoadHost(svc, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -680,10 +687,12 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 
 // Mount mounts a Share on a local directory of a host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
-func (instance *Share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
+func (instance *Share) Mount(
+	ctx context.Context, target resources.Host, spath string, withCache bool,
+) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -692,7 +701,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 	if target == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
-	if path == "" {
+	if spath == "" {
 		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
@@ -759,7 +768,11 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			cloned, cerr := hostSharesV1.ByID[shareID].Clone()
+			if cerr != nil {
+				return fail.Wrap(cerr)
+			}
+			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}
@@ -776,10 +789,10 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 	}
 
 	// Sanitize path
-	mountPath, xerr := sanitize(path)
+	mountPath, xerr := sanitize(spath)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "invalid mount path '%s'", path)
+		return nil, fail.Wrap(xerr, "invalid mount path '%s'", spath)
 	}
 
 	// Lock for read, won't change data other than properties, which are protected by their own way
@@ -803,9 +816,9 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 					return fail.AbortedError(nil, "aborted")
 				}
 
-				if i.Path == path {
+				if i.Path == spath {
 					// cannot mount a Share in place of a volume (by convention, nothing technically preventing it)
-					return fail.InvalidRequestError(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, path))
+					return fail.InvalidRequestError(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, spath))
 				}
 			}
 			for _, i := range targetMountsV1.RemoteMountsByPath {
@@ -813,7 +826,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 					return fail.AbortedError(nil, "aborted")
 				}
 
-				if strings.Index(path, i.Path) == 0 {
+				if strings.Index(spath, i.Path) == 0 {
 					// cannot mount a Share inside another Share (at least by convention, if not technically)
 					return fail.InvalidRequestError("there is already a Share mounted in '%s:%s'", targetName, i.Path)
 				}
@@ -852,7 +865,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 				return fail.NotFoundError(fmt.Sprintf("failed to find metadata about Share '%s'", shareName))
 			}
 
-			shareID := hostSharesV1.ByName[shareName]
+			ashareID := hostSharesV1.ByName[shareName]
 
 			nfsClient, xerr := nfs.NewNFSClient(targetSSHConfig)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -860,28 +873,28 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 				return xerr
 			}
 
-			xerr = nfsClient.Install(ctx)
+			xerr = nfsClient.Install(ctx, instance.Service())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
-			xerr = nfsClient.Mount(ctx, export, mountPath, withCache)
+			xerr = nfsClient.Mount(ctx, instance.Service(), export, mountPath, withCache)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
-			hostSharesV1.ByName[shareName] = shareID
-			if hostSharesV1.ByID[shareID].ClientsByName == nil {
-				hostSharesV1.ByID[shareID].ClientsByName = map[string]string{}
+			hostSharesV1.ByName[shareName] = ashareID
+			if hostSharesV1.ByID[ashareID].ClientsByName == nil {
+				hostSharesV1.ByID[ashareID].ClientsByName = map[string]string{}
 			}
-			hostSharesV1.ByID[shareID].ClientsByName[targetName] = targetID
+			hostSharesV1.ByID[ashareID].ClientsByName[targetName] = targetID
 
-			if hostSharesV1.ByID[shareID].ClientsByID == nil {
-				hostSharesV1.ByID[shareID].ClientsByID = map[string]string{}
+			if hostSharesV1.ByID[ashareID].ClientsByID == nil {
+				hostSharesV1.ByID[ashareID].ClientsByID = map[string]string{}
 			}
-			hostSharesV1.ByID[shareID].ClientsByID[targetID] = targetName
+			hostSharesV1.ByID[ashareID].ClientsByID[targetID] = targetName
 			return nil
 		})
 	})
@@ -906,14 +919,21 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 					return nil
 				})
 			})
-			if derr == nil {
-				var nfsClient *nfs.Client
-				if nfsClient, derr = nfs.NewNFSClient(targetSSHConfig); derr == nil {
-					derr = nfsClient.Unmount(ctx, export)
-				}
-			}
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to alter metadata trying to delete Share"))
+				return
+			}
+
+			var nfsClient *nfs.Client
+			if nfsClient, derr = nfs.NewNFSClient(targetSSHConfig); derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to delete Share"))
+				return
+			}
+
+			derr = nfsClient.Unmount(ctx, instance.Service(), export)
+			if derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
+				return
 			}
 		}
 	}()
@@ -952,14 +972,24 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 		return nil, xerr
 	}
 
-	return mount.Clone().(*propertiesv1.HostRemoteMount), nil
+	cloned, cerr := mount.Clone()
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
+	casted, ok := cloned.(*propertiesv1.HostRemoteMount)
+	if !ok {
+		return nil, fail.InconsistentError("cloned is not a *propertiesv1.HostRemoteMount")
+	}
+
+	return casted, nil
 }
 
 // Unmount unmounts a Share from local directory of a host
-func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1000,6 +1030,10 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 		shareID = si.ShareID
 		return nil
 	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
 
 	rhServer, xerr := instance.unsafeGetServer()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1061,7 +1095,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 				return inErr
 			}
 
-			inErr = nfsClient.Unmount(ctx, serverPrivateIP+":"+hostShare.Path)
+			inErr = nfsClient.Unmount(ctx, instance.Service(), serverPrivateIP+":"+hostShare.Path)
 			if inErr != nil {
 				return inErr
 			}
@@ -1101,10 +1135,10 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 }
 
 // Delete deletes a Share from server
-func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1166,11 +1200,16 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			if _, ok := hostSharesV1.ByID[shareID]; !ok {
+			if _, ok = hostSharesV1.ByID[shareID]; !ok {
 				return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, objserver.GetName())
 			}
 
-			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			cloned, cerr := hostSharesV1.ByID[shareID].Clone()
+			if cerr != nil {
+				return fail.Wrap(cerr)
+			}
+
+			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}
@@ -1193,7 +1232,7 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 				return xerr
 			}
 
-			nfsServer, xerr := nfs.NewServer(sshConfig)
+			nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1217,8 +1256,6 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	// FIXME: we should have a defer statement to restore Share in case of failure...
-
 	defer task.DisarmAbortSignal()()
 
 	// Remove Share metadata
@@ -1234,10 +1271,11 @@ func sanitize(in string) (string, fail.Error) {
 	return sanitized, nil
 }
 
-func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+// ToProtocol transforms a Share into its protobuf representation
+func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1269,8 +1307,9 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 			// SecurityModes: Share.ShareAcls,
 		},
 	}
+	svc := instance.Service()
 	for k := range share.ClientsByName {
-		h, xerr := LoadHost(instance.GetService(), k)
+		h, xerr := LoadHost(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())
@@ -1278,7 +1317,10 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 		}
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(h)
 
 		mounts, xerr := h.GetMounts()

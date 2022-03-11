@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 type cache struct {
@@ -69,7 +70,7 @@ func (instance *cache) GetName() string {
 
 // Entry returns a cache entry from its key
 func (instance *cache) Entry(key string) (*Entry, fail.Error) {
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -139,8 +140,8 @@ Returns:
 	*fail.ErrNotAvailable; if entry is already reserved
 	*fail.ErrDuplicate: if entry is already present
 */
-func (instance *cache) Reserve(key string, timeout time.Duration) (xerr fail.Error) {
-	if instance.isNull() {
+func (instance *cache) Reserve(key string, timeout time.Duration) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key = strings.TrimSpace(key); key == "" {
@@ -156,7 +157,7 @@ func (instance *cache) Reserve(key string, timeout time.Duration) (xerr fail.Err
 }
 
 // unsafeReserveEntry is the workforce of ReserveEntry, without locking
-func (instance *cache) unsafeReserveEntry(key string, timeout time.Duration) (xerr fail.Error) {
+func (instance *cache) unsafeReserveEntry(key string, timeout time.Duration) (ferr fail.Error) {
 	if _, ok := instance.reserved[key]; ok {
 		return fail.NotAvailableError("the entry '%s' of %s cache is already reserved", key, instance.GetName())
 	}
@@ -185,12 +186,15 @@ Returns:
 
 Note: if CommitEntry fails, you still have to call FreeEntry to release the reservation
 */
-func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
-	if instance.isNull() {
+func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
+	}
+	if content == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("content")
 	}
 
 	instance.lock.Lock()
@@ -201,7 +205,7 @@ func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fa
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking
 // The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.ID() has to be the final key.
-func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entry, xerr fail.Error) {
+func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entry, ferr fail.Error) {
 	if _, ok := instance.reserved[key]; !ok {
 		return nil, fail.NotFoundError("the cache entry '%s' is not reserved (may have expired)", key)
 	}
@@ -275,8 +279,8 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entr
 //  nil: reservation removed
 //  *fail.ErrNotAvailable: the cache entry identified by 'key' is not reserved
 //  *fail.InconsistentError: the cache entry of the reservation should have been *cache.reservation, and is not
-func (instance *cache) Free(key string) (xerr fail.Error) {
-	if instance.isNull() {
+func (instance *cache) Free(key string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key = strings.TrimSpace(key); key == "" {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	uuidpkg "github.com/satori/go.uuid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
@@ -42,7 +43,7 @@ type Job interface {
 	String() string
 
 	Abort() fail.Error
-	Aborted() bool
+	Aborted() (bool, fail.Error)
 	Close()
 }
 
@@ -64,8 +65,8 @@ var (
 )
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, xerr fail.Error) { // nolint
-	defer fail.OnPanic(&xerr)
+func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, ferr fail.Error) { // nolint
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -141,72 +142,44 @@ func (instance *job) isNull() bool {
 
 // ID returns the id of the job (ie the uuid of gRPC message)
 func (instance job) ID() string {
-	if instance.isNull() {
-		return ""
-	}
-
 	return instance.uuid
 }
 
 // Name returns the name (== id) of the job
 func (instance job) Name() string {
-	if instance.isNull() {
-		return ""
-	}
-
 	return instance.uuid
 }
 
 // Tenant returns the tenant to use
 func (instance job) Tenant() string {
-	if instance.isNull() {
-		return ""
-	}
-
 	return instance.tenant
 }
 
-// Context returns the context of the job (should be the same than the one of the task)
+// Context returns the context of the job (should be the same as the one of the task)
 func (instance job) Context() context.Context {
-	if instance.isNull() {
-		return nil
-	}
-
 	return instance.ctx
 }
 
 // Task returns the task instance
 func (instance job) Task() concurrency.Task {
-	if instance.isNull() {
-		return nil
-	}
-
 	return instance.task
 }
 
 // Service returns the service instance
 func (instance job) Service() iaas.Service {
-	if instance.isNull() {
-		return iaas.NullService()
-	}
-
 	return instance.service
 }
 
 // Duration returns the duration of the job
 func (instance job) Duration() time.Duration {
-	if instance.isNull() {
-		return 0
-	}
-
 	return time.Since(instance.startTime)
 }
 
 // Abort tells the job it has to abort operations
-func (instance *job) Abort() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *job) Abort() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance.isNull() {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if instance.cancel == nil {
@@ -219,21 +192,16 @@ func (instance *job) Abort() (xerr fail.Error) {
 }
 
 // Aborted tells if the job has been aborted
-func (instance job) Aborted() bool {
-	if instance.isNull() {
-		return false
+func (instance job) Aborted() (bool, fail.Error) {
+	status, err := instance.task.Status()
+	if err != nil {
+		return false, fail.Wrap(err, "problem getting aborted status")
 	}
-
-	status, _ := instance.task.Status()
-	return status == concurrency.ABORTED
+	return status == concurrency.ABORTED, nil
 }
 
 // Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
 func (instance *job) Close() {
-	if instance.isNull() {
-		return
-	}
-
 	_ = deregister(instance)
 	if instance.cancel != nil {
 		instance.cancel()
@@ -242,9 +210,6 @@ func (instance *job) Close() {
 
 // String returns a string representation of job information
 func (instance job) String() string {
-	if instance.isNull() {
-		return ""
-	}
 	return fmt.Sprintf("Job: %s (started at %s)", instance.description, instance.startTime.String())
 }
 
@@ -279,8 +244,8 @@ func deregister(job Job) fail.Error {
 }
 
 // AbortJobByID asks the job identified by 'id' to abort
-func AbortJobByID(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func AbortJobByID(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")

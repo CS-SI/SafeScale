@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string 
 }
 
 // ClusterRequestFromProtocolToAbstract ...
-func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, xerr fail.Error) {
+func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, ferr fail.Error) {
 	nullCR := abstract.ClusterRequest{}
 
 	var (
@@ -124,6 +124,8 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		masterSizing  *abstract.HostSizingRequirements
 		nodeSizing    *abstract.HostSizingRequirements
 	)
+
+	var xerr fail.Error
 	if in.GatewaySizing != "" {
 		gatewaySizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.GatewaySizing)
 		if xerr != nil {
@@ -178,6 +180,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		Force:                   in.Force,
 		DisabledDefaultFeatures: disabled,
 		InitialNodeCount:        uint(nodeCount),
+		FeatureParameters:       in.GetParameters(),
 	}
 	return out, nil
 }
@@ -253,6 +256,14 @@ func HostStateFromProtocolToEnum(in protocol.HostState) hoststate.Enum {
 		return hoststate.Error
 	case protocol.HostState_HS_TERMINATED:
 		return hoststate.Terminated
+	case protocol.HostState_HS_UNKNOWN:
+		return hoststate.Unknown
+	case protocol.HostState_HS_ANY:
+		return hoststate.Any
+	case protocol.HostState_HS_FAILED:
+		return hoststate.Failed
+	case protocol.HostState_HS_DELETED:
+		return hoststate.Deleted
 	}
 	return hoststate.Unknown
 }

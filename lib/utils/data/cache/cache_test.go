@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,273 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func Test_NewCache(t *testing.T) {
+
+	_, err := NewCache("")
+	require.Error(t, err)
+
+}
+
+/*
+func TestCache_IsNull(t *testing.T) {
+
+	var c *cache = nil
+	require.EqualValues(t, c.isNull(), true)
+
+	c, err := NewCache("")
+	require.NotEqual(t, err, nil)
+	require.EqualValues(t, c.isNull(), true)
+
+	c, err = NewCache("name")
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, c.isNull(), false)
+
+}
+*/
+
+func TestCache_Reserve(t *testing.T) {
+
+	/*
+		var c *cache = nil
+		err := c.Reserve("", 1*time.Second)
+		if err == nil {
+			t.Error("Can't reserve on nil pointer cache")
+			t.Fail()
+		}
+	*/
+	c2, err := NewCache("cache")
+	if err != nil {
+		t.Fail()
+	}
+	err = c2.Reserve("", 1*time.Second)
+	if err == nil {
+		t.Error("Expect empty key error")
+		t.Fail()
+	}
+	err = c2.Reserve("key", 0*time.Second)
+	if err == nil {
+		t.Error("Expect timeout=0 error")
+		t.Fail()
+	}
+	err = c2.Reserve("key", 1*time.Second)
+	require.NoError(t, err)
+	err = c2.Reserve("key", 1*time.Second)
+	if err == nil {
+		t.Error("Can't duplicate reservation")
+		t.Fail()
+	}
+
+}
+
+func TestCache_Commit(t *testing.T) {
+
+	content := newReservation("content" /*, time.Minute*/)
+
+	/*
+		var c *cache = nil
+		_, err := c.Commit("", content)
+		if err == nil {
+			t.Error("Can't commit on nil pointer cache")
+			t.Fail()
+		}
+	*/
+
+	c2, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	err = c2.Reserve(content.GetID(), 100*time.Millisecond)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	_, err = c2.Commit("", content)
+	if err == nil {
+		t.Error("Expect empty key error")
+		t.Fail()
+	}
+
+}
+
+func TestCache_Free(t *testing.T) {
+
+	var rc *cache = nil
+	err := rc.Free("key")
+	if err == nil {
+		t.Error("Can't Free on nil pointer cache")
+		t.Fail()
+	}
+
+	content := newReservation("content" /*, time.Minute*/)
+
+	rc2, err := NewCache("cache")
+	require.NoError(t, err)
+
+	err = rc2.Reserve("key", 100*time.Millisecond)
+	require.NoError(t, err)
+
+	_, err = rc2.Commit("key", content)
+	require.NoError(t, err)
+
+	err = rc2.Free("")
+	if err == nil {
+		t.Error("Can't Free empty key")
+		t.Fail()
+	}
+
+}
+
+func TestCache_Add(t *testing.T) {
+
+	content := newReservation("content" /*, time.Minute*/)
+	var rc *cache = nil
+	_, err := rc.Add(content)
+	if err == nil {
+		t.Error("Can't Add on nil pointer cache")
+		t.Fail()
+	}
+	rc2, err := NewCache("cache")
+	require.NoError(t, err)
+	_, err = rc2.Add(nil)
+	if err == nil {
+		t.Error("Can't Add nil content")
+		t.Fail()
+	}
+	_, err = rc2.Add(content)
+	require.NoError(t, err)
+
+}
+
+func TestCache_SignalChange(t *testing.T) {
+
+	// Expect no panic
+	defer func() {
+		if q := recover(); q != nil {
+			t.Error(q)
+			t.Fail()
+		}
+	}()
+
+	content := newReservation("content" /*, time.Minute*/)
+
+	var rc *cache = nil
+	rc.SignalChange(content.GetName())
+
+	rc2, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	err = rc2.Reserve(content.GetName(), 100*time.Millisecond)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	_, err = rc2.Commit(content.GetName(), content)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	rc2.SignalChange("")
+	rc2.SignalChange(content.GetName())
+
+}
+
+func TestCache_MarkAsFreed(t *testing.T) {
+
+	// Expect no panic
+	defer func() {
+		if q := recover(); q != nil {
+			t.Error(q)
+			t.Fail()
+		}
+	}()
+
+	content := newReservation("content" /*, time.Minute*/)
+
+	var rc *cache = nil
+	rc.MarkAsFreed(content.GetName())
+
+	rc2, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	err = rc2.Reserve(content.GetName(), 100*time.Millisecond)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	_, err = rc2.Commit(content.GetName(), content)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	rc2.MarkAsFreed("")
+	rc2.MarkAsFreed(content.GetName())
+
+}
+
+func TestCache_MarkAsDeleted(t *testing.T) {
+
+	// Expect no panic
+	defer func() {
+		if q := recover(); q != nil {
+			t.Error(q)
+			t.Fail()
+		}
+	}()
+
+	content := newReservation("content" /*, time.Minute*/)
+
+	var rc *cache = nil
+	rc.MarkAsDeleted(content.GetName())
+
+	rc2, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	err = rc2.Reserve(content.GetName(), 100*time.Millisecond)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	_, err = rc2.Commit(content.GetName(), content)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	rc2.MarkAsDeleted("")
+	rc2.MarkAsDeleted(content.GetName())
+
+}
 
 func TestLockContent(t *testing.T) {
 	content := newReservation("content" /*, time.Minute*/)

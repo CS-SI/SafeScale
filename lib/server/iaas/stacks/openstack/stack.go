@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,14 @@ package openstack // Package openstack contains the implemenation of a stack for
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // stack contains the needs to operate on stack OpenStack
@@ -52,6 +53,8 @@ type stack struct {
 
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
+
+	*temporal.MutableTimings
 }
 
 // NullStack returns a null value of the stack
@@ -82,7 +85,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
 	}
 
-	s := stack{
+	s := &stack{
 		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
 
 		authOpts: auth,
@@ -236,7 +239,10 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	}
 
-	return &s, nil
+	s.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+
+	return s, nil
 }
 
 // IsNull ...
@@ -247,4 +253,15 @@ func (s *stack) IsNull() bool {
 // GetStackName returns the name of the stack
 func (s stack) GetStackName() (string, fail.Error) {
 	return "openstack", nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
+	if s == nil {
+		return temporal.NewTimings(), fail.InvalidInstanceError()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings, nil
 }

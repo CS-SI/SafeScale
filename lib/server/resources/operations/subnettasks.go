@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
@@ -38,10 +40,12 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Subnet) taskCreateGateway(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -67,8 +71,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 
 	hostSizing := castedParams.sizing
 
-	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
-	svc := instance.GetService()
+	logrus.Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
+	svc := instance.Service()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
 
@@ -90,8 +94,10 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 
 		// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
-		if id := rgw.GetID(); id != "" {
-			as.GatewayIDs = append(as.GatewayIDs, id)
+		if rgw.IsTaken() {
+			if id := rgw.GetID(); id != "" {
+				as.GatewayIDs = append(as.GatewayIDs, id)
+			}
 		}
 		return nil
 	})
@@ -107,28 +113,44 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
-		if ferr != nil && !hostReq.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
+		if ferr != nil {
+			if !hostReq.KeepOnFailure {
+				// Disable abort signal during clean up
+				defer task.DisarmAbortSignal()()
 
-			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-			derr := rgw.Delete(task.Context())
-			if derr != nil {
-				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					// missing Host is considered as a successful deletion, continue
-					debug.IgnoreError(derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
-				default:
-					logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+				logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
+				derr := rgw.Delete(task.Context())
+				if derr != nil {
+					msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// missing Host is considered as a successful deletion, continue
+						debug.IgnoreError(derr)
+					case *fail.ErrTimeout:
+						logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
+					default:
+						logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+					}
+					_ = ferr.AddConsequence(derr)
+				} else {
+					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 				}
 				_ = ferr.AddConsequence(derr)
 			} else {
-				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
+				xerr = rgw.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.HostCore)
+					if !ok {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					as.LastState = hoststate.Failed
+					return nil
+				})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					logrus.Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+				}
 			}
-			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
@@ -165,10 +187,12 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) taskFinalizeGatewayConfiguration(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -184,7 +208,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	objgw := castedParams.host
-	if objgw == nil || objgw.IsNull() {
+	if objgw == nil || valid.IsNil(objgw) {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
 
@@ -194,12 +218,13 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	// Executes userdata phase2 script to finalize host installation
 	tracer := debug.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
+	var xerr fail.Error
 	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
 
 	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
@@ -218,7 +243,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			theCause := fail.ConvertError(fail.Cause(xerr))
-			if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
+			if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
 				return nil, xerr
 			}
 
@@ -249,7 +274,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		return nil, xerr
 	}
 
-	// By design, phsse 5 doesn't  touch network cfg, so no reboot needed
+	// By design, phase 5 doesn't  touch network cfg, so no reboot needed
 	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, time.Duration(0))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

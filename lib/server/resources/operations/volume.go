@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
@@ -46,7 +47,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
@@ -61,22 +61,16 @@ type volume struct {
 	lock sync.RWMutex
 }
 
-// VolumeNullValue returns an instance of share corresponding to its null value.
-// The idea is to avoid nil pointer using VolumeNullValue()
-func VolumeNullValue() *volume { // nolint
-	return &volume{MetadataCore: NullCore()}
-}
-
 // NewVolume creates an instance of Volume
-func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
+func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 	if svc == nil {
-		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return VolumeNullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &volume{
@@ -90,21 +84,26 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
-		return VolumeNullValue(), fail.InvalidParameterCannotBeEmptyStringError("ref")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	volumeCache, xerr := svc.GetCache(volumeKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return VolumeNullValue(), xerr
+		return nil, xerr
 	}
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
-		temporal.GetMetadataTimeout(),
+		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := volumeCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -113,9 +112,9 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return VolumeNullValue(), fail.NotFoundError("failed to find Volume '%s'", ref)
+			return nil, fail.NotFoundError("failed to find Volume '%s'", ref)
 		default:
-			return VolumeNullValue(), xerr
+			return nil, xerr
 		}
 	}
 
@@ -165,7 +164,7 @@ func onVolumeCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Erro
 
 // IsNull tells if the instance is a null value
 func (instance *volume) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache
@@ -173,8 +172,10 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	if !valid.IsNil(instance) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -184,13 +185,18 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -222,10 +228,10 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // GetSpeed ...
-func (instance *volume) GetSpeed() (_ volumespeed.Enum, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -236,10 +242,10 @@ func (instance *volume) GetSpeed() (_ volumespeed.Enum, xerr fail.Error) {
 }
 
 // GetSize ...
-func (instance *volume) GetSize() (_ int, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) GetSize() (_ int, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -250,10 +256,11 @@ func (instance *volume) GetSize() (_ int, xerr fail.Error) {
 }
 
 // GetAttachments returns where the Volume is attached
-func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -280,8 +287,8 @@ func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xer
 }
 
 // Browse walks through volume MetadataFolder and executes a callback for each entry
-func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
 	if instance == nil {
@@ -340,10 +347,10 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 }
 
 // Delete deletes Volume and its metadata
-func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -403,7 +410,7 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// delete volume
-	xerr = instance.GetService().DeleteVolume(instance.GetID())
+	xerr = instance.Service().DeleteVolume(instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -434,12 +441,10 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
-		volumeName := instance.GetName()
-		if volumeName != "" {
-			return fail.NotAvailableError("already carrying Subnet '%s'", volumeName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
@@ -476,20 +481,21 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer instance.lock.Unlock()
 
 	// Check if Volume exists and is managed by SafeScale
-	svc := instance.GetService()
+	svc := instance.Service()
 	existing, xerr := LoadVolume(svc, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
 			debug.IgnoreError(xerr)
-			break // nolint
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
 	} else {
-		existing.Released()
+		issue := existing.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
@@ -499,9 +505,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
 			debug.IgnoreError(xerr)
-			break // nolint
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume name '%s' is already used", req.Name)
 		}
@@ -543,7 +547,7 @@ func (instance *volume) Attach(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -557,6 +561,11 @@ func (instance *volume) Attach(
 	}
 	if format == "" {
 		return fail.InvalidParameterError("format", "cannot be empty string")
+	}
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -588,7 +597,7 @@ func (instance *volume) Attach(
 		nfsServer                                                      *nfs.Server
 	)
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	targetID := host.GetID()
 	targetName := host.GetName()
 
@@ -663,29 +672,37 @@ func (instance *volume) Attach(
 					}
 
 					path := mount.Path
-					if path != mountPoint {
-						return fail.InvalidRequestError("volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
+					if mountPoint != "" {
+						if path != mountPoint {
+							return fail.InvalidRequestError("volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
+						}
 					}
 					return nil
 				}
 
-				// Check if there is no other device mounted in the path (or in subpath)
-				for _, i := range hostMountsV1.LocalMountsByPath {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
+				if !doNotMount {
+					// Check if there is no other device mounted in the path (or in subpath)
+					for _, i := range hostMountsV1.LocalMountsByPath {
+						if task.Aborted() {
+							return fail.AbortedError(nil, "aborted")
+						}
 
-					if strings.Index(i.Path, mountPoint) == 0 {
-						return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+						if mountPoint != "" {
+							if strings.Index(i.Path, mountPoint) == 0 {
+								return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+							}
+						}
 					}
-				}
-				for _, i := range hostMountsV1.RemoteMountsByPath {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
+					for _, i := range hostMountsV1.RemoteMountsByPath {
+						if task.Aborted() {
+							return fail.AbortedError(nil, "aborted")
+						}
 
-					if strings.Index(i.Path, mountPoint) == 0 {
-						return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
+						if mountPoint != "" {
+							if strings.Index(i.Path, mountPoint) == 0 {
+								return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
+							}
+						}
 					}
 				}
 				return nil
@@ -756,8 +773,8 @@ func (instance *volume) Attach(
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
-		temporal.GetCommunicationTimeout(),
+		timings.SmallDelay(),
+		timings.CommunicationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -795,7 +812,7 @@ func (instance *volume) Attach(
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			nfsServer, deeperXErr = nfs.NewServer(sshConfig)
+			nfsServer, deeperXErr = nfs.NewServer(svc, sshConfig)
 			if deeperXErr != nil {
 				return deeperXErr
 			}
@@ -812,7 +829,7 @@ func (instance *volume) Attach(
 
 				defer func() {
 					if ferr != nil {
-						// Disable abort signal during the clean up
+						// Disable abort signal during the cleanup
 						defer task.DisarmAbortSignal()()
 
 						if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
@@ -944,7 +961,7 @@ func (instance *volume) Attach(
 	return nil
 }
 
-func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set, xerr fail.Error) {
+func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set, ferr fail.Error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -964,6 +981,13 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 		}
 	}
 
+	svc := host.Service()
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	hostName := host.GetName()
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessful(
@@ -972,7 +996,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return retry.StopRetryError(fmt.Errorf("aborted"))
 			}
 
-			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -987,8 +1011,8 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
-		temporal.GetExecutionTimeout(),
+		timings.SmallDelay(),
+		timings.ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1012,10 +1036,10 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1072,7 +1096,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 	}
 
 	// -- retrieve host data --
-	svc := instance.GetService()
+	svc := instance.Service()
 	targetName := host.GetName()
 
 	// -- Update target attachments --
@@ -1191,7 +1215,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 			}
 
 			// Create NFS Server instance
-			nfsServer, innerXErr := nfs.NewServer(sshConfig)
+			nfsServer, innerXErr := nfs.NewServer(svc, sshConfig)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1265,7 +1289,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 
 // ToProtocol converts the volume to protocol message VolumeInspectResponse
 func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1288,7 +1312,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	for k := range attachments.Hosts {
 		hostInstance, xerr := LoadHost(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1298,7 +1322,10 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 
 		//goland:noinspection ALL
 		defer func(item resources.Host) {
-			item.Released()
+			issue := item.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(hostInstance)
 
 		vols, _ := hostInstance.(*Host).unsafeGetVolumes()

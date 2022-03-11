@@ -5,9 +5,10 @@ on:
     branches:
       - master
       - develop
+      - hotfixes
+      - 'feature/**'
       - 'release/**'
   pull_request:
-    # The branches below must be a subset of the branches above
     branches:
       - master
       - develop
@@ -37,7 +38,7 @@ jobs:
         sudo chmod a+r -R /opt/protoc
         sudo chmod a+xr /opt/protoc/bin/protoc
         sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
-    - run: make debug ci mintest
+    - run: make debug ci with-coverage mintest
     - uses: actions/upload-artifact@v2
       if: failure()
       with:
@@ -46,5 +47,6 @@ jobs:
           generation_results.log
           vet_results.log
           test_results.log
+          style_results.log
           go.mod
           go.sum

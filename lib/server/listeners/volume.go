@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,16 +22,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
@@ -62,11 +59,6 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/volumes/list")
@@ -115,11 +107,6 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/create", name))
 	if xerr != nil {
@@ -156,11 +143,6 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -219,11 +201,6 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
@@ -272,10 +249,6 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -312,10 +285,6 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/inspect", ref))

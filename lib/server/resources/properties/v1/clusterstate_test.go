@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package propertiesv1
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,11 +27,56 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 )
 
-func TestState_Clone(t *testing.T) {
+func TestClusterState_IsNull(t *testing.T) {
+
+	var cs *ClusterState = nil
+	if !cs.IsNull() {
+		t.Error("Nil pointer ClusterState is null")
+		t.Fail()
+	}
+	cs = &ClusterState{
+		State:                clusterstate.Created,
+		StateCollectInterval: 0 * time.Second,
+	}
+	if !cs.IsNull() {
+		t.Error("ClusterState with StateCollectInterval=0 is null")
+		t.Fail()
+	}
+	cs.StateCollectInterval = -40 * time.Second
+	if !cs.IsNull() {
+		t.Error("ClusterState with StateCollectInterval<0 is null")
+		t.Fail()
+	}
+	cs.StateCollectInterval = 40 * time.Second
+	if cs.IsNull() {
+		t.Error("ClusterState is not null")
+		t.Fail()
+	}
+
+}
+
+func TestClusterState_Replace(t *testing.T) {
+
+	var cs *ClusterState = nil
+	cs2 := newClusterState()
+	result, err := cs.Replace(cs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
+
+}
+
+func TestClusterState_Clone(t *testing.T) {
 	ct := newClusterState()
 	ct.State = clusterstate.Created
 
-	clonedCt, ok := ct.Clone().(*ClusterState)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterState)
 	if !ok {
 		t.Fail()
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
@@ -81,7 +82,7 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // CreateVolume creates a block volume
 func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 
@@ -98,7 +99,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 		AvailabilityZone: az,
 		Name:             request.Name,
 		Size:             request.Size,
-		VolumeType:       s.getVolumeType(request.Speed),
+		VolumeType:       strings.ToUpper(s.getVolumeType(request.Speed)),
 	}
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
@@ -125,7 +126,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -162,7 +163,7 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 // ListVolumes lists volumes
 func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var emptySlice []abstract.Volume
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 

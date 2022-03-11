@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
@@ -163,7 +164,7 @@ func (s stack) rpcListServers() ([]*servers.Server, fail.Error) {
 }
 
 // rpcCreateServer calls openstack to create a server
-func (s stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, userdata []byte, az string) (*servers.Server, fail.Error) {
+func (s stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, diskSize int, userdata []byte, az string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
 		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
@@ -195,10 +196,21 @@ func (s stack) rpcCreateServer(name string, networks []servers.Network, template
 		Metadata:         metadata,
 	}
 
+	bd := []bootfromvolume.BlockDevice{
+		{
+			UUID:       srvOpts.ImageRef,
+			SourceType: bootfromvolume.SourceImage,
+			VolumeSize: diskSize,
+		},
+	}
+
 	var server *servers.Server
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			server, innerErr = servers.Create(s.ComputeClient, srvOpts).Extract()
+			server, innerErr = bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
+				CreateOptsBuilder: srvOpts,
+				BlockDevice:       bd,
+			}).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -224,8 +236,8 @@ func (s stack) rpcDeleteServer(id string) fail.Error {
 }
 
 // rpcCreatePort creates a port
-func (s stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, xerr fail.Error) {
-	xerr = stacks.RetryableRemoteCall(
+func (s stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, ferr fail.Error) {
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
 			return innerErr
@@ -294,14 +306,14 @@ func (s stack) rpcUpdatePort(id string, options ports.UpdateOpts) fail.Error {
 }
 
 // rpcGetPort returns port information from its ID
-func (s stack) rpcGetPort(id string) (port *ports.Port, xerr fail.Error) {
+func (s stack) rpcGetPort(id string) (port *ports.Port, ferr fail.Error) {
 	nullPort := &ports.Port{}
 
 	if id == "" {
 		return nullPort, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
 			return innerErr

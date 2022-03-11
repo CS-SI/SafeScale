@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,11 +60,11 @@ func AbsPathify(inPath string) string {
 	}
 
 	p, err := filepath.Abs(inPath)
-	if err == nil {
-		return filepath.Clean(p)
+	if err != nil {
+		return ""
 	}
 
-	return ""
+	return filepath.Clean(p)
 }
 
 func userHomeDir() string {
@@ -88,8 +88,8 @@ func UserConfirmed(msg string) bool {
 }
 
 // ExtractRetCode extracts info from the error
-func ExtractRetCode(err error) (_ string, _ int, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func ExtractRetCode(err error) (_ string, _ int, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	retCode := -1
 	msg := "__ NO MESSAGE __"
 	if ee, ok := err.(*exec.ExitError); ok {

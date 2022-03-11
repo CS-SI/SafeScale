@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -93,10 +92,6 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -112,7 +107,12 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 		return empty, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	xerr = hostInstance.Start(job.Context())
 	if xerr != nil {
@@ -143,10 +143,6 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -162,7 +158,12 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		return empty, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	if xerr = hostInstance.Stop(job.Context()); xerr != nil {
 		return empty, xerr
@@ -190,10 +191,6 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host%s/reboot", ref))
 	if xerr != nil {
 		return nil, xerr
@@ -209,7 +206,12 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 		return empty, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	if xerr = hostInstance.Reboot(job.Context(), false); xerr != nil { // FIXME: We should run a sync first
 		return empty, xerr
@@ -230,10 +232,6 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/hosts/list")
@@ -277,10 +275,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -327,7 +321,10 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 			//goland:noinspection GoDeferInLoop
 			defer func(instance resources.Subnet) { // nolint
-				instance.Released()
+				issue := instance.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(subnetInstance)
 
 			xerr = subnetInstance.Review(
@@ -354,7 +351,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			return nil, xerr
 		}
 
-		defer subnetInstance.Released()
+		defer func() {
+			issue := subnetInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		xerr = subnetInstance.Review(
 			func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -390,6 +392,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
 		ImageRef:      in.GetImageId(),
+		DiskSize:      int(in.GetDisk()),
 	}
 
 	hostInstance, xerr := hostfactory.New(job.Service())
@@ -402,7 +405,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	// logrus.Infof("Host '%s' created", name)
 	return hostInstance.ToProtocol()
@@ -422,10 +430,6 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -452,7 +456,12 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	reduce := false
 	xerr = hostInstance.Inspect(
@@ -507,10 +516,6 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
@@ -536,7 +541,12 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		}
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	// Data sync
 	xerr = hostInstance.Reload()
@@ -554,10 +564,10 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 }
 
 // Inspect a host
-func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect host")
-	defer fail.OnPanic(&err)
+func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot inspect host")
+	defer fail.OnPanic(&ferr)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -569,11 +579,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -583,10 +589,6 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, xerr
 	}
 	defer job.Close()
-
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
@@ -598,13 +600,25 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		}
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	_, xerr = hostInstance.ForceGetState(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
-	return hostInstance.ToProtocol()
+
+	var ph *protocol.Host
+	ph, xerr = hostInstance.ToProtocol()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return ph, nil
 }
 
 // Delete a host
@@ -622,10 +636,6 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -650,7 +660,10 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 
 	xerr = hostInstance.Delete(job.Context())
 	if xerr != nil {
-		hostInstance.Released()
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
 		return empty, xerr
 	}
 
@@ -672,10 +685,6 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -720,10 +729,6 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Host")
@@ -751,14 +756,24 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		return empty, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -791,10 +806,6 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
@@ -822,14 +833,24 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	return empty, hostInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 }
@@ -849,10 +870,6 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -882,14 +899,24 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	if xerr = hostInstance.EnableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		return empty, xerr
@@ -913,10 +940,6 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -953,7 +976,12 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		}
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
@@ -967,7 +995,12 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		}
 	}
 
-	defer sgInstance.Released()
+	defer func() {
+		issue := sgInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	if xerr = hostInstance.DisableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		switch xerr.(type) {
@@ -999,10 +1032,6 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
@@ -1023,7 +1052,12 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 		return nil, xerr
 	}
 
-	defer hostInstance.Released()
+	defer func() {
+		issue := hostInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	bonds, xerr := hostInstance.ListSecurityGroups(securitygroupstate.All)
 	if xerr != nil {

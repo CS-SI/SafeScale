@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
@@ -46,7 +47,7 @@ type Makers struct {
 	CreateNode             func(c resources.Cluster, index uint, host resources.Host) fail.Error
 	ConfigureNode          func(c resources.Cluster, index uint, host resources.Host) fail.Error
 	UnconfigureNode        func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
-	ConfigureCluster       func(ctx context.Context, c resources.Cluster) fail.Error
+	ConfigureCluster       func(ctx context.Context, c resources.Cluster, params data.Map) fail.Error
 	UnconfigureCluster     func(c resources.Cluster) fail.Error
 	JoinMasterToCluster    func(c resources.Cluster, host resources.Host) fail.Error
 	JoinNodeToCluster      func(c resources.Cluster, host resources.Host) fail.Error

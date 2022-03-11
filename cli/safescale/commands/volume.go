@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ package commands
 
 import (
 	"fmt"
+	"strings"
+
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -26,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -60,7 +62,8 @@ var volumeList = &cli.Command{
 			Aliases: []string{"a"},
 			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -68,7 +71,7 @@ var volumeList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		volumes, err := clientSession.Volume.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		volumes, err := clientSession.Volume.List(c.Bool("all"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of volumes", false).Error())))
@@ -82,7 +85,8 @@ var volumeInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -94,7 +98,7 @@ var volumeInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		volumeInfo, err := clientSession.Volume.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		volumeInfo, err := clientSession.Volume.Inspect(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of volume", false).Error())))
@@ -108,7 +112,8 @@ var volumeDelete = &cli.Command{
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove volume",
 	ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -124,7 +129,7 @@ var volumeDelete = &cli.Command{
 		volumeList = append(volumeList, c.Args().First())
 		volumeList = append(volumeList, c.Args().Tail()...)
 
-		err := clientSession.Volume.Delete(volumeList, temporal.GetExecutionTimeout())
+		err := clientSession.Volume.Delete(volumeList, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of volume", false).Error())))
@@ -150,7 +155,8 @@ var volumeCreate = &cli.Command{
 			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -177,7 +183,7 @@ var volumeCreate = &cli.Command{
 			Speed: protocol.VolumeSpeed(volSpeed),
 		}
 
-		volume, err := clientSession.Volume.Create(&def, temporal.GetExecutionTimeout())
+		volume, err := clientSession.Volume.Create(&def, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of volume", true).Error())))
@@ -211,7 +217,8 @@ var volumeAttach = &cli.Command{
 			Usage: "Prevent the volume to be mounted",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -231,7 +238,7 @@ var volumeAttach = &cli.Command{
 			Host:        &protocol.Reference{Name: c.Args().Get(1)},
 			Volume:      &protocol.Reference{Name: c.Args().Get(0)},
 		}
-		err := clientSession.Volume.Attach(&def, temporal.GetExecutionTimeout())
+		err := clientSession.Volume.Attach(&def, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "attach of volume", true).Error())))
@@ -245,7 +252,8 @@ var volumeDetach = &cli.Command{
 	Aliases:   []string{"unbind"},
 	Usage:     "Detach a volume from a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -257,7 +265,7 @@ var volumeDetach = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Volume.Detach(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
+		err := clientSession.Volume.Detach(c.Args().Get(0), c.Args().Get(1), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unattach of volume", true).Error())))
@@ -337,6 +345,8 @@ func getAllowedSpeeds() string {
 		if i > 0 {
 			speeds += ", "
 		}
+		// this message is intended for final users, showing allowed values that didn't match allowed inputs wasn't a good idea
+		k = strings.TrimPrefix(k, "VS_")
 		speeds += k
 		i++
 	}

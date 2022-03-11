@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,8 @@ package template
 import (
 	txttmpl "text/template"
 
-	"github.com/Masterminds/sprig"
-
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	sprig "github.com/Masterminds/sprig/v3"
 )
 
 // Parse returns a text template with default funcs declared

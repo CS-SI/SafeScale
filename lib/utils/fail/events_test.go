@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,152 +17,353 @@
 package fail
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
-// -------- tests for log helpers ---------
+func logrus_capture(routine func()) string {
 
-func getNotFoundErrorWithLog() (err error) {
-	defer OnExitLogError(&err)
-	return NotFoundError("not there !!!")
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	logrus.SetOutput(w)
+
+	routine()
+
+	_ = w.Close()
+	out, _ := ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+	return string(out)
+
 }
 
-func doPanic() {
-	panic("Ouch")
-}
+func Test_OnExitLogErrorWithLevel(t *testing.T) {
 
-func liveDangerously(panicflag bool) (err error) {
-	spew.Dump(&err)
-	defer OnPanic(&err)
+	log := logrus_capture(func() {
+		OnExitLogErrorWithLevel(nil, logrus.WarnLevel)
+	})
+	require.EqualValues(t, log, "")
 
-	if panicflag {
-		doPanic()
+	log = logrus_capture(func() {
+		OnExitLogErrorWithLevel(struct{}{}, logrus.WarnLevel)
+	})
+	require.EqualValues(t, strings.Contains(log, "fail.OnExitLogErrorWithLevel()"), true)
+
+	log = logrus_capture(func() {
+		nerr := errors.New("Any message")
+		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
+	})
+	require.EqualValues(t, strings.Contains(log, "Any message"), true)
+
+	log = logrus_capture(func() {
+		nerr := fmt.Errorf("Any message")
+		OnExitLogErrorWithLevel(&nerr, 42)
+	})
+	require.EqualValues(t, strings.Contains(log, "level=error"), true)
+
+	log = logrus_capture(func() {
+		nerr := grpcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
+		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
+
+		fmt.Println(nerr)
+	})
+	require.EqualValues(t, strings.Contains(log, "GRPC Error"), true)
+	require.EqualValues(t, strings.Contains(log, "FailedPrecondition"), true)
+
+	errs := []Error{
+		WarningError(errors.New("math: can't divide by zero"), "Any message"),
+		TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message"),
+		AbortedError(errors.New("math: can't divide by zero"), "Any message"),
+		OverflowError(errors.New("math: can't divide by zero"), 30, "Any message"),
+		ExecutionError(errors.New("exit error"), "Any message"),
+		NewError("Any message"),
+		&errorCore{
+			message:             "math: can't divide by zero: Any message",
+			cause:               errors.New("math: can't divide by zero"),
+			consequences:        []error{errors.New("can't resolve equation")},
+			annotations:         make(data.Annotations),
+			grpcCode:            codes.Unknown,
+			causeFormatter:      defaultCauseFormatter,
+			annotationFormatter: defaultAnnotationFormatter,
+			lock:                &sync.RWMutex{},
+		},
 	}
 
-	return nil
-}
+	for i := range errs {
+		log = logrus_capture(func() {
+			err := func(in_err Error) (out_err error) {
+				defer OnExitLogErrorWithLevel(&in_err, logrus.WarnLevel)
+				return in_err
+			}(errs[i])
+			if err == nil {
+				t.Fail()
+			}
 
-func TestLogErrorWithPanic(t *testing.T) {
-	err := liveDangerously(true)
-	if err == nil {
-		t.Errorf("Panic error shouldn't go unnoticed")
-	} else {
-		message := err.Error()
-		if !strings.Contains(message, "Ouch") {
-			t.Errorf("Panic should contain panic info...")
+		})
+		if !strings.Contains(log, "level=warning") {
+			t.Errorf("Invalid '%s' log level", reflect.TypeOf(errs[i]).String())
+			t.Fail()
+		}
+		if !strings.Contains(log, "Any message") {
+			t.Errorf("Invalid '%s' error message", errs[i].Error())
+			t.Fail()
 		}
 	}
+
 }
 
-func TestExitLogError(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	logrus.SetOutput(w)
-
-	err := getNotFoundErrorWithLog()
-	if err == nil {
-		t.Fail()
+func OnExit_extractCallerName_deepcall(length uint, callback func() string) string {
+	if length > 0 {
+		length--
+		OnExit_extractCallerName_deepcall(length, callback)
 	}
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-
-	tk := string(out)
-
-	if !strings.Contains(tk, "getNotFoundErrorWithLog") {
-		t.Fail()
-	}
+	return callback()
 }
 
-func callToSomethingThatReturnsErr() error {
-	return getNotFoundErrorWithLog()
+func Test_extractCallerName(t *testing.T) {
+
+	result := extractCallerName()
+	require.EqualValues(t, strings.Contains(result, "runtime.goexit"), true)
+
+	result = func() string {
+		return extractCallerName() // nolint
+	}()
+	require.EqualValues(t, strings.Contains(result, "testing.tRunner"), true)
+
+	result = func() string {
+		return func() string { // nolint
+			return extractCallerName() // nolint
+		}()
+	}()
+	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+
+	result = func() string {
+		return func() string {
+			return func() string { // nolint
+				return extractCallerName() // nolint
+			}()
+		}()
+	}()
+	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+
+	result = func() string {
+		return func() string {
+			return func() string {
+				return func() string { // nolint
+					return extractCallerName() // nolint
+				}()
+			}()
+		}()
+	}()
+	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+
+	result = func() string {
+		return func() string {
+			return func() string {
+				return func() string {
+					return func() string { // nolint
+						return extractCallerName() // nolint
+					}()
+				}()
+			}()
+		}()
+	}()
+	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+
+	result = OnExit_extractCallerName_deepcall(12, extractCallerName)
+	require.EqualValues(t, strings.Contains(result, "testing.tRunner"), true)
+
 }
 
-func callToSomethingThatReturnsErrButLogsIt() (err error) {
-	defer OnExitLogErrorWithLevel(&err, logrus.WarnLevel)
-	return getNotFoundError()
+func Test_OnExitLogError(t *testing.T) {
+
+	log := logrus_capture(func() {
+		OnExitLogError(nil, "test")
+	})
+	require.EqualValues(t, log, "")
+
+	log = logrus_capture(func() {
+		nerr := fmt.Errorf("Any message")
+		OnExitLogError(&nerr, "test")
+	})
+	if !strings.Contains(log, "Any message") {
+		t.Fail()
+	}
+
+	errs := []Error{
+		WarningError(errors.New("math: can't divide by zero"), "Any message"),
+		TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message"),
+		AbortedError(errors.New("math: can't divide by zero"), "Any message"),
+		OverflowError(errors.New("math: can't divide by zero"), 30, "Any message"),
+		ExecutionError(errors.New("exit error"), "Any message"),
+		NewError("Any message"),
+	}
+
+	for i := range errs {
+		log = logrus_capture(func() {
+			err := func(in_err Error) (out_err error) {
+				defer OnExitLogError(&in_err, "test")
+				return in_err
+			}(errs[i])
+			if err == nil {
+				t.Fail()
+			}
+
+		})
+		if !strings.Contains(log, "level=error") {
+			t.Fail()
+		}
+		if !strings.Contains(log, "Any message") {
+			t.Fail()
+		}
+	}
+
 }
 
-func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
-	defer OnExitLogError(&err)
-	return getNotFoundError()
+func Test_OnExitTraceError(t *testing.T) {
+
+	log := logrus_capture(func() {
+		OnExitTraceError(nil, "test")
+	})
+	require.EqualValues(t, log, "")
+
+	log = logrus_capture(func() {
+		nerr := fmt.Errorf("Any message")
+		OnExitTraceError(&nerr, "test")
+	})
+	require.EqualValues(t, log, "")
+
+	errs := []Error{
+		WarningError(errors.New("math: can't divide by zero"), "Any message"),
+		TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message"),
+		AbortedError(errors.New("math: can't divide by zero"), "Any message"),
+		OverflowError(errors.New("math: can't divide by zero"), 30, "Any message"),
+		ExecutionError(errors.New("exit error"), "Any message"),
+		NewError("Any message"),
+	}
+
+	for i := range errs {
+		log = logrus_capture(func() {
+			err := func(in_err Error) (out_err error) {
+				defer OnExitTraceError(&in_err, "test")
+				return in_err
+			}(errs[i])
+			if err == nil {
+				t.Fail()
+			}
+
+		})
+		require.EqualValues(t, log, "")
+	}
+
 }
 
-func TestOnExit(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func Test_OnExitWrapError(t *testing.T) {
 
-	logrus.SetOutput(w)
+	log := logrus_capture(func() {
+		OnExitWrapError(nil, "")
+	})
+	require.EqualValues(t, log, "")
 
-	err := callToSomethingThatReturnsErr()
-	if err == nil {
+	log = logrus_capture(func() {
+		errv := NewError("Any message")
+		OnExitWrapError(&errv, "test")
+	})
+	if !strings.Contains(log, "OnExitWrapError only works when 'err' is a '*error'") {
 		t.Fail()
 	}
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-
-	tk := string(out)
-
-	if !strings.Contains(tk, "getNotFoundErrorWithLog") {
+	log = logrus_capture(func() {
+		errv := WarningError(errors.New("math: can't divide by zero"), "Any message")
+		OnExitWrapError(&errv, "test")
+	})
+	if !strings.Contains(log, "unexpected type '**fail.ErrWarning'") {
 		t.Fail()
 	}
+	log = logrus_capture(func() {
+		errv := errors.New("Any message")
+		OnExitWrapError(&errv, "test")
+	})
+	require.EqualValues(t, log, "")
+
 }
 
-func TestOnExitAndLog(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func Test_OnExitConvertToGRPCStatus(t *testing.T) {
 
-	logrus.SetOutput(w)
+	err := grpcstatus.Error(codes.NotFound, "id was not found")
+	OnExitConvertToGRPCStatus(&err)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*status.Error")
 
-	err := callToSomethingThatReturnsErrButLogsIt()
-	if err == nil {
-		t.Fail()
-	}
+	errv := errors.New("Any message")
+	OnExitConvertToGRPCStatus(&errv)
+	require.EqualValues(t, reflect.TypeOf(errv).String(), "*status.Error")
 
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-
-	tk := string(out)
-
-	if !strings.Contains(tk, "callToSomethingThatReturnsErrButLogsIt") {
-		t.Fail()
-	}
 }
 
-func TestOnExitAndLogWithWarning(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func Test_OnPanic(t *testing.T) {
 
-	logrus.SetOutput(w)
+	err := func() (err error) {
+		spew.Dump(&err)
+		defer OnPanic(&err)
+		panic("mayday")
+	}()
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
 
-	err := callToSomethingThatReturnsErrButLogItWithWarning()
-	if err == nil {
-		t.Fail()
-	}
+	log := logrus_capture(func() {
+		_ = func() (err *Error) {
+			err = nil
+			defer OnPanic(err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "intercepted panic but '*err' is nil"), true)
 
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
+	log = logrus_capture(func() {
+		_ = func() (err Error) {
+			err = NotFoundError("Any message")
+			defer OnPanic(&err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "fail.OnPanic"), true)
 
-	tk := string(out)
+	log = logrus_capture(func() {
+		_ = func() (err *error) {
+			err = nil
+			defer OnPanic(err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "intercepted panic but '*err' is nil"), true)
 
-	if !strings.Contains(tk, "callToSomethingThatReturnsErrButLogItWithWarning") {
-		t.Fail()
-	}
+	log = logrus_capture(func() {
+		_ = func() (err error) {
+			err = errors.New("Any message")
+			defer OnPanic(&err)
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "fail.OnPanic"), true)
+
+	log = logrus_capture(func() {
+		_ = func() (err error) {
+			defer OnPanic(struct{}{})
+			panic("mayday")
+		}()
+	})
+	require.EqualValues(t, strings.Contains(log, "intercepted panic but parameter 'err' is invalid"), true)
+
 }

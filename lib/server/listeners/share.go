@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
@@ -34,6 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 )
 
 // safescale share create --path="/shared/data" share1 host1
@@ -62,10 +60,6 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	shareName := in.GetName()
@@ -102,7 +96,12 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 
-	defer shareInstance.Released()
+	defer func() {
+		issue := shareInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	out, xerr := shareInstance.ToProtocol()
 	if xerr != nil {
@@ -129,10 +128,6 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	shareName := in.GetName()
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/share/%s/delete", shareName))
 	if xerr != nil {
@@ -149,7 +144,12 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return empty, xerr
 	}
 
-	defer shareInstance.Released()
+	defer func() {
+		issue := shareInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	if xerr = shareInstance.Delete(job.Context()); xerr != nil {
 		return empty, xerr
@@ -169,10 +169,6 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/shares/list")
@@ -217,10 +213,6 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
@@ -260,10 +252,6 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
@@ -301,10 +289,6 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	shareRef, _ := srvutils.GetReference(in)
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/share/%s/inspect", shareRef))
 	if xerr != nil {
@@ -328,7 +312,12 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	defer shareInstance.Released()
+	defer func() {
+		issue := shareInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	return shareInstance.ToProtocol()
 }

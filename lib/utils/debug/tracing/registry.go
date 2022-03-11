@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ func RegisterTraceSettings(jsonSettings string) error {
 	newSettings := map[string]map[string]bool{}
 	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
 	if err != nil {
-		return fmt.Errorf("no trace are enabled, an error occurred loading trace settings: %v", err)
+		return fmt.Errorf("no trace are enabled, an error occurred loading trace settings: %w", err)
 	}
 
 	// Check with env variable SAFESCALE_TRACE if key or key.subkey is inside

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@ package stacks
 
 // AWSConfiguration AWS cloud platform configuration
 type AWSConfiguration struct {
-	S3Endpoint  string `json:"-"`
-	Ec2Endpoint string `json:"-"`
-	SsmEndpoint string `json:"-"`
-	Region      string `json:"-"`
-	Zone        string `json:"-"`
-	NetworkName string `json:"-"`
+	S3Endpoint  string   `json:"-"`
+	Ec2Endpoint string   `json:"-"`
+	SsmEndpoint string   `json:"-"`
+	Region      string   `json:"-"`
+	Zone        string   `json:"-"`
+	NetworkName string   `json:"-"`
+	Owners      []string `json:"-"`
 }

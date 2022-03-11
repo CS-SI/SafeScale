@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package abstract
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
@@ -25,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // ClusterRequest defines what kind of Cluster is wanted
@@ -43,7 +45,8 @@ type ClusterRequest struct {
 	InitialNodeCount        uint                   // contains the initial count of nodes to create (cannot be less than flavor requirement)
 	OS                      string                 // contains the name of the linux distribution wanted
 	DisabledDefaultFeatures map[string]struct{}    // contains the list of features that should be installed by default but we don't want actually
-	Force                   bool                   // Force is set to True in order to ignore sizing recommendations
+	Force                   bool                   // set to True in order to ignore sizing recommendations
+	FeatureParameters       []string               // contains parameter values of automatically installed Features
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster
@@ -67,62 +70,63 @@ func NewClusterIdentity() *ClusterIdentity {
 }
 
 // IsNull ...
-func (i *ClusterIdentity) IsNull() bool {
-	return i == nil || i.Name == ""
+func (instance *ClusterIdentity) IsNull() bool {
+	return instance == nil || instance.Name == ""
 }
 
 // Clone makes a copy of the instance
 // satisfies interface data.Clonable
-func (i ClusterIdentity) Clone() data.Clonable {
-	return NewClusterIdentity().Replace(&i)
+func (instance ClusterIdentity) Clone() (data.Clonable, error) {
+	return NewClusterIdentity().Replace(&instance)
 }
 
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
-func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
-	if i == nil || p == nil {
-		return i
+func (instance *ClusterIdentity) Replace(p data.Clonable) (data.Clonable, error) {
+	if instance == nil || p == nil {
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME, Replace should also return an error
-	src, _ := p.(*ClusterIdentity) // nolint
-	*i = *src
-	i.Keypair = nil
-	if src.Keypair != nil {
-		i.Keypair = &KeyPair{}
-		*i.Keypair = *src.Keypair
+	src, ok := p.(*ClusterIdentity)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterIdentity")
 	}
-	return i
+	*instance = *src
+	instance.Keypair = nil
+	if src.Keypair != nil {
+		instance.Keypair = &KeyPair{}
+		*instance.Keypair = *src.Keypair
+	}
+	return instance, nil
 }
 
 // GetName returns the name of the cluster
 // Satisfies interface data.Identifiable
-func (i ClusterIdentity) GetName() string {
-	return i.Name
+func (instance ClusterIdentity) GetName() string {
+	return instance.Name
 }
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
-func (i ClusterIdentity) GetID() string {
-	return i.GetName()
+func (instance ClusterIdentity) GetID() string {
+	return instance.GetName()
 }
 
 // OK ...
-func (i ClusterIdentity) OK() bool {
+func (instance ClusterIdentity) OK() bool {
 	result := true
-	result = result && i.Name != ""
-	result = result && i.Flavor != 0
+	result = result && instance.Name != ""
+	result = result && instance.Flavor != 0
 	return result
 }
 
 // Serialize serializes ClusterIdentity instance into bytes (output json code)
-func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
-	if i.IsNull() {
+func (instance *ClusterIdentity) Serialize() ([]byte, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	r, jserr := json.Marshal(i)
+	r, jserr := json.Marshal(instance)
 	if jserr != nil {
 		return nil, fail.NewError(jserr.Error())
 	}
@@ -130,15 +134,15 @@ func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a ClusterIdentity
-func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
-	// i cannot be nil, but can be null value (which will be filled by this method)
-	if i == nil {
+func (instance *ClusterIdentity) Deserialize(buf []byte) (ferr fail.Error) {
+	// instance cannot be nil, but can be null value (which will be filled by this method)
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
-	jserr := json.Unmarshal(buf, i)
+	jserr := json.Unmarshal(buf, instance)
 	if jserr != nil {
 		switch jserr.(type) {
 		case *stdjson.SyntaxError:

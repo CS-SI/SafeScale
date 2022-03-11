@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ const (
 )
 
 // BuildMetadataBucketName builds the name of the bucket/stowContainer that will store metadata
-func BuildMetadataBucketName(driver, region, domain, project string) (name string, xerr fail.Error) {
+func BuildMetadataBucketName(driver, region, domain, project string) (name string, ferr fail.Error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
 	_, herr := hash.Write([]byte(sig))

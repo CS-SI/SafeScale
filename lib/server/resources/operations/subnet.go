@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ import (
 	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -76,12 +76,14 @@ type Subnet struct {
 
 // NullSubnet returns a *Subnet representing null value
 func NullSubnet() *Subnet {
-	return &Subnet{MetadataCore: NullCore()}
+	return &Subnet{MetadataCore: nil}
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func ListSubnets(
+	ctx context.Context, svc iaas.Service, networkID string, all bool,
+) (_ []*abstract.Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -138,8 +140,8 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 }
 
 // NewSubnet creates an instance of Subnet used as resources.Subnet
-func NewSubnet(svc iaas.Service) (_ *Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return NullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
@@ -168,12 +170,17 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
 
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// -- First step: identify subnetID from (networkRef, subnetRef) --
 	var (
 		subnetID        string
 		networkInstance resources.Network
 	)
-	var xerr fail.Error
+
 	networkRef = strings.TrimSpace(networkRef)
 	switch networkRef {
 	case "":
@@ -264,7 +271,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 
 		options := iaas.CacheMissOption(
 			func() (cache.Cacheable, fail.Error) { return onSubnetCacheMiss(svc, subnetID) },
-			temporal.GetMetadataTimeout(),
+			timings.MetadataTimeout(),
 		)
 		cacheEntry, xerr := subnetCache.Get(subnetID, options...)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -350,7 +357,7 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 	}
 
 	if primaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(instance.GetService(), primaryGatewayID)
+		hostInstance, xerr := LoadHost(instance.Service(), primaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -363,7 +370,7 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 		}
 	}
 	if secondaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(instance.GetService(), secondaryGatewayID)
+		hostInstance, xerr := LoadHost(instance.Service(), secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -372,7 +379,7 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 		var ok bool
 		instance.gateways[1], ok = hostInstance.(*Host)
 		if !ok {
-			return fail.NewError("hostInstance should be a *Host")
+			return fail.InconsistentError("hostInstance should be a *Host")
 		}
 	}
 
@@ -380,7 +387,7 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 }
 
 func (instance *Subnet) IsNull() bool {
-	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && instance.MetadataCore.IsNull())))
+	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && valid.IsNil(instance.MetadataCore))))
 }
 
 // Carry wraps rv.core.Carry() to add Volume to service cache
@@ -393,13 +400,18 @@ func (instance *Subnet) Carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -431,20 +443,19 @@ func (instance *Subnet) Carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Create creates a Subnet
-// FIXME: split up this function for readability
-func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (ferr fail.Error) {
+func (instance *Subnet) Create(
+	ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
-		subnetName := instance.GetName()
-		if subnetName != "" {
-			return fail.NotAvailableError("already carrying Subnet '%s'", subnetName)
+	if !valid.IsNil(instance.MetadataCore) {
+		if instance.MetadataCore.IsTaken() {
+			return fail.NotAvailableError("already carrying information")
 		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -479,11 +490,24 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
-		if ferr != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
-			} else {
-				logrus.Infof("the subnet '%s' should be gone by now", instance.GetID())
+		if ferr != nil {
+			if !req.KeepOnFailure {
+				if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
+				} else {
+					logrus.Infof("the subnet '%s' should be gone by now", instance.GetID())
+				}
+			}
+		}
+	}()
+
+	defer func() {
+		if ferr != nil {
+			if instance != nil {
+				derr := instance.unsafeUpdateSubnetStatus(subnetstate.Error)
+				if derr != nil {
+					_ = ferr.AddConsequence(derr)
+				}
 			}
 		}
 	}()
@@ -516,11 +540,16 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sg, innerXErr := LoadSecurityGroup(instance.GetService(), as.InternalSecurityGroupID)
+		sg, innerXErr := LoadSecurityGroup(instance.Service(), as.InternalSecurityGroupID)
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
 		}
-		defer sg.Released()
+		defer func() {
+			issue := sg.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
 		if innerXErr = sg.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, sg.GetName(), host.GetName())
@@ -531,7 +560,9 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 }
 
 // undoBindInternalSecurityGroupToGateway does what its name says
-func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) {
+func (instance *Subnet) undoBindInternalSecurityGroupToGateway(
+	ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error,
+) {
 	// FIXME: Use ctx the right way
 
 	if xerr != nil && *xerr != nil && keepOnFailure {
@@ -541,13 +572,20 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sg, derr := LoadSecurityGroup(instance.GetService(), as.InternalSecurityGroupID)
-			if derr == nil {
-				derr = sg.UnbindFromHost(context.Background(), host)
-				sg.Released()
-			}
+			sg, derr := LoadSecurityGroup(instance.Service(), as.InternalSecurityGroupID)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+				return derr
+			}
+
+			derr = sg.UnbindFromHost(context.Background(), host)
+			if derr != nil {
+				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+				return derr
+			}
+			err := sg.Released()
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			return nil
 		})
@@ -556,8 +594,14 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 
 // deleteSubnetThenWaitCompletion deletes the Subnet identified by 'id' and wait for deletion confirmation
 func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
-	svc := instance.GetService()
-	xerr := svc.DeleteSubnet(id)
+	svc := instance.Service()
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = svc.DeleteSubnet(id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -576,8 +620,8 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					debug.IgnoreError(xerr)
 					// Subnet not found, good
+					debug.IgnoreError(xerr)
 					return nil
 				default:
 					return xerr
@@ -585,8 +629,8 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
-		temporal.GetContextTimeout(),
+		timings.SmallDelay(),
+		timings.ContextTimeout(),
 	)
 }
 
@@ -620,7 +664,7 @@ func (instance *Subnet) validateCIDR(req *abstract.SubnetRequest, network abstra
 	// CIDR is empty, choose the first Class C available one
 	logrus.Debugf("CIDR is empty, choosing one...")
 
-	subnets, xerr := instance.GetService().ListSubnets(network.ID)
+	subnets, xerr := instance.Service().ListSubnets(network.ID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -672,7 +716,7 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 
 // checkUnicity checks if the Subnet name is not already used
 func (instance *Subnet) checkUnicity(req abstract.SubnetRequest) fail.Error {
-	resSubnet, xerr := LoadSubnet(instance.GetService(), req.NetworkID, req.Name)
+	resSubnet, xerr := LoadSubnet(instance.Service(), req.NetworkID, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -683,16 +727,38 @@ func (instance *Subnet) checkUnicity(req abstract.SubnetRequest) fail.Error {
 		}
 	}
 
-	resSubnet.Released()
+	err := resSubnet.Released()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
 	return fail.DuplicateError("Subnet '%s' already exists", req.Name)
 }
 
 // validateNetwork verifies the Network exists and make sure req.Network field is an ID
 func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
 	var an *abstract.Network
-	svc := instance.GetService()
+	svc := instance.Service()
 	rn, xerr := LoadNetwork(svc, req.NetworkID)
-	if xerr == nil {
+	if xerr != nil {
+		switch xerr.(type) { // nolint
+		case *fail.ErrNotFound:
+			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if !withDefaultSubnetwork {
+				return nil, nil, xerr
+			}
+
+			an, xerr = svc.GetDefaultNetwork()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, nil, xerr
+			}
+		}
+	} else {
 		xerr = rn.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			an, ok = clonable.(*abstract.Network)
@@ -712,24 +778,10 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 			}
 			return nil
 		})
-	} else {
-		rn = nil
-		switch xerr.(type) { // nolint
-		case *fail.ErrNotFound:
-			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
-			if err != nil {
-				return nil, nil, err
-			}
-
-			if !withDefaultSubnetwork {
-				return nil, nil, xerr
-			}
-			an, xerr = svc.GetDefaultNetwork()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, nil, xerr
 		}
-	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, xerr
 	}
 
 	req.NetworkID = an.ID
@@ -745,7 +797,7 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.GetService().UnbindHostFromVIP(vip, host.GetID())
+	xerr := instance.Service().UnbindHostFromVIP(vip, host.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", ActionFromError(xerr), host.GetName())
@@ -755,8 +807,8 @@ func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resource
 }
 
 // Browse walks through all the metadata objects in Subnet
-func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -811,10 +863,10 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 }
 
 // AttachHost links Host to the Subnet
-func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -883,7 +935,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xe
 		}
 
 		if subnetAbstract.InternalSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(instance.GetService(), subnetAbstract.InternalSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(instance.Service(), subnetAbstract.InternalSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -910,7 +962,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xe
 		}
 
 		if !isGateway && pubIP != "" && subnetAbstract.PublicIPSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(instance.GetService(), subnetAbstract.PublicIPSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(instance.Service(), subnetAbstract.PublicIPSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -936,10 +988,10 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xe
 }
 
 // DetachHost unlinks host ID from Subnet
-func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -979,10 +1031,10 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (xerr fai
 }
 
 // ListHosts returns the list of Hosts attached to the Subnet (excluding gateway)
-func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1019,7 +1071,7 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			svc := instance.GetService()
+			svc := instance.Service()
 			for id := range shV1.ByID {
 				hostInstance, innerErr := LoadHost(svc, id)
 				if innerErr != nil {
@@ -1034,11 +1086,11 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr
 }
 
 // InspectGateway returns the gateway related to Subnet
-func (instance *Subnet) InspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) InspectGateway(primary bool) (_ resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
-		return HostNullValue(), fail.InvalidInstanceError()
+	if instance == nil || valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	instance.lock.Lock()
@@ -1048,10 +1100,10 @@ func (instance *Subnet) InspectGateway(primary bool) (_ resources.Host, xerr fai
 }
 
 // GetGatewayPublicIP returns the Public IP of a particular gateway
-func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -1059,8 +1111,8 @@ func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, xerr fail.Er
 	defer instance.lock.RUnlock()
 
 	var ip string
-	svc := instance.GetService()
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	svc := instance.Service()
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1080,13 +1132,19 @@ func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, xerr fail.Er
 
 			id = as.GatewayIDs[1]
 		}
-		if rgw, innerXErr = LoadHost(svc, id); innerXErr != nil {
-			return innerXErr
+		var inErr fail.Error
+		if rgw, inErr = LoadHost(svc, id); inErr != nil {
+			return inErr
 		}
-		defer rgw.Released()
+		defer func() {
+			issue := rgw.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
+		}()
 
-		if ip, innerXErr = rgw.GetPublicIP(); innerXErr != nil {
-			return innerXErr
+		if ip, inErr = rgw.GetPublicIP(); inErr != nil {
+			return inErr
 		}
 
 		return nil
@@ -1100,11 +1158,11 @@ func (instance *Subnet) GetGatewayPublicIP(primary bool) (_ string, xerr fail.Er
 }
 
 // GetGatewayPublicIPs returns a slice of public IP of gateways
-func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetGatewayPublicIPs() (_ []string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	var emptySlice []string
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -1112,28 +1170,31 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 	defer instance.lock.RUnlock()
 
 	var gatewayIPs []string
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		gatewayIPs = make([]string, 0, len(as.GatewayIDs))
-		svc := instance.GetService()
+		svc := instance.Service()
 		for _, v := range as.GatewayIDs {
-			rgw, innerXErr := LoadHost(svc, v)
-			if innerXErr != nil {
-				return innerXErr
+			rgw, inErr := LoadHost(svc, v)
+			if inErr != nil {
+				return inErr
 			}
 
 			//goland:noinspection ALL
 			defer func(hostInstance resources.Host) {
-				hostInstance.Released()
+				issue := hostInstance.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(rgw)
 
-			ip, innerXErr := rgw.GetPublicIP()
-			if innerXErr != nil {
-				return innerXErr
+			ip, inErr := rgw.GetPublicIP()
+			if inErr != nil {
+				return inErr
 			}
 
 			gatewayIPs = append(gatewayIPs, ip)
@@ -1154,10 +1215,10 @@ var (
 )
 
 // Delete deletes a Subnet
-func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1168,7 +1229,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		subnetAbstract *abstract.Subnet
 		subnetHosts    *propertiesv1.SubnetHosts
 	)
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		subnetAbstract, ok = clonable.(*abstract.Subnet)
 		if !ok {
@@ -1216,7 +1277,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	subnetName := instance.GetName()
 	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
@@ -1237,8 +1298,13 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr == nil {
-						hostInstance.Released()
+					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr != nil {
+						debug.IgnoreError(innerXErr)
+					} else {
+						err := hostInstance.Released()
+						if err != nil {
+							return fail.Wrap(err)
+						}
 						hostList = append(hostList, k)
 					}
 				}
@@ -1312,7 +1378,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		// 4st free CIDR index if the Subnet has been created for a single Host
 		if as.SingleHostCIDRIndex > 0 {
 			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-			networkInstance, innerXErr := instance.InspectNetwork()
+			networkInstance, innerXErr := LoadNetwork(instance.Service(), as.Network)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1348,8 +1414,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // deleteSecurityGroups deletes the Security Groups created for the Subnet
-func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (xerr fail.Error) {
-	svc := instance.GetService()
+func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (ferr fail.Error) {
+	svc := instance.Service()
 	for _, v := range sgs {
 		if v == "" {
 			return fail.NewError("unexpected empty security group")
@@ -1387,25 +1453,24 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 }
 
 // Released overloads core.Released() to release the parent Network instance
-func (instance *Subnet) Released() {
-	if instance == nil || instance.IsNull() {
-		return
+func (instance *Subnet) Released() error {
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
 	}
 
-	// instance.parentNetwork.Released()
-	instance.MetadataCore.Released()
+	return instance.MetadataCore.Released()
 }
 
 // InspectNetwork returns the Network instance owning the Subnet
-func (instance *Subnet) InspectNetwork() (rn resources.Network, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) InspectNetwork() (rn resources.Network, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var as *abstract.Subnet
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		var ok bool
 		as, ok = clonable.(*abstract.Subnet)
 		if !ok {
@@ -1416,13 +1481,13 @@ func (instance *Subnet) InspectNetwork() (rn resources.Network, xerr fail.Error)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return LoadNetwork(instance.GetService(), as.Network)
+	return LoadNetwork(instance.Service(), as.Network)
 }
 
 // deleteGateways deletes all the gateways of the Subnet
 // A gateway host that is not found must be considered as a success
-func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, xerr fail.Error) {
-	svc := instance.GetService()
+func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, ferr fail.Error) {
+	svc := instance.Service()
 
 	ids = []string{}
 	if len(subnet.GatewayIDs) > 0 {
@@ -1474,14 +1539,16 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 }
 
 // onRemovalUnbindSecurityGroups makes sure the security groups bound to Subnet are unbound
-func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+func (instance *Subnet) onRemovalUnbindSecurityGroups(
+	ctx context.Context, subnetHosts *propertiesv1.SubnetHosts, sgs *propertiesv1.SubnetSecurityGroups,
+) (ferr fail.Error) {
 	unbindParams := taskUnbindFromHostsAttachedToSubnetParams{
 		subnetID:    instance.GetID(),
 		subnetName:  instance.GetName(),
 		subnetHosts: subnetHosts,
 		onRemoval:   true,
 	}
-	svc := instance.GetService()
+	svc := instance.Service()
 	for k := range sgs.ByID {
 		sgInstance, xerr := LoadSecurityGroup(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1496,7 +1563,10 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 		} else {
 			//goland:noinspection ALL
 			defer func(sgInstance resources.SecurityGroup) {
-				sgInstance.Released()
+				issue := sgInstance.Released()
+				if issue != nil {
+					logrus.Warn(issue)
+				}
 			}(sgInstance)
 
 			xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)
@@ -1513,10 +1583,10 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 }
 
 // GetDefaultRouteIP returns the IP of the LAN default route
-func (instance *Subnet) GetDefaultRouteIP() (ip string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetDefaultRouteIP() (ip string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	instance.lock.RLock()
@@ -1526,18 +1596,18 @@ func (instance *Subnet) GetDefaultRouteIP() (ip string, xerr fail.Error) {
 }
 
 // GetEndpointIP returns the internet (public) IP to reach the Subnet
-func (instance *Subnet) GetEndpointIP() (ip string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetEndpointIP() (ip string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	ip = ""
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1546,7 +1616,7 @@ func (instance *Subnet) GetEndpointIP() (ip string, xerr fail.Error) {
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
-			objpgw, innerXErr := LoadHost(instance.GetService(), as.GatewayIDs[0])
+			objpgw, innerXErr := LoadHost(instance.Service(), as.GatewayIDs[0])
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1561,7 +1631,7 @@ func (instance *Subnet) GetEndpointIP() (ip string, xerr fail.Error) {
 
 // HasVirtualIP tells if the Subnet uses a VIP a default route
 func (instance *Subnet) HasVirtualIP() (bool, fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -1572,10 +1642,10 @@ func (instance *Subnet) HasVirtualIP() (bool, fail.Error) {
 }
 
 // GetVirtualIP returns an abstract.VirtualIP used by gateway HA
-func (instance *Subnet) GetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetVirtualIP() (vip *abstract.VirtualIP, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	instance.lock.RLock()
@@ -1585,10 +1655,10 @@ func (instance *Subnet) GetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error
 }
 
 // GetCIDR returns the CIDR of the Subnet
-func (instance *Subnet) GetCIDR() (cidr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetCIDR() (cidr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -1599,10 +1669,10 @@ func (instance *Subnet) GetCIDR() (cidr string, xerr fail.Error) {
 }
 
 // GetState returns the current state of the Subnet
-func (instance *Subnet) GetState() (state subnetstate.Enum, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) GetState() (state subnetstate.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return subnetstate.Unknown, fail.InvalidInstanceError()
 	}
 
@@ -1613,10 +1683,10 @@ func (instance *Subnet) GetState() (state subnetstate.Enum, xerr fail.Error) {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1630,6 +1700,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	)
 
 	// Get primary gateway ID
+	var xerr fail.Error
 	gw, xerr = instance.unsafeInspectGateway(true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1643,7 +1714,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	gw, xerr = instance.unsafeInspectGateway(false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 	} else {
@@ -1662,7 +1733,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	vip, xerr = instance.unsafeGetVirtualIP()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 	}
@@ -1674,10 +1745,12 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 }
 
 // BindSecurityGroup binds a security group to the Subnet; if enabled is true, apply it immediately
-func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup, enabled resources.SecurityGroupActivation) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) BindSecurityGroup(
+	ctx context.Context, sgInstance resources.SecurityGroup, enabled resources.SecurityGroupActivation,
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1772,10 +1845,10 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resour
 }
 
 // UnbindSecurityGroup unbinds a security group from the host
-func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1789,11 +1862,13 @@ func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sgInstance reso
 }
 
 // ListSecurityGroups returns a slice of security groups bound to Subnet
-func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) ListSecurityGroups(
+	ctx context.Context, state securitygroupstate.Enum,
+) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	var emptyList []*propertiesv1.SecurityGroupBond
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1838,10 +1913,10 @@ func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygr
 }
 
 // EnableSecurityGroup enables a binded security group to Subnet
-func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1875,7 +1950,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -1963,10 +2038,10 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 }
 
 // DisableSecurityGroup disables an already binded security group on Subnet
-func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2000,7 +2075,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -2078,80 +2153,86 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 }
 
 // InspectGatewaySecurityGroup returns the instance of SecurityGroup in Subnet related to external access on gateways
-func (instance *Subnet) InspectGatewaySecurityGroup() (sgInstance resources.SecurityGroup, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) InspectGatewaySecurityGroup() (_ resources.SecurityGroup, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	sgInstance = SecurityGroupNullValue()
-	if instance == nil || instance.IsNull() {
-		return sgInstance, fail.InvalidInstanceError()
+	if instance == nil || valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var sgInstance resources.SecurityGroup
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sgInstance, innerXErr = LoadSecurityGroup(instance.GetService(), as.GWSecurityGroupID)
-		return innerXErr
+		var inErr fail.Error
+		sgInstance, inErr = LoadSecurityGroup(instance.Service(), as.GWSecurityGroupID)
+		return inErr
 	})
 	return sgInstance, xerr
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
-func (instance *Subnet) InspectInternalSecurityGroup() (sg resources.SecurityGroup, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) InspectInternalSecurityGroup() (_ resources.SecurityGroup, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	sg = SecurityGroupNullValue()
-	if instance == nil || instance.IsNull() {
-		return sg, fail.InvalidInstanceError()
+	if instance == nil || valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var sg resources.SecurityGroup
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sg, innerXErr = LoadSecurityGroup(instance.GetService(), as.InternalSecurityGroupID)
-		return innerXErr
+		var inErr fail.Error
+		sg, inErr = LoadSecurityGroup(instance.Service(), as.InternalSecurityGroupID)
+		return inErr
 	})
 	return sg, xerr
 }
 
 // InspectPublicIPSecurityGroup returns the instance of SecurityGroup in Subnet for Hosts with Public IP (which does not apply on gateways)
-func (instance *Subnet) InspectPublicIPSecurityGroup() (sg resources.SecurityGroup, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) InspectPublicIPSecurityGroup() (_ resources.SecurityGroup, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	sg = SecurityGroupNullValue()
-	if instance == nil || instance.IsNull() {
-		return sg, fail.InvalidInstanceError()
+	if instance == nil || valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var sg resources.SecurityGroup
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sg, innerXErr = LoadSecurityGroup(instance.GetService(), as.PublicIPSecurityGroupID)
-		return innerXErr
+		var inErr fail.Error
+		sg, inErr = LoadSecurityGroup(instance.Service(), as.PublicIPSecurityGroupID)
+		return inErr
 	})
 	return sg, xerr
 }
 
 // CreateSubnetWithoutGateway creates a Subnet named like 'singleHostName', without gateway
-func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abstract.SubnetRequest) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abstract.SubnetRequest) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: do not use .isNull() here
 	if instance == nil {

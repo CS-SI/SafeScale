@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
@@ -110,6 +111,14 @@ func Profile(what string) func() {
 			runtime.SetBlockProfileRate(1)
 			server := listen + ":" + port
 			go func() {
+				var crash error
+				defer func() {
+					if crash != nil {
+						logrus.Error(crash)
+					}
+				}()
+				defer fail.OnPanic(&crash)
+
 				err := http.ListenAndServe(server, nil)
 				if err != nil {
 					logrus.Errorf("ailed to start profiling web ui: %s", err.Error())

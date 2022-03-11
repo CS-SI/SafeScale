@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,14 +35,14 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
-func (instance *Cluster) unsafeGetIdentity() (clusterIdentity abstract.ClusterIdentity, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeGetIdentity() (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -54,8 +54,8 @@ func (instance *Cluster) unsafeGetIdentity() (clusterIdentity abstract.ClusterId
 }
 
 // unsafeGetFlavor returns the flavor of the Cluster
-func (instance *Cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	aci, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -67,8 +67,8 @@ func (instance *Cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, xerr fail
 }
 
 // unsafeGetComplexity returns the complexity of the Cluster
-func (instance *Cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	aci, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -81,11 +81,12 @@ func (instance *Cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, xerr f
 
 // unsafeGetState returns the current state of the Cluster
 // Uses the "maker" ForceGetState
-func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	state = clusterstate.Unknown
 	if instance.makers.GetState != nil {
+		var xerr fail.Error
 		state, xerr = instance.makers.GetState(instance)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -106,7 +107,7 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 		})
 	}
 
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
@@ -127,12 +128,12 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 
 // unsafeListMasters is the not goroutine-safe equivalent of ListMasters, that does the real work
 // Note: must be used with wisdom
-func (instance *Cluster) unsafeListMasters() (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeListMasters() (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
 
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -159,10 +160,10 @@ func (instance *Cluster) unsafeListMasters() (list resources.IndexedListOfCluste
 
 // unsafeListMasterIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 
-	xerr = instance.beingRemoved()
+	xerr := instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
@@ -215,11 +216,12 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 }
 
 // unsafeListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-func (instance *Cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	xerr = instance.beingRemoved()
+
+	xerr := instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
@@ -245,15 +247,16 @@ func (instance *Cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, 
 	if xerr != nil {
 		return emptyList, xerr
 	}
+
 	return list, nil
 }
 
 // unsafeListNodeIPs lists the IPs of the nodes in the Cluster
-func (instance *Cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -277,12 +280,17 @@ func (instance *Cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, xe
 
 // unsafeFindAvailableMaster is the not go-routine-safe version of FindAvailableMaster, that does the real work
 // Must be used with wisdom
-func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	master = nil
 	masters, xerr := instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -295,13 +303,13 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			continue
 		}
 
-		master, xerr = LoadHost(instance.GetService(), v.ID)
+		master, xerr = LoadHost(instance.Service(), v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		_, xerr = master.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		_, xerr = master.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -323,11 +331,11 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 
 // unsafeListNodes is the not goroutine-safe version of ListNodes and no parameter validation, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeListNodes() (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) unsafeListNodes() (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -352,10 +360,10 @@ func (instance *Cluster) unsafeListNodes() (list resources.IndexedListOfClusterN
 
 // unsafeListNodeIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 
-	xerr = instance.beingRemoved()
+	xerr := instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
@@ -409,7 +417,7 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 
 // unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node resources.Host, xerr fail.Error) {
+func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node resources.Host, ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -422,6 +430,11 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		default:
 			return nil, xerr
 		}
+	}
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -440,7 +453,7 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	node = nil
 	found := false
 	for _, v := range list {
@@ -456,10 +469,13 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
+			issue := hostInstance.Released()
+			if issue != nil {
+				logrus.Warn(issue)
+			}
 		}(node)
 
-		_, xerr = node.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

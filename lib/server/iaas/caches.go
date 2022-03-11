@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -72,7 +73,7 @@ func NewResourceCache(name string) (*ResourceCache, fail.Error) {
 
 	cacheInstance, xerr := cache.NewCache(name)
 	if xerr != nil {
-		return &ResourceCache{}, nil
+		return &ResourceCache{}, xerr
 	}
 
 	rc := &ResourceCache{
@@ -88,8 +89,8 @@ func (instance *ResourceCache) isNull() bool {
 }
 
 // Get returns the content associated with key
-func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
-	if instance == nil || instance.isNull() {
+func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, ferr fail.Error) {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -113,13 +114,13 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				var ok bool
 				onMissFunc, ok = v.Value().(func() (cache.Cacheable, fail.Error))
 				if !ok {
-					logrus.Warnf("unable to set onMissFunc because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+					return nil, fail.InconsistentError("unable to set onMissFunc because of wrong cast: %v", v.Value())
 				}
 			case cacheOptionOnMissTimeoutKeyword:
 				var ok bool
 				onMissTimeout, ok = v.Value().(time.Duration)
 				if !ok {
-					logrus.Warnf("unable to set onMissTimeout because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+					return nil, fail.InconsistentError("unable to set onMissTimeout because of wrong cast: %v", v.Value())
 				}
 			default:
 			}
@@ -127,6 +128,7 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 		if onMissFunc != nil {
 			if onMissTimeout <= 0 {
+				var xerr fail.Error
 				_, xerr = onMissFunc() // onMissFunc() knows what the error is
 				return nil, xerr
 			}
@@ -135,7 +137,13 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// Search in the cache by ID
-					if ce, xerr = instance.byID.Entry(key); xerr == nil {
+					var nilErrNotFound *fail.ErrNotFound = nil // nolint
+					ce, xerr = instance.byID.Entry(key)
+					if xerr != nil && xerr != nilErrNotFound {
+						if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
+							return nil, xerr
+						}
+					} else {
 						return ce, nil
 					}
 
@@ -145,10 +153,12 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 					if id, ok := instance.byName[key]; ok {
 						ce, xerr = instance.byID.Entry(id)
-						if xerr == nil {
-							return ce, nil
+						if xerr != nil {
+							return nil, xerr
 						}
+						return ce, nil
 					}
+
 					return nil, xerr
 				default:
 					return nil, xerr
@@ -156,15 +166,22 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 			}
 
 			var content cache.Cacheable
-			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = instance.CommitEntry(key, content)
-			}
+			content, xerr = onMissFunc()
 			if xerr != nil {
 				if derr := instance.FreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
 			}
+
+			ce, xerr = instance.CommitEntry(key, content)
+			if xerr != nil {
+				if derr := instance.FreeEntry(key); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
+				}
+				return nil, xerr
+			}
+
 			return ce, nil
 		}
 	}
@@ -180,12 +197,16 @@ func (instance *ResourceCache) loadEntry(key string) (*cache.Entry, bool) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if ce, xerr := instance.byID.Entry(key); xerr == nil {
+	if ce, xerr := instance.byID.Entry(key); xerr != nil {
+		debug.IgnoreError(xerr)
+	} else {
 		return ce, true
 	}
 
 	if id, ok := instance.byName[key]; ok {
-		if ce, xerr := instance.byID.Entry(id); xerr == nil {
+		if ce, xerr := instance.byID.Entry(id); xerr != nil {
+			debug.IgnoreError(xerr)
+		} else {
 			return ce, true
 		}
 	}
@@ -194,7 +215,7 @@ func (instance *ResourceCache) loadEntry(key string) (*cache.Entry, bool) {
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
 func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) fail.Error {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -211,8 +232,8 @@ func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) f
 }
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
-func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if instance == nil || instance.isNull() {
+func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, ferr fail.Error) {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -222,6 +243,7 @@ func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	var xerr fail.Error
 	if ce, xerr = instance.byID.Commit(key, content); xerr != nil {
 		return nil, xerr
 	}
@@ -232,7 +254,7 @@ func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) 
 
 // FreeEntry removes the reservation in cache
 func (instance *ResourceCache) FreeEntry(key string) fail.Error {
-	if instance == nil || instance.isNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -246,14 +268,15 @@ func (instance *ResourceCache) FreeEntry(key string) fail.Error {
 }
 
 // AddEntry ...
-func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if instance == nil || instance.isNull() {
+func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, ferr fail.Error) {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	var xerr fail.Error
 	if ce, xerr = instance.byID.Add(content); xerr != nil {
 		return nil, xerr
 	}

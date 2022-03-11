@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gojuno/minimock/v3"
+	"github.com/oscarpicas/smetrics"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/mocks"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/gojuno/minimock/v3"
-	"github.com/sirupsen/logrus"
-	"github.com/xrash/smetrics"
 
 	_ "github.com/itchyny/gojq" // Not needed here, but we will need this later to do some serious testing
 )
@@ -100,11 +101,7 @@ func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Erro
 		return nil, xerr
 	}
 
-	reg, err := regexp.Compile("[^A-Z0-9.]")
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
-
+	reg := regexp.MustCompile("[^A-Z0-9.]")
 	var maxLength int
 	for _, img := range imgs {
 		length := len(img.Name)

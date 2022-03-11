@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkSecurityGroups contains a list of security groups owned by the Network
@@ -45,19 +48,21 @@ func (nsg *NetworkSecurityGroups) IsNull() bool {
 }
 
 // Clone ...
-func (nsg NetworkSecurityGroups) Clone() data.Clonable {
+func (nsg NetworkSecurityGroups) Clone() (data.Clonable, error) {
 	return NewNetworkSecurityGroups().Replace(&nsg)
 }
 
 // Replace ...
-func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
 	if nsg == nil || p == nil {
-		return nsg
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*NetworkSecurityGroups) // nolint
+	src, ok := p.(*NetworkSecurityGroups)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *NetworkSecurityGroups")
+	}
+
 	*nsg = *src
 	nsg.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
@@ -67,7 +72,7 @@ func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByName {
 		nsg.ByName[k] = v
 	}
-	return nsg
+	return nsg, nil
 }
 
 func init() {

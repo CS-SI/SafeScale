@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,6 @@ import (
 type Notify func(Try, verdict.Enum)
 
 // NotifyByLog logs the status of each try
-func NotifyByLog(try Try, verdict verdict.Enum) {
-	logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, verdict.String(), try.Err)
+func NotifyByLog(try Try, ver verdict.Enum) {
+	logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, ver.String(), try.Err)
 }

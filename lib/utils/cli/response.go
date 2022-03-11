@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ func FailureResponse(err error) error {
 	r := newResponse()
 	_ = r.Failure(err)
 	if r.Error != nil {
-		return urfcli.NewExitError("", r.Error.ExitCode())
+		return urfcli.Exit("", r.Error.ExitCode())
 	}
 	return nil
 }

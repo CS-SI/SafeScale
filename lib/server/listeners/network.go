@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 )
@@ -59,11 +58,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	networkName := in.GetName()
 	if networkName == "" {
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
@@ -78,11 +72,21 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 
 	tracer := debug.NewTracer(job.Task(), true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	cidr := in.GetCidr()
 	if cidr == "" {
 		cidr = defaultCIDR
+	}
+
+	// If there is conflict with docker quit
+	thisCidr := netretry.CIDRString(cidr)
+	conflict, err := thisCidr.IntersectsWith("172.17.0.0/16")
+	if err != nil {
+		return nil, err
+	}
+	if conflict {
+		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", cidr, "172.17.0.0/16")
 	}
 
 	req := abstract.NetworkRequest{
@@ -154,10 +158,16 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
 
-		subnetInstance.Released()
+		err := subnetInstance.Released()
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
 	}
 
-	networkInstance.Released()
+	err = networkInstance.Released()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
 	return networkInstance.ToProtocol()
@@ -176,13 +186,6 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/networks/list")
@@ -230,13 +233,6 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -257,7 +253,12 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	defer networkInstance.Released()
+	defer func() {
+		issue := networkInstance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
+		}
+	}()
 
 	return networkInstance.ToProtocol()
 }
@@ -276,13 +277,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
 	}
 
 	ref, refLabel := srvutils.GetReference(in)

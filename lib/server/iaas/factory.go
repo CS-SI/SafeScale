@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ var (
 )
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
-// This function shoud be called by the init function of each provider to be registered in SafeScale
+// This function should be called by the init function of each provider to be registered in SafeScale
 func Register(name string, provider providers.Provider) {
 	// if already registered, leave
 	if _, ok := allProviders[name]; ok {
@@ -70,9 +70,9 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName, metadataVersion string) (newService Service, xerr fail.Error) {
-	defer fail.OnExitLogError(&xerr)
-	defer fail.OnPanic(&xerr)
+func UseService(tenantName, metadataVersion string) (newService Service, ferr fail.Error) {
+	defer fail.OnExitLogError(&ferr)
+	defer fail.OnPanic(&ferr)
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
@@ -90,8 +90,11 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 	for _, tenant := range tenants {
 		name, found = tenant["name"].(string)
 		if !found {
-			logrus.Error("tenant found without 'name'")
-			continue
+			name, found = tenant["Name"].(string)
+			if !found {
+				logrus.Error("tenant found without 'name'")
+				continue
+			}
 		}
 		if name != tenantName {
 			continue
@@ -100,10 +103,16 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		tenantInCfg = true
 		provider, found = tenant["provider"].(string)
 		if !found {
-			provider, found = tenant["client"].(string)
+			provider, found = tenant["Provider"].(string)
 			if !found {
-				logrus.Error("Missing field 'provider' in tenant")
-				continue
+				provider, found = tenant["client"].(string)
+				if !found {
+					provider, found = tenant["Client"].(string)
+					if !found {
+						logrus.Error("Missing field 'provider' or 'client' in tenant")
+						continue
+					}
+				}
 			}
 		}
 
@@ -205,9 +214,9 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			// 	return nil, fail.Wrap(xerr, "invalid region in section 'metadata'")
 			// }
 
-			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
-			if err != nil {
-				return NullService(), fail.Wrap(err, "error connecting to Object Storage location to store metadata")
+			metadataLocation, xerr := objectstorage.NewLocation(metadataLocationConfig)
+			if xerr != nil {
+				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location to store metadata")
 			}
 
 			if metadataLocationConfig.BucketName == "" {
@@ -216,10 +225,11 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 					return NullService(), xerr
 				}
 
-				anon, found := serviceCfg.Get("MetadataBucketName")
-				if !found {
+				anon, there := serviceCfg.Get("MetadataBucketName")
+				if !there {
 					return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
 				}
+
 				var ok bool
 				metadataLocationConfig.BucketName, ok = anon.(string)
 				if !ok {
@@ -454,6 +464,25 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
 	}
 
+	for k, v := range identity {
+		if _, ok = v.(string); !ok {
+			return config, fail.InconsistentError("'identity' it's a map[string]string, and the key %s is not a string: %v", k, v)
+		}
+	}
+	for k, v := range compute {
+		if _, ok = v.(string); !ok {
+			if _, ok = v.(bool); ok {
+				continue
+			}
+			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
+		}
+	}
+	for k, v := range ostorage {
+		if _, ok = v.(string); !ok {
+			return config, fail.InconsistentError("'ostorage' it's a map[string]string, and the key %s is not a string: %v", k, v)
+		}
+	}
+
 	// FIXME: Remove google custom code
 	if config.Type == "google" {
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
@@ -465,7 +494,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 		config.ProjectID, ok = identity["project_id"].(string)
 		if !ok {
-			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
+			return config, fail.InconsistentError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
 		}
 
 		googleCfg := stacks.GCPConfiguration{
@@ -678,8 +707,16 @@ func loadConfig() fail.Error {
 		return err
 	}
 	for _, tenant := range tenantsCfg {
-		if name, ok := tenant["name"].(string); ok {
-			if provider, ok := tenant["client"].(string); ok {
+		name, ok := tenant["name"].(string)
+		if !ok {
+			name, ok = tenant["Name"].(string)
+		}
+		if ok {
+			provider, ok := tenant["client"].(string)
+			if !ok {
+				provider, ok = tenant["Client"].(string)
+			}
+			if ok {
 				allTenants[name] = provider
 			} else {
 				return fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
@@ -62,7 +63,8 @@ type Network struct {
 // NewNetwork initializes a new instance of Network
 func NewNetwork() *Network {
 	nn := &Network{
-		Tags: make(map[string]string),
+		DNSServers: make([]string, 0),
+		Tags:       make(map[string]string),
 	}
 	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nn.Tags["ManagedBy"] = "safescale"
@@ -77,24 +79,25 @@ func (n *Network) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n Network) Clone() data.Clonable {
+func (n Network) Clone() (data.Clonable, error) {
 	return NewNetwork().Replace(&n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *Network) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (n *Network) Replace(p data.Clonable) (data.Clonable, error) {
 	if n == nil || p == nil {
-		return n
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*Network) // nolint
+	src, ok := p.(*Network)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Network")
+	}
 	*n = *src
-	n.DNSServers = make([]string, 0, len(src.DNSServers))
+	n.DNSServers = make([]string, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
-	return n
+	return n, nil
 }
 
 // OK ...
@@ -127,11 +130,11 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates a Network
-func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
+func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 	if n == nil {
 		return fail.InvalidInstanceError()
 	}
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 	return fail.ConvertError(json.Unmarshal(buf, n))
 }
 

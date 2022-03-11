@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -284,8 +284,8 @@ func (c cluster) RemoveFeature(clusterName, featureName string, params map[strin
 	return err
 }
 
-// ListInstalledFeatures ...
-func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration time.Duration) (*protocol.FeatureListResponse, error) {
+// ListFeatures ...
+func (c cluster) ListFeatures(clusterName string, installed bool, duration time.Duration) (*protocol.FeatureListResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -302,12 +302,71 @@ func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration ti
 	request := &protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_CLUSTER,
 		TargetRef:     &protocol.Reference{Name: clusterName},
-		InstalledOnly: !all,
+		InstalledOnly: installed,
 	}
 	list, err := service.List(ctx, request)
 	if err != nil {
 		return nil, err
 	}
+
+	return list, nil
+}
+
+// InspectFeature ...
+func (c cluster) InspectFeature(clusterName, featureName string, embedded bool, duration time.Duration) (*protocol.FeatureDetailResponse, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	request := &protocol.FeatureDetailRequest{
+		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:  &protocol.Reference{Name: clusterName},
+		Name:       featureName,
+		Embedded:   embedded,
+	}
+	list, err := service.Inspect(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+// ExportFeature recovers content of the feature file and returns it
+func (c cluster) ExportFeature(clusterName, featureName string, embedded bool, duration time.Duration) (*protocol.FeatureExportResponse, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	request := &protocol.FeatureDetailRequest{
+		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:  &protocol.Reference{Name: clusterName},
+		Name:       featureName,
+		Embedded:   embedded,
+	}
+	list, err := service.Export(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
 	return list, nil
 }
 
@@ -402,6 +461,9 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 	)
 
 	nodeDeleter := func(ref string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
 
 		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
@@ -49,7 +48,7 @@ const (
 	curlPatch = "curl -kSsl -X PATCH --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
 
-var kongProxyCheckedCache cache.Cache
+var kongProxyCheckedCache cache.Cache // nolint
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
@@ -110,9 +109,10 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 					item := propertiesv1.NewHostInstalledFeature()
 					item.HostContext = true
-					item.Requires, innerXErr = featureInstance.GetRequirements()
-					if innerXErr != nil {
-						return innerXErr
+					var inErr fail.Error
+					item.Requires, inErr = featureInstance.GetRequirements()
+					if inErr != nil {
+						return inErr
 					}
 					featuresV1.Installed[featureInstance.GetName()] = item
 					return nil
@@ -230,15 +230,16 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if err != nil {
 			return "", fail.Wrap(err, "failed to marshal service rule")
 		}
-		content := string(jsoned)
+
+		jsonContent := string(jsoned)
 
 		url := "services/" + ruleName
-		response, _, xerr := k.put(ctx, ruleName, url, content, values, true)
+		response, _, xerr := k.put(ctx, ruleName, url, jsonContent, values, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
-		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, jsonContent)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
@@ -427,8 +428,13 @@ func (k *KongController) addSourceControl(ctx context.Context,
 }
 
 func (k *KongController) get(ctx context.Context, name, url string) (map[string]interface{}, string, fail.Error) {
+	timings, xerr := k.subnet.Service().Timings()
+	if xerr != nil {
+		return nil, "", xerr
+	}
+
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, _, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
@@ -449,8 +455,13 @@ func (k *KongController) get(ctx context.Context, name, url string) (map[string]
 
 // post creates a rule
 func (k *KongController) post(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
+	timings, xerr := k.subnet.Service().Timings()
+	if xerr != nil {
+		return nil, "", xerr
+	}
+
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
@@ -479,8 +490,13 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 
 // put updates or creates a rule
 func (k *KongController) put(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
+	timings, xerr := k.subnet.Service().Timings()
+	if xerr != nil {
+		return nil, "", xerr
+	}
+
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
@@ -509,8 +525,13 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 
 // patch updates an existing rule
 func (k *KongController) patch(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
+	timings, xerr := k.subnet.Service().Timings()
+	if xerr != nil {
+		return nil, "", xerr
+	}
+
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr

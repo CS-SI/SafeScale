@@ -9,7 +9,7 @@ Using Networks, you will be able to use same CIDR for different usages.
 ## Network creation
 
 There are two ways to create a Network as a user :
-- the full-featured mode, where Networks and Subnets cab ne fully managed 
+- the full-featured mode, where Networks and Subnets are fully managed 
 - the legacy mode, where a Network was a Cloud Provider Network/VPC with a Subnet using the same name as the Network/VPC. Of course, this legacy mode uses the full-featured mode to realize the work.
 
 The legacy is the default mode, to be consistent with scripts that used SafeScale before v20.09. To use the full-featured mode, the flag `--empty` has to be used at Network creation.

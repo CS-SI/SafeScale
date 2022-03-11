@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,9 @@ import (
 	"strings"
 	"time"
 
+	utils2 "github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -65,7 +67,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		connectionTimeout = DefaultConnectionTimeout
 	}
 	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
+		connectionTimeout = executionTimeout + temporal.ContextTimeout()
 	}
 
 	ctx, xerr := utils.GetContext(true)
@@ -84,13 +86,13 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 			defer func(cmd *system.SSHCommand) {
 				derr := cmd.Close()
 				if derr != nil {
-					if innerErr == nil {
-						innerErr = derr
-					} else {
+					if innerErr != nil {
 						innerXErr = fail.ConvertError(innerErr)
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 						innerErr = innerXErr
+						return
 					}
+					innerErr = derr
 				}
 			}(sshCmd)
 
@@ -119,7 +121,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.MinDelay(),
 		connectionTimeout,
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -251,8 +253,8 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 		return invalid, "", "", xerr
 	}
 
-	if executionTimeout < temporal.GetHostTimeout() {
-		executionTimeout = temporal.GetHostTimeout()
+	if executionTimeout < temporal.HostOperationTimeout() {
+		executionTimeout = temporal.HostOperationTimeout()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
@@ -391,7 +393,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				}
 
 				if xerr = crcCheck(); xerr != nil {
-					if _, ok := xerr.(*fail.ErrWarning); !ok || xerr.IsNull() {
+					if _, ok := xerr.(*fail.ErrWarning); !ok || valid.IsNil(xerr) {
 						return xerr
 					}
 					logrus.Warnf(xerr.Error())
@@ -404,7 +406,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.MinDelay(),
 		connectionTimeout+2*executionTimeout,
 	)
 	if retryErr != nil {
@@ -448,8 +450,8 @@ func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) er
 		func() error {
 			return sshCfg.Enter(username, shell)
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetConnectSSHTimeout(),
+		temporal.DefaultDelay(),
+		temporal.SSHConnectionTimeout(),
 		retry.OrArbiter, // if sshCfg.Ender succeeds, we don't care about the timeout
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -484,8 +486,8 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 			_, _, innerErr := sshCfg.CreateTunneling()
 			return innerErr
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetConnectSSHTimeout(),
+		temporal.DefaultDelay(),
+		temporal.SSHConnectionTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
@@ -519,19 +521,31 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 	)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
-	if err == nil {
-		portStrs := strings.Split(strings.Trim(string(bytes), "\n"), "\n")
-		for _, portStr := range portStrs {
-			_, err = strconv.Atoi(portStr)
-			if err != nil {
-				logrus.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
-			err = exec.Command("kill", "-9", portStr).Run()
-			if err != nil {
-				logrus.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
+	if err != nil {
+		_, code, problem := utils2.ExtractRetCode(err)
+		if problem != nil {
+			return fail.Wrap(err, "unable to close tunnel, running pgrep")
+		}
+		if code == 1 { // no process found
+			debug.IgnoreError(err)
+			return nil
+		}
+		if code == 127 { // pgrep not installed
+			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
+			return nil
+		}
+		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
+	}
+
+	portStrs := strings.Split(strings.Trim(string(bytes), "\n"), "\n")
+	for _, portStr := range portStrs {
+		_, err = strconv.Atoi(portStr)
+		if err != nil {
+			return fail.Wrap(err, "unable to close tunnel: %s", fmt.Sprintf("atoi failed on pid: %s", reflect.TypeOf(err).String()))
+		}
+		err = exec.Command("kill", "-9", portStr).Run()
+		if err != nil {
+			return fail.Wrap(err, "unable to close tunnel: %s", fmt.Sprintf("kill -9 failed: %s\n", reflect.TypeOf(err).String()))
 		}
 	}
 
@@ -550,8 +564,8 @@ func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if timeout < temporal.GetHostTimeout() {
-		timeout = temporal.GetHostTimeout()
+	if timeout < temporal.HostOperationTimeout() {
+		timeout = temporal.HostOperationTimeout()
 	}
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {

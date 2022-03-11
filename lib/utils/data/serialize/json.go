@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,10 @@ package serialize
 
 import (
 	stdjson "encoding/json"
+	"fmt"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
@@ -36,28 +38,33 @@ type jsonProperty struct {
 
 // IsNull tells if the jsonProperty is a Null Value
 func (jp *jsonProperty) IsNull() bool {
-	return jp == nil || jp.Shielded.IsNull()
+	return jp == nil || valid.IsNil(jp.Shielded)
 }
 
-func (jp jsonProperty) Clone() data.Clonable {
+func (jp jsonProperty) Clone() (data.Clonable, error) {
 	newP := &jsonProperty{}
 	return newP.Replace(&jp)
 }
 
-func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
-	// Indeed, and that also means that not doing it here is a mistake, Clone() should use a replace function that don't use isNull(), and EVERYBODY else should use a Replace function that does use isNull
+func (jp *jsonProperty) Replace(clonable data.Clonable) (data.Clonable, error) {
 	if jp == nil || clonable == nil {
-		return jp // FIXME: This is a problem, this means that mistakes go unnoticed
+		return nil, fail.InvalidInstanceError()
 	}
 
 	srcP, ok := clonable.(*jsonProperty)
 	if !ok {
-		return jp // FIXME: Again, mistakes go unnoticed, if we pick the wrong clonable nobody notices, Replace signature should return (data.Clonable, error)
+		return nil, fmt.Errorf("clonable is not a *jsonProperty")
 	}
+
 	*jp = *srcP
-	jp.Shielded = srcP.Shielded.Clone()
-	return jp
+
+	var err error
+	jp.Shielded, err = srcP.Shielded.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	return jp, nil
 }
 
 // JSONProperties ...
@@ -70,7 +77,9 @@ type JSONProperties struct {
 }
 
 // NewJSONProperties creates a new JSonProperties instance
-func NewJSONProperties(module string) (*JSONProperties, fail.Error) {
+func NewJSONProperties(module string) (_ *JSONProperties, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if module == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("module")
 	}
@@ -90,26 +99,34 @@ func (x *JSONProperties) Lookup(key string) bool {
 	defer x.RUnlock()
 
 	p, ok := x.Properties[key]
-	return ok && !p.IsNull()
+	return ok && !valid.IsNil(p)
 }
 
-// Clone ...
-func (x *JSONProperties) Clone() *JSONProperties {
-	if x == nil {
-		return nil
-	}
-
+func (x *JSONProperties) hasKey(key string) (*jsonProperty, bool) {
 	x.RLock()
 	defer x.RUnlock()
 
-	newP := &JSONProperties{
-		module: x.module,
+	jsp, found := x.Properties[key]
+	return jsp, found
+}
+
+func (x *JSONProperties) storeZero(key string) (*jsonProperty, error) {
+	x.Lock()
+	defer x.Unlock()
+
+	zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+	nsh, err := shielded.NewShielded(zeroValue)
+	if err != nil {
+		return nil, err
 	}
-	for k, v := range x.Properties {
-		// FIXME: Another problem here, Clone() should return (*JSONProperties, error)
-		newP.Properties[k], _ = v.Clone().(*jsonProperty) // nolint
+
+	item := &jsonProperty{
+		Shielded: nsh,
+		module:   x.module,
+		key:      key,
 	}
-	return newP
+	x.Properties[key] = item
+	return item, nil
 }
 
 // Count returns the number of properties available
@@ -117,12 +134,18 @@ func (x *JSONProperties) Count() uint {
 	if x == nil {
 		return 0
 	}
+
+	x.RLock()
+	defer x.RUnlock()
+
 	return uint(len(x.Properties))
 }
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) fail.Error) fail.Error {
+func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -144,19 +167,20 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		found bool
 	)
 
-	x.RLock()
-	defer x.RUnlock()
-	if item, found = x.Properties[key]; !found {
-		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-		item = &jsonProperty{
-			Shielded: shielded.NewShielded(zeroValue),
-			module:   x.module,
-			key:      key,
+	var err error
+	item, found = x.hasKey(key)
+	if !found {
+		item, err = x.storeZero(key)
+		if err != nil {
+			return fail.Wrap(err)
 		}
-		x.Properties[key] = item
 	}
 
-	clone := item.Clone()
+	clone, err := item.Clone()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
 	cloned, ok := clone.(*jsonProperty)
 	if !ok {
 		return fail.InconsistentError("clone is expected to be a *jsonProperty and it's not: %v", clone)
@@ -176,7 +200,9 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 // can't fail because a key doesn't exist).
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
-func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Error) fail.Error {
+func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -203,15 +229,19 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 
 	if item, found = x.Properties[key]; !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+		nsh, err := shielded.NewShielded(zeroValue)
+		if err != nil {
+			return fail.Wrap(err)
+		}
 		item = &jsonProperty{
-			Shielded: shielded.NewShielded(zeroValue),
+			Shielded: nsh,
 			module:   x.module,
 			key:      key,
 		}
 		x.Properties[key] = item
 	}
 
-	clone := item.Clone()
+	clone, _ := item.Clone()
 	castedClone, ok := clone.(*jsonProperty)
 	if !ok {
 		return fail.InconsistentError("failed to cast clone to '*jsonProperty'")
@@ -222,12 +252,17 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		return xerr
 	}
 
-	_ = item.Replace(clone)
+	_, err := item.Replace(clone)
+	if err != nil {
+		return fail.Wrap(err)
+	}
 	return nil
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
-func (x *JSONProperties) SetModule(module string) fail.Error {
+func (x *JSONProperties) SetModule(module string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -246,7 +281,9 @@ func (x *JSONProperties) SetModule(module string) fail.Error {
 
 // Serialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
+func (x *JSONProperties) Serialize() (_ []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if x == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -267,7 +304,7 @@ func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 	}
 	r, jserr := json.Marshal(mapped)
 	if jserr != nil {
-		return nil, fail.NewError(jserr.Error())
+		return nil, fail.Wrap(jserr)
 	}
 	return r, nil
 }
@@ -275,12 +312,12 @@ func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 // Deserialize ...
 // Returns fail.SyntaxError if an JSON syntax error happens
 // satisfies interface data.Serializable
-func (x *JSONProperties) Deserialize(buf []byte) (xerr fail.Error) {
+func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
+
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
-
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()
@@ -293,7 +330,7 @@ func (x *JSONProperties) Deserialize(buf []byte) (xerr fail.Error) {
 			return fail.SyntaxError(jserr.Error())
 		default:
 			logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
-			return fail.NewError(jserr.Error())
+			return fail.Wrap(jserr)
 		}
 	}
 
@@ -304,8 +341,12 @@ func (x *JSONProperties) Deserialize(buf []byte) (xerr fail.Error) {
 	for k, v := range unjsoned {
 		if prop, ok = x.Properties[k]; !ok {
 			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, k)
+			nsh, err := shielded.NewShielded(zeroValue)
+			if err != nil {
+				return fail.Wrap(err)
+			}
 			item := &jsonProperty{
-				Shielded: shielded.NewShielded(zeroValue),
+				Shielded: nsh,
 				module:   x.module,
 				key:      k,
 			}

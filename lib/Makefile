@@ -25,11 +25,14 @@ vet:
 	@$(GO) vet ./...
 
 test:
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -v ./...
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) 2>&1
 	@(cd system && $(MAKE) $(@))
 
 bashtest:
 	@(cd system && $(MAKE) $(@))
+
+beta:
+	@$(eval GO = "go1.18beta1")
 
 gensrc:
 	@(mkdir -p mocks) || true

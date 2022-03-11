@@ -186,6 +186,7 @@ The valid keywords in this section are :
 > | `DNS` | OPTIONAL |
 > | `Scannable` | OPTIONAL |
 > | `OperatorUsername` | OPTIONAL |
+> | `Owners` | OPTIONAL |
 
 ### Section ``[tenants.network]``
 
@@ -357,6 +358,11 @@ If set to true, allow the scanner to scan the tenant ([cf. SCANNER](SCANNER.md))
 Contains the username for the authentication necessary to connect to the provider.
 
 It (or one of its aliases) must be present in section `tenants.identity`, and may be present in sections `tenants.objectstorage` and `tenants.metadata`.
+
+### `Owners`
+
+Only for AWS, optional.
+Contains the comma-separated list of AMI Owners that will be used for AMI image search/selection.
 
 ### `Tenant`
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,15 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
+	"regexp"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -48,7 +50,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 type blockDevice struct {
@@ -62,7 +63,7 @@ type blockDevice struct {
 	// BootIndex is the boot index. It defaults to 0.
 	BootIndex string `json:"boot_index,omitempty"`
 
-	// DeleteOnTermination specifies whether or not to delete the attached volume
+	// DeleteOnTermination specifies whether to delete the attached volume
 	// when the server is deleted. Defaults to `false`.
 	DeleteOnTermination bool `json:"delete_on_termination"`
 
@@ -97,8 +98,6 @@ func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, e
 	}
 
 	if len(opts.BlockDevice) == 0 {
-		err := gophercloud.ErrMissingInput{}
-		err.Argument = "bootfromvolume.CreateOptsExt.BlockDevice"
 		return nil, fail.InvalidInstanceContentError("opts.BlockDevice", "cannot be empty slice")
 	}
 
@@ -260,7 +259,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 	return map[string]interface{}{"server": b}, nil
 }
 
-// getFlavorIDFromName is a convienience function that returns a flavor's ID given its name.
+// getFlavorIDFromName is a convenience function that returns a flavor's ID given its name.
 func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
@@ -299,18 +298,20 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptyMap map[string]bool
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
 			return innerErr
@@ -343,7 +344,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 
 // SelectedAvailabilityZone returns the selected availability zone
 func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -371,7 +372,7 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
 func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -417,7 +418,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	var xerr fail.Error
 	nullAhf := abstract.NewHostFull()
 	nullUdc := userdata.NewContent()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAhf, nullUdc, fail.InvalidInstanceError()
 	}
 
@@ -465,9 +466,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// --- prepares data structures for Provider usage ---
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "bad timings")
+	}
+
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -482,23 +488,38 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAhf, nullUdc, xerr
 	}
 
-	if request.DiskSize > template.DiskSize {
-		template.DiskSize = request.DiskSize
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
+		diskSize = request.DiskSize
 	}
 
-	if int(rim.DiskSize) > template.DiskSize {
-		template.DiskSize = int(rim.DiskSize)
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
 	}
 
-	if template.DiskSize == 0 {
+	if diskSize == 0 {
 		// Determines appropriate disk size
-		if template.Cores < 16 { // nolint
-			template.DiskSize = 100
-		} else if template.Cores < 32 {
-			template.DiskSize = 200
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
 		} else {
-			template.DiskSize = 400
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
 		}
+	}
+
+	if diskSize < 10 {
+		diskSize = 10
+	}
+
+	logrus.Warnf("Trying to create a machine with disk size: %d Gb", diskSize)
+	if diskSize < 11 {
+		logrus.Warnf("It seems a fuckup: %s", spew.Sdump(rim))
 	}
 
 	// Select usable availability zone
@@ -515,7 +536,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		DeleteOnTermination: true,
 		UUID:                request.ImageID,
 		VolumeType:          "SSD",
-		VolumeSize:          template.DiskSize,
+		VolumeSize:          diskSize,
 	}
 	// Defines server
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
@@ -567,12 +588,15 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
-				func() (innerErr error) {
-					_, r.Err = s.ComputeClient.Post(
+				func() (extErr error) {
+					var hr *http.Response
+					hr, r.Err = s.ComputeClient.Post( // nolint
 						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 							OkCodes: []int{200, 202},
 						},
 					)
+					defer closer(hr)
+					var innerErr error
 					server, innerErr = r.Extract()
 					xerr := normalizeError(innerErr)
 					if xerr != nil {
@@ -597,7 +621,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				normalizeError,
 			)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+					return retry.StopRetryError(innerXErr, "stopping creation retries")
+				default:
+					return innerXErr
+				}
 			}
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
@@ -628,7 +657,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, temporal.GetHostTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -645,8 +674,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -711,9 +740,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 		}()
 
-		if govalidator.IsIPv4(fip.PublicIPAddress) {
+		if valid.IsIPv4(fip.PublicIPAddress) {
 			host.Networking.PublicIPv4 = fip.PublicIPAddress
-		} else if govalidator.IsIPv6(fip.PublicIPAddress) {
+		} else if valid.IsIPv6(fip.PublicIPAddress) {
 			host.Networking.PublicIPv6 = fip.PublicIPAddress
 		}
 		userData.PublicIP = fip.PublicIPAddress
@@ -732,30 +761,95 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 // validateHostname validates the name of a host based on known FlexibleEngine requirements
 func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
-	s := check.Struct{
-		"ResourceName": check.Composite{
-			check.NonEmpty{},
-			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{Constraint: 64},
-		},
+	err := validation.ValidateStruct(&req,
+		validation.Field(&req.ResourceName, validation.Required, validation.Length(1, 64)),
+		validation.Field(&req.ResourceName, validation.Required, validation.Match(regexp.MustCompile(`^[a-zA-Z0-9_-]+$`))),
+	)
+	if err != nil {
+		return false, fail.Wrap(err, "validation issue")
 	}
 
-	e := s.Validate(req)
-	if e.HasErrors() {
-		errorList, _ := e.GetErrorsByKey("ResourceName")
-		var errs []error
-		for _, msg := range errorList {
-			errs = append(errs, msg)
-		}
-		return false, fail.NewErrorList(errs)
-	}
 	return true, nil
 }
 
+// FIXME: Remove this function later when searchInStruct is ready
+func extractImageTheLongWay(in *images.Image) (_ abstract.Image, ferr fail.Error) { // nolint
+	defer fail.OnPanic(&ferr)
+
+	properties := in.Properties
+	imagev, ok := properties["image"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'image' not found")
+	}
+	image, ok := imagev.(map[string]interface{})
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid cast")
+	}
+
+	dv, ok := image["minDisk"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'minDisk' not found")
+	}
+	d, ok := dv.(float64)
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid new format")
+	}
+
+	idv, ok := image["id"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'id' not found")
+	}
+
+	id, ok := idv.(string)
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid new format")
+	}
+
+	namev, ok := image["name"]
+	if !ok {
+		return abstract.Image{}, fail.NewError("key 'name' not found")
+	}
+
+	name, ok := namev.(string)
+	if !ok {
+		return abstract.Image{}, fail.NewError("invalid new format")
+	}
+
+	out := abstract.Image{
+		ID:       id,
+		Name:     name,
+		DiskSize: int64(d),
+	}
+
+	return out, nil
+}
+
+func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	// following code will eventually break or panic
+	// FIXME: Write function that can search external structs without panicking, like jq for json
+	// so we can write something like searchInStruct(in.Properties, ".Properties.image.minDisk")
+
+	properties := in.Properties
+	image := properties["image"].(map[string]interface{}) // nolint
+	d := image["minDisk"].(float64)                       // nolint
+	id := image["id"].(string)                            // nolint
+	name := image["name"].(string)                        // nolint
+
+	out := abstract.Image{
+		ID:       id,
+		Name:     name,
+		DiskSize: int64(d),
+	}
+
+	return out, nil
+}
+
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	nullAI := abstract.Image{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAI, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -766,10 +860,14 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	defer tracer.Exiting()
 
 	var img *images.Image
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			img, innerErr = images.Get(s.ComputeClient, id).Extract()
-			return innerErr
+	xerr := stacks.RetryableRemoteCall(
+		func() error {
+			aimg, innerErr := images.Get(s.ComputeClient, id).Extract()
+			if innerErr != nil {
+				return innerErr
+			}
+			img = aimg
+			return nil
 		},
 		NormalizeError,
 	)
@@ -777,11 +875,27 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 		return nullAI, xerr
 	}
 
-	out := abstract.Image{
-		ID:       img.ID,
-		Name:     img.Name,
-		DiskSize: int64(img.MinDiskGigabytes),
+	if img == nil {
+		return nullAI, fail.UnknownError("get image information didn't fail, but it was nil")
 	}
+
+	if img.ID == id {
+		out := abstract.Image{
+			ID:       img.ID,
+			Name:     img.Name,
+			DiskSize: int64(img.MinDiskGigabytes),
+		}
+		return out, nil
+	}
+
+	// if we are here this means that image description is not truly compatible with openstack
+	out, err := extractImage(img)
+	if err != nil {
+		// probably image internals has changed, dump image description
+		logrus.Warnf("this image description is invalid: %s", spew.Sdump(img))
+		return nullAI, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
+	}
+
 	return out, nil
 }
 
@@ -792,7 +906,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	defer fail.OnPanic(&ferr)
 
 	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 
@@ -801,7 +915,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nullAHF, xerr
+	}
+
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -833,15 +952,17 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptySlice []abstract.Image
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	opts := images.ListOpts{
 		Status: images.ImageStatusActive,
@@ -876,7 +997,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -929,8 +1050,8 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
 	if xerr != nil {
@@ -1095,7 +1216,7 @@ func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversio
 // ListHosts lists available hosts
 func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
@@ -1140,7 +1261,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1161,37 +1282,45 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	if s.cfgOpts.UseFloatingIP {
 		fip, xerr := s.getFloatingIPOfHost(ahf.Core.ID)
-		if xerr == nil {
-			if fip != nil {
-				// Floating IP found, first dissociate it from the host...
-				retryErr := stacks.RetryableRemoteCall(
-					func() error {
-						err := floatingips.DisassociateInstance(
-							s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
-								FloatingIP: fip.IP,
-							},
-						).ExtractErr()
-						return normalizeError(err)
-					},
-					normalizeError,
-				)
-				if retryErr != nil {
-					return retryErr
-				}
+		if xerr != nil {
+			return xerr
+		}
 
-				// then delete it.
-				retryErr = stacks.RetryableRemoteCall(
-					func() error {
-						err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
-						return normalizeError(err)
-					},
-					normalizeError,
-				)
-				if retryErr != nil {
-					return retryErr
-				}
+		if fip != nil {
+			// Floating IP found, first dissociate it from the host...
+			retryErr := stacks.RetryableRemoteCall(
+				func() error {
+					err := floatingips.DisassociateInstance(
+						s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
+							FloatingIP: fip.IP,
+						},
+					).ExtractErr()
+					return normalizeError(err)
+				},
+				normalizeError,
+			)
+			if retryErr != nil {
+				return retryErr
+			}
+
+			// then delete it.
+			retryErr = stacks.RetryableRemoteCall(
+				func() error {
+					err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
+					return normalizeError(err)
+				},
+				normalizeError,
+			)
+			if retryErr != nil {
+				return retryErr
 			}
 		}
+
+	}
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
 	}
 
 	// Try to remove host for 3 minutes
@@ -1228,23 +1357,23 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 							},
 							normalizeError,
 						)
-						if commRetryErr == nil {
-							if toHostState(host.Status) == hoststate.Error {
+						if commRetryErr != nil {
+							// FIXME: capture more error types
+							switch commRetryErr.(type) {
+							case *fail.ErrNotFound:
+								resourcePresent = false
 								return nil
+							default:
 							}
-							return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
+							return commRetryErr
 						}
-						// FIXME: capture more error types
-						switch commRetryErr.(type) {
-						case *fail.ErrNotFound:
-							resourcePresent = false
+						if toHostState(host.Status) == hoststate.Error {
 							return nil
-						default:
 						}
-						return commRetryErr
+						return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 					},
-					temporal.GetDefaultDelay(),
-					temporal.GetHostCleanupTimeout(),
+					timings.NormalDelay(),
+					timings.HostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
@@ -1263,7 +1392,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		temporal.GetHostCleanupTimeout(),
+		2*timings.HostCleanupTimeout(), // inner retry already has HostCleanupTimeout, so here we need more
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
@@ -1311,9 +1440,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	}
 	// VPL: fip not found is not an abnormal situation, do not log or raise error
 	if len(fips) > 1 {
-		return nil, fail.InconsistentError(
-			"configuration error, more than one Floating IP associated to host '%s'", hostID,
-		)
+		return nil, fail.InconsistentError("configuration error, more than one Floating IP associated to host '%s'", hostID)
 	}
 	if len(fips) == 0 {
 		return nil, nil
@@ -1347,6 +1474,11 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 		portID *string
 	)
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
@@ -1360,8 +1492,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetOperationTimeout(),
+		timings.NormalDelay(),
+		timings.OperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

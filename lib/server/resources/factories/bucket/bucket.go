@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,11 +34,11 @@ func List(svc iaas.Service) ([]string, fail.Error) {
 }
 
 // New creates a bucket instance
-func New(svc iaas.Service) (resources.Bucket, fail.Error) {
+func New(svc iaas.Service) (resources.Bucket, fail.Error) { // nolint
 	return operations.NewBucket(svc)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(svc iaas.Service, name string) (resources.Bucket, fail.Error) {
+func Load(svc iaas.Service, name string) (resources.Bucket, fail.Error) { // nolint
 	return operations.LoadBucket(svc, name)
 }

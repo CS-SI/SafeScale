@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,10 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup
@@ -40,20 +43,23 @@ func (sgb *SecurityGroupBond) IsNull() bool {
 }
 
 // Clone ...
-func (sgb SecurityGroupBond) Clone() data.Clonable {
+func (sgb SecurityGroupBond) Clone() (data.Clonable, error) {
 	return NewSecurityGroupBond().Replace(&sgb)
 }
 
 // Replace ...
-func (sgb *SecurityGroupBond) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (sgb *SecurityGroupBond) Replace(p data.Clonable) (data.Clonable, error) {
 	if sgb == nil || p == nil {
-		return sgb
+		return nil, fail.InvalidInstanceError()
 	}
 
-	src, _ := p.(*SecurityGroupBond) // FIXME: Replace should also return an error
+	src, ok := p.(*SecurityGroupBond)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SecurityGroupBond")
+	}
+
 	*sgb = *src
-	return sgb
+	return sgb, nil
 }
 
 // Note: no need to register this property, it is not used directly (component of other properties)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go
 
 // BucketHandler defines interface to manipulate buckets
 type BucketHandler interface {
@@ -50,15 +51,15 @@ func NewBucketHandler(job server.Job) BucketHandler {
 }
 
 // List retrieves all available buckets
-func (handler *bucketHandler) List(all bool) (_ []string, outerr fail.Error) {
-	defer fail.OnPanic(&outerr)
+func (handler *bucketHandler) List(all bool) (_ []string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(handler.job.Task(), true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&outerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	if all {
 		return handler.job.Service().ListBuckets(objectstorage.RootPath)
@@ -82,8 +83,8 @@ func (handler *bucketHandler) List(all bool) (_ []string, outerr fail.Error) {
 }
 
 // Create a bucket
-func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -94,12 +95,12 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
 	rb, xerr := bucketfactory.Load(svc, name)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
 		}
 	}
@@ -115,8 +116,8 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 }
 
 // Delete a bucket
-func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -127,7 +128,7 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	rb, xerr := bucketfactory.Load(handler.job.Service(), name)
 	if xerr != nil {
@@ -137,8 +138,8 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 }
 
 // Inspect a bucket
-func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -149,8 +150,9 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
+	var xerr fail.Error
 	rb, xerr = bucketfactory.Load(handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -46,21 +49,23 @@ func (hlm *HostLocalMount) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hlm HostLocalMount) Clone() data.Clonable {
+func (hlm HostLocalMount) Clone() (data.Clonable, error) {
 	return NewHostLocalMount().Replace(&hlm)
 }
 
 // Replace ...
-func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hlm *HostLocalMount) Replace(p data.Clonable) (data.Clonable, error) {
 	if hlm == nil || p == nil {
-		return hlm
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostLocalMount) // nolint
+	src, ok := p.(*HostLocalMount)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostLocalMount")
+	}
+
 	*hlm = *src
-	return hlm
+	return hlm, nil
 }
 
 // HostRemoteMount stores information about a remote filesystem mount
@@ -86,21 +91,22 @@ func (hrm *HostRemoteMount) IsNull() bool {
 }
 
 // Clone ...
-func (hrm HostRemoteMount) Clone() data.Clonable {
-	return NewHostRemoteMount().Replace(&hrm)
+func (hrm *HostRemoteMount) Clone() (data.Clonable, error) {
+	return NewHostRemoteMount().Replace(hrm)
 }
 
 // Replace ...
-func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hrm *HostRemoteMount) Replace(p data.Clonable) (data.Clonable, error) {
 	if hrm == nil || p == nil {
-		return hrm
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostRemoteMount) // nolint
+	src, ok := p.(*HostRemoteMount)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostRemoteMount")
+	}
 	*hrm = *src
-	return hrm
+	return hrm, nil
 }
 
 // HostMounts contains information about mounts on the host
@@ -135,27 +141,36 @@ func (hm *HostMounts) IsNull() bool {
 }
 
 // Clone ...  (data.Clonable interface)
-func (hm HostMounts) Clone() data.Clonable {
-	return NewHostMounts().Replace(&hm)
+func (hm *HostMounts) Clone() (data.Clonable, error) {
+	return NewHostMounts().Replace(hm)
 }
 
 // Replace ...  (data.Clonable interface)
-func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
+func (hm *HostMounts) Replace(p data.Clonable) (data.Clonable, error) {
 	// Note: do not validate with isNull(), it's allowed to replace a null value...
 	if hm == nil || p == nil {
-		return hm
+		return hm, nil
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostMounts) // nolint
+	src, ok := p.(*HostMounts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostMounts")
+	}
+
 	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
 	for k, v := range src.LocalMountsByDevice {
 		hm.LocalMountsByDevice[k] = v
 	}
 	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
 	for k, v := range src.LocalMountsByPath {
-		// FIXME: Replace should also return an error
-		hm.LocalMountsByPath[k], _ = v.Clone().(*HostLocalMount) // nolint
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		hm.LocalMountsByPath[k], ok = cloned.(*HostLocalMount)
+		if !ok {
+			return nil, fmt.Errorf("cloned is not a *HostLocalMount")
+		}
 	}
 	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
 	for k, v := range src.RemoteMountsByShareID {
@@ -167,14 +182,20 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	}
 	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.RemoteMountsByPath))
 	for k, v := range src.RemoteMountsByPath {
-		// FIXME: Replace should also return an error
-		hm.RemoteMountsByPath[k], _ = v.Clone().(*HostRemoteMount) // nolint
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		hm.RemoteMountsByPath[k], ok = cloned.(*HostRemoteMount)
+		if !ok {
+			return nil, fmt.Errorf("p is not a *HostRemoteMount")
+		}
 	}
 	hm.BucketMounts = make(map[string]string, len(src.BucketMounts))
 	for k, v := range src.BucketMounts {
 		hm.BucketMounts[k] = v
 	}
-	return hm
+	return hm, nil
 }
 
 func init() {

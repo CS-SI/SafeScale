@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
+	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -48,12 +48,15 @@ import (
 var profileCloseFunc = func() {}
 
 func cleanup(clientSession *client.Session, onAbort *uint32) {
+	var crash error
+	defer fail.OnPanic(&crash) // nolint
+
 	if atomic.CompareAndSwapUint32(onAbort, 0, 0) {
 		profileCloseFunc()
-		os.Exit(0)
+		os.Exit(0) // nolint
 	}
 
-	fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
+	fmt.Println("\nBe careful: stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible.")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
@@ -62,7 +65,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
 		if err != nil {
 			fmt.Printf("failed to stop the process %v\n", err)
 		}
@@ -140,7 +143,8 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		// Define trace settings of the application (what to trace if trace is wanted)
 		// TODO: is it the good behavior ? Shouldn't we fail ?
 		// If trace settings cannot be registered, report it but do not fail
@@ -158,18 +162,18 @@ func main() {
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
-			app2.Verbose = true
+			appwide.Verbose = true
 		} else {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
 		// Defines trace level wanted by user
-		if app2.Verbose = c.Bool("verbose"); app2.Verbose {
+		if appwide.Verbose = c.Bool("verbose"); appwide.Verbose {
 			logrus.SetLevel(logrus.InfoLevel)
-			app2.Verbose = true
+			appwide.Verbose = true
 		}
-		if app2.Debug = c.Bool("debug"); app2.Debug {
-			if app2.Verbose {
+		if appwide.Debug = c.Bool("debug"); appwide.Debug {
+			if appwide.Verbose {
 				logrus.SetLevel(logrus.TraceLevel)
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)
@@ -197,7 +201,8 @@ func main() {
 		return nil
 	}
 
-	app.After = func(c *cli.Context) error {
+	app.After = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		cleanup(clientSession, &onAbort)
 		return nil
 	}
@@ -233,6 +238,19 @@ func main() {
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
+
+	// if last argument has "--" or "-" and is NOT help we are probably writing a wrong command
+	{
+		if len(os.Args) > 1 {
+			last := os.Args[len(os.Args)-1]
+			if !(last == "-help" || last == "--help") {
+				if strings.HasPrefix(last, "-") {
+					fmt.Printf("this is probably a mistake, flags MUST be used BEFORE arguments: 'safescale subcommand arg1 arg2 --flag1 this_value_is_ignored', you should write 'safescale subcommand --flag1 this_value_now_works arg1 arg2'\n")
+					os.Exit(1)
+				}
+			}
+		}
+	}
 
 	err := app.RunContext(mainCtx, os.Args)
 	if err != nil {

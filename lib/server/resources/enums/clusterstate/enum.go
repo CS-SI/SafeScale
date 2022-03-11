@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ package clusterstate
 type Enum int
 
 const (
-	_ Enum = iota
+	// Unknown the cluster is in unknown state
+	Unknown Enum = iota
 	// Nominal the cluster is started and fully operational
 	Nominal
 	// Degraded the cluster is running but some key components are failing (typically a master)
@@ -44,7 +45,4 @@ const (
 	Stopping
 	// Starting the cluster is starting
 	Starting
-
-	// Unknown ...
-	Unknown
 )

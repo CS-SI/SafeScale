@@ -5,6 +5,8 @@ ndef = $(if $(value $(1)),,$(error $(1) not set))
 .PHONY: default version
 default: help ;
 
+THIS_FILE := $(lastword $(MAKEFILE_LIST))
+
 include ./common.mk
 
 # Binaries generated
@@ -26,7 +28,10 @@ XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 RULES := github.com/quasilyte/go-ruleguard/cmd/ruleguard
 RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
-GOGREP := mvdan.cc/gogrep
+GOENUM := github.com/abice/go-enum
+GOWRAP := github.com/hexdigest/gowrap
+MAINT := github.com/yagipy/maintidx/cmd/maintidx
+IRETURN := github.com/butuzov/ireturn/cmd/ireturn
 
 # CI tools
 BATS := github.com/sstephenson/bats
@@ -41,28 +46,45 @@ export BUILD_TAGS
 TEST_COVERAGE_ARGS =
 export TEST_COVERAGE_ARGS
 
-all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet semgrep style #metalint
+all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
+	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 with-soft:
 	@echo "go easy running semgrep"
 	@$(eval CERR = "default")
 
-ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep
+ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style #metalint
+rawci: logclean ground getdevdeps mod sdk generate lib cli
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+
+allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
+	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
+	@md5sum cli/safescaled/safescaled-cover 2>/dev/null >> sums.log || true
+	@md5sum cli/safescale/safescale-cover 2>/dev/null >> sums.log || true
 
 version:
 	@printf "%b" "$(VERSION)-$$(git rev-parse --abbrev-ref HEAD | tr \"/\" \"_\")";
 
-release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style releasearchive #metalint releasearchive
+release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
+	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
-releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style releasearchive #metalint releasearchive
+releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
+	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 releasetags:
 	@echo "settings go build tags for release"
@@ -83,6 +105,8 @@ with-coverage:
 	@$(eval TEST_COVERAGE_ARGS = "-coverprofile=cover.out")
 
 checkbuild: begin
+	@if [ ! -s ./sums.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) checkbuild FAILED, you have to run 'make all' first !$(NO_COLOR)\n";exit 1;fi;
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
 	@(cd lib && $(MAKE) all)
 	@(cd cli && $(MAKE) all)
@@ -90,6 +114,12 @@ checkbuild: begin
 	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | grep -v .pb. | grep -v nolint | grep -v _test.go | xargs errcheck | grep -v test | awk 'NF' | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
+	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
 
 common: begin ground getdevdeps mod sdk generate
 
@@ -98,14 +128,30 @@ versioncut:
 	@(($(GO) version | grep go1.18) || ($(GO) version | grep go1.17) ||($(GO) version | grep go1.16)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.16 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD), go '$$($(GO) version)', protoc '$$(protoc --version)' ...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD), commit $$(git log --format="%H" -n 1), go '$$($(GO) version)', protoc '$$(protoc --version)' ...$(NO_COLOR)\n";
 
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) mod download &>/dev/null || true)
-	@($(GO) mod tidy &>/dev/null || true)
-	@($(GO) mod download &>/dev/null || true)
+	@($(GO) mod download || true)
+	@sleep 4
+	@while [ $(ps -ef | grep "mod download") ] ; do \
+		sleep 4 ; \
+	done
+	@($(GO) mod tidy || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 || true)
+	@sleep 4
+	@while [ $(ps -ef | grep "mod download") ] ; do \
+		sleep 4 ; \
+	done
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+
+cleancache:
+	@($(GO) clean -cache -modcache -i -r &>/dev/null || true)
+
+modclean: cleancache mod
 
 debug:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'debug' flag$(NO_COLOR)\n";
@@ -130,7 +176,7 @@ ground: begin
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n"; \
-		$(GO) install $(GOJQ)@v0.12.3 &>/dev/null || true; \
+		$(GO) install $(GOJQ)@v0.12.6 &>/dev/null || true; \
 	fi
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n";
@@ -138,11 +184,11 @@ cideps: begin ground
 	fi
 	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n"; \
-		$(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
+		$(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.4 &>/dev/null || true; \
 	fi
 	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n"; \
-		$(GO) install $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+		$(GO) install $(JSONTOML)/cmd/tomljson@v1.9.4 &>/dev/null || true; \
 	fi
 
 batscheck: begin
@@ -187,7 +233,7 @@ coverdeps: begin ground
 	@sleep 2
 
 getdevdeps: begin ground
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dependencies. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
@@ -223,30 +269,48 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) stringer > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n"; \
-		$(GO) install $(STRINGER)@v0.1.0 &>/dev/null || true; \
+		$(GO) install $(STRINGER)@v0.1.9 &>/dev/null || true; \
+	fi
+	@sleep 2
+	@$(WHICH) go-enum > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading go-enum...\n"; \
+		$(GO) install $(GOENUM)@v0.3.11 &>/dev/null || true; \
+	fi
+	@sleep 2
+	@$(WHICH) gowrap > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gowrap...\n"; \
+		$(GO) install $(GOWRAP)/cmd/gowrap@v1.2.2 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n"; \
-		$(GO) install $(RULES)@v0.3.10 &>/dev/null || true; \
-		$(GO) get -d $(RULES_DSL)@v0.3.10 &>/dev/null || true; \
+		$(GO) install $(RULES)@v0.3.15 &>/dev/null || true; \
+		$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true; \
 	fi
 	@sleep 2
-	@$(WHICH) gogrep > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gogrep...\n" && $(GO) get $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
-		$(GO) install $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
+	@$(WHICH) maintidx > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading maintidx...\n"; \
+		$(GO) install $(MAINT)@v1.0.0 &>/dev/null || true; \
+	fi
+	@sleep 2
+	@$(WHICH) ireturn > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ireturn...\n"; \
+		$(GO) install $(IRETURN)@v0.1.1 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.43.0 || true; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.42.1 || true; \
 	fi
 	@sleep 5
 
 ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	
-sdk: getdevdeps
+
+unmerged:
+	@$(WHICH) git > /dev/null && git grep -r "<<<<<" -- "*.*" && printf "%b" "$(ERR_COLOR)$(INFO_STRING) Unmerged content...\n" && exit 1 || true
+
+sdk: getdevdeps unmerged
 	@(cd lib && $(MAKE) $(@))
 
 force_sdk_python: sdk
@@ -276,7 +340,7 @@ mrproper: clean
 
 install: removebins
 	@($(CP) -f $(EXECS) $(GOPATH)/bin)
-	@($(CP) -f $(COVEREXECS) $(GOPATH)/bin > /dev/null 2>&1 || :)
+	@($(CP) -f $(COVEREXECS) $(GOPATH)/bin > /dev/null 2>&1 || true)
 
 removebins:
 	@# Big Sur on ARM M1 processor requires all code to be validly signed; so removal of existing files is necessary
@@ -306,43 +370,45 @@ generate: sdk
 	@sleep 2
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./generation_results.log || true
-	@$(GO) generate -run stringer ./... 2>&1 | $(TEE) -a generation_results.log
-	@cd cli && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log
-	@cd lib && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log
-	@cd lib && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log
-	@cd cli && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log
+	@$(GO) generate -run stringer ./... 2>&1 | $(TEE) -a generation_results.log || true
+	@cd cli && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log || true
+	@cd lib && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log || true
+	@cd lib && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log || true
+	@cd cli && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log || true
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
-	@$(CP) ./cover.out ./cover.tmp || true
+	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/fail/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
-	@$(MV) ./cover.tmp ./cover.out || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
+	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@$(GO) clean -testcache
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
-	@$(CP) ./cover.out ./cover.tmp || true
+	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/fail/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
-	@$(MV) ./cover.tmp ./cover.out || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
+	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -351,10 +417,10 @@ test: begin coverdeps # Run unit tests
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
-	@$(CP) ./cover.out ./cover.tmp || true
+	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
-	@$(MV) ./cover.tmp ./cover.out || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
+	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
@@ -378,51 +444,105 @@ vet: begin generate
 
 semgrep: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks with '$(CERR)' ruleset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) get -d $(RULES_DSL)@v0.3.10 &>/dev/null || true;
+	@($(GO) version | grep go1.18) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Semgrep don't work with go1.18 yet ! $(NO_COLOR)\n" && false) || true;
+	@$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true;
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) semgrep_results.log || true
 	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v _test.go | grep -v mock | grep -v .pb. | awk 'NF' | $(TEE) semgrep_results.log
 	@ruleguard -c=0 -rules build/rules/ruleguard.rules.json.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
 	@ruleguard -c=0 -rules build/rules/ruleguard.rules.locks.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v defer | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
 	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED, look at semgrep_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
 
 minimock: begin generate
 	@$(GO) generate -run minimock ./... > /dev/null 2>&1 | $(TEE) -a generation_results.log
 
+beta: begin
+	@$(GO) install golang.org/dl/go1.18beta1@latest
+	@echo "go begins"
+	@$(eval GO = "go1.18beta1")
+	@$(GO) download
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) go version: $$($(GO) version), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd lib && $(MAKE) all)
+	@(cd cli && $(MAKE) all)
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | grep -v .pb. | grep -v nolint | grep -v _test.go | xargs errcheck | grep -v test | awk 'NF' | $(TEE) err_results.log
+	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+
 metalint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) metalint_results.log || true
-	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./... 2>&1 | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) metalint_results.log
+	@golangci-lint --color never --timeout=16m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --disable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v "\s*^\s*" | $(TEE) metalint_results.log
 	@if [ -s ./metalint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) metalint FAILED, look at metalint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
+
+newissues: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running checks on modified files, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+	@if [ ! -s ./sums.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) broken FAILED, you have to run 'make all' first !$(NO_COLOR)\n";exit 1;fi;
+	@md5sum --ignore-missing -w -c sums.log 2>&1 | grep FAILED | tr ':' ' ' | awk {'print $$1'} | xargs -L1 golangci-lint run 2>/dev/null  | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v typecheck
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
 
 style: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) style_results.log || true
-	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>&1 | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) style_results.log
+	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --disable=typecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | grep -v typecheck | awk 'NF' | $(TEE) style_results.log
 	@if [ -s ./style_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) style FAILED, look at style_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
+
+maint: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running maint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) maintidx > /dev/null || (echo "maintidx not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+	@$(RM) maint_results.log || true
+	@maintidx ./... 2>&1 | $(TEE) maint_results.log
+	@if [ -s ./maint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at maint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
+
+badpractices: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running bad practices checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) ireturn > /dev/null || (echo "ireturn not installed in your system" && exit 1))
+ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+	@$(RM) practices_results.log || true
+	@ireturn ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) practices_results.log
+	@if [ -s ./practices_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at practices_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+else
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+endif
 
 warnings: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running warnings checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 	@$(RM) warnings_results.log || true
-	@golangci-lint --color never --timeout=10m run ./... 2>&1 | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) warnings_results.log
+	@golangci-lint --color never --timeout=16m run ./... 2>/dev/null | tr '\n' ' ' | sed -e "s/\^/\n/g" | grep -v nolint | grep -v rangeValCopy | grep -v json.camel | grep -v magic.numbers | grep -v _test.go | grep -v .pb. | $(TEE) warnings_results.log
 	@if [ -s ./warnings_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) warnings FAILED, look at warnings_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
-coverage: begin generate with-coverage
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) > coverage_results.log 2>&1 || true
-	@$(GO) tool cover -html=cover.out -o cover.html || true
-
 show-cov: begin
-	@command -v firefox >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) You don't have firefox on PATH.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@command -v $(BROWSER) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) You don't have $(BROWSER) on PATH.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@if [ ! -s ./cover.out ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) show-cov FAILED, You have to run coverage first !$(NO_COLOR)\n";exit 1;fi
 	@if [ -s ./cover.out ]; then $(GO) tool cover -html=cover.out -o cover.html || true;fi
 	@if [ -s ./cover.html ]; then $(BROWSER) ./cover.html || true;fi
 
 logclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning logs... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(RM) sums.log || true
 	@$(RM) *_results.log || true
 	@$(RM) xunit_tests.xml || true
 	@$(RM) cover.out || true
@@ -449,7 +569,6 @@ help: with_git
 	@echo '  err          - Looks for unhandled errors'
 	@echo '  test         - Runs all unit tests'
 	@echo '  convey       - Runs goconvey in lib/utils dir'
-	@echo '  coverage     - Collects coverage info from unit tests'
 	@echo '  show-cov     - Displays coverage info in firefox'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";

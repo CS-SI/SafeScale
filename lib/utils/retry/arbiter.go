@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 type Arbiter func(Try) (verdict.Enum, fail.Error)
 
 // DefaultArbiter allows 10 retries, with a maximum duration of 30 seconds
-var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
+var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.BigDelay()))
 
 // CommonArbiter allows between 5 and 10 retries
 var CommonArbiter = PrevailDone(Min(5), Max(10))

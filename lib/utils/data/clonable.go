@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ package data
 
 // Clonable is the interface a struct must satisfy to be able to be cloned
 type Clonable interface {
-	IsNull() bool              // tells of Clonable represents a null value
-	Clone() Clonable           // allows duplication of a Clonable
-	Replace(Clonable) Clonable // allows replacing a Clonable with data from another one
+	IsNull() bool                       // tells of Clonable represents a null value
+	Clone() (Clonable, error)           // allows duplication of a Clonable
+	Replace(Clonable) (Clonable, error) // allows replacing a Clonable with data from another one
 }

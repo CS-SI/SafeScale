@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,14 +21,14 @@ import (
 )
 
 func ActionFromError(err error) string {
-	if err == nil {
-		return ""
+	if err != nil {
+		switch err.(type) {
+		case *fail.ErrAborted:
+			return "abort"
+		default:
+			return "failure"
+		}
 	}
 
-	switch err.(type) {
-	case *fail.ErrAborted:
-		return "abort"
-	default:
-		return "failure"
-	}
+	return ""
 }

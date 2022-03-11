@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -86,7 +86,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build builds a new Client from configuration parameter
-func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr fail.Error) {
+func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr fail.Error) {
 	identity := remap(opt["identity"])
 	compute := remap(opt["compute"])
 	metadata := remap(opt["metadata"])
@@ -104,6 +104,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			return nil, fail.SyntaxError("keyword 'UserID' in section 'identity' not found in tenant file")
 		}
 
+		var xerr fail.Error
 		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if xerr != nil {
 			return nil, xerr
@@ -116,13 +117,13 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
@@ -172,17 +173,19 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		return nil, fail.ConvertError(err)
 	}
 
+	// Note: if timings have to be tuned, update stack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "outscale",
+		FullStack: stack,
+		Name:      "outscale",
 	}
 
 	p.Stack = wrapped
 	p.tenantParameters = opt
 
 	wp := providers.ProviderProxy{
-		InnerProvider: p,
-		Name:          wrapped.Name,
+		Provider: p,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -190,7 +193,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 
 // GetAuthenticationOptions returns authentication parameters
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -208,7 +211,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 
 // GetConfigurationOptions returns configuration parameters
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -250,8 +253,8 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
-		return map[string]interface{}{}, nil
+	if valid.IsNil(p) {
+		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
 }
@@ -280,8 +283,8 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
-		return emptySlice, nil
+	if valid.IsNil(p) {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -291,7 +294,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

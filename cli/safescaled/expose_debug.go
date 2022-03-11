@@ -2,7 +2,7 @@
 // +build debug
 
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/exportstats"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/felixge/fgprof"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
@@ -57,6 +58,9 @@ func expose() {
 	// Debug using fgprof
 	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux)
 		if err != nil {
 			logrus.Fatalf("Failed to start expvar: %v", err)

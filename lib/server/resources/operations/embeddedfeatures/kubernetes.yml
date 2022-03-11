@@ -1,4 +1,4 @@
-# Copyright 2018-2021, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2022, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,19 +47,19 @@ feature:
                     nodes:   "count >= 8, cpu >= 2"
 
     parameters:
-        - AllowPodsOnMasters=false
-        - AllowPodsOnGateways=false
-        - CNI=flannel
+        - AllowPodsOnMasters=false      # define if pods can be run on master(s)
+        - AllowPodsOnGateways=false     # define if pods can be run on gateway(s)
+        - CNI=flannel                   # define the name of the CNI to use (can be flannel or calico)
         #- CNI=calico
-        - CalicoNetworking=vxlan
-        - ClusterControlplaneEndpointIP
-        - Dashboard=true
-        - EnableAudit=false
-        - ExternalLoadBalancerHostname=
-        - Hardening=true
-        - KubeVersion=1.20.9
-        # - CalicoVersion=v3.19.1
-        - FlannelVersion=v0.13.0
+        - CalicoNetworking=vxlan        # define the Calico Networking tech
+        - ClusterControlplaneEndpointIP # define the IP address of the cluster ControlPlane
+        - Dashboard=true                # define if Kubernetes Dashboard have to be installed
+        - EnableAudit=false             # define if system audit have to be configured
+        - ExternalLoadBalancerHostname= # define the DNS/IP address of the external Load Balancer (none by default)
+        - Hardening=true                # tells if hardening is wanted
+        - KubeVersion=1.20.9            # defines the Kubernetes version to use
+        #- CalicoVersion=v3.19.1         # defines the Calico version to use
+        - FlannelVersion=v0.13.0        # defines the Flannel version to use
         - OIDCClientName=default
         - OIDCGroupName=user_groups
         - OIDCRealm=
@@ -749,7 +749,7 @@ feature:
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218 "failure checking apiserver"
+                            sfRetryEx 10m 20  sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218 "failure checking apiserver"
                             sfRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219 "failure checking controller"
                             sfRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220 "failure checking scheduler"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,17 +88,19 @@ func (rc reservation) RemoveObserver(name string) error {
 }
 
 // Released is used to inform observers the reservation was released (decreasing the use counter)
-func (rc reservation) Released() {
+func (rc reservation) Released() error {
 	for _, ob := range rc.observers {
 		ob.MarkAsFreed(rc.key)
 	}
+	return nil
 }
 
 // Destroyed is used to inform observers the reservation was destroyed
-func (rc reservation) Destroyed() {
+func (rc reservation) Destroyed() error {
 	for _, ob := range rc.observers {
 		ob.MarkAsDeleted(rc.key)
 	}
+	return nil
 }
 
 // freed returns a read-only channel to be notified when the reservation has been freed

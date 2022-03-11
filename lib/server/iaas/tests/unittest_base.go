@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -585,7 +585,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StopHost(host.Core.ID, true)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Stopped, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Stopped, temporal.BigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
@@ -595,7 +595,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StartHost(host.Core.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Started, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Started, temporal.BigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
@@ -624,7 +624,7 @@ func (tester *ServiceTester) Volumes(t *testing.T) {
 	assert.Equal(t, 25, v1.Size)
 	assert.Equal(t, volumespeed.Hdd, v1.Speed)
 
-	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
@@ -637,7 +637,7 @@ func (tester *ServiceTester) Volumes(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	lst, err = tester.Service.ListVolumes()
@@ -685,7 +685,7 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 	defer func() {
 		_ = tester.Service.DeleteVolume(v1.ID)
 	}()
-	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
@@ -698,7 +698,7 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
@@ -770,48 +770,3 @@ func (tester *ServiceTester) Buckets(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotContains(t, cl, "testC", "testC2")
 }
-
-// TODO: disabled, need overhaul
-// // Objects test
-// func (tester *ServiceTester) Objects(t *testing.T) {
-// 	_, err := tester.Service.CreateBucket("testC")
-// 	assert.Nil(t, err)
-// 	_, err = tester.Service.WriteObject("testC", "object1", strings.NewReader("123456789"), 0, objectstorage.ObjectMetadata{"A": "B"})
-// 	assert.Nil(t, err)
-
-// 	var buff bytes.Buffer
-// 	err = tester.Service.ReadObject("testC", "object1", buff, 0, 0)
-// 	sc := buff.String()
-// 	assert.Equal(t, "123456789", sc)
-// 	assert.Equal(t, 1, len(o.Metadata))
-// 	assert.Equal(t, "B", o.Metadata["A"])
-
-// 	o, err = tester.Service.GetObjectMetadata("testC", "object1")
-// 	assert.Empty(t, o.Content)
-// 	assert.Equal(t, 1, len(o.Metadata))
-// 	assert.Equal(t, "B", o.Metadata["A"])
-// 	o, err = tester.Service.GetObject("testC", "object1", []abstract.Range{
-// 		abstract.NewRange(0, 2),
-// 		abstract.NewRange(4, 7),
-// 	})
-// 	assert.Nil(t, err)
-// 	if err == nil {
-// 		buff.Reset()
-// 		_, err = buff.ReadFrom(o.Content)
-// 		assert.Nil(t, err)
-// 		sc = buff.String()
-// 		assert.Equal(t, "1235678", sc)
-// 	}
-
-// 	assert.Nil(t, err)
-// 	time.Sleep(5 * time.Second)
-// 	_, err = tester.Service.GetObject("testC", "object1", nil)
-// 	assert.NotNil(t, err)
-
-// 	err = tester.Service.DeleteObject("testC", "object1")
-// 	assert.NotNil(t, err)
-// 	err = tester.Service.DeleteBucket("testC")
-// 	assert.Nil(t, err)
-// }
-
-// TODO: Implement missing methods here (Look at TODO: Implement Test)

@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,10 +19,11 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+
     install:
         bash:
             check:
-                pace: pkg
+                pace: pkg,config
                 steps:
                     pkg:
                         targets:
@@ -53,7 +54,7 @@ feature:
                             nodes: no
                         run: |
                             [[ ! -d ${SF_ETCDIR}/ansible ]] && sfFail 1
-                            [[ ! -d ${SF_ETCDIR}/ansible/ansible.cfg ]] && sfFail 2
+                            [[ ! -f ${SF_ETCDIR}/ansible/ansible.cfg ]] && sfFail 2
                             sfExit
 
             add:
@@ -117,11 +118,22 @@ feature:
 
                             cat >${SF_ETCDIR}/ansible/ansible.cfg <<-EOF
                             [defaults]
-                            inventory = ${SF_ETCDIR}/ansible/inventory/inventory.py
+                            inventory = ${SF_ETCDIR}/ansible/inventory/_static.yml
                             remote_tmp = ${SF_TMPDIR}/ansible-\${USER}
                             log_path = ${SF_LOGDIR}/ansible.log
                             EOF
 
+                            cat >${SF_ETCDIR}/ansible/inventory/_static.yml <<-EOF
+                            ...
+                            all:
+                                hosts:
+                                    {{ .Hostname }}:
+                                        ansible_host: {{ .HostIP }}
+                            
+                                vars:
+                                    ansible_user: {{ .Username }}
+                            EOF
+                            
                             cat >${SF_ETCDIR}/ansible/pathes.cfg <<-EOF
                             sf_base_dir: "/opt/safescale"
                             sf_etc_dir: "{{ "{{ sf_base_dir }}/etc" }}"
@@ -145,26 +157,9 @@ feature:
                             {{ if .SecondaryPublicIP }}secondary_gateway_public_ip: "{{ .SecondaryPublicIP }}"{{ end }}
                             EOF
 
-                            cat >${SF_ETCDIR}/ansible/cluster.cfg <<-EOF
-                            cluster_name: "{{ .ClusterName }}"
-                            cluster_flavor: "{{ .ClusterFlavor }}"
-                            cluster_complexity: "{{ .ClusterComplexity }}"
-                            controlplane_uses_vip: {{ .ClusterControlplaneUsesVIP }}
-                            controlplane_endpoint_ip: "{{ .ClusterControlplaneEndpointIP }}"
-                            cluster_admin_username: "{{ .ClusterAdminUsername }}"
-                            EOF
-
-                            cat >${SF_ETCDIR}/ansible/inventory/inventory.py <<-EOF
-                            #!/usr/bin/env python3
-                            print("{\"_meta\": {\"hostvars\": {}},\"all\": {\"children\": [\"ungrouped\"]},\"ungrouped\": {\"children\": []}}")
-                            EOF
-
-                            chown -R {{ .ClusterAdminUsername }}:root ${SF_ETCDIR}/ansible
+                            chown -R {{ .Username }}:root ${SF_ETCDIR}/ansible
                             chmod -R ug+rwx,o+rx-w ${SF_ETCDIR}/ansible
                             find ${SF_ETCDIR}/ansible -type d -exec chmod a+x {} \;
-
-                            chown safescale:root ${SF_ETCDIR}/ansible/inventory/inventory.py
-                            chmod -R ug+rwx,o+rx-w ${SF_ETCDIR}/ansible/inventory
                             sfExit
 
             remove:
@@ -200,8 +195,8 @@ feature:
 
                     config:
                         targets:
-                            gateways: no
                             hosts: yes
+                            gateways: no
                             masters: all
                             nodes: no
                         run: |

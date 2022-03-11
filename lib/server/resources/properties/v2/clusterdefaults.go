@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterDefaults ...
@@ -42,25 +45,29 @@ func newClusterDefaults() *ClusterDefaults {
 // IsNull ...
 // satisfies interface data.Clonable
 func (cd *ClusterDefaults) IsNull() bool {
-	return cd == nil || (cd.GatewaySizing.IsNull() && cd.MasterSizing.IsNull() && cd.NodeSizing.IsNull())
+	return cd == nil || (cd.GatewaySizing == HostSizingRequirements{} && cd.MasterSizing == HostSizingRequirements{} && cd.NodeSizing == HostSizingRequirements{})
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cd ClusterDefaults) Clone() data.Clonable {
+func (cd ClusterDefaults) Clone() (data.Clonable, error) {
 	return newClusterDefaults().Replace(&cd)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (cd *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
 	if cd == nil || p == nil {
-		return cd
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*cd = *p.(*ClusterDefaults)
-	return cd
+	cloned, ok := p.(*ClusterDefaults)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterDefaults")
+	}
+
+	*cd = *cloned
+	return cd, nil
 }
 
 func init() {

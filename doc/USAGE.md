@@ -36,7 +36,7 @@ SafeScale is composed of 2 parts:
 
 ## <a name="safescaled">safescaled</a>
 
-`safescaled` is a daemon and you only need to launch it on your own computer.
+`safescaled` is the daemon you need to launch on your own computer.
 The purpose of this daemon is to execute requests ordered by `safescale` client on the providers.
 <br>
 It is composed internally of 2 layers:
@@ -2321,6 +2321,8 @@ The following actions are proposed:
         <li><code>--ram &lt;value&gt;</code> RAM for the host (default: 1 Go)</li>
         <li><code>--disk &lt;value&gt;</code> Disk space for the host (default depending of Cluster flavor)</li>
       </ul><br>
+      <b>! WARNING !</b> flags '--' or '-' MUST be used BEFORE arguments like stated in command description: running <code>safescale cluster create mycluster -C large</code> IGNORES <code>-C large</code>, using <code>safescale cluster create -C large mycluster</code> works as expected
+      <br><br>
       example:
       <pre>$ safescale cluster create -F k8s -C small -N 192.168.22.0/24 mycluster</pre>
       response on success:

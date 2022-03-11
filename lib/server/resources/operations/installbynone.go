@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ import (
 type noneInstaller struct{}
 
 // Check checks if the Feature is installed
-func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if f == nil {
 		return nil, fail.InvalidParameterError("f", "cannot be null value of 'resources.Feature'")
@@ -58,9 +58,9 @@ func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resource
 
 // Add installs the Feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -95,9 +95,9 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 }
 
 // Remove uninstalls the Feature
-func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if f == nil {
 		return nil, fail.InvalidParameterError("f", "cannot be null value of 'resources.Feature'")

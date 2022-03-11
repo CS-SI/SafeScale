@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,13 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
+func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -38,6 +39,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Erro
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	var xerr fail.Error
 	akp, xerr = abstract.NewKeyPair(name)
 	if xerr != nil {
 		return nullAKP, xerr
@@ -46,8 +48,8 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Erro
 }
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
-func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -61,9 +63,9 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
+func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error) {
 	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -86,9 +88,9 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
+func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
 	var emptySlice []abstract.KeyPair
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -112,8 +114,8 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) DeleteKeyPair(name string) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

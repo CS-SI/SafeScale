@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -121,13 +122,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
@@ -157,13 +158,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	operatorUsername := abstract.DefaultUser
-	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
+	if operatorUsernameIf, there := compute["OperatorUsername"]; there {
 		operatorUsername, ok = operatorUsernameIf.(string)
-		if ok { // FIXME: Validation
-			if operatorUsername == "" {
-				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-				operatorUsername = abstract.DefaultUser
-			}
+		if !ok {
+			return nil, fail.InconsistentError("'OperatorUsername' should be a string")
+		}
+		if operatorUsername == "" {
+			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
@@ -173,7 +175,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	maxLifeTime := 0
-	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+	if _, ok = compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
@@ -188,14 +190,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	}
-
-	_, err := govalidator.ValidateStruct(authOptions)
+	err := validation.ValidateStruct(&authOptions,
+		validation.Field(&authOptions.Region, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
+		validation.Field(&authOptions.AvailabilityZone, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
+	)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.NewError("Structure validation failure: %v", err)
 	}
 
 	providerName := "openstack"
@@ -229,9 +229,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	// Note: if timings have to be tuned, update stack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "ovh",
+		FullStack: stack,
+		Name:      "ovh",
 	}
 
 	newP := &provider{
@@ -240,8 +242,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: newP,
-		Name:          wrapped.Name,
+		Provider: newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -250,7 +252,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -274,7 +276,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -304,7 +306,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // InspectTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (p provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
 	nullAHT := abstract.HostTemplate{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nullAHT, fail.InvalidInstanceError()
 	}
 
@@ -325,7 +327,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
@@ -333,7 +335,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(false)
@@ -402,7 +404,7 @@ func isFlexTemplate(t abstract.HostTemplate) bool {
 
 // CreateNetwork is overloaded to handle specific OVH situation
 func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -426,8 +428,8 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
-		return map[string]interface{}{}, nil
+	if valid.IsNil(p) {
+		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
 }
@@ -441,7 +443,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 
 // BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -456,7 +458,7 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 
 // UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -472,8 +474,8 @@ func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
-		return emptySlice, nil
+	if valid.IsNil(p) {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -487,7 +489,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

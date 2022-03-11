@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,12 +24,56 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBucketMounts_IsNull(t *testing.T) {
+
+	var bm *BucketMounts = nil
+	if !bm.IsNull() {
+		t.Error("BucketMounts Nil pointer is null")
+		t.Fail()
+	}
+
+	bm = &BucketMounts{
+		ByHostID:   map[string]string{},
+		ByHostName: map[string]string{},
+	}
+	if !bm.IsNull() {
+		t.Error("BucketMounts with empty ByHostID is null")
+		t.Fail()
+	}
+	bm = &BucketMounts{
+		ByHostID: map[string]string{
+			"HostID": "HostData",
+		},
+		ByHostName: map[string]string{},
+	}
+	if bm.IsNull() {
+		t.Error("No, BucketMounts is not null")
+		t.Fail()
+	}
+
+}
+
+func TestBucketMounts_Replace(t *testing.T) {
+
+	var bm *BucketMounts = nil
+	bm2 := NewBucketMounts()
+	_, err := bm.Replace(bm2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+}
+
 func TestBucketMounts_Clone(t *testing.T) {
 	mounts := NewBucketMounts()
 	mounts.ByHostID["i18930"] = "/buckets/my-bucket"
 	mounts.ByHostName["my-server"] = "/buckets/my-bucket"
 
-	clonedMounts, ok := mounts.Clone().(*BucketMounts)
+	cloned, err := mounts.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedMounts, ok := cloned.(*BucketMounts)
 	if !ok {
 		t.Fail()
 	}

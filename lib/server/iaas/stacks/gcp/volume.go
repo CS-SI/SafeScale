@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
@@ -40,9 +41,9 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
@@ -74,7 +75,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	return out, nil
 }
 
-func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
+func toAbstractVolume(in compute.Disk) (out *abstract.Volume, ferr fail.Error) {
 	out = abstract.NewVolume()
 	out.Name = in.Name
 	if strings.Contains(in.Type, "pd-ssd") {
@@ -84,6 +85,8 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
 	}
 	out.Size = int(in.SizeGb)
 	out.ID = strconv.FormatUint(in.Id, 10)
+
+	var xerr fail.Error
 	if out.State, xerr = toAbstractVolumeState(in.Status); xerr != nil {
 		return abstract.NewVolume(), xerr
 	}
@@ -91,9 +94,9 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -135,7 +138,7 @@ func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
 // ListVolumes return the list of all volume known on the current tenant
 func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var emptySlice []abstract.Volume
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -185,7 +188,7 @@ func (s stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s stack) DeleteVolume(ref string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -200,7 +203,7 @@ func (s stack) DeleteVolume(ref string) fail.Error {
 
 // CreateVolumeAttachment attaches a volume to a host
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.VolumeID == "" {
@@ -223,7 +226,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return nullAVA, fail.InvalidInstanceError()
 	}
 	if hostRef == "" {
@@ -319,7 +322,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 
 // DeleteVolumeAttachment ...
 func (s stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if vaID == "" {
@@ -335,7 +338,7 @@ func (s stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
 // ListVolumeAttachments lists available volume attachment
 func (s stack) ListVolumeAttachments(serverRef string) ([]abstract.VolumeAttachment, fail.Error) {
 	var emptySlice []abstract.VolumeAttachment
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverRef == "" {

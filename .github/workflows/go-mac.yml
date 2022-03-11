@@ -5,9 +5,10 @@ on:
     branches:
       - master
       - develop
+      - hotfixes
+      - 'feature/**'
       - 'release/**'
   pull_request:
-    # The branches below must be a subset of the branches above
     branches:
       - master
       - develop
@@ -42,5 +43,6 @@ jobs:
           generation_results.log
           vet_results.log
           test_results.log
+          style_results.log
           go.mod
           go.sum
