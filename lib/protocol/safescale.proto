@@ -398,6 +398,7 @@ message Host {
 	string state_label = 15;
 	string creation_date = 16;
 	bool managed = 17;
+	string template = 18;
 }
 
 message HostStatus {

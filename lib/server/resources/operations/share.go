@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -397,6 +398,18 @@ func (instance *Share) Create(
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	targetName := server.GetName()
+
+	var state hoststate.Enum
+	state, xerr = server.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot create share on '%s', '%s' is NOT started", targetName, targetName))
+	}
+
 	// Check if a Share already exists with the same name
 	_, xerr = server.GetShare(shareName)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -733,6 +746,18 @@ func (instance *Share) Mount(
 		shareName, shareID   string
 	)
 
+	targetName = target.GetName()
+
+	var state hoststate.Enum
+	state, xerr = target.GetState()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if state != hoststate.Started {
+		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot mount share on '%s', '%s' is NOT started", targetName, targetName))
+	}
+
 	// Retrieve info about the Share
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
@@ -797,7 +822,6 @@ func (instance *Share) Mount(
 
 	// Lock for read, won't change data other than properties, which are protected by their own way
 	targetID = target.GetID()
-	targetName = target.GetName()
 	xerr = target.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if Share is already mounted
 		// Check if there is already volume mounted in the path (or in subpath)
@@ -1019,6 +1043,18 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		hostShare *propertiesv1.HostShare
 	)
 
+	targetName := target.GetName()
+
+	var state hoststate.Enum
+	state, xerr = target.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot unmount share on '%s', '%s' is NOT started", targetName, targetName))
+	}
+
 	// Retrieve info about the Share
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
@@ -1070,7 +1106,6 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 
 	var mountPath string
 	remotePath := serverPrivateIP + ":" + hostShare.Path
-	targetName := target.GetName()
 	targetID := target.GetID()
 	xerr = target.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
@@ -1191,6 +1226,18 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	targetName := objserver.GetName()
+
+	var state hoststate.Enum
+	state, xerr = objserver.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot delete share on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
 	xerr = objserver.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

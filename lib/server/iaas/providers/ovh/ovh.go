@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 
@@ -36,6 +35,7 @@ import (
 	filters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -349,7 +349,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 		allTemplates = filters.FilterTemplates(allTemplates, filter)
 	}
 
-	// check flavor disponibilities through OVH-API
+	// check flavor availability through OVH-API
 	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
 		logrus.Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
@@ -358,40 +358,63 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	service := authOpts.GetString("TenantID")
 	region := authOpts.GetString("Region")
 
+	var listAvailableTemplates []abstract.HostTemplate
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, xerr := p.requestOVHAPI(restURL, "GET")
 	if xerr != nil {
 		logrus.Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
-		return allTemplates, nil
-	}
-
-	flavorMap := map[string]map[string]interface{}{}
-	for _, flavor := range flavors.([]interface{}) {
-		// Removal of all the unavailable templates
-		if flavmap, ok := flavor.(map[string]interface{}); ok {
-			if val, ok := flavmap["available"].(bool); ok {
-				if val {
-					if aflav, ok := flavmap["id"]; ok {
-						if key, ok := aflav.(string); ok {
-							flavorMap[key] = flavmap
+		listAvailableTemplates = allTemplates
+	} else {
+		flavorMap := map[string]map[string]interface{}{}
+		for _, flavor := range flavors.([]interface{}) {
+			// Removal of all the unavailable templates
+			if flavmap, ok := flavor.(map[string]interface{}); ok {
+				if val, ok := flavmap["available"].(bool); ok {
+					if val {
+						if aflav, ok := flavmap["id"]; ok {
+							if key, ok := aflav.(string); ok {
+								flavorMap[key] = flavmap
+							}
 						}
 					}
 				}
 			}
 		}
-	}
 
-	var listAvailableTemplates []abstract.HostTemplate
-	for _, template := range allTemplates {
-		if _, ok := flavorMap[template.ID]; ok {
-			listAvailableTemplates = append(listAvailableTemplates, template)
-		} else {
-			logrus.Debugf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
+		for _, template := range allTemplates {
+			if _, ok := flavorMap[template.ID]; ok {
+				// update incomplete disk size of some templates
+				if strings.HasPrefix(template.Name, "i1-") {
+					template.DiskSize = 2000000
+				} else {
+					switch template.Name {
+					case "t1-180", "t2-180":
+						template.DiskSize = 2000000
+					default:
+					}
+				}
+
+				listAvailableTemplates = append(listAvailableTemplates, template)
+			} else {
+				logrus.Debugf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
+			}
 		}
 	}
-	allTemplates = listAvailableTemplates
 
-	return allTemplates, nil
+	// update incomplete disk size of some templates
+	for k, template := range listAvailableTemplates {
+		if strings.HasPrefix(template.Name, "i1-") {
+			listAvailableTemplates[k].DiskSize += 2000
+		} else {
+			switch template.Name {
+			case "t1-180", "t2-180":
+				listAvailableTemplates[k].DiskSize += 2000
+			default:
+			}
+		}
+	}
+
+	return listAvailableTemplates, nil
 }
 
 func isWindowsTemplate(t abstract.HostTemplate) bool {

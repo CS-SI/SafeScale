@@ -145,8 +145,8 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
-	Scan(string, bool, []string) (_ *protocol.ScanResultList, xerr fail.Error)
-	Inspect(string) (_ *protocol.TenantInspectResponse, xerr fail.Error)
+	Scan(string, bool, []string) (_ *protocol.ScanResultList, ferr fail.Error)
+	Inspect(string) (_ *protocol.TenantInspectResponse, ferr fail.Error)
 }
 
 // tenantHandler service

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -74,6 +75,18 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if state != hoststate.Started {
+		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
+	}
 
 	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -195,6 +208,18 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 
 	tracer := debug.NewTracer(task, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
 	defer tracer.Exiting()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if state != hoststate.Started {
+		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
+	}
 
 	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)

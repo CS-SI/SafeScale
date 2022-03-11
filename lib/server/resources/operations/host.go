@@ -1049,11 +1049,7 @@ func (instance *Host) Create(
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name,
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
 			}
 		}
 	}()
@@ -1084,6 +1080,29 @@ func (instance *Host) Create(
 		}
 	}()
 
+	defer func() {
+		if ferr != nil {
+			if !valid.IsNil(ahf) {
+				if !valid.IsNil(ahf.Core) {
+					derr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+						ahc, ok := clonable.(*abstract.HostCore)
+						if !ok {
+							return fail.InconsistentError(
+								"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+							)
+						}
+
+						ahc.LastState = hoststate.Failed
+						return nil
+					})
+					if derr != nil {
+						_ = ferr.AddConsequence(derr)
+					}
+				}
+			}
+		}
+	}()
+
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
 			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
@@ -1093,6 +1112,7 @@ func (instance *Host) Create(
 
 			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
 			hostSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(hostDef)
+			hostSizingV2.Template = hostReq.TemplateRef
 			return nil
 		})
 		if innerXErr != nil {
@@ -1246,6 +1266,25 @@ func (instance *Host) Create(
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	if !valid.IsNil(ahf) {
+		if !valid.IsNil(ahf.Core) {
+			derr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				ahc, ok := clonable.(*abstract.HostCore)
+				if !ok {
+					return fail.InconsistentError(
+						"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+					)
+				}
+
+				ahc.LastState = hoststate.Started
+				return nil
+			})
+			if derr != nil {
+				return userdataContent, derr
+			}
+		}
 	}
 
 	logrus.Infof("Host '%s' created successfully", instance.GetName())
@@ -2889,6 +2928,18 @@ func (instance *Host) Run(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot run anything on '%s', '%s' is NOT started", targetName, targetName))
+	}
+
 	return instance.unsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
 }
 
@@ -2940,6 +2991,18 @@ func (instance *Host) Pull(
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot pull anything on '%s', '%s' is NOT started", targetName, targetName))
+	}
 
 	var (
 		stdout, stderr string
@@ -3020,6 +3083,18 @@ func (instance *Host) Push(
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
+	}
 
 	return instance.unsafePush(ctx, source, target, owner, mode, timeout)
 }
@@ -3675,6 +3750,18 @@ func (instance *Host) PushStringToFileWithOwnership(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
+	targetName := instance.GetName()
+
+	var state hoststate.Enum
+	state, xerr = instance.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
+	}
+
 	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, owner, mode)
 }
 
@@ -3706,6 +3793,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 	var (
 		ahc           *abstract.HostCore
 		hostSizingV1  *propertiesv1.HostSizing
+		hostSizingV2  *propertiesv1.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string
 	)
@@ -3758,6 +3846,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 		StateLabel:          ahc.LastState.String(),
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
+		Template:            hostSizingV2.Template,
 	}
 	return ph, nil
 }

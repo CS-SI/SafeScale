@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
@@ -35,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
@@ -62,80 +62,6 @@ func newFeature(displayName string, fileName string, displayFileName string, emb
 // FeatureNullValue returns a *Feature corresponding to a null value
 func FeatureNullValue() *Feature {
 	return newFeature("", "", "", false, make(map[installmethod.Enum]Installer), nil, nil)
-}
-
-// ListFeatures lists all features suitable for hosts or clusters
-func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	var (
-		cfgFiles []interface{}
-		paths    []string
-	)
-	features := allEmbeddedFeaturesMap
-	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
-	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
-	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
-
-	for _, path := range paths {
-		files, err := ioutil.ReadDir(path)
-		if err != nil {
-			debug.IgnoreError(err)
-			continue
-		}
-		for _, f := range files {
-			if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
-				feat, xerr := NewFeature(svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					debug.IgnoreError(xerr) // Don't hide errors
-					continue
-				}
-				casted, ok := feat.(*Feature)
-				if !ok {
-					logrus.Warnf("feat should be a *Feature") // FIXME: This should be an error
-					continue
-				}
-				if _, ok := allEmbeddedFeaturesMap[casted.displayName]; !ok {
-					allEmbeddedFeaturesMap[casted.displayName] = casted
-				}
-			}
-		}
-	}
-
-	for _, feat := range features {
-		switch suitableFor {
-		case "host":
-			yamlKey := "feature.suitableFor.host"
-			if feat.Specs().IsSet(yamlKey) {
-				value := strings.ToLower(feat.Specs().GetString(yamlKey))
-				if value == "ok" || value == "yes" || value == "true" || value == "1" {
-					cfgFiles = append(cfgFiles, feat.fileName)
-				}
-			}
-		case "cluster":
-			yamlKey := "feature.suitableFor.cluster"
-			if feat.Specs().IsSet(yamlKey) {
-				values := strings.Split(strings.ToLower(feat.Specs().GetString(yamlKey)), ",")
-				if values[0] == "all" || values[0] == "k8s" || values[0] == "boh" {
-					cfg := struct {
-						FeatureName    string   `json:"feature"`
-						ClusterFlavors []string `json:"available-cluster-flavors"`
-					}{feat.displayName, []string{}}
-
-					cfg.ClusterFlavors = append(cfg.ClusterFlavors, values...)
-
-					cfgFiles = append(cfgFiles, cfg)
-				}
-			}
-		default:
-			return nil, fail.SyntaxError("unknown parameter value: %s (should be 'host' or 'cluster')", suitableFor)
-		}
-	}
-
-	return cfgFiles, nil
 }
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
@@ -314,7 +240,7 @@ func (instance *Feature) GetDisplayFilename() string {
 	return instance.displayFileName
 }
 
-// installerOfMethod instanciates the right installer corresponding to the method
+// installerOfMethod instantiates the right installer corresponding to the method
 func (instance *Feature) installerOfMethod(m installmethod.Enum) Installer {
 	if valid.IsNil(instance) {
 		return nil
@@ -428,6 +354,31 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			})
 			return outcomes, nil
 		}
+	}
+
+	switch ata := target.(type) {
+	case resources.Host:
+		state, xerr := ata.GetState()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if state != hoststate.Started {
+			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT started", targetName, targetName))
+		}
+		// FIXME: Fix deadlock
+		/*
+			case resources.Cluster:
+				state, xerr := ata.GetState()
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if state != clusterstate.Nominal {
+					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT nominal", targetName, targetName))
+				}
+		*/
+	default:
 	}
 
 	// -- fall back to active check
@@ -548,6 +499,31 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName),
 	)()
 
+	switch ata := target.(type) {
+	case resources.Host:
+		state, xerr := ata.GetState()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if state != hoststate.Started {
+			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot add feature on '%s', '%s' is NOT started", targetName, targetName))
+		}
+		// FIXME: Fix deadlock
+		/*
+			case resources.Cluster:
+				state, xerr := ata.GetState()
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if state != clusterstate.Nominal {
+					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot add feature on '%s', '%s' is NOT nominal", targetName, targetName))
+				}
+		*/
+	default:
+	}
+
 	installer, xerr := instance.findInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -663,6 +639,31 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		fmt.Sprintf("Starting removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
 		fmt.Sprintf("Ending removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
 	)()
+
+	switch ata := target.(type) {
+	case resources.Host:
+		state, xerr := ata.GetState()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if state != hoststate.Started {
+			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot remove feature on '%s', '%s' is NOT started", targetName, targetName))
+		}
+		// FIXME: Fix deadlock
+		/*
+			case resources.Cluster:
+				state, xerr := ata.GetState()
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if state != clusterstate.Nominal {
+					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot remove feature on '%s', '%s' is NOT nominal", targetName, targetName))
+				}
+		*/
+	default:
+	}
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV, cerr := v.FakeClone()

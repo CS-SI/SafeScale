@@ -219,7 +219,7 @@ func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error
 
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
-// - "Reload": bool = allow to disable reloading from Object Storage if set to false (default is true)
+// - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
 func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
@@ -633,7 +633,7 @@ func (myself *MetadataCore) Reload() (ferr fail.Error) {
 	return myself.reload()
 }
 
-// reload reloads the content from the Object Storage
+// reload loads the content from the Object Storage
 // Note: must be called after locking the instance
 func (myself *MetadataCore) reload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

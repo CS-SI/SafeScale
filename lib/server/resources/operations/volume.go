@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
@@ -651,6 +652,16 @@ func (instance *volume) Attach(
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	var state hoststate.Enum
+	state, xerr = host.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': host '%s' is NOT started", volumeName, targetName, mountPoint, targetName))
+	}
+
 	// -- proceed some checks on target server --
 	xerr = host.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -1079,6 +1090,18 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		mountPath            string
 	)
 
+	targetName := host.GetName()
+
+	var state hoststate.Enum
+	state, xerr = host.GetState()
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot detach volume '%s' from '%s', '%s' is NOT started", volumeName, targetName, targetName))
+	}
+
 	// -- retrieves volume data --
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		volume, ok := clonable.(*abstract.Volume)
@@ -1097,7 +1120,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 	// -- retrieve host data --
 	svc := instance.Service()
-	targetName := host.GetName()
 
 	// -- Update target attachments --
 	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

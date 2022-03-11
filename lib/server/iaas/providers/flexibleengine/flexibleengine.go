@@ -55,11 +55,11 @@ type gpuCfg struct {
 var gpuMap = map[string]gpuCfg{
 	"g1.xlarge": {
 		GPUNumber: 1,
-		GPUType:   "UNKNOW",
+		GPUType:   "UNKNOWN",
 	},
 	"g1.2xlarge": {
 		GPUNumber: 1,
-		GPUType:   "UNKNOW",
+		GPUType:   "UNKNOWN",
 	},
 	"g1.2xlarge.8": {
 		GPUNumber: 1,

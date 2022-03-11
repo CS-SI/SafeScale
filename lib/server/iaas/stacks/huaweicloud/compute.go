@@ -517,11 +517,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		diskSize = 10
 	}
 
-	logrus.Warnf("Trying to create a machine with disk size: %d Gb", diskSize)
-	if diskSize < 11 {
-		logrus.Warnf("It seems a fuckup: %s", spew.Sdump(rim))
-	}
-
 	// Select usable availability zone
 	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
