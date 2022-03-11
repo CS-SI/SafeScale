@@ -1049,11 +1049,7 @@ func (instance *Host) Create(
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name,
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
 			}
 		}
 	}()
@@ -1093,6 +1089,7 @@ func (instance *Host) Create(
 
 			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
 			hostSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(hostDef)
+			hostSizingV2.Template = hostReq.TemplateRef
 			return nil
 		})
 		if innerXErr != nil {
@@ -3706,6 +3703,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 	var (
 		ahc           *abstract.HostCore
 		hostSizingV1  *propertiesv1.HostSizing
+		hostSizingV2  *propertiesv1.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string
 	)
@@ -3758,6 +3756,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, ferr fail.Error) {
 		StateLabel:          ahc.LastState.String(),
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
+		Template:            hostSizingV2.Template,
 	}
 	return ph, nil
 }
