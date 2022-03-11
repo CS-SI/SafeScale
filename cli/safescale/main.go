@@ -240,17 +240,19 @@ func main() {
 	sort.Sort(cli.CommandsByName(app.Commands))
 
 	// if last argument has "--" or "-" and is NOT help we are probably writing a wrong command
-	{
-		if len(os.Args) > 1 {
-			last := os.Args[len(os.Args)-1]
-			if !(last == "-help" || last == "--help") {
-				if strings.HasPrefix(last, "-") {
-					fmt.Printf("this is probably a mistake, flags MUST be used BEFORE arguments: 'safescale subcommand arg1 arg2 --flag1 this_value_is_ignored', you should write 'safescale subcommand --flag1 this_value_now_works arg1 arg2'\n")
-					os.Exit(1)
+	/*
+		{
+			if len(os.Args) > 1 {
+				last := os.Args[len(os.Args)-1]
+				if !(last == "-help" || last == "--help") {
+					if strings.HasPrefix(last, "-") {
+						fmt.Printf("this is probably a mistake, flags MUST be used BEFORE arguments: 'safescale subcommand arg1 arg2 --flag1 this_value_is_ignored', you should write 'safescale subcommand --flag1 this_value_now_works arg1 arg2'\n")
+						os.Exit(1)
+					}
 				}
 			}
 		}
-	}
+	*/
 
 	err := app.RunContext(mainCtx, os.Args)
 	if err != nil {
