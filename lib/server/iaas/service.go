@@ -125,15 +125,20 @@ type ByRankDRF []*abstract.HostTemplate
 func (a ByRankDRF) Len() int      { return len(a) }
 func (a ByRankDRF) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
-// Less returns what entry is less between indexes i and j, baed on rank. If rank is identical, compares entry names
+// Less returns what entry is less between indexes i and j, based on rank. If rank is identical, compares entry names
 func (a ByRankDRF) Less(i, j int) bool {
 	ra := RankDRF(a[i])
 	rb := RankDRF(a[j])
-	if ra == rb {
-		return a[i].Name < a[j].Name
+
+	if ra < rb {
+		return true
 	}
 
-	return ra < rb
+	if ra > rb {
+		return false
+	}
+
+	return a[i].Name < a[j].Name
 }
 
 // NullService creates a service instance corresponding to null value
