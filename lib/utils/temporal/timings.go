@@ -61,7 +61,7 @@ const (
 	defaultSmallDelay = 1 * time.Second
 
 	// defaultNormalDelay is the default delay
-	defaultNormalDelay = 5 * time.Second
+	defaultNormalDelay = 10 * time.Second
 
 	// defaultBigDelay is a big delay
 	defaultBigDelay = 30 * time.Second
