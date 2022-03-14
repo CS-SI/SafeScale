@@ -111,7 +111,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 			}
 
 			if retcode != 0 {
-				problem := fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+				problem := fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d)", rfc.Local, host.GetName(), rfc.Remote, retcode)
 				problem.Annotate("iterations", iterations)
 				return problem
 			}

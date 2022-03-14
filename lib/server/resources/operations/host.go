@@ -1754,13 +1754,42 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	}
 
 	file := fmt.Sprintf("%s/user_data.%s.sh", utils.TempFolder, phase)
-	xerr = instance.unsafePushStringToFile(ctx, string(content), file)
+	xerr = instance.unsafePushStringToFileWithOwnership(ctx, string(content), file, userdataContent.Username, "755")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
+	rounds := 10
+	for {
+		rc, _, _, xerr := instance.unsafeRun(ctx, "sudo sync", outputs.COLLECT, 0, 10*time.Second)
+		if xerr != nil {
+			rounds--
+			continue
+		}
+
+		if rc == 126 {
+			logrus.Debugf("Text busy happened")
+		}
+
+		if rc == 0 {
+			break
+		}
+
+		if rc != 126 || rounds == 0 {
+			if rc == 126 {
+				return fail.NewError("Text busy killed the script")
+			}
+		}
+
+		rounds--
+	}
+
+	// background work
+	// command := fmt.Sprintf("sudo -b bash -c 'nohup %s > /dev/null 2>&1 &'", file)
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
+	logrus.Warnf("running '%s'", command)
+
 	// Executes the script on the remote Host
 	retcode, stdout, stderr, xerr := instance.unsafeRun(ctx, command, outputs.COLLECT, 0, timeout)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2097,6 +2126,14 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
+	// maybe there is a reboot here...
+
+	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout())
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
 	// If the script doesn't reboot, we force a reboot
 	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
@@ -2110,7 +2147,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		}
 	}
 
-	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 0)
+	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 90*time.Second) // FIXME: It should be 1:30 min tops, 2*reboot time
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2141,7 +2178,8 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 				return xerr
 			}
 
-			_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
+			// FIXME: 0) timeouts -> DANGER
+			_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, waitingTime)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -3011,7 +3049,7 @@ func (instance *Host) Pull(
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			iretcode, istdout, istderr, innerXErr := instance.sshProfile.CopyWithTimeout(
-				ctx, target, source, false, timeout,
+				task.Context(), target, source, false, timeout,
 			)
 			if innerXErr != nil {
 				return innerXErr
@@ -3403,7 +3441,7 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Reboot Host
-	logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
+	logrus.Infof("Host '%s': rebooting", instance.GetName())
 	command := `echo "sleep 4 ; sync ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
