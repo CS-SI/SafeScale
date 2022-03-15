@@ -62,7 +62,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 	ctx := task.Context()
 
-	logrus.Warnf("This is the cluster creation request: %s", spew.Sdump(req))
+	logrus.Tracef("This is the cluster creation request: %s", spew.Sdump(req))
 
 	// Check if Cluster exists in metadata; if yes, error
 	existing, xerr := LoadCluster(ctx, instance.Service(), req.Name)

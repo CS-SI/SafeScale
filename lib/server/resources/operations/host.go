@@ -1785,10 +1785,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 		rounds--
 	}
 
-	// background work
-	// command := fmt.Sprintf("sudo -b bash -c 'nohup %s > /dev/null 2>&1 &'", file)
-	command := fmt.Sprintf("sudo bash %s; exit $?", file)
-	logrus.Warnf("running '%s'", command)
+	command := getCommand(file)
 
 	// Executes the script on the remote Host
 	retcode, stdout, stderr, xerr := instance.unsafeRun(ctx, command, outputs.COLLECT, 0, timeout)
@@ -2099,7 +2096,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
-	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, timings.HostOperationTimeout())
+	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, getPhase2Timeout(timings))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2159,7 +2156,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	if !userdataContent.IsGateway {
 		if instance.thePhaseDoesSomething(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent) {
 			// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-			xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, waitingTime)
+			xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, getPhase4Timeout(timings))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				theCause := fail.ConvertError(fail.Cause(xerr))
@@ -2178,7 +2175,6 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 				return xerr
 			}
 
-			// FIXME: 0) timeouts -> DANGER
 			_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, waitingTime)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
