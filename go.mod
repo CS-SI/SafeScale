@@ -37,8 +37,9 @@ require (
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a
+	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.72.0
+	google.golang.org/api v0.71.0
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.27.1
 )
