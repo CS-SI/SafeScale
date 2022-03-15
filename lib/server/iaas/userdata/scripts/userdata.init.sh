@@ -195,6 +195,9 @@ function disable_cloudinit_network_autoconf() {
 
 # For testing purposes
 function unsafe_sshd() {
+  {{- if .IsGateway }}
+  sed -i -E 's/(#|)Port\ ([0-9]+)/Port\ {{ .SSHPort }}/g' /etc/ssh/sshd_config || fail 208 "failure changing ssh service port"
+  {{- end }}
   sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
     sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config &&
     sed -i '/^.*PubkeyAuthentication / s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config &&
@@ -202,6 +205,9 @@ function unsafe_sshd() {
 }
 
 function secure_sshd() {
+  {{- if .IsGateway }}
+  sed -i -E 's/(#|)Port\ ([0-9]+)/Port\ {{ .SSHPort }}/g' /etc/ssh/sshd_config || fail 208 "failure changing ssh service port"
+  {{- end }}
   sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config &&
     sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config &&
     sed -i '/^.*PubkeyAuthentication / s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config &&

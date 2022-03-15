@@ -1055,9 +1055,15 @@ func (instance *Host) Create(
 	}()
 
 	// Make sure ssh port wanted is set
-	if hostReq.SSHPort > 0 {
-		ahf.Core.SSHPort = hostReq.SSHPort
+	if !userdataContent.IsGateway {
+		if hostReq.SSHPort > 0 {
+			ahf.Core.SSHPort = hostReq.SSHPort
+		} else {
+			ahf.Core.SSHPort = 22
+		}
 	} else {
+		// Always init ssh port to 22 for gw
+		userdataContent.SSHPort = "22"
 		ahf.Core.SSHPort = 22
 	}
 
@@ -1249,6 +1255,11 @@ func (instance *Host) Create(
 			instance.undoUpdateSubnets(hostReq, &ferr)
 		}
 	}()
+
+	// Set ssh port from given one (applied after netsec setup)
+	if userdataContent.IsGateway {
+		userdataContent.SSHPort = strconv.Itoa(int(hostReq.SSHPort))
+	}
 
 	xerr = instance.finalizeProvisioning(ctx, userdataContent)
 	xerr = debug.InjectPlannedFail(xerr)

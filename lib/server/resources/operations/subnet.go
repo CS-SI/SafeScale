@@ -529,9 +529,9 @@ func (instance *Subnet) Create(
 	return nil
 }
 
-func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
 	// FIXME: This should take a lock first
-	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure)
+	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
 }
 
 // bindInternalSecurityGroupToGateway does what its name says
