@@ -250,20 +250,28 @@ func main() {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
 			app2.Verbose = true
-		} else {
-			logrus.SetLevel(logrus.WarnLevel)
+			app2.Debug = true
+			return nil
 		}
 
+		// default level is INFO
+		logrus.SetLevel(logrus.InfoLevel)
+
+		// if -d or -v specified -> DEBUG Level
 		if c.Bool("verbose") {
-			logrus.SetLevel(logrus.InfoLevel)
+			logrus.SetLevel(logrus.DebugLevel)
 			app2.Verbose = true
 		}
+
 		if c.Bool("debug") {
-			if c.Bool("verbose") {
-				logrus.SetLevel(logrus.TraceLevel)
-			} else {
-				logrus.SetLevel(logrus.DebugLevel)
-			}
+			logrus.SetLevel(logrus.DebugLevel)
+			app2.Debug = true
+		}
+
+		// if -d AND -v specified -> TRACE Level
+		if c.Bool("debug") && c.Bool("verbose") {
+			logrus.SetLevel(logrus.TraceLevel)
+			app2.Verbose = true
 			app2.Debug = true
 		}
 		return nil
