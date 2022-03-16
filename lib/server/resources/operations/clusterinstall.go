@@ -58,10 +58,9 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
-func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
+func (instance *Cluster) InstallMethods() (map[uint8]installmethod.Enum, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
-		logrus.Error(fail.InvalidInstanceError().Error())
-		return nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	out := make(map[uint8]installmethod.Enum)
@@ -70,7 +69,7 @@ func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 		out[k.(uint8)], ok = v.(installmethod.Enum)
 		return ok
 	})
-	return out
+	return out, nil
 }
 
 // InstalledFeatures returns a list of installed features
