@@ -37,10 +37,10 @@ require (
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
-	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.71.0
+	google.golang.org/api v0.73.0
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.27.1
 )
