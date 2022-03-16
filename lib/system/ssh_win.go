@@ -21,6 +21,6 @@ package system
 
 import "syscall"
 
-func getSyscallAttrs() *syscall.SysProcAttr {
+func getSyscallAttrs() *syscall.SysProcAttr { // nolint
 	return &syscall.SysProcAttr{}
 }

@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -198,7 +197,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, xerr
 	}
 	if retcode != 0 {
-		return nil, fail.NewError("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+		return nil, fail.NewError("copy failed: retcode=%d: %s", retcode, stderr)
 	}
 
 	return &protocol.SshResponse{

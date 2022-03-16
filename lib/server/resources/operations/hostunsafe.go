@@ -468,7 +468,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 				return problem
 			}
 			if retcode != 0 {
-				return fail.NewError("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
+				return fail.NewError("failed to copy temporary file to '%s' (retcode: %d)", to, retcode)
 			}
 			return nil
 		},
@@ -487,51 +487,6 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		}
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	cmd := ""
-	if owner != "" {
-		cmd += `sudo chown ` + owner + ` '` + filename + `' ;`
-	}
-	if mode != "" {
-		cmd += `sudo chmod ` + mode + ` '` + filename + `'`
-	}
-	if cmd != "" {
-		retryErr = retry.WhileUnsuccessful(
-			func() error {
-				retcode, stdout, stderr, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrAborted:
-						return innerXErr
-					default:
-						innerXErr.Annotate("retcode", retcode)
-						innerXErr.Annotate("stdout", stdout)
-						innerXErr.Annotate("stderr", stderr)
-						return innerXErr
-					}
-				}
-				if retcode != 0 {
-					return fail.NewError("failed to change rights of file '%s' (retcode=%d)", to, retcode)
-				}
-				return nil
-			},
-			timings.SmallDelay(),
-			2*temporal.MaxTimeout(timings.ConnectionTimeout(), timings.ExecutionTimeout()),
-		)
-		if retryErr != nil {
-			switch retryErr.(type) {
-			case *retry.ErrStopRetry:
-				return fail.Wrap(fail.Cause(retryErr), "stopping retries")
-			case *retry.ErrTimeout:
-				return fail.Wrap(fail.Cause(retryErr), "timeout")
-			default:
-				return retryErr
-			}
-		}
-	}
 	return nil
 }
 

@@ -24,11 +24,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -43,7 +43,6 @@ var nfsScripts embed.FS
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-// func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(
 	ctx context.Context, timings temporal.Timings, sshconfig system.SSHConfig, name string,
 	data map[string]interface{},
@@ -96,22 +95,19 @@ func executeScript(
 	// get file content as string
 	tmplContent, err := nfsScripts.ReadFile("scripts/" + name)
 	if err != nil {
-		xerr = fail.ExecutionError(err)
-		return "", xerr
+		return "", fail.ExecutionError(err)
 	}
 
 	// Prepare the template for execution
 	tmplPrepared, err := template.Parse(name, string(tmplContent))
 	if err != nil {
-		xerr = fail.ExecutionError(err)
-		return "", xerr
+		return "", fail.ExecutionError(err)
 	}
 
 	var buffer bytes.Buffer
 	err = tmplPrepared.Option("missingkey=error").Execute(&buffer, data)
 	if err != nil {
-		xerr = fail.ExecutionError(err, "failed to execute template")
-		return "", xerr
+		return "", fail.ExecutionError(err, "failed to execute template")
 	}
 	content := buffer.String()
 
@@ -135,12 +131,12 @@ func executeScript(
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(task.Context(), filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 			if retcode != 0 {
-				innerXErr = fail.ExecutionError(xerr, "script copy failed: %s, %s", stdout, stderr)
+				innerXErr := fail.ExecutionError(xerr, "script copy failed: %s, %s", stdout, stderr)
 				innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
@@ -197,15 +193,13 @@ func executeScript(
 	if xerr != nil {
 		switch cErr := xerr.(type) {
 		case *fail.ErrTimeout:
-			logrus.Errorf("ErrTimeout running remote script '%s'", name)
-			xerr := fail.ExecutionError(cErr)
-			return stdout, xerr
+			return stdout, fail.ExecutionError(cErr)
 		case *fail.ErrExecution:
 			return stdout, cErr
 		default:
-			xerr = fail.ExecutionError(xerr)
-			xerr.Annotate("stderr", "")
-			return stdout, xerr
+			tbr := fail.ExecutionError(xerr)
+			tbr.Annotate("stderr", stderr)
+			return stdout, tbr
 		}
 	}
 	if retcode != 0 {

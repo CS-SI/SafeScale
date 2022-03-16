@@ -532,7 +532,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
+			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(task.Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}

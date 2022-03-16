@@ -1,4 +1,4 @@
-name: Latest Go Build CI Debug
+name: Go Build CI Generics
 
 on:
   push:
@@ -16,12 +16,16 @@ on:
       - 'release/**'
 
 env:
-  GOVERSION: '1.17.7' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:
 
   build-linux:
+
+    strategy:
+      matrix:
+        go: [ 1.18 ]
+        tags: [ releasetags, debug, tunnel ]
 
     runs-on: ubuntu-latest
 
@@ -29,7 +33,7 @@ jobs:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
-        go-version: ${{env.GOVERSION}}
+        go-version: ${{ matrix.go }}
     - name: Install Protoc
       run: |
         cd /tmp
@@ -39,7 +43,7 @@ jobs:
         sudo chmod a+r -R /opt/protoc
         sudo chmod a+xr /opt/protoc/bin/protoc
         sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
-    - run: make debug ci with-coverage mintest
+    - run: make ${{ matrix.tags }} rawci with-coverage mintest
     - uses: actions/upload-artifact@v2
       if: failure()
       with:

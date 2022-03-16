@@ -139,6 +139,9 @@ func ToGRPCStatus(err error) error {
 // Wrap creates a new error with a message 'msg' and a causer error 'cause'
 func Wrap(cause error, msg ...interface{}) Error {
 	if cause == nil {
+		if len(msg) == 0 {
+			return nil
+		}
 		return newError(nil, nil, msg...)
 	}
 

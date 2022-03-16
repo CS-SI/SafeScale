@@ -160,24 +160,26 @@ func main() {
 			profileCloseFunc = debug.Profile(what)
 		}
 
-		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			logrus.SetLevel(logrus.TraceLevel)
-			appwide.Verbose = true
-		} else {
-			logrus.SetLevel(logrus.WarnLevel)
-		}
+		// Default level is INFO
+		logrus.SetLevel(logrus.InfoLevel)
 
 		// Defines trace level wanted by user
 		if appwide.Verbose = c.Bool("verbose"); appwide.Verbose {
-			logrus.SetLevel(logrus.InfoLevel)
-			appwide.Verbose = true
+			logrus.SetLevel(logrus.DebugLevel)
 		}
+
 		if appwide.Debug = c.Bool("debug"); appwide.Debug {
-			if appwide.Verbose {
-				logrus.SetLevel(logrus.TraceLevel)
-			} else {
-				logrus.SetLevel(logrus.DebugLevel)
-			}
+			logrus.SetLevel(logrus.DebugLevel)
+		}
+
+		if appwide.Debug && appwide.Verbose {
+			logrus.SetLevel(logrus.TraceLevel)
+		}
+
+		if strings.Contains(path.Base(os.Args[0]), "-cover") {
+			logrus.SetLevel(logrus.TraceLevel)
+			appwide.Verbose = true
+			appwide.Debug = true
 		}
 
 		clientSession, err = client.New(c.String("server"))
@@ -244,10 +246,9 @@ func main() {
 		{
 			if len(os.Args) > 1 {
 				last := os.Args[len(os.Args)-1]
-				if !(last == "-help" || last == "--help") {
+				if !(last == "-help" || last == "--help" || last == "-h" || last == "--h") {
 					if strings.HasPrefix(last, "-") {
-						fmt.Printf("this is probably a mistake, flags MUST be used BEFORE arguments: 'safescale subcommand arg1 arg2 --flag1 this_value_is_ignored', you should write 'safescale subcommand --flag1 this_value_now_works arg1 arg2'\n")
-						os.Exit(1)
+						fmt.Printf("this might be a mistake, flags MUST be used BEFORE arguments: 'safescale subcommand arg1 arg2 --flag1 this_value_is_ignored', you should write 'safescale subcommand --flag1 this_value_now_works arg1 arg2'\n")
 					}
 				}
 			}

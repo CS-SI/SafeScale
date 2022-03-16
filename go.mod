@@ -5,8 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.43.16
-	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
+	github.com/aws/aws-sdk-go v1.43.18
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -28,18 +27,19 @@ require (
 	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
+	github.com/pkg/sftp v1.13.4
 	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/sanity-io/litter v1.5.2
+	github.com/sanity-io/litter v1.5.4
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.0
-	github.com/urfave/cli/v2 v2.3.0
+	github.com/urfave/cli/v2 v2.4.0
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.71.0
 	google.golang.org/grpc v1.45.0
