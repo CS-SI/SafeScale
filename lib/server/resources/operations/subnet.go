@@ -529,8 +529,10 @@ func (instance *Subnet) Create(
 	return nil
 }
 
+// CreateSecurityGroups ...
 func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
-	// FIXME: This should take a lock first
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure)
 }
 
