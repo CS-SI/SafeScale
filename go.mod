@@ -9,6 +9,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
+	github.com/dgraph-io/ristretto v0.1.0
+	github.com/eko/gocache/v2 v2.2.0
 	github.com/felixge/fgprof v0.9.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofrs/uuid v4.2.0+incompatible
@@ -28,7 +30,7 @@ require (
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
 	github.com/pkg/sftp v1.13.4
-	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
+	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/sanity-io/litter v1.5.4
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
