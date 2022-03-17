@@ -367,7 +367,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 	if !valid.IsNil(instance.MetadataCore) {
 		if instance.MetadataCore.IsTaken() {
-			return fail.NotAvailableError("already carrying information")
+			return fail.InconsistentError("already carrying information")
 		}
 	}
 	if ctx == nil {

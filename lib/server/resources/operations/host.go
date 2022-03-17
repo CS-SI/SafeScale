@@ -834,7 +834,7 @@ func (instance *Host) Create(
 	}
 	if !valid.IsNil(instance.MetadataCore) {
 		if instance.MetadataCore.IsTaken() {
-			return nil, fail.NotAvailableError("already carrying information")
+			return nil, fail.InconsistentError("already carrying information")
 		}
 	}
 	if ctx == nil {

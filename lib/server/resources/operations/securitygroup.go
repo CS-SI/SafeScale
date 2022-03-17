@@ -326,7 +326,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 	if !valid.IsNil(instance.MetadataCore) {
 		if instance.MetadataCore.IsTaken() {
-			return fail.NotAvailableError("already carrying information")
+			return fail.InconsistentError("already carrying information")
 		}
 	}
 	if ctx == nil {

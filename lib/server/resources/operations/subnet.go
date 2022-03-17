@@ -454,7 +454,7 @@ func (instance *Subnet) Create(
 	}
 	if !valid.IsNil(instance.MetadataCore) {
 		if instance.MetadataCore.IsTaken() {
-			return fail.NotAvailableError("already carrying information")
+			return fail.InconsistentError("already carrying information")
 		}
 	}
 	if ctx == nil {
@@ -531,8 +531,8 @@ func (instance *Subnet) Create(
 
 // CreateSecurityGroups ...
 func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
 }
 
