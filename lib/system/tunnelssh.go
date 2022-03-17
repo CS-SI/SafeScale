@@ -402,7 +402,7 @@ func (sc *SSHCommand) cleanup() error {
 	return nil
 }
 
-// Close ...
+// Close this function exists only to provide compatibility with previous SSH api
 func (sc *SSHCommand) Close() fail.Error {
 	return nil
 }
@@ -412,26 +412,30 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
-		sc.LocalHost = "127.0.0.1"
+		sc.LocalHost = "127.0.0.1" // TODO Remove hardcoded string
 	}
 
+	internalPort := 22 // all machines use port 22... // TODO Remove magic number
 	var gateway *sshtunnel.Endpoint
-	if sc.GatewayConfig == nil {
+	if sc.GatewayConfig == nil { // it has to be a gateway
+		internalPort = sc.Port // ... except maybe the gateway itself
+
 		var rerr error
-		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:22", sc.User, sc.IPAddress),
+		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.User, sc.IPAddress, sc.Port),
 			sshtunnel.EndpointOptionKeyFromString(sc.PrivateKey, ""))
 		if rerr != nil {
 			return nil, nil, rerr
 		}
 	} else {
 		var rerr error
-		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:22", sc.GatewayConfig.User, sc.GatewayConfig.IPAddress),
+		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.GatewayConfig.User, sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port),
 			sshtunnel.EndpointOptionKeyFromString(sc.GatewayConfig.PrivateKey, ""))
 		if rerr != nil {
 			return nil, nil, rerr
 		}
 	}
-	server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:22", sc.IPAddress),
+
+	server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:%d", sc.IPAddress, internalPort),
 		sshtunnel.EndpointOptionKeyFromString(sc.PrivateKey, ""))
 	if err != nil {
 		return nil, nil, err

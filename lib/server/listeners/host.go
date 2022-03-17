@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -708,7 +709,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 		return nil, xerr
 	}
 
-	tracer.Trace("SSH config of host %s successfully loaded", refLabel)
+	tracer.Trace("SSH config of host %s successfully loaded: %s", refLabel, spew.Sdump(sshConfig))
 	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
 }
 

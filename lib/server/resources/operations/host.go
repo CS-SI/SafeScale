@@ -1062,9 +1062,8 @@ func (instance *Host) Create(
 			ahf.Core.SSHPort = 22
 		}
 	} else {
-		// Always init ssh port to 22 for gw
-		userdataContent.SSHPort = "22"
-		ahf.Core.SSHPort = 22
+		userdataContent.SSHPort = strconv.Itoa(int(hostReq.SSHPort))
+		ahf.Core.SSHPort = hostReq.SSHPort
 	}
 
 	// Creates metadata early to "reserve" Host name

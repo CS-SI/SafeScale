@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
