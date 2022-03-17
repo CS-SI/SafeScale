@@ -530,7 +530,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 	defer tracer.Exiting()
 
 	originalPhase := phase
-	if phase == "ready" { // FIXME: Harcoded strings
+	if phase == "ready" { // FIXME: Hardcoded strings
 		phase = "final"
 	}
 
@@ -588,6 +588,14 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 
 // CopyWithTimeout ...
 func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, timeout time.Duration) (int, string, string, fail.Error) {
+	if ctx == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	if timeout == 0 {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("timeout")
+	}
+
 	currentCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -614,10 +622,13 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 	select {
 	case res := <-rCh: // if it works return the return
 		return res.code, res.stderr, res.stderr, fail.Wrap(res.err)
-	case <-ctx.Done(): // if not...
+	case <-ctx.Done(): // if not because parent context was canceled
+	case <-currentCtx.Done(): // or timeout hits
 	}
 
 	// wait anyway until call it's finished, then return an error
+	// if sc.Copy can handle contexts well, we don't have to wait until it's finished
+	// however is not the case here
 	<-rCh
 	if ctx.Err() != nil {
 		return -1, "", "", fail.Wrap(ctx.Err())
