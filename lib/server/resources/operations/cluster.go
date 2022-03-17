@@ -2721,7 +2721,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	svc := instance.Service() // FIXME: This might FAIL, IT CAN be nil
+	svc := instance.Service()
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
