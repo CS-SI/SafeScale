@@ -357,6 +357,12 @@ var clusterCreateCommand = &cli.Command{
 			Name:  "force, f",
 			Usage: "If used, it forces the cluster creation even if requested sizing is less than recommended",
 		},
+		&cli.IntFlag{
+			Name:    "gwport",
+			Aliases: []string{"default-ssh-port"},
+			Value:   22,
+			Usage:   `Define the port to use for SSH (default: 22) in gateways`,
+		},
 		&cli.StringFlag{
 			Name:    "cidr",
 			Aliases: []string{"N"},
@@ -451,6 +457,7 @@ var clusterCreateCommand = &cli.Command{
 		cidr := c.String("cidr")
 		disable := c.StringSlice("disable")
 		los := c.String("os")
+		gatewaySSHPort := uint32(c.Int("gwport"))
 
 		var (
 			globalDef   string
@@ -489,20 +496,20 @@ var clusterCreateCommand = &cli.Command{
 		}
 
 		req := protocol.ClusterCreateRequest{
-			Name:          clusterName,
-			Complexity:    protocol.ClusterComplexity(comp),
-			Flavor:        protocol.ClusterFlavor(fla),
-			KeepOnFailure: keep,
-			Cidr:          cidr,
-			Disabled:      disable,
-			Os:            los,
-			GlobalSizing:  globalDef,
-			GatewaySizing: gatewaysDef,
-			MasterSizing:  mastersDef,
-			NodeSizing:    nodesDef,
-			Force:         force,
-			// NodeCount:     uint32(c.Int("initial-node-count")),
-			Parameters: c.StringSlice("param"),
+			Name:           clusterName,
+			Complexity:     protocol.ClusterComplexity(comp),
+			Flavor:         protocol.ClusterFlavor(fla),
+			KeepOnFailure:  keep,
+			Cidr:           cidr,
+			Disabled:       disable,
+			Os:             los,
+			GlobalSizing:   globalDef,
+			GatewaySizing:  gatewaysDef,
+			MasterSizing:   mastersDef,
+			NodeSizing:     nodesDef,
+			Force:          force,
+			Parameters:     c.StringSlice("param"),
+			DefaultSshPort: gatewaySSHPort,
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
 

@@ -531,8 +531,8 @@ func (instance *Subnet) Create(
 
 // CreateSecurityGroups ...
 func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
 }
 

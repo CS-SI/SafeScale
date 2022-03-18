@@ -555,13 +555,6 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		}
 	}()
 
-	// Write Subnet object metadata and updates the service cache
-	xerr = instance.Carry(abstractSubnet)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	// Starting from here, delete Subnet metadata if exiting with error
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
@@ -570,6 +563,14 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 			}
 		}
 	}()
+
+	// Write Subnet object metadata and updates the service cache
+	xerr = instance.Carry(abstractSubnet)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

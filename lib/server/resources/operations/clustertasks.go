@@ -728,12 +728,13 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	// Creates Subnet
 	logrus.Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 	subnetReq := abstract.SubnetRequest{
-		Name:          req.Name,
-		NetworkID:     networkInstance.GetID(),
-		CIDR:          req.CIDR,
-		HA:            !gwFailoverDisabled,
-		ImageRef:      gatewaysDef.Image,
-		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
+		Name:           req.Name,
+		NetworkID:      networkInstance.GetID(),
+		CIDR:           req.CIDR,
+		HA:             !gwFailoverDisabled,
+		ImageRef:       gatewaysDef.Image,
+		DefaultSSHPort: uint32(req.DefaultSshPort),
+		KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 
 	subnetInstance, xerr := NewSubnet(svc)
@@ -762,6 +763,13 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				return nil, nil, xerr
 			}
 			subnetReq.CIDR = subIPNet.String()
+
+			newSubnetInstance, xerr := NewSubnet(svc) // subnetInstance.Create CANNOT be reused
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, nil, xerr
+			}
+			subnetInstance = newSubnetInstance // replace the external reference
 
 			if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
 				return nil, nil, fail.Wrap(

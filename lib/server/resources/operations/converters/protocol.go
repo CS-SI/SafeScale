@@ -181,6 +181,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		DisabledDefaultFeatures: disabled,
 		InitialNodeCount:        uint(nodeCount),
 		FeatureParameters:       in.GetParameters(),
+		DefaultSshPort:          uint(in.DefaultSshPort),
 	}
 	return out, nil
 }
