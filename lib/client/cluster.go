@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -47,7 +48,11 @@ func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, err
 		return nil, xerr
 	}
 
-	result, err := service.List(ctx, &protocol.Reference{})
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	result, err := service.List(newCtx, &protocol.Reference{})
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +74,11 @@ func (c cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.C
 		return nil, xerr
 	}
 
-	result, err := service.Inspect(ctx, &protocol.Reference{Name: clusterName})
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	result, err := service.Inspect(newCtx, &protocol.Reference{Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +185,12 @@ func (c cluster) Expand(req *protocol.ClusterResizeRequest, duration time.Durati
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Expand(ctx, req)
+	return service.Expand(newCtx, req)
 }
 
 // Shrink ...
@@ -194,8 +207,12 @@ func (c cluster) Shrink(req *protocol.ClusterResizeRequest, duration time.Durati
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Shrink(ctx, req)
+	return service.Shrink(newCtx, req)
 }
 
 // CheckFeature ...
@@ -222,8 +239,13 @@ func (c cluster) CheckFeature(clusterName, featureName string, params map[string
 		Variables:  params,
 		Settings:   settings,
 	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewFeatureServiceClient(c.session.connection)
-	_, err := service.Check(ctx, req)
+	_, err := service.Check(newCtx, req)
 	return err
 }
 
@@ -250,8 +272,13 @@ func (c cluster) AddFeature(clusterName, featureName string, params map[string]s
 		Variables:  params,
 		Settings:   settings,
 	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewFeatureServiceClient(c.session.connection)
-	_, err := service.Add(ctx, req)
+	_, err := service.Add(newCtx, req)
 	return err
 }
 
@@ -279,8 +306,13 @@ func (c cluster) RemoveFeature(clusterName, featureName string, params map[strin
 		Variables:  params,
 		Settings:   settings,
 	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewFeatureServiceClient(c.session.connection)
-	_, err := service.Remove(ctx, req)
+	_, err := service.Remove(newCtx, req)
 	return err
 }
 
@@ -304,7 +336,12 @@ func (c cluster) ListFeatures(clusterName string, installed bool, duration time.
 		TargetRef:     &protocol.Reference{Name: clusterName},
 		InstalledOnly: installed,
 	}
-	list, err := service.List(ctx, request)
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
+	list, err := service.List(newCtx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +370,12 @@ func (c cluster) InspectFeature(clusterName, featureName string, embedded bool, 
 		Name:       featureName,
 		Embedded:   embedded,
 	}
-	list, err := service.Inspect(ctx, request)
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
+	list, err := service.Inspect(newCtx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +404,12 @@ func (c cluster) ExportFeature(clusterName, featureName string, embedded bool, d
 		Name:       featureName,
 		Embedded:   embedded,
 	}
-	list, err := service.Export(ctx, request)
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
+	list, err := service.Export(newCtx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -384,8 +431,12 @@ func (c cluster) FindAvailableMaster(clusterName string, duration time.Duration)
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	host, err := service.FindAvailableMaster(ctx, &protocol.Reference{Name: clusterName})
+	host, err := service.FindAvailableMaster(newCtx, &protocol.Reference{Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -406,8 +457,12 @@ func (c cluster) ListNodes(clusterName string, duration time.Duration) (*protoco
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListNodes(ctx, &protocol.Reference{Name: clusterName})
+	list, err := service.ListNodes(newCtx, &protocol.Reference{Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -431,8 +486,12 @@ func (c cluster) InspectNode(clusterName string, nodeRef string, duration time.D
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.InspectNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	return service.InspectNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 }
 
 // DeleteNode ...
