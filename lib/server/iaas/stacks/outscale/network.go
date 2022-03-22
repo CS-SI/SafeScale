@@ -585,6 +585,7 @@ func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// No nics, continue
+			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}

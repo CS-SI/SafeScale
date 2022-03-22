@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -49,7 +50,7 @@ func (n network) List(all bool, timeout time.Duration) (*protocol.NetworkList, e
 }
 
 // Delete deletes several networks at the same time in goroutines
-func (n network) Delete(names []string, timeout time.Duration) error { // TODO: concurrent access if deleting multiple networks
+func (n network) Delete(names []string, timeout time.Duration, force bool) error { // TODO: concurrent access if deleting multiple networks
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
@@ -57,6 +58,11 @@ func (n network) Delete(names []string, timeout time.Duration) error { // TODO: 
 	if xerr != nil {
 		return xerr
 	}
+
+	// finally, using context
+	valCtx := context.WithValue(ctx, "force", force)
+	newCtx, cancel := context.WithTimeout(valCtx, timeout)
+	defer cancel()
 
 	var (
 		mutex sync.Mutex
@@ -69,7 +75,7 @@ func (n network) Delete(names []string, timeout time.Duration) error { // TODO: 
 		defer fail.OnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
 
 		if err != nil {
 			mutex.Lock()

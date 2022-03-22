@@ -96,6 +96,13 @@ var networkDelete = &cli.Command{
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete NETWORKREF",
 	ArgsUsage: "NETWORKREF [NETWORKREF ...]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		},
+	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
@@ -115,7 +122,7 @@ var networkDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout())
+		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
