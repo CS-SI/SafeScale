@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -48,8 +49,12 @@ func (sg securityGroup) List(all bool, timeout time.Duration) (*protocol.Securit
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	rv, err := service.List(ctx, &protocol.SecurityGroupListRequest{All: all})
+	rv, err := service.List(newCtx, &protocol.SecurityGroupListRequest{All: all})
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +71,12 @@ func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.Se
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	rv, err := service.Inspect(ctx, &protocol.Reference{Name: ref})
+	rv, err := service.Inspect(newCtx, &protocol.Reference{Name: ref})
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +95,10 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 		return nullSg, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	protoRequest := &protocol.SecurityGroupCreateRequest{
 		Network:     &protocol.Reference{Name: networkRef},
 		Name:        req.Name,
@@ -93,7 +106,7 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 		Rules:       converters.SecurityGroupRulesFromAbstractToProtocol(req.Rules),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	resp, err := service.Create(ctx, protoRequest)
+	resp, err := service.Create(newCtx, protoRequest)
 	if err != nil {
 		return nullSg, err
 	}
@@ -115,6 +128,10 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
@@ -131,7 +148,7 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 			Group: &protocol.Reference{Name: aname},
 			Force: force,
 		}
-		_, err := service.Delete(ctx, req)
+		_, err := service.Delete(newCtx, req)
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -161,8 +178,12 @@ func (sg securityGroup) Clear(ref string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.Clear(ctx, &protocol.Reference{Name: ref})
+	_, err := service.Clear(newCtx, &protocol.Reference{Name: ref})
 	if err != nil {
 		return err
 	}
@@ -179,8 +200,12 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.Reset(ctx, &protocol.Reference{Name: ref})
+	_, err := service.Reset(newCtx, &protocol.Reference{Name: ref})
 	if err != nil {
 		return err
 	}
@@ -188,7 +213,7 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 }
 
 // AddRule ...
-func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, duration time.Duration) error {
+func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -197,12 +222,16 @@ func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, 
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	req := &protocol.SecurityGroupRuleRequest{
 		Group: &protocol.Reference{Name: group},
 		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
-	_, err := service.AddRule(ctx, req)
+	_, err := service.AddRule(newCtx, req)
 	if err != nil {
 		return err
 	}
@@ -210,7 +239,7 @@ func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, 
 }
 
 // DeleteRule ...
-func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRule, duration time.Duration) error {
+func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -219,12 +248,16 @@ func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRul
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	def := &protocol.SecurityGroupRuleDeleteRequest{
 		Group: &protocol.Reference{Name: group},
 		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.DeleteRule(ctx, def)
+	_, err := service.DeleteRule(newCtx, def)
 	if err != nil {
 		return err
 	}
@@ -232,7 +265,7 @@ func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRul
 }
 
 // Bonds ...
-func (sg securityGroup) Bonds(group, kind string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+func (sg securityGroup) Bonds(group, kind string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -241,12 +274,16 @@ func (sg securityGroup) Bonds(group, kind string, duration time.Duration) (*prot
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	req := &protocol.SecurityGroupBondsRequest{
 		Target: &protocol.Reference{Name: group},
 		Kind:   strings.ToLower(kind),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	rv, err := service.Bonds(ctx, req)
+	rv, err := service.Bonds(newCtx, req)
 	if err != nil {
 		return nil, err
 	}
