@@ -115,7 +115,7 @@ var networkDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout())
+		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), false)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
