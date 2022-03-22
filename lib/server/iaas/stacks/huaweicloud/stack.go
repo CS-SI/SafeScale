@@ -286,8 +286,13 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	s.IdentityClient = identity
 	s.cfgOpts.UseFloatingIP = true
 
-	s.MutableTimings = temporal.NewTimings()
 	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+	if cfg.Timings != nil {
+		s.MutableTimings = cfg.Timings
+		_ = s.MutableTimings.Update(temporal.NewTimings())
+	} else {
+		s.MutableTimings = temporal.NewTimings()
+	}
 
 	// Initializes the VPC
 	xerr = s.initVPC()

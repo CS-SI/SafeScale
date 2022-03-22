@@ -19,6 +19,7 @@ package outscale // Package outscale contains stack implementation for Outscale
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/outscale/osc-sdk-go/osc"
@@ -82,6 +83,7 @@ type ConfigurationOptions struct {
 	Network       NetworkConfiguration  `json:"network,omitempty"`
 	ObjectStorage StorageConfiguration  `json:"objectstorage,omitempty"`
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
+	Timings       *temporal.MutableTimings
 }
 
 // stack implements Outscale IaaS API
@@ -158,13 +160,26 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 			// BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
 			// WhitelistImageRegexp:      options.Compute.WhitelistImageRegexp,
 			// WhitelistTemplateRegexp:   options.Compute.WhitelistTemplateRegexp,
+			Timings: options.Timings,
 		},
 		auth: auth,
 	}
 	s.buildTemplateList()
 
-	s.MutableTimings = temporal.NewTimings()
 	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+	if options.Timings != nil {
+		s.MutableTimings = options.Timings
+		_ = s.MutableTimings.Update(temporal.NewTimings())
+	} else {
+		// outscale needs more time
+		s.MutableTimings = temporal.NewTimings() // take default timings, but...
+	}
+
+	// change a few things
+	s.MutableTimings.HostOperation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.HostOperation)
+	s.MutableTimings.HostCreation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.HostCreation)
+	s.MutableTimings.SSHConnection = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.SSHConnection)
+	s.MutableTimings.Operation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.Operation)
 
 	return &s, s.initDefaultNetwork()
 }

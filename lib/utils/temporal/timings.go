@@ -18,6 +18,9 @@ package temporal
 
 import (
 	"time"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/pelletier/go-toml/v2"
 )
 
 const (
@@ -115,28 +118,28 @@ type Timings interface {
 }
 
 type Timeouts struct {
-	Communication          time.Duration
-	Connection             time.Duration
-	Context                time.Duration
-	HostCreation           time.Duration
-	HostCleanup            time.Duration
-	HostOperation          time.Duration
-	HostLongOperation      time.Duration
-	Operation              time.Duration
-	SSHConnection          time.Duration
-	Metadata               time.Duration
-	MetadataReadAfterWrite time.Duration
+	Communication          time.Duration `json:"timeout_communication,omitempty" mapstructure:"communication"`
+	Connection             time.Duration `json:"timeout_connection,omitempty" mapstructure:"connection"`
+	Context                time.Duration `json:"timeout_context,omitempty" mapstructure:"context"`
+	HostCreation           time.Duration `json:"timeout_host_creation,omitempty" mapstructure:"hostcreation"`
+	HostCleanup            time.Duration `json:"timeout_host_cleanup,omitempty" mapstructure:"hostcleanup"`
+	HostOperation          time.Duration `json:"timeout_host_operation,omitempty" mapstructure:"hostoperation"`
+	HostLongOperation      time.Duration `json:"timeout_host_long_operation,omitempty" mapstructure:"hostlongoperation"`
+	Operation              time.Duration `json:"timeout_operation,omitempty" mapstructure:"operation"`
+	SSHConnection          time.Duration `json:"timeout_ssh_connection,omitempty" mapstructure:"sshconnection"`
+	Metadata               time.Duration `json:"timeout_metadata,omitempty" mapstructure:"metadata"`
+	MetadataReadAfterWrite time.Duration `json:"timeout_metadata_raw,omitempty" mapstructure:"metadatareadafterwrite"`
 }
 
 type Delays struct {
-	Small  time.Duration
-	Normal time.Duration
-	Big    time.Duration
+	Small  time.Duration `json:"delay_small,omitempty" mapstructure:"small"`
+	Normal time.Duration `json:"delay_normal,omitempty" mapstructure:"normal"`
+	Big    time.Duration `json:"delay_big,omitempty" mapstructure:"big"`
 }
 
 type MutableTimings struct {
-	Timeouts
-	Delays
+	Timeouts `json:"timeouts" mapstructure:"timeouts"`
+	Delays   `json:"delays" mapstructure:"delays"`
 }
 
 // NewTimings creates a new instance of MutableTimings with default values
@@ -163,6 +166,58 @@ func NewTimings() *MutableTimings {
 	}
 }
 
+func (t *MutableTimings) Update(a *MutableTimings) error {
+	if t == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	if a == nil {
+		return nil
+	}
+
+	if t.Communication == 0 && a.Communication != 0 {
+		t.Communication = a.Communication
+	}
+	if t.Connection == 0 && a.Connection != 0 {
+		t.Connection = a.Connection
+	}
+	if t.Context == 0 && a.Context != 0 {
+		t.Context = a.Context
+	}
+	if t.HostCleanup == 0 && a.HostCleanup != 0 {
+		t.HostCleanup = a.HostCleanup
+	}
+	if t.HostCreation == 0 && a.HostCreation != 0 {
+		t.HostCreation = a.HostCreation
+	}
+	if t.HostLongOperation == 0 && a.HostLongOperation != 0 {
+		t.HostLongOperation = a.HostLongOperation
+	}
+	if t.HostOperation == 0 && a.HostOperation != 0 {
+		t.HostOperation = a.HostOperation
+	}
+	if t.Metadata == 0 && a.Metadata != 0 {
+		t.Metadata = a.Metadata
+	}
+	if t.MetadataReadAfterWrite == 0 && a.MetadataReadAfterWrite != 0 {
+		t.MetadataReadAfterWrite = a.MetadataReadAfterWrite
+	}
+	if t.Operation == 0 && a.Operation != 0 {
+		t.Operation = a.Operation
+	}
+	if t.Small == 0 && a.Small != 0 {
+		t.Small = a.Small
+	}
+	if t.Normal == 0 && a.Normal != 0 {
+		t.Normal = a.Normal
+	}
+	if t.Big == 0 && a.Big != 0 {
+		t.Big = a.Big
+	}
+
+	return nil
+}
+
 // ContextTimeout returns the configured timeout for context (optionally overloaded from ENV)
 func (t *MutableTimings) ContextTimeout() time.Duration {
 	if t == nil {
@@ -170,6 +225,14 @@ func (t *MutableTimings) ContextTimeout() time.Duration {
 	}
 
 	return t.Timeouts.Context
+}
+
+func (t MutableTimings) ToToml() (string, error) {
+	barr, err := toml.Marshal(t)
+	if err != nil {
+		return "", err
+	}
+	return string(barr), nil
 }
 
 // ConnectionTimeout returns the configured timeout for connection
@@ -253,7 +316,7 @@ func (t *MutableTimings) SSHConnectionTimeout() time.Duration {
 	return t.Timeouts.SSHConnection
 }
 
-// MetadataTimeout returns the configured timeout for metadata acceee
+// MetadataTimeout returns the configured timeout for metadata access
 func (t *MutableTimings) MetadataTimeout() time.Duration {
 	if t == nil {
 		return MetadataTimeout()

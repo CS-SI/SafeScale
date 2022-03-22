@@ -20,6 +20,7 @@ import (
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
@@ -144,4 +145,6 @@ type ConfigurationOptions struct {
 	BlacklistImageRegexp *regexp.Regexp
 
 	MaxLifeTime int
+
+	Timings *temporal.MutableTimings
 }

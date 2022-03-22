@@ -29,7 +29,9 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -92,6 +94,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 	metadata := remap(opt["metadata"])
 	network := remap(opt["network"])
 	objstorage := remap(opt["objectstorage"])
+	tc := remap(opt["timings"])
 
 	region := get(compute, "Region")
 	if region == "" {
@@ -128,6 +131,15 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 			}
 		}
 	}
+
+	var timings *temporal.MutableTimings
+	s := &temporal.MutableTimings{}
+	err := mapstructure.Decode(tc, &s)
+	if err != nil {
+		goto next
+	}
+	timings = s
+next:
 
 	options := &outscale.ConfigurationOptions{
 		Identity: outscale.Credentials{
@@ -166,6 +178,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 			Bucket:   get(metadata, "Bucket", "0.safescale"),
 			CryptKey: get(metadata, "CryptKey", "safescale"),
 		},
+		Timings: timings,
 	}
 
 	stack, err := outscale.New(options)
