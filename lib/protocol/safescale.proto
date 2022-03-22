@@ -234,11 +234,16 @@ message NetworkListRequest {
 	string tenant_id = 2;
 }
 
+message NetworkDeleteRequest {
+	Reference network = 1;
+    bool force = 2;
+}
+
 service NetworkService {
 	rpc Create(NetworkCreateRequest) returns (Network){}
 	rpc List(NetworkListRequest) returns (NetworkList){}
 	rpc Inspect(Reference) returns (Network) {}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(NetworkDeleteRequest) returns (google.protobuf.Empty){}
 }
 
 // safescale network subnet create --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" net-1 subnet-1 (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)

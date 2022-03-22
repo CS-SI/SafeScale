@@ -265,7 +265,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete network")
 
@@ -280,7 +280,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in.Network)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -291,6 +291,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	var force bool
 	var ok bool
 	if cv := ctx.Value("force"); cv != nil {
+		logrus.Warnf("value: %s", spew.Sdump(cv))
 		force, ok = cv.(bool)
 		if !ok {
 			return empty, fail.InvalidRequestError("force flag must be a bool")
@@ -301,7 +302,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		logrus.Warnf("Indeed it's forced")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
+	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}

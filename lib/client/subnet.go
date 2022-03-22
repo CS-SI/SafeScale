@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -61,6 +62,11 @@ func (s subnet) Delete(networkRef string, names []string, timeout time.Duration)
 		return xerr
 	}
 
+	// finally, using context
+	valCtx := context.WithValue(ctx, "force", true) // FIXME: Use boolean later // nolint
+	newCtx, cancel := context.WithTimeout(valCtx, timeout)
+	defer cancel()
+
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
@@ -69,7 +75,7 @@ func (s subnet) Delete(networkRef string, names []string, timeout time.Duration)
 
 	subnetDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.SubnetInspectRequest{
+		_, err := service.Delete(newCtx, &protocol.SubnetInspectRequest{
 			Network: &protocol.Reference{Name: networkRef},
 			Subnet:  &protocol.Reference{Name: aname},
 		})

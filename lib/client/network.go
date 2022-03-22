@@ -60,8 +60,8 @@ func (n network) Delete(names []string, timeout time.Duration, force bool) error
 	}
 
 	// finally, using context
-	valCtx := context.WithValue(ctx, "force", force)
-	newCtx, cancel := context.WithTimeout(valCtx, timeout)
+	aCtx, cancel := context.WithTimeout(ctx, timeout)
+	newCtx := context.WithValue(aCtx, "force", force) // nolint
 	defer cancel()
 
 	var (
@@ -75,7 +75,10 @@ func (n network) Delete(names []string, timeout time.Duration, force bool) error
 		defer fail.OnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.NetworkDeleteRequest{
+			Network: &protocol.Reference{Name: aname},
+			Force:   force,
+		})
 
 		if err != nil {
 			mutex.Lock()
