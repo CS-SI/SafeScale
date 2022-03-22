@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -39,8 +40,12 @@ func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.List(ctx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
+	return service.List(newCtx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
 }
 
 // Match returns the list of templates that match the sizing
@@ -53,8 +58,12 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.Match(ctx, &protocol.TemplateMatchRequest{Sizing: sizing})
+	return service.Match(newCtx, &protocol.TemplateMatchRequest{Sizing: sizing})
 }
 
 // Inspect returns details of a template identified by name of ID
@@ -67,7 +76,11 @@ func (t template) Inspect(name string, timeout time.Duration) (*protocol.HostTem
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 
-	return service.Inspect(ctx, &protocol.TemplateInspectRequest{Template: &protocol.Reference{Name: name}})
+	return service.Inspect(newCtx, &protocol.TemplateInspectRequest{Template: &protocol.Reference{Name: name}})
 }
