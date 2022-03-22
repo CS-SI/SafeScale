@@ -46,7 +46,11 @@ func (s subnet) List(networkRef string, all bool, timeout time.Duration) (*proto
 		return nil, xerr
 	}
 
-	return service.List(ctx, &protocol.SubnetListRequest{
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return service.List(newCtx, &protocol.SubnetListRequest{
 		Network: &protocol.Reference{Name: networkRef},
 		All:     all,
 	})
@@ -111,11 +115,15 @@ func (s subnet) Inspect(networkRef, name string, timeout time.Duration) (*protoc
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	req := &protocol.SubnetInspectRequest{
 		Network: &protocol.Reference{Name: networkRef},
 		Subnet:  &protocol.Reference{Name: name},
 	}
-	return service.Inspect(ctx, req)
+	return service.Inspect(newCtx, req)
 
 }
 
@@ -137,6 +145,10 @@ func (s subnet) Create(
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	def := &protocol.SubnetCreateRequest{
 		Name:     name,
 		Cidr:     cidr,
@@ -150,11 +162,11 @@ func (s subnet) Create(
 		},
 		KeepOnFailure: keepOnFailure,
 	}
-	return service.Create(ctx, def)
+	return service.Create(newCtx, def)
 }
 
 // BindSecurityGroup calls the gRPC server to bind a security group to a network
-func (s subnet) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable bool, duration time.Duration) error {
+func (s subnet) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable bool, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -162,6 +174,10 @@ func (s subnet) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable bo
 	if xerr != nil {
 		return xerr
 	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	var state protocol.SecurityGroupState
 	switch enable {
@@ -177,12 +193,12 @@ func (s subnet) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable bo
 		State:   state,
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
-	_, err := service.BindSecurityGroup(ctx, req)
+	_, err := service.BindSecurityGroup(newCtx, req)
 	return err
 }
 
 // UnbindSecurityGroup calls the gRPC server to unbind a security group from a network
-func (s subnet) UnbindSecurityGroup(networkRef, subnetRef, sgRef string, duration time.Duration) error {
+func (s subnet) UnbindSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -191,18 +207,22 @@ func (s subnet) UnbindSecurityGroup(networkRef, subnetRef, sgRef string, duratio
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	req := &protocol.SecurityGroupSubnetBindRequest{
 		Group:   &protocol.Reference{Name: sgRef},
 		Network: &protocol.Reference{Name: networkRef},
 		Subnet:  &protocol.Reference{Name: subnetRef},
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
-	_, err := service.UnbindSecurityGroup(ctx, req)
+	_, err := service.UnbindSecurityGroup(newCtx, req)
 	return err
 }
 
 // EnableSecurityGroup calls the gRPC server to enable a bound security group of a network
-func (s subnet) EnableSecurityGroup(networkRef, subnetRef, sgRef string, duration time.Duration) error {
+func (s subnet) EnableSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -211,18 +231,22 @@ func (s subnet) EnableSecurityGroup(networkRef, subnetRef, sgRef string, duratio
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	req := &protocol.SecurityGroupSubnetBindRequest{
 		Group:   &protocol.Reference{Name: sgRef},
 		Network: &protocol.Reference{Name: networkRef},
 		Subnet:  &protocol.Reference{Name: subnetRef},
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
-	_, err := service.EnableSecurityGroup(ctx, req)
+	_, err := service.EnableSecurityGroup(newCtx, req)
 	return err
 }
 
 // DisableSecurityGroup calls the gRPC server to disable a bound security group of a network
-func (s subnet) DisableSecurityGroup(networkRef, subnetRef, sgRef string, duration time.Duration) error {
+func (s subnet) DisableSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -231,6 +255,10 @@ func (s subnet) DisableSecurityGroup(networkRef, subnetRef, sgRef string, durati
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 
 	req := &protocol.SecurityGroupSubnetBindRequest{
@@ -238,13 +266,13 @@ func (s subnet) DisableSecurityGroup(networkRef, subnetRef, sgRef string, durati
 		Network: &protocol.Reference{Name: networkRef},
 		Subnet:  &protocol.Reference{Name: subnetRef},
 	}
-	_, err := service.DisableSecurityGroup(ctx, req)
+	_, err := service.DisableSecurityGroup(newCtx, req)
 	return err
 }
 
 // ListSecurityGroups calls the gRPC server to list bound security groups of a network
 // FIXME: do not use protocol as response
-func (s subnet) ListSecurityGroups(networkRef, subnetRef, state string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+func (s subnet) ListSecurityGroups(networkRef, subnetRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -252,6 +280,10 @@ func (s subnet) ListSecurityGroups(networkRef, subnetRef, state string, duration
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 
@@ -270,5 +302,5 @@ func (s subnet) ListSecurityGroups(networkRef, subnetRef, state string, duration
 		return nil, fail.SyntaxError("invalid value '%s' for 'state' field", state)
 	}
 
-	return service.ListSecurityGroups(ctx, req)
+	return service.ListSecurityGroups(newCtx, req)
 }
