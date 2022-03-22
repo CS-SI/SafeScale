@@ -99,7 +99,11 @@ func (c cluster) GetState(clusteName string, timeout time.Duration) (*protocol.C
 		return nil, err
 	}
 
-	return service.State(ctx, &protocol.Reference{Name: clusteName})
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return service.State(newCtx, &protocol.Reference{Name: clusteName})
 }
 
 // Start starts all the hosts of the cluster
@@ -112,7 +116,11 @@ func (c cluster) Start(clusterName string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Start(ctx, &protocol.Reference{Name: clusterName})
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	_, err := service.Start(newCtx, &protocol.Reference{Name: clusterName})
 	return err
 }
 
@@ -126,7 +134,11 @@ func (c cluster) Stop(clusterName string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Stop(ctx, &protocol.Reference{Name: clusterName})
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	_, err := service.Stop(newCtx, &protocol.Reference{Name: clusterName})
 	return err
 }
 
@@ -144,8 +156,12 @@ func (c cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duratio
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Create(ctx, def)
+	return service.Create(newCtx, def)
 }
 
 // Delete deletes a cluster
@@ -162,12 +178,16 @@ func (c cluster) Delete(clusterName string, force bool, timeout time.Duration) e
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	req := &protocol.ClusterDeleteRequest{
 		Name:  clusterName,
 		Force: force,
 	}
-	_, err := service.Delete(ctx, req)
+	_, err := service.Delete(newCtx, req)
 	return err
 }
 
@@ -511,6 +531,10 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
 
 	var (
@@ -525,7 +549,7 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 
 		defer wg.Done()
 
-		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
+		if _, err := service.DeleteNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
 			errs = append(errs, err.Error())
@@ -535,7 +559,7 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 	if len(nodes) > 1 {
 		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenant set...
 		tenantService := protocol.NewTenantServiceClient(c.session.connection)
-		_, err := tenantService.Get(ctx, &googleprotobuf.Empty{})
+		_, err := tenantService.Get(newCtx, &googleprotobuf.Empty{})
 		if err != nil {
 			return err
 		}
@@ -571,8 +595,12 @@ func (c cluster) StartNode(clusterName string, nodeRef string, duration time.Dur
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StartNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	_, err := service.StartNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 	return err
 }
 
@@ -593,8 +621,12 @@ func (c cluster) StopNode(clusterName string, nodeRef string, duration time.Dura
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StopNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	_, err := service.StopNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 	return err
 }
 
@@ -615,8 +647,12 @@ func (c cluster) StateNode(clusterName string, nodeRef string, duration time.Dur
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.StateNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	return service.StateNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 }
 
 // ListMasters ...
@@ -633,8 +669,12 @@ func (c cluster) ListMasters(clusterName string, duration time.Duration) (*proto
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListMasters(ctx, &protocol.Reference{Name: clusterName})
+	list, err := service.ListMasters(newCtx, &protocol.Reference{Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -658,8 +698,12 @@ func (c cluster) InspectMaster(clusterName string, masterRef string, duration ti
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.InspectMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	return service.InspectMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 }
 
 // StartMaster ...
@@ -679,8 +723,12 @@ func (c cluster) StartMaster(clusterName string, masterRef string, duration time
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StartMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	_, err := service.StartMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 	return err
 }
 
@@ -701,8 +749,12 @@ func (c cluster) StopMaster(clusterName string, masterRef string, duration time.
 		return xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StopMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	_, err := service.StopMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 	return err
 }
 
@@ -723,6 +775,10 @@ func (c cluster) StateMaster(clusterName string, masterRef string, duration time
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.StateMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	return service.StateMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 }

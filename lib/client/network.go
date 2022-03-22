@@ -44,7 +44,11 @@ func (n network) List(all bool, timeout time.Duration) (*protocol.NetworkList, e
 		return nil, xerr
 	}
 
-	return service.List(ctx, &protocol.NetworkListRequest{
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return service.List(newCtx, &protocol.NetworkListRequest{
 		All: all,
 	})
 }
@@ -107,7 +111,11 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 		return nil, xerr
 	}
 
-	return service.Inspect(ctx, &protocol.Reference{Name: name})
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return service.Inspect(newCtx, &protocol.Reference{Name: name})
 
 }
 
@@ -128,6 +136,10 @@ func (n network) Create(
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	def := &protocol.NetworkCreateRequest{
 		Name:          name,
 		Cidr:          cidr,
@@ -140,5 +152,5 @@ func (n network) Create(
 			SizingAsString: sizing,
 		},
 	}
-	return service.Create(ctx, def)
+	return service.Create(newCtx, def)
 }
