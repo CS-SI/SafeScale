@@ -740,13 +740,15 @@ func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
 	v.AddConfigPath(utils.AbsPathify("$HOME/.config/safescale"))
 	v.AddConfigPath("/etc/safescale")
 	v.SetConfigName("tenants")
+	return getTenantsFromViperCfg(v)
+}
 
+func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Viper, fail.Error) {
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
 		logrus.Errorf(msg)
 		return nil, v, fail.SyntaxError(msg)
 	}
-	// settings := v.AllSettings()
 
 	var tenantsCfg []map[string]interface{}
 	err := v.UnmarshalKey("tenants", &tenantsCfg)
