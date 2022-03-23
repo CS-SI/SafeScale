@@ -43,7 +43,7 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.73.0
 	google.golang.org/grpc v1.45.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.27.1
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
