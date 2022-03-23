@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
-	"github.com/davecgh/go-spew/spew"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 )
@@ -285,18 +284,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	// FIXME: Maybe now we have a rich "ctx", we should take a look.
-	logrus.Warnf("New ctx: %s", spew.Sdump(ctx))
-
-	var force bool
-	var ok bool
-	if cv := ctx.Value("force"); cv != nil {
-		logrus.Warnf("value: %s", spew.Sdump(cv))
-		force, ok = cv.(bool)
-		if !ok {
-			return empty, fail.InvalidRequestError("force flag must be a bool")
-		}
-	}
+	force := in.GetForce()
 
 	if force {
 		logrus.Warnf("Indeed it's forced")

@@ -47,6 +47,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -1227,6 +1228,20 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	var force bool
+	var ok bool
+	if cv := ctx.Value("force"); cv != nil {
+		logrus.Warnf("value: %s", spew.Sdump(cv))
+		force, ok = cv.(bool)
+		if !ok {
+			return fail.InvalidRequestError("force flag must be a bool")
+		}
+	}
+
+	if force {
+		logrus.Warnf("Indeed, forcing subnet deletion")
 	}
 
 	var (

@@ -297,6 +297,12 @@ message SubnetInspectRequest {
 	Reference subnet = 2;
 }
 
+message SubnetDeleteRequest {
+	Reference network = 1;
+	Reference subnet = 2;
+	bool force = 3;
+}
+
 message Subnet {
 	string id = 1;
 	string name = 2;
@@ -327,7 +333,7 @@ service SubnetService {
 	rpc Create(SubnetCreateRequest) returns (Subnet){}
 	rpc List(SubnetListRequest) returns (SubnetList){}
 	rpc Inspect(SubnetInspectRequest) returns (Subnet) {}
-	rpc Delete(SubnetInspectRequest) returns (google.protobuf.Empty){}
+	rpc Delete(SubnetDeleteRequest) returns (google.protobuf.Empty){}
 	rpc BindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
 	rpc UnbindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
 	rpc EnableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}

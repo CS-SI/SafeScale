@@ -569,9 +569,6 @@ var clusterDeleteCommand = &cli.Command{
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete Cluster '%s'", clusterName)) {
 			return clitools.SuccessResponse("Aborted")
 		}
-		if force {
-			logrus.Println("'-f,--force' does nothing yet")
-		}
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {

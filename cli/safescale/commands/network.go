@@ -1129,6 +1129,11 @@ var subnetDelete = &cli.Command{
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
+		&cli.BoolFlag{
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
@@ -1157,7 +1162,7 @@ var subnetDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.Delete(networkRef, list, temporal.ExecutionTimeout())
+		err := clientSession.Subnet.Delete(networkRef, list, temporal.ExecutionTimeout(), c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(

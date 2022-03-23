@@ -53,7 +53,7 @@ func (s subnet) List(networkRef string, all bool, timeout time.Duration) (*proto
 }
 
 // Delete deletes several networks at the same time in goroutines
-func (s subnet) Delete(networkRef string, names []string, timeout time.Duration) error {
+func (s subnet) Delete(networkRef string, names []string, timeout time.Duration, force bool) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
 	service := protocol.NewSubnetServiceClient(s.session.connection)
@@ -63,7 +63,7 @@ func (s subnet) Delete(networkRef string, names []string, timeout time.Duration)
 	}
 
 	// finally, using context
-	valCtx := context.WithValue(ctx, "force", true) // FIXME: Use boolean later // nolint
+	valCtx := context.WithValue(ctx, "force", force) // nolint
 	newCtx, cancel := context.WithTimeout(valCtx, timeout)
 	defer cancel()
 
@@ -75,9 +75,10 @@ func (s subnet) Delete(networkRef string, names []string, timeout time.Duration)
 
 	subnetDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.SubnetInspectRequest{
+		_, err := service.Delete(newCtx, &protocol.SubnetDeleteRequest{
 			Network: &protocol.Reference{Name: networkRef},
 			Subnet:  &protocol.Reference{Name: aname},
+			Force:   true,
 		})
 
 		if err != nil {
