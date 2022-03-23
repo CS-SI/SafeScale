@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -70,7 +71,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	defer job.Close()
 	svc := job.Service()
 
-	tracer := debug.NewTracer(job.Task(), true, "('%s')", networkName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.network"), "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -195,7 +196,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	defer job.Close()
 	svc := job.Service()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.network")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -244,7 +245,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.networkInstance")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.networkInstance"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -291,7 +292,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer job.Close()
 	svc := job.Service()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.network"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -330,6 +331,12 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		default:
 			return empty, xerr
 		}
+	}
+
+	// Reload from metadata before sending the response
+	xerr = networkInstance.Reload()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	xerr = networkInstance.Delete(job.Context())
