@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 // unitResults contains the errors of the step for each host target
@@ -167,14 +166,13 @@ func (r results) ErrorMessagesOfKey(key string) string {
 }
 
 // ErrorMessagesOfUnit ...
-func (r results) ErrorMessagesOfUnit(unitName string) string {
+func (r results) ErrorMessagesOfUnit(unitName string) (string, fail.Error) {
 	output := ""
 	for _, urs := range r {
 		if urs != nil {
 			rurs, ok := urs.(*unitResults)
 			if !ok {
-				logrus.Errorf(fail.InconsistentError("failed to cast urs to '*unitResults'").Error())
-				return ""
+				return "", fail.InconsistentError("failed to cast urs to '*unitResults'")
 			}
 			for k, v := range *rurs {
 				if k == unitName {
@@ -186,27 +184,7 @@ func (r results) ErrorMessagesOfUnit(unitName string) string {
 			}
 		}
 	}
-	return output
-}
-
-// ResultsOfUnit ...
-func (r results) ResultsOfUnit(unitName string) resources.UnitResults {
-	newSrs := unitResults{}
-	for _, urs := range r {
-		if urs != nil {
-			rurs, ok := urs.(*unitResults)
-			if !ok {
-				logrus.Errorf("failed to cast urs to '*unitResults'") // FIXME: return error
-				return &unitResults{}
-			}
-			for k, v := range *rurs {
-				if k == unitName {
-					newSrs.AddOne(unitName, v)
-				}
-			}
-		}
-	}
-	return &newSrs
+	return output, nil
 }
 
 // ResultsOfKey ...

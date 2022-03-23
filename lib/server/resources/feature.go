@@ -33,7 +33,7 @@ type Targetable interface {
 	ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error        // adds parameters corresponding to the Target in preparation of feature installation
 	UnregisterFeature(f string) fail.Error                                         // unregisters a Feature from Target in metadata
 	InstalledFeatures() []string                                                   // returns a list of installed features
-	InstallMethods() map[uint8]installmethod.Enum                                  // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
+	InstallMethods() (map[uint8]installmethod.Enum, fail.Error)                    // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 	RegisterFeature(f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
 	TargetType() featuretargettype.Enum                                            // returns the type of the target
 }
@@ -44,7 +44,7 @@ type Feature interface {
 	data.Identifiable
 
 	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // Add installs the feature on the target
-	Applicable(Targetable) bool                                                                     // Applicable tells if the feature is installable on the target
+	Applicable(Targetable) (bool, fail.Error)                                                       // Applicable tells if the feature is installable on the target
 	GetDisplayFilename() string                                                                     // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
 	GetFilename() string                                                                            // GetFilename returns the filename of the feature
 	GetRequirements() (map[string]struct{}, fail.Error)                                             // GetRequirements returns the other features needed as requirements

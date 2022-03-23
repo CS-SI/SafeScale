@@ -124,7 +124,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	}
 
 	sshConfig = &system.SSHConfig{
-		Port:      22,
+		Port:      22, // will be overwritten later
 		IPAddress: ip,
 		Hostname:  host.GetName(),
 		User:      user,
@@ -233,9 +233,15 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			if ip, xerr = gw.GetAccessIP(); xerr != nil {
 				return nil, xerr
 			}
+
+			var gwcfg *system.SSHConfig
+			if gwcfg, xerr = gw.GetSSHConfig(); xerr != nil {
+				return nil, xerr
+			}
+
 			GatewayConfig := system.SSHConfig{
 				PrivateKey: gwahc.PrivateKey,
-				Port:       22,
+				Port:       gwcfg.Port,
 				IPAddress:  ip,
 				Hostname:   gw.GetName(),
 				User:       user,
@@ -270,9 +276,15 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			if ip, xerr = gw.GetAccessIP(); xerr != nil {
 				return nil, xerr
 			}
+
+			var gwcfg *system.SSHConfig
+			if gwcfg, xerr = gw.GetSSHConfig(); xerr != nil {
+				return nil, xerr
+			}
+
 			GatewayConfig := system.SSHConfig{
 				PrivateKey: gwahc.PrivateKey,
-				Port:       22,
+				Port:       gwcfg.Port,
 				IPAddress:  ip,
 				Hostname:   gw.GetName(),
 				User:       user,

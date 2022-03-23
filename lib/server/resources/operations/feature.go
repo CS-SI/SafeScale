@@ -271,19 +271,22 @@ func (instance *Feature) Specs() *viper.Viper {
 }
 
 // Applicable tells if the Feature is installable on the target
-func (instance *Feature) Applicable(t resources.Targetable) bool {
+func (instance *Feature) Applicable(t resources.Targetable) (bool, fail.Error) {
 	if valid.IsNil(instance) {
-		return false
+		return false, fail.InvalidInstanceError()
 	}
 
-	methods := t.InstallMethods()
+	methods, xerr := t.InstallMethods()
+	if xerr != nil {
+		return false, xerr
+	}
 	for _, k := range methods {
 		installer := instance.installerOfMethod(k)
 		if installer != nil {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // Check if Feature is installed on target
@@ -418,9 +421,12 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	return r, xerr
 }
 
-// findInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
+// findInstallerForTarget isolates the available installer to use for target (one that is defined in the file and applicable on target)
 func (instance *Feature) findInstallerForTarget(target resources.Targetable, action string) (installer Installer, ferr fail.Error) {
-	methods := target.InstallMethods()
+	methods, xerr := target.InstallMethods()
+	if xerr != nil {
+		return nil, xerr
+	}
 	w := instance.specs.GetStringMap("feature.install")
 	for i := uint8(1); i <= uint8(len(methods)); i++ {
 		meth := methods[i]

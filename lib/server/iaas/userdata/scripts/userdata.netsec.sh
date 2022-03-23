@@ -1063,7 +1063,13 @@ EOF
   # Allows default services on public zone
   firewall-offline-cmd --zone=public --add-service=ssh 2> /dev/null
   # Applies fw rules
-  # sfFirewallReload
+
+  # Update ssh port
+  [ ! -f /etc/firewalld/services/ssh.xml ] && [ -f /usr/etc/firewalld/services/ssh.xml ] && cp /usr/etc/firewalld/services/ssh.xml /etc/firewalld/services/ssh.xml
+  [ ! -f /etc/firewalld/services/ssh.xml ] && [ -f /usr/lib/firewalld/services/ssh.xml ] && cp /usr/lib/firewalld/services/ssh.xml /etc/firewalld/services/ssh.xml
+  sed -i -E "s/<port(.*)protocol=\"tcp\"(.*)port=\"([0-9]+)\"(.*)\/>/<port\1protocol=\"tcp\"\2port=\"{{ .SSHPort }}\"\4\/>/gm" /etc/firewalld/services/ssh.xml
+  sed -i -E "s/<port(.*)port=\"([0-9]+)\"(.*)protocol=\"tcp\"(.*)\/>/<port\1port=\"{{ .SSHPort }}\"\3protocol=\"tcp\"\4\/>/gm" /etc/firewalld/services/ssh.xml
+  sfFirewallReload
 
   sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 208 "failure allowing tcp forwarding"
 

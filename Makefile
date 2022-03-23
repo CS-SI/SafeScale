@@ -37,7 +37,6 @@ IRETURN := github.com/butuzov/ireturn/cmd/ireturn
 BATS := github.com/sstephenson/bats
 GOJQ := github.com/itchyny/gojq/cmd/gojq
 GRON := github.com/tomnomnom/gron
-JSONTOML := github.com/pelletier/go-toml
 
 # Default build tags
 BUILD_TAGS = 
@@ -182,14 +181,6 @@ cideps: begin ground
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n";
 		$(GO) install $(GRON)@v0.6.1 &>/dev/null || true; \
-	fi
-	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n"; \
-		$(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.4 &>/dev/null || true; \
-	fi
-	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n"; \
-		$(GO) install $(JSONTOML)/cmd/tomljson@v1.9.4 &>/dev/null || true; \
 	fi
 
 batscheck: begin

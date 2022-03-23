@@ -402,7 +402,7 @@ func (sc *SSHCommand) cleanup() error {
 	return nil
 }
 
-// Close ...
+// Close this function exists only to provide compatibility with previous SSH api
 func (sc *SSHCommand) Close() fail.Error {
 	return nil
 }
@@ -412,26 +412,30 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
-		sc.LocalHost = "127.0.0.1"
+		sc.LocalHost = "127.0.0.1" // TODO Remove hardcoded string
 	}
 
+	internalPort := 22 // all machines use port 22... // TODO Remove magic number
 	var gateway *sshtunnel.Endpoint
-	if sc.GatewayConfig == nil {
+	if sc.GatewayConfig == nil { // it has to be a gateway
+		internalPort = sc.Port // ... except maybe the gateway itself
+
 		var rerr error
-		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:22", sc.User, sc.IPAddress),
+		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.User, sc.IPAddress, sc.Port),
 			sshtunnel.EndpointOptionKeyFromString(sc.PrivateKey, ""))
 		if rerr != nil {
 			return nil, nil, rerr
 		}
 	} else {
 		var rerr error
-		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:22", sc.GatewayConfig.User, sc.GatewayConfig.IPAddress),
+		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.GatewayConfig.User, sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port),
 			sshtunnel.EndpointOptionKeyFromString(sc.GatewayConfig.PrivateKey, ""))
 		if rerr != nil {
 			return nil, nil, rerr
 		}
 	}
-	server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:22", sc.IPAddress),
+
+	server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:%d", sc.IPAddress, internalPort),
 		sshtunnel.EndpointOptionKeyFromString(sc.PrivateKey, ""))
 	if err != nil {
 		return nil, nil, err
@@ -530,7 +534,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 	defer tracer.Exiting()
 
 	originalPhase := phase
-	if phase == "ready" { // FIXME: Harcoded strings
+	if phase == "ready" { // FIXME: Hardcoded strings
 		phase = "final"
 	}
 
@@ -588,6 +592,14 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 
 // CopyWithTimeout ...
 func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, timeout time.Duration) (int, string, string, fail.Error) {
+	if ctx == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	if timeout == 0 {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("timeout")
+	}
+
 	currentCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -614,10 +626,13 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 	select {
 	case res := <-rCh: // if it works return the return
 		return res.code, res.stderr, res.stderr, fail.Wrap(res.err)
-	case <-ctx.Done(): // if not...
+	case <-ctx.Done(): // if not because parent context was canceled
+	case <-currentCtx.Done(): // or timeout hits
 	}
 
 	// wait anyway until call it's finished, then return an error
+	// if sc.Copy can handle contexts well, we don't have to wait until it's finished
+	// however is not the case here
 	<-rCh
 	if ctx.Err() != nil {
 		return -1, "", "", fail.Wrap(ctx.Err())

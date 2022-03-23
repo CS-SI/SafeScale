@@ -363,7 +363,7 @@ func (instance *Share) Create(
 	}
 	if !valid.IsNil(instance.MetadataCore) {
 		if instance.MetadataCore.IsTaken() {
-			return fail.NotAvailableError("already carrying information")
+			return fail.InconsistentError("already carrying information")
 		}
 	}
 	if ctx == nil {

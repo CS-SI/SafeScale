@@ -21,7 +21,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -146,6 +148,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	var timings *temporal.MutableTimings
+	if tc, ok := params["timings"]; ok {
+		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
+			s := &temporal.MutableTimings{}
+			err := mapstructure.Decode(theRecoveredTiming, &s)
+			if err != nil {
+				goto next
+			}
+			timings = s
+		}
+	}
+next:
+
 	cfgOptions := stacks.ConfigurationOptions{
 		ProviderNetwork:           providerNetwork,
 		UseFloatingIP:             true,
@@ -162,6 +177,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"performant": volumespeed.Hdd,
 		},
 		MaxLifeTime: maxLifeTime,
+		Timings:     timings,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)

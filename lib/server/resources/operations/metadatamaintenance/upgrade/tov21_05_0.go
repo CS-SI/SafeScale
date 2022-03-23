@@ -281,7 +281,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			// owningInstance may be identical to currentInstance, so we need to pass the properties of currentInstance through context,
 			// to prevent deadlock trying to alter an instance already inside an Alter
 			ctx = context.WithValue(ctx, operations.CurrentNetworkPropertiesContextKey, currentNetworkProps) // nolint
-			gwSG, internalSG, publicSG, innerXErr := subnetInstance.CreateSecurityGroups(ctx, owningInstance, false)
+			gwSG, internalSG, publicSG, innerXErr := subnetInstance.CreateSecurityGroups(ctx, owningInstance, false, int32(abstractSubnet.DefaultSSHPort))
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr

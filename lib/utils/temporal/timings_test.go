@@ -20,12 +20,33 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_NewTimings(t *testing.T) {
-
 	result := NewTimings()
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*temporal.MutableTimings")
+}
 
+func Test_NewTimingsToml(t *testing.T) {
+	result := NewTimings()
+	ct, err := result.ToToml()
+	require.Nil(t, err)
+	t.Logf(ct)
+}
+
+func Test_CarryAfterYou(t *testing.T) {
+	type Foo struct {
+		Thing MutableTimings
+	}
+
+	deepest := &Foo{
+		Thing: *NewTimings(),
+	}
+
+	barr, err := toml.Marshal(deepest)
+	require.Nil(t, err)
+
+	t.Logf(string(barr))
 }

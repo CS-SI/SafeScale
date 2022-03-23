@@ -352,7 +352,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	}
 	if !valid.IsNil(instance.MetadataCore) {
 		if instance.MetadataCore.IsTaken() {
-			return fail.NotAvailableError("already carrying information")
+			return fail.InconsistentError("already carrying information")
 		}
 	}
 	if ctx == nil {
@@ -2734,7 +2734,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	svc := instance.Service() // FIXME: This might FAIL, IT CAN be nil
+	svc := instance.Service()
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr

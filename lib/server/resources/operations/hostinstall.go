@@ -265,11 +265,9 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
-	// FIXME: Return error
+func (instance *Host) InstallMethods() (map[uint8]installmethod.Enum, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
-		logrus.Error(fail.InvalidInstanceError().Error())
-		return map[uint8]installmethod.Enum{}
+		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}
 
 	out := make(map[uint8]installmethod.Enum)
@@ -278,7 +276,7 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 		out[k.(uint8)], ok = v.(installmethod.Enum)
 		return ok
 	})
-	return out
+	return out, nil
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host

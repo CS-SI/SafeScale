@@ -31,7 +31,9 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 )
 
@@ -211,6 +213,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	var timings *temporal.MutableTimings
+	if tc, ok := params["timings"]; ok {
+		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
+			s := &temporal.MutableTimings{}
+			err := mapstructure.Decode(theRecoveredTiming, &s)
+			if err != nil {
+				goto next
+			}
+			timings = s
+		}
+	}
+next:
+
 	cfgOptions := stacks.ConfigurationOptions{
 		DNSList:                   dnsServers,
 		UseFloatingIP:             true,
@@ -227,6 +242,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
 		DefaultSecurityGroupName: "default",
 		MaxLifeTime:              maxLifeTime,
+		Timings:                  timings,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
