@@ -592,7 +592,16 @@ func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 	}
 
 	if len(resp) > 0 {
-		// Remove should succeed only when something goes wrong when deleting VMs
+		for _, nic := range resp {
+			if nic.LinkNic.LinkNicId != "" {
+				xerr = s.rpcUnLinkNic(nic.LinkNic.LinkNicId)
+				if xerr != nil {
+					debug.IgnoreError(xerr)
+				}
+			}
+		}
+
+		// Remove should fail only if something goes wrong when deleting VMs
 		logrus.Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
 		if xerr = s.deleteNICs(resp); xerr != nil {
 			return xerr
@@ -603,7 +612,7 @@ func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 }
 
 // BindSecurityGroupToSubnet binds a Security Group to a Subnet
-// Acrually does nothing for outscale
+// Actually does nothing for outscale
 func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
