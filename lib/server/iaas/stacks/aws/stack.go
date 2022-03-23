@@ -129,8 +129,12 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
 
-	stack.MutableTimings = temporal.NewTimings()
 	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+	if cfg.Timings != nil {
+		stack.MutableTimings = cfg.Timings
+	} else {
+		stack.MutableTimings = temporal.NewTimings()
+	}
 
 	return stack, nil
 }

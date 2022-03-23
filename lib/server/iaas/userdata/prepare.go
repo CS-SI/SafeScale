@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -55,7 +56,8 @@ type Content struct {
 	FinalPrivateKey             string                        // is the private key used to connect tp Host starting phase3 (disabling FirstPrivateKey)
 	ConfIF                      bool                          // if set to true, configure all interfaces to DHCP
 	IsGateway                   bool                          // if set to true, activate IP forwarding
-	PublicIP                    string                        // contains a public IP binded to the host
+	SSHPort                     string                        // Define Gateway SSHport
+	PublicIP                    string                        // contains a public IP bound to the host
 	AddGateway                  bool                          // if set to true, configure default gateway
 	DNSServers                  []string                      // contains the list of DNS servers to use; used only if IsGateway is true
 	CIDR                        string                        // contains the cidr of the network
@@ -180,6 +182,7 @@ func (ud *Content) Prepare(
 	ud.IsGateway = request.IsGateway /*&& request.Subnets[0].Name != abstract.SingleHostNetworkName*/
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
+	ud.SSHPort = strconv.Itoa(int(request.SSHPort))
 	ud.CIDR = cidr
 	ud.DefaultRouteIP = ip
 	ud.Password = request.Password

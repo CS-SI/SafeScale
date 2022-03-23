@@ -44,9 +44,10 @@ type ClusterRequest struct {
 	NodesDef                HostSizingRequirements // sizing of nodes
 	InitialNodeCount        uint                   // contains the initial count of nodes to create (cannot be less than flavor requirement)
 	OS                      string                 // contains the name of the linux distribution wanted
-	DisabledDefaultFeatures map[string]struct{}    // contains the list of features that should be installed by default but we don't want actually
+	DisabledDefaultFeatures map[string]struct{}    // contains the list of features that should be installed by default, but we don't want actually
 	Force                   bool                   // set to True in order to ignore sizing recommendations
 	FeatureParameters       []string               // contains parameter values of automatically installed Features
+	DefaultSshPort          uint                   // default ssh port for gateways // nolint
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster

@@ -30,7 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -168,6 +170,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, err
 	}
 
+	var timings *temporal.MutableTimings
+	if tc, ok := params["timings"]; ok {
+		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
+			s := &temporal.MutableTimings{}
+			err := mapstructure.Decode(theRecoveredTiming, &s)
+			if err != nil {
+				goto next
+			}
+			timings = s
+		}
+	}
+next:
+
 	cfgOptions := stacks.ConfigurationOptions{
 		DNSList:                   dnsServers,
 		UseFloatingIP:             true,
@@ -182,6 +197,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		UseNATService:    true,
 		ProviderName:     providerName,
 		MaxLifeTime:      maxLifeTime,
+		Timings:          timings,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)

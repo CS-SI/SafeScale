@@ -1,0 +1,53 @@
+[[tenants]]
+    provider = "outscale"
+    client = "outscale"
+    name = "fakeoutscale"
+
+    [tenants.identity]
+        AccessKey = "XXXXXXXXXX"
+        SecretKey = "YYYYYYYYYYYYYYYYYYYY"
+        UserID = "11111111111111111111"
+
+    [tenants.compute]
+        Region = "eu-west-2"
+        Subregion = "eu-west-2a"
+        Service = "api"
+        DefaultImage = ""
+        DefaultVolumeSpeed = "HDD"
+        DNSList=[]
+        OperatorUsername = "boo"
+
+    [tenants.network]
+        VPCName = "test-vpc"
+        VPCCIDR = "192.168.0.0/16"
+
+    [tenants.objectstorage]
+        Type = "s3"
+        Endpoint = "https://oos.eu-west-2.outscale.com"
+        AccessKey = "XXXXXXXXXXXXX"
+        SecretKey = "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
+
+    [tenants.metadata]
+        Type = "s3"
+        Endpoint = "https://oos.eu-west-2.outscale.com"
+        AccessKey = "XXXXXXXXXXXXXXXXXXX"
+        SecretKey = "YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
+        CryptKey = "ZZZZZZZZZZZZZZZ"
+
+    [tenants.timings.timeouts]
+        Communication = 180000000000
+        Connection = 60000000000
+        Context = 60000000000
+        HostCreation = 480000000000
+        HostCleanup = 300000000000
+        HostOperation = 120000000000
+        HostLongOperation = 840000000000
+        Operation = 150000000000
+        SSHConnection = 180000000000
+        Metadata = 150000000000
+        MetadataReadAfterWrite = 90000000000
+
+    [tenants.timings.delays]
+        Small = 1000000000
+        Normal = 10000000000
+        Big = 30000000000

@@ -197,13 +197,13 @@ func (instance *Subnet) unsafeHasVirtualIP() (bool, fail.Error) {
 }
 
 // UnsafeCreateSecurityGroups creates the 3 Security Groups needed by a Subnet
-// 'ctx' may contains values "CurrentNetworkAbstractContextKey" and "CurrentNetworkPropertiesContextKey", corresponding respectively
-// to Network abstract and Network properties; these values may be used by SecurityGroup.Create() not to try to Alter networkInstance directly (may be inside a code already altering it)
-func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
+// 'ctx' may contain values "CurrentNetworkAbstractContextKey" and "CurrentNetworkPropertiesContextKey", corresponding respectively
+// to Network abstract and Network properties; these values may be used by SecurityGroup.Create() not to try to Alter networkInstance directly (might be inside a code already altering it)
+func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
 	var xerr fail.Error
 	networkID := networkInstance.GetID()
 	networkName := networkInstance.GetName()
-	subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, networkID, networkName, keepOnFailure)
+	subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, networkID, networkName, keepOnFailure, defaultSSHPort)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -248,7 +248,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkI
 
 // createGWSecurityGroup creates a Security Group that will be applied to gateways of the Subnet
 func (instance *Subnet) createGWSecurityGroup(
-	ctx context.Context, networkID, networkName string, keepOnFailure bool,
+	ctx context.Context, networkID, networkName string, keepOnFailure bool, defaultSSHPort int32,
 ) (_ resources.SecurityGroup, ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -297,7 +297,7 @@ func (instance *Subnet) createGWSecurityGroup(
 		{
 			Description: "[ingress][ipv4][tcp] Allow SSH",
 			Direction:   securitygroupruledirection.Ingress,
-			PortFrom:    22,
+			PortFrom:    defaultSSHPort,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
 			Sources:     []string{"0.0.0.0/0"},
@@ -306,7 +306,7 @@ func (instance *Subnet) createGWSecurityGroup(
 		{
 			Description: "[ingress][ipv6][tcp] Allow SSH",
 			Direction:   securitygroupruledirection.Ingress,
-			PortFrom:    22,
+			PortFrom:    defaultSSHPort,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
 			Sources:     []string{"::/0"},
@@ -333,6 +333,34 @@ func (instance *Subnet) createGWSecurityGroup(
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	if defaultSSHPort != 22 {
+		rules := abstract.SecurityGroupRules{
+			{
+				Description: "[ingress][ipv4][tcp] Temporary Allow SSH",
+				Direction:   securitygroupruledirection.Ingress,
+				PortFrom:    22,
+				EtherType:   ipversion.IPv4,
+				Protocol:    "tcp",
+				Sources:     []string{"0.0.0.0/0"},
+				Targets:     []string{sg.GetID()},
+			},
+			{
+				Description: "[ingress][ipv6][tcp] Temporary Allow SSH",
+				Direction:   securitygroupruledirection.Ingress,
+				PortFrom:    22,
+				EtherType:   ipversion.IPv6,
+				Protocol:    "tcp",
+				Sources:     []string{"::/0"},
+				Targets:     []string{sg.GetID()},
+			},
+		}
+		xerr = sg.AddRules(ctx, rules)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
 
 	return sg, nil
@@ -527,13 +555,6 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		}
 	}()
 
-	// Write Subnet object metadata and updates the service cache
-	xerr = instance.Carry(abstractSubnet)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	// Starting from here, delete Subnet metadata if exiting with error
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
@@ -542,13 +563,21 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 			}
 		}
 	}()
+
+	// Write Subnet object metadata and updates the service cache
+	xerr = instance.Carry(abstractSubnet)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.unsafeCreateSecurityGroups(ctx, networkInstance, req.KeepOnFailure)
+	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.unsafeCreateSecurityGroups(ctx, networkInstance, req.KeepOnFailure, int32(req.DefaultSSHPort))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

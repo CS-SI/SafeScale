@@ -710,10 +710,11 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 			return nil, xerr
 		}
 		req := abstract.SubnetRequest{
-			Name:      scanSubnetName,
-			NetworkID: networkID,
-			IPVersion: ipversion.IPv4,
-			CIDR:      scanSubnetCIDR,
+			Name:           scanSubnetName,
+			NetworkID:      networkID,
+			IPVersion:      ipversion.IPv4,
+			CIDR:           scanSubnetCIDR,
+			DefaultSSHPort: 22,
 		}
 
 		subnetHostSizing := abstract.HostSizingRequirements{

@@ -22,8 +22,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -149,6 +151,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	var timings *temporal.MutableTimings
+	if tc, ok := params["timings"]; ok {
+		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
+			s := &temporal.MutableTimings{}
+			err := mapstructure.Decode(theRecoveredTiming, &s)
+			if err != nil {
+				goto next
+			}
+			timings = s
+		}
+	}
+next:
+
 	cfgOptions := stacks.ConfigurationOptions{
 		DNSList:             dnsServers,
 		UseFloatingIP:       true,
@@ -165,6 +180,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		DefaultNetworkCIDR: vpcCIDR,
 		DefaultImage:       defaultImage,
 		MaxLifeTime:        maxLifeTime,
+		Timings:            timings,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {

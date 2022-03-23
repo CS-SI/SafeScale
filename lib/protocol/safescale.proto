@@ -796,6 +796,7 @@ message ClusterCreateRequest {
 	string node_options = 16;        // same as gateway_options for nodes
 	bool force = 17;                 // ignore cluster sizing recommendations
 	repeated string parameters = 18; // contains optional parameters for automatically installed Features
+	uint32 default_ssh_port = 19;    // contains the default ssh port for cluster gateways
 }
 
 message ClusterResizeRequest {

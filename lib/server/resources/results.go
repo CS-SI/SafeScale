@@ -16,6 +16,8 @@
 
 package resources
 
+import "github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+
 // UnitResult ...
 type UnitResult interface {
 	Successful() bool
@@ -41,7 +43,7 @@ type Results interface {
 	AddOne(string, string, UnitResult) error
 	Successful() bool
 	AllErrorMessages() string
-	ErrorMessagesOfUnit(name string) string
+	ErrorMessagesOfUnit(name string) (string, fail.Error)
 	ErrorMessagesOfKey(name string) string
 	ResultsOfKey(key string) UnitResults
 	Keys() []string
