@@ -54,19 +54,17 @@ func (instance *Subnet) unsafeInspectGateway(primary bool) (_ resources.Host, fe
 	if !primary {
 		gwIdx = 1
 	}
-	out := instance.gateways[gwIdx]
-	if out == nil {
-		xerr := instance.updateCachedInformation()
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
-	out = instance.gateways[gwIdx]
-	if out == nil {
-		return nil, fail.NotFoundError("failed to find gateway")
+	xerr := instance.updateCachedInformation()
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	return out, nil
+	out := instance.gateways[gwIdx]
+	if out != nil {
+		return out, nil
+	}
+
+	return nil, fail.NotFoundError("failed to find gateway")
 }
 
 // unsafeGetDefaultRouteIP ...
