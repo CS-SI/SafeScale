@@ -45,7 +45,7 @@ import (
 type VolumeHandler interface {
 	Delete(ref string) fail.Error
 	List(all bool) ([]resources.Volume, fail.Error)
-	Inspect(ref string) (resources.Volume, fail.Error)
+	// Inspect(ref string) (resources.Volume, fail.Error)
 	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, fail.Error)
 	Attach(volume string, host string, path string, format string, doNotFormat bool, doNotMount bool) fail.Error
 	Detach(volume string, host string) fail.Error
@@ -154,34 +154,43 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	return volumeInstance.Delete(task.Context())
 }
 
-// Inspect returns the volume identified by ref and its attachment (if any)
-func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
-	}
-	if ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
-	}
-
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
-
-	objv, xerr := volumefactory.Load(handler.job.Service(), ref)
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); ok {
-			return nil, abstract.ResourceNotFoundError("volume", ref)
-		}
-		return nil, xerr
-	}
-	return objv, nil
-}
+// // Inspect returns the volume identified by ref and its attachment (if any)
+// func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr fail.Error) {
+// 	defer fail.OnPanic(&ferr)
+//
+// 	if handler == nil {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+// 	if handler.job == nil {
+// 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+// 	}
+// 	if ref == "" {
+// 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
+// 	}
+//
+// 	task := handler.job.Task()
+// 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
+// 	defer tracer.Exiting()
+// 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+//
+// 	objv, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
+// 	if xerr != nil {
+// 		if _, ok := xerr.(*fail.ErrNotFound); ok {
+// 			return nil, abstract.ResourceNotFoundError("volume", ref)
+// 		}
+// 		return nil, xerr
+// 	}
+//
+// 	defer func() {
+// 		issue := objv.Released()
+// 		if issue != nil {
+// 			logrus.Warn(issue)
+// 		}
+// 	}()
+//
+//
+// 	return objv, nil
+// }
 
 // Create a volume
 func (handler *volumeHandler) Create(name string, size int, speed volumespeed.Enum) (objv resources.Volume, ferr fail.Error) {

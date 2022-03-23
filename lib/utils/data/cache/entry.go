@@ -22,6 +22,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // Entry is a struct containing information about a cache entry
@@ -58,6 +60,22 @@ func (ce *Entry) Content() interface{} {
 	defer ce.lock.RUnlock()
 
 	return ce.content.Value()
+}
+
+// UpdateContent updates the content of the Entry
+func (ce *Entry) UpdateContent(content Cacheable) fail.Error {
+	if valid.IsNil(content) {
+		return fail.InvalidParameterCannotBeNilError("content")
+	}
+	if ce.content.Key() != content.GetID() {
+		return fail.InvalidRequestError("content", "id of 'content' does not match key of entry")
+	}
+
+	ce.lock.Lock()
+	defer ce.lock.Unlock()
+
+	ce.content = data.NewImmutableKeyValue(content.GetID(), content)
+	return nil
 }
 
 // LockContent increments the counter of use of cache entry

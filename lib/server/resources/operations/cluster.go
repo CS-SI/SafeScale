@@ -197,7 +197,20 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
 	}
 
-	cacheEntry.LockContent()
+	_ = cacheEntry.LockContent()
+	defer func() {
+		if ferr != nil {
+			_ = cacheEntry.UnlockContent()
+		}
+	}()
+
+	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
+	if cacheEntry.LockCount() > 1 {
+		xerr = clusterInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
 
 	if clusterInstance.randomDelayCh == nil {
 		xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
