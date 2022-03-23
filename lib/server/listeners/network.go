@@ -287,7 +287,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	force := in.GetForce()
 
 	if force {
-		logrus.Warnf("Indeed it's forced")
+		logrus.Tracef("forcing network deletion")
 	}
 
 	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))

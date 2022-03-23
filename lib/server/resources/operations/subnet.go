@@ -1241,7 +1241,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	if force {
-		logrus.Warnf("Indeed, forcing subnet deletion")
+		logrus.Tracef("forcing subnet deletion")
 	}
 
 	var (
