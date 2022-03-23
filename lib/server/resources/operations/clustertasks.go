@@ -972,6 +972,12 @@ func (instance *Cluster) createHostResources(
 		}
 	}
 
+	// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
+	if primaryGateway.GetID() == secondaryGateway.GetID() {
+		logrus.Errorf("We have a primary gateway with name %s and id %s and a secondary gateway with name %s and id %s", primaryGateway.GetName(), primaryGateway.GetID(), secondaryGateway.GetName(), secondaryGateway.GetID())
+		haveSecondaryGateway = false
+	}
+
 	_, xerr = primaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
