@@ -418,7 +418,7 @@ test: begin coverdeps # Run unit tests
 
 gofmt: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running gofmt checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) fmt ./...
+	@$(GO) fmt ./... 2>/dev/null
 
 err: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -447,19 +447,6 @@ endif
 
 minimock: begin generate
 	@$(GO) generate -run minimock ./... > /dev/null 2>&1 | $(TEE) -a generation_results.log
-
-beta: begin
-	@$(GO) install golang.org/dl/go1.18beta1@latest
-	@echo "go begins"
-	@$(eval GO = "go1.18beta1")
-	@$(GO) download
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) go version: $$($(GO) version), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd lib && $(MAKE) all)
-	@(cd cli && $(MAKE) all)
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | grep -v .pb. | grep -v nolint | grep -v _test.go | xargs errcheck | grep -v test | awk 'NF' | $(TEE) err_results.log
-	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 metalint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
