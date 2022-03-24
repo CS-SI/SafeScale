@@ -559,7 +559,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 			cmd, _ := sc.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 0)
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 10*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				return xerr
 			}
