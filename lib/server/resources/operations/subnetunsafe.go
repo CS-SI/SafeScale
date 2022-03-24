@@ -575,6 +575,10 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		return xerr
 	}
 
+	if req.DefaultSSHPort == 0 {
+		req.DefaultSSHPort = 22
+	}
+
 	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.unsafeCreateSecurityGroups(ctx, networkInstance, req.KeepOnFailure, int32(req.DefaultSSHPort))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
