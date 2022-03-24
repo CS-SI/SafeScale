@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.43.22
+	github.com/aws/aws-sdk-go v1.43.23
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -43,7 +43,7 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.73.0
 	google.golang.org/grpc v1.45.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.27.1
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4

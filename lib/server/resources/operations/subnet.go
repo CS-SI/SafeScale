@@ -47,6 +47,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -1229,6 +1230,20 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	var force bool
+	var ok bool
+	if cv := ctx.Value("force"); cv != nil {
+		logrus.Warnf("value: %s", spew.Sdump(cv))
+		force, ok = cv.(bool)
+		if !ok {
+			return fail.InvalidRequestError("force flag must be a bool")
+		}
+	}
+
+	if force {
+		logrus.Tracef("forcing subnet deletion")
+	}
+
 	var (
 		subnetAbstract *abstract.Subnet
 		subnetHosts    *propertiesv1.SubnetHosts
@@ -1458,7 +1473,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 
 // Released overloads core.Released() to release the parent Network instance
 func (instance *Subnet) Released() error {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1469,7 +1484,7 @@ func (instance *Subnet) Released() error {
 func (instance *Subnet) InspectNetwork() (rn resources.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1490,12 +1505,48 @@ func (instance *Subnet) InspectNetwork() (rn resources.Network, ferr fail.Error)
 
 // deleteGateways deletes all the gateways of the Subnet
 // A gateway host that is not found must be considered as a success
-func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, ferr fail.Error) {
+func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (_ []string, ferr fail.Error) {
 	svc := instance.Service()
 
-	ids = []string{}
+	if subnet.GatewayIDs == nil { // unlikely, either is an input error or we are dealing with metadata corruption
+		subnet.GatewayIDs = []string{}
+	}
+
+	if len(subnet.GatewayIDs) == 0 { // unlikely, either is an input error or we are dealing with metadata corruption
+		gwInstance, xerr := LoadHost(svc, fmt.Sprintf("gw-%s", subnet.Name))
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
+			default:
+				return subnet.GatewayIDs, xerr
+			}
+		}
+
+		if gwInstance != nil {
+			if gwInstance.GetID() != "" { // valid id
+				subnet.GatewayIDs = append(subnet.GatewayIDs, gwInstance.GetID())
+			}
+		}
+
+		gw2Instance, xerr := LoadHost(svc, fmt.Sprintf("gw2-%s", subnet.Name))
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
+			default:
+				return subnet.GatewayIDs, xerr
+			}
+		}
+
+		if gw2Instance != nil {
+			if gw2Instance.GetID() != "" { // valid id
+				subnet.GatewayIDs = append(subnet.GatewayIDs, gw2Instance.GetID())
+			}
+		}
+	}
+
 	if len(subnet.GatewayIDs) > 0 {
-		// TODO: parallelize
 		for _, v := range subnet.GatewayIDs {
 			hostInstance, xerr := LoadHost(svc, v)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -1506,17 +1557,16 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, f
 					logrus.Tracef("host instance not found, gateway deletion considered as a success")
 					debug.IgnoreError(xerr)
 				default:
-					return ids, xerr
+					return subnet.GatewayIDs, xerr
 				}
 			} else {
 				name := hostInstance.GetName()
 				logrus.Debugf("Deleting gateway '%s'...", name)
 
 				// delete Host
-				ids = append(ids, hostInstance.GetID())
 				hostInstanceImpl, ok := hostInstance.(*Host)
 				if !ok {
-					return ids, fail.InconsistentError("failed to cast hostInstance to '*Host'")
+					return subnet.GatewayIDs, fail.InconsistentError("failed to cast hostInstance to '*Host'")
 				}
 
 				xerr := hostInstanceImpl.RelaxedDeleteHost(context.Background())
@@ -1528,7 +1578,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, f
 						logrus.Tracef("host instance not found, relaxed gateway deletion considered as a success")
 						debug.IgnoreError(xerr)
 					default:
-						return ids, xerr
+						return subnet.GatewayIDs, xerr
 					}
 				}
 
@@ -1538,8 +1588,10 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, f
 			// Remove current entry from gateways to delete
 			subnet.GatewayIDs = subnet.GatewayIDs[1:]
 		}
+	} else {
+		logrus.Warnf("no gateways were detected")
 	}
-	return ids, nil
+	return subnet.GatewayIDs, nil
 }
 
 // onRemovalUnbindSecurityGroups makes sure the security groups bound to Subnet are unbound

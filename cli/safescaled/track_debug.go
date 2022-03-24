@@ -20,11 +20,16 @@
 package main
 
 import (
+	"runtime"
+
 	"github.com/nakabonne/gosivy/agent"
 	"github.com/sirupsen/logrus"
 )
 
 func startTrack() {
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(5)
+
 	// Track goroutines with gosivy
 	if err := agent.Listen(agent.Options{}); err != nil {
 		logrus.Fatal(err)
