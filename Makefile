@@ -300,7 +300,7 @@ ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 unmerged:
-	@$(WHICH) git > /dev/null && git grep -r "<<<<<" -- "*.*" && printf "%b" "$(ERR_COLOR)$(INFO_STRING) Unmerged content...\n" && exit 1 || true
+	@$(WHICH) git > /dev/null && git grep -r -O "<<<<<" -- "*.*" && printf "%b" "$(ERR_COLOR)$(INFO_STRING) Unmerged content...\n" && exit 1 || true
 
 sdk: getdevdeps unmerged
 	@(cd lib && $(MAKE) $(@))
