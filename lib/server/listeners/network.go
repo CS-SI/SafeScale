@@ -265,7 +265,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete network")
 
@@ -280,12 +280,18 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in.Network)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
+	force := in.GetForce()
+
+	if force {
+		logrus.Tracef("forcing network deletion")
+	}
+
+	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}

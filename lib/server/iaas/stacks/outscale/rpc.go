@@ -729,6 +729,28 @@ func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
 	)
 }
 
+func (s stack) rpcUnLinkNic(linkNicID string) fail.Error {
+	if linkNicID == "" {
+		return fail.InvalidParameterError("nicLinkID", "cannot be empty string")
+	}
+
+	opts := osc.UnlinkNicOpts{
+		UnlinkNicRequest: optional.NewInterface(osc.UnlinkNicRequest{
+			LinkNicId: linkNicID,
+		}),
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, hr, err := s.client.NicApi.UnlinkNic(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
+		},
+		normalizeError,
+	)
+}
+
 func (s stack) rpcCreateDhcpOptions(name string, dnsServers, ntpServers []string) (osc.DhcpOptionsSet, fail.Error) {
 	opts := osc.CreateDhcpOptionsOpts{
 		CreateDhcpOptionsRequest: optional.NewInterface(osc.CreateDhcpOptionsRequest{

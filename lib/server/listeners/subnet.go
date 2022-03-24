@@ -275,7 +275,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 }
 
 // Delete a/many subnet/s
-func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Subnet")
@@ -308,6 +308,10 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	force := in.GetForce()
+	jobCtx := job.Context()
+	newCtx := context.WithValue(jobCtx, "force", force)
+
 	var (
 		networkInstance resources.Network
 		subnetInstance  resources.Subnet
@@ -338,7 +342,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		}
 	}
 	if clean {
-		xerr = subnetInstance.Delete(job.Context())
+		xerr = subnetInstance.Delete(newCtx)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -358,7 +362,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 			}
 		}()
 
-		xerr = networkInstance.AbandonSubnet(job.Context(), subnetID)
+		xerr = networkInstance.AbandonSubnet(newCtx, subnetID)
 		if xerr != nil {
 			return empty, xerr
 		}
