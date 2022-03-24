@@ -418,11 +418,7 @@ test: begin coverdeps # Run unit tests
 
 gofmt: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running gofmt checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@if [ -n "$$($(GOFMT) -d .)" ]; then \
-		"$$($(GOFMT) -d .)" \
-		echo "-- gofmt check failed"; \
-		false; \
-	fi
+	@$(GO) fmt ./...
 
 err: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
