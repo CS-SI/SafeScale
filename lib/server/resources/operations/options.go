@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-package volume
+package operations
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
-// New creates an instance of resources.Volume
-func New(svc iaas.Service) (resources.Volume, fail.Error) {
-	return operations.NewVolume(svc)
-}
+const (
+	optionWithoutReloadKeyword = "without_reload"
+)
 
-// Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(svc iaas.Service, ref string) (resources.Volume, fail.Error) {
-	return operations.LoadVolume(svc, ref, operations.WithReloadOption)
-}
+var (
+	// WithoutReloadOption is used as option to LoadXXX() to disable reloading from metadata and/or local instance caching (that may lead to deadlock sometimes)
+	WithoutReloadOption = data.NewImmutableKeyValue(optionWithoutReloadKeyword, true)
+	// WithReloadOption is used as option to LoadXXX() to enable reloading from metadata
+	WithReloadOption = data.NewImmutableKeyValue(optionWithoutReloadKeyword, false)
+)

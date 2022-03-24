@@ -69,15 +69,6 @@ const (
 	hostKind = "host"
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
-
-	hostOptionLightKeyword = "light"
-)
-
-var (
-	// HostLightOption is used as option to LoadHost() to disable external information caching (that may lead to deadlock sometimes)
-	HostLightOption = data.NewImmutableKeyValue(hostOptionLightKeyword, true)
-	// HostFullOption is used as option to LoadHost() to enable external information caching (that may lead to deadlock sometimes) (default if neither "light" nor "full" is used)
-	HostFullOption = data.NewImmutableKeyValue(hostOptionLightKeyword, false)
 )
 
 // Host ...
@@ -122,6 +113,18 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
+	updateCachedInformation := false
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
+	}
+
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -133,20 +136,8 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		return nil, xerr
 	}
 
-	updateCachedInformation := true
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case hostOptionLightKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
 	cacheOptions := iaas.CacheMissOption(
-		func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref, updateCachedInformation) },
+		func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref) },
 		timings.MetadataTimeout(),
 	)
 	cacheEntry, xerr := hostCache.Get(ref, cacheOptions...)
@@ -176,11 +167,20 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		}
 	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
-		xerr = hostInstance.Reload()
+	if updateCachedInformation {
+		// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
+		if cacheEntry.LockCount() > 1 {
+			xerr = hostInstance.Reload()
+			if xerr != nil {
+				return nil, xerr
+			}
+		}
+
+		hostInstance.lock.Lock()
+		defer hostInstance.lock.Unlock()
+		xerr := hostInstance.updateCachedInformation()
 		if xerr != nil {
-			return nil, xerr
+			return hostInstance, xerr
 		}
 	}
 
@@ -188,7 +188,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
-func onHostCacheMiss(svc iaas.Service, ref string, updateCachedInformation bool) (cache.Cacheable, fail.Error) {
+func onHostCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
 	hostInstance, innerXErr := NewHost(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -197,15 +197,6 @@ func onHostCacheMiss(svc iaas.Service, ref string, updateCachedInformation bool)
 	// TODO: MetadataCore.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 	if innerXErr = hostInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
-	}
-
-	if updateCachedInformation {
-		hostInstance.lock.Lock()
-		defer hostInstance.lock.Unlock()
-		xerr := hostInstance.updateCachedInformation()
-		if xerr != nil {
-			return hostInstance, xerr
-		}
 	}
 
 	return hostInstance, nil
@@ -2444,7 +2435,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				if count > 0 {
 					// clients found, checks if these clients already exists...
 					for _, hostID := range hostShare.ClientsByID {
-						instance, inErr := LoadHost(svc, hostID, HostLightOption)
+						instance, inErr := LoadHost(svc, hostID, WithoutReloadOption)
 						if inErr != nil {
 							debug.IgnoreError(inErr)
 							continue

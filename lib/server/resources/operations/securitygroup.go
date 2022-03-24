@@ -115,7 +115,7 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup, ferr fail.Error) {
+func LoadSecurityGroup(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (sgInstance *SecurityGroup, ferr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&ferr)
 
@@ -124,6 +124,18 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	updateCachedInformation := false
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
 	}
 
 	timings, xerr := svc.Timings()
@@ -137,11 +149,11 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		return nil, fail.Wrap(xerr, "failed to get cache for Security Groups")
 	}
 
-	options := iaas.CacheMissOption(
+	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) },
 		timings.MetadataTimeout(),
 	)
-	cacheEntry, xerr := sgCache.Get(ref, options...)
+	cacheEntry, xerr := sgCache.Get(ref, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -171,7 +183,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 	}()
 
 	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
+	if updateCachedInformation && cacheEntry.LockCount() > 1 {
 		xerr = sgInstance.Reload()
 		if xerr != nil {
 			return nil, xerr

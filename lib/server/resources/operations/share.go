@@ -144,7 +144,8 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, ferr fail.Error) {
+// if 'options' contains WithReloadOption, the instance is refreshed from metadata. Otherwise, metadata is not read (except if Share is not in cache)
+func LoadShare(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (shareInstance resources.Share, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -165,11 +166,23 @@ func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, fer
 		return nil, xerr
 	}
 
-	options := iaas.CacheMissOption(
+	updateCachedInformation := true
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
+	}
+
+	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
 		timings.MetadataTimeout(),
 	)
-	cacheEntry, xerr := shareCache.Get(ref, options...)
+	cacheEntry, xerr := shareCache.Get(ref, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -199,7 +212,7 @@ func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, fer
 	}()
 
 	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
+	if updateCachedInformation && cacheEntry.LockCount() > 1 {
 		xerr = shareInstance.Reload()
 		if xerr != nil {
 			return nil, xerr

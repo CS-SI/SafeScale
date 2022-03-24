@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
@@ -33,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // -------------Volumes Management---------------------------------------------------------------------------------------

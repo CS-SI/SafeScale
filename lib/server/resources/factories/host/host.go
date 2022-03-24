@@ -62,5 +62,5 @@ func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 
 // Load loads the metadata of host and returns an instance of resources.Host
 func Load(svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
-	return operations.LoadHost(svc, ref)
+	return operations.LoadHost(svc, ref, operations.WithReloadOption)
 }

@@ -148,7 +148,7 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 }
 
 // LoadCluster loads cluster information from metadata
-func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, ferr fail.Error) {
+func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -156,6 +156,18 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	updateCachedInformation := false
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
 	}
 
 	clusterCache, xerr := svc.GetCache(clusterKind)
@@ -169,11 +181,11 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 		return nil, xerr
 	}
 
-	options := iaas.CacheMissOption(
+	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) },
 		timings.MetadataTimeout(),
 	)
-	cacheEntry, xerr := clusterCache.Get(name, options...)
+	cacheEntry, xerr := clusterCache.Get(name, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -204,11 +216,13 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 		}
 	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
-		xerr = clusterInstance.Reload()
-		if xerr != nil {
-			return nil, xerr
+	if updateCachedInformation {
+		// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
+		if cacheEntry.LockCount() > 1 {
+			xerr = clusterInstance.Reload()
+			if xerr != nil {
+				return nil, xerr
+			}
 		}
 	}
 
@@ -1299,7 +1313,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 			for _, v := range nodes {
 				_, derr = dtg.Start(
-					instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostLightOption},
+					instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: WithoutReloadOption},
 				)
 				if derr != nil {
 					abErr := dtg.AbortWithCause(derr)
@@ -1496,7 +1510,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
-	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host), HostFullOption)
+	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host), WithReloadOption)
 	if xerr != nil {
 		return xerr
 	}
@@ -2607,7 +2621,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 				completedOptions = append(completedOptions, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
 				_, xerr = tg.Start(
-					instance.taskDeleteNode, taskDeleteNodeParameters{node: n, nodeLoadMethod: HostLightOption},
+					instance.taskDeleteNode, taskDeleteNodeParameters{node: n, nodeLoadMethod: WithoutReloadOption},
 					completedOptions...,
 				)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2633,7 +2647,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 				completedOptions = append(completedOptions, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
 				_, xerr := tg.Start(
-					instance.taskDeleteMaster, taskDeleteNodeParameters{node: n, nodeLoadMethod: HostLightOption},
+					instance.taskDeleteMaster, taskDeleteNodeParameters{node: n, nodeLoadMethod: WithoutReloadOption},
 					completedOptions...,
 				)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2691,7 +2705,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 		for _, v := range all {
 			_, xerr = tg.Start(
-				instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostLightOption},
+				instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: WithoutReloadOption},
 				concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)),
 			)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -3727,7 +3741,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		for _, v := range removedNodes {
 			_, xerr = tg.Start(
 				instance.taskDeleteNode,
-				taskDeleteNodeParameters{node: v, nodeLoadMethod: HostFullOption, master: selectedMaster.(*Host)},
+				taskDeleteNodeParameters{node: v, nodeLoadMethod: WithReloadOption, master: selectedMaster.(*Host)},
 				concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)),
 			)
 			xerr = debug.InjectPlannedFail(xerr)

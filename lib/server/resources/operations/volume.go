@@ -81,7 +81,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, ferr fail.Error) {
+func LoadVolume(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (volumeInstance resources.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -96,17 +96,29 @@ func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, 
 		return nil, xerr
 	}
 
+	updateCachedInformation := false
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
+	}
+
 	volumeCache, xerr := svc.GetCache(volumeKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	options := iaas.CacheMissOption(
+	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
 		timings.MetadataTimeout(),
 	)
-	cacheEntry, xerr := volumeCache.Get(ref, options...)
+	cacheEntry, xerr := volumeCache.Get(ref, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -137,7 +149,7 @@ func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, 
 	}()
 
 	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
+	if updateCachedInformation && cacheEntry.LockCount() > 1 {
 		xerr = volumeInstance.Reload()
 		if xerr != nil {
 			return nil, xerr

@@ -205,11 +205,11 @@ message NetworkCreateRequest{
 }
 
 enum NetworkState {
-	NS_UNKNOWNSTATE = 0;
-	NS_PHASE1 = 1;  // Deprecated
-	NS_PHASE2 = 2;  // Deprecated
-	NS_READY = 3;
-	NS_NETWORKERROR = 4;
+	NS_UNKNOWNSTATE = 0; // Deprecated
+	NS_PHASE1 = 1;       // Deprecated
+	NS_PHASE2 = 2;       // Deprecated
+	NS_READY = 3;        // Deprecated
+	NS_NETWORKERROR = 4; // Deprecated
 }
 
 message Network {
@@ -220,7 +220,7 @@ message Network {
 	string secondary_gateway_id = 5;    // Deprecated: moved to Subnet
 	VirtualIp virtual_ip = 6;           // Deprecated: moved to Subnet
 	bool failover = 7;                  // Deprecated: moved to Subnet
-	NetworkState state = 8;
+	NetworkState state = 8;             // Deprecated: moved to Subnet
 	repeated string subnets = 9;
 	repeated string dns_servers = 10;
 }

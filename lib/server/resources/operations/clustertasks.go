@@ -2908,8 +2908,8 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	if p.node.ID == "" && p.node.Name == "" {
 		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
 	}
-	if p.nodeLoadMethod != HostLightOption && p.nodeLoadMethod != HostFullOption {
-		return nil, fail.InvalidParameterError("params.nodeLoadMethod", "must be 'HostLightOption' or 'HostFullOption'")
+	if p.nodeLoadMethod != WithoutReloadOption && p.nodeLoadMethod != WithReloadOption {
+		return nil, fail.InvalidParameterError("params.nodeLoadMethod", "must be 'WithoutReloadOption' or 'WithReloadOption'")
 	}
 	nodeName := p.node.Name
 	if nodeName == "" {
@@ -2984,7 +2984,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	host, xerr := LoadHost(instance.Service(), nodeName, HostLightOption)
+	host, xerr := LoadHost(instance.Service(), nodeName, WithoutReloadOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {

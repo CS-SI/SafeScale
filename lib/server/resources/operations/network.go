@@ -75,12 +75,25 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Network, ferr fail.Error) {
+// if 'options' contains WithReloadOption, the instance is refreshed from metadata
+func LoadNetwork(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (networkInstance resources.Network, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be null value")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	updateCachedInformation := false
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
 	}
 
 	networkCache, xerr := svc.GetCache(networkKind)
@@ -94,11 +107,11 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		return nil, xerr
 	}
 
-	options := iaas.CacheMissOption(
+	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
 		timings.MetadataTimeout(),
 	)
-	cacheEntry, xerr := networkCache.Get(ref, options...)
+	cacheEntry, xerr := networkCache.Get(ref, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -129,7 +142,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	}()
 
 	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
+	if updateCachedInformation && cacheEntry.LockCount() > 1 {
 		xerr = networkInstance.Reload()
 		if xerr != nil {
 			return nil, xerr
@@ -736,7 +749,7 @@ func (instance *Network) GetCIDR() (cidr string, ferr fail.Error) {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *Network) ToProtocol() (_ *protocol.Network, ferr fail.Error) {
+func (instance *Network) ToProtocol() (out *protocol.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -746,7 +759,6 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, ferr fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	var pn *protocol.Network
 	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
@@ -754,7 +766,7 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, ferr fail.Error) {
 
 		}
 
-		pn = &protocol.Network{
+		out = &protocol.Network{
 			Id:   an.ID,
 			Name: an.Name,
 			Cidr: an.CIDR,
@@ -766,7 +778,7 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, ferr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			for k := range nsV1.ByName {
-				pn.Subnets = append(pn.Subnets, k)
+				out.Subnets = append(out.Subnets, k)
 			}
 			return nil
 		})
@@ -776,7 +788,7 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, ferr fail.Error) {
 		return nil, xerr
 	}
 
-	return pn, nil
+	return out, nil
 }
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to

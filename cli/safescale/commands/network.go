@@ -24,12 +24,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
+	"github.com/CS-SI/SafeScale/v21/lib/client"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-
-	"github.com/CS-SI/SafeScale/v21/lib/client"
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -160,15 +160,7 @@ var networkInspect = &cli.Command{
 		network, err := clientSession.Network.Inspect(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "inspection of network", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
 		}
 
 		// Convert struct to map using struct to json then json to map
@@ -187,15 +179,7 @@ var networkInspect = &cli.Command{
 				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.ExecutionTimeout())
 				if err != nil {
 					err = fail.FromGRPCStatus(err)
-					return clitools.FailureResponse(
-						clitools.ExitOnRPC(
-							strprocess.Capitalize(
-								client.DecorateTimeoutError(
-									err, "inspection of network", false,
-								).Error(),
-							),
-						),
-					)
+					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
 				}
 
 				subnetMapped := map[string]interface{}{}
@@ -222,14 +206,15 @@ var networkInspect = &cli.Command{
 					mapped[k] = v
 				}
 
-				stnum, ok := mapped["state"].(float64)
-				if ok {
-					mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
-				}
+				// Deprecated
+				// stnum, ok := mapped["state"].(float64)
+				// if ok {
+				// 	mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
+				// }
 
 				staltnum, ok := mapped["subnet_state"].(float64)
 				if ok {
-					mapped["subnet_state_label"] = protocol.NetworkState_name[int32(staltnum)]
+					mapped["subnet_state_label"] = subnetstate.Enum(int32(staltnum)).String()
 				}
 
 				if err = queryGatewaysInformation(clientSession, subnet, mapped, false); err != nil {

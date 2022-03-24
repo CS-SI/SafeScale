@@ -81,9 +81,7 @@ func NullSubnet() *Subnet {
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(
-	ctx context.Context, svc iaas.Service, networkID string, all bool,
-) (_ []*abstract.Subnet, ferr fail.Error) {
+func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -161,7 +159,7 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance *Subnet, ferr fail.Error) {
+func LoadSubnet(svc iaas.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (subnetInstance *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -262,6 +260,18 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		}
 	}
 
+	updateCachedInformation := false
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case optionWithoutReloadKeyword:
+				updateCachedInformation = !v.Value().(bool)
+			default:
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
+	}
+
 	// -- second step: search instance in service cache
 	if subnetID != "" {
 		subnetCache, xerr := svc.GetCache(subnetKind)
@@ -298,13 +308,12 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		}()
 
 		// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-		if cacheEntry.LockCount() > 1 {
+		if updateCachedInformation && cacheEntry.LockCount() > 1 {
 			xerr = subnetInstance.Reload()
 			if xerr != nil {
 				return nil, xerr
 			}
 		}
-
 	} else {
 		return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 	}
@@ -315,8 +324,10 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
+
 		return nil, fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 	}
+
 	return subnetInstance, nil
 }
 
@@ -1317,7 +1328,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr != nil {
+					if hostInstance, innerXErr := LoadHost(svc, k, WithoutReloadOption); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
 						err := hostInstance.Released()
