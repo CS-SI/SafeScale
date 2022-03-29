@@ -67,6 +67,6 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(svc iaas.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.LoadSecurityGroup(svc, ref, operations.WithReloadOption)
+func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
+	return operations.LoadSecurityGroup(ctx, svc, ref, operations.WithReloadOption)
 }

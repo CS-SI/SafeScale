@@ -118,6 +118,8 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 		return nil, fail.InvalidParameterError("params", "must be a 'taskUnbindFromHostsAttachedToSubnetParams'")
 	}
 
+	ctx := task.Context()
+
 	if len(p.subnetHosts.ByID) > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 		if xerr != nil {
@@ -126,7 +128,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 
 		svc := instance.Service()
 		for k, v := range p.subnetHosts.ByID {
-			hostInstance, xerr := LoadHost(svc, k)
+			hostInstance, xerr := LoadHost(ctx, svc, k)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -195,7 +197,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
 	}
 
-	hostInstance, innerXErr := LoadHost(instance.Service(), hostID)
+	hostInstance, innerXErr := LoadHost(task.Context(), instance.Service(), hostID)
 	if innerXErr != nil {
 		switch innerXErr.(type) {
 		case *fail.ErrNotFound:
@@ -250,7 +252,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(
 	}
 
 	svc := instance.Service()
-	hostInstance, innerXErr := LoadHost(svc, hostID)
+	hostInstance, innerXErr := LoadHost(task.Context(), svc, hostID)
 	if innerXErr != nil {
 		switch innerXErr.(type) {
 		case *fail.ErrNotFound:

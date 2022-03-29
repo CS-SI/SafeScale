@@ -887,9 +887,15 @@ function sfIsPodRunning() {
 }
 export -f sfIsPodRunning
 
+# Returns the version corresponding to latest release
+function sfGitHubTagOfRelease() {
+  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/$3" | jq -r .tag_name
+}
+export -f sfGithubTagOfRelease
+
 # Returns the tag name corresponding to latest release
 function sfGithubLastRelease() {
-  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/latest" | jq -r .tag_name
+  sfGitHubTagOfRelease $1 $2 latest
 }
 export -f sfGithubLastRelease
 

@@ -27,9 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
-	"github.com/oscarpicas/covertool/pkg/exit"
+	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
@@ -39,9 +37,11 @@ import (
 	_ "github.com/CS-SI/SafeScale/v21/lib/server"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/listeners"
-	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
+	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
 )
 
 var profileCloseFunc = func() {}
@@ -138,6 +138,8 @@ func work(c *cli.Context) {
 	// - /debug/metrics
 	// - /debug/fgprof
 	expose()
+
+	// operations.StartFeatureFileWatcher()
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	if              //goland:noinspection GoBoolExpressions
@@ -249,9 +251,9 @@ func main() {
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
-			app2.Verbose = true
-			app2.Debug = true
-			return nil
+			appwide.Verbose = true
+		} else {
+			logrus.SetLevel(logrus.WarnLevel)
 		}
 
 		// default level is INFO
@@ -259,20 +261,24 @@ func main() {
 
 		// if -d or -v specified -> DEBUG Level
 		if c.Bool("verbose") {
-			logrus.SetLevel(logrus.DebugLevel)
-			app2.Verbose = true
+			logrus.SetLevel(logrus.InfoLevel)
+			appwide.Verbose = true
 		}
 
 		if c.Bool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
-			app2.Debug = true
+			if c.Bool("verbose") {
+				logrus.SetLevel(logrus.TraceLevel)
+			} else {
+				logrus.SetLevel(logrus.DebugLevel)
+			}
+			appwide.Debug = true
 		}
 
 		// if -d AND -v specified -> TRACE Level
 		if c.Bool("debug") && c.Bool("verbose") {
 			logrus.SetLevel(logrus.TraceLevel)
-			app2.Verbose = true
-			app2.Debug = true
+			appwide.Verbose = true
+			appwide.Debug = true
 		}
 		return nil
 	}

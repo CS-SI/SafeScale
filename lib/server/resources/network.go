@@ -41,6 +41,6 @@ type Network interface {
 	Create(ctx context.Context, req abstract.NetworkRequest) fail.Error                 // creates a Network
 	Delete(ctx context.Context) fail.Error
 	Import(ctx context.Context, ref string) fail.Error
-	InspectSubnet(subnetRef string) (Subnet, fail.Error) // returns the Subnet instance corresponding to Subnet reference (ID or name) provided (if Subnet is attached to the Network)
-	ToProtocol() (*protocol.Network, fail.Error)         // converts the network to protobuf message
+	InspectSubnet(ctx context.Context, subnetRef string) (Subnet, fail.Error) // returns the Subnet instance corresponding to Subnet reference (ID or name) provided (if Subnet is attached to the Network)
+	ToProtocol() (*protocol.Network, fail.Error)                              // converts the network to protobuf message
 }

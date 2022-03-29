@@ -98,7 +98,7 @@ func (handler *shareHandler) Create(
 		return nil, xerr
 	}
 
-	objh, xerr := hostfactory.Load(handler.job.Service(), hostName)
+	objh, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -125,7 +125,7 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	objs, xerr := sharefactory.Load(handler.job.Service(), name)
+	objs, xerr := sharefactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -169,7 +169,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	}
 
 	for _, serverID := range servers {
-		host, xerr := hostfactory.Load(svc, serverID)
+		host, xerr := hostfactory.Load(handler.job.Context(), svc, serverID)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -218,17 +218,18 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 	// Retrieve info about the share
 	svc := handler.job.Service()
-	shareInstance, xerr := sharefactory.Load(svc, shareName)
+	ctx := handler.job.Context()
+	shareInstance, xerr := sharefactory.Load(ctx, svc, shareName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	target, xerr := hostfactory.Load(svc, hostRef)
+	target, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return shareInstance.Mount(task.Context(), target, path, withCache)
+	return shareInstance.Mount(ctx, target, path, withCache)
 }
 
 // Unmount a share from local directory of a host
@@ -254,17 +255,18 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
-	objs, xerr := sharefactory.Load(svc, shareRef)
+	ctx := handler.job.Context()
+	objs, xerr := sharefactory.Load(ctx, svc, shareRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	target, xerr := hostfactory.Load(svc, hostRef)
+	target, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	return objs.Unmount(task.Context(), target)
+	return objs.Unmount(ctx, target)
 }
 
 // Inspect returns the host and share corresponding to 'shareName'
@@ -287,5 +289,5 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, fe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	return sharefactory.Load(handler.job.Service(), shareRef)
+	return sharefactory.Load(handler.job.Context(), handler.job.Service(), shareRef)
 }

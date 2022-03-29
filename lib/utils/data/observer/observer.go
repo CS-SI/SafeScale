@@ -20,8 +20,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observer -o ../mocks/mock_observer.go
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observable -o ../mocks/mock_observable.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observer -o mocks/mock_observer.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observable -o mocks/mock_observable.go
 
 // Observer is the interface a struct must satisfy to be observed by outside
 type Observer interface {

@@ -67,7 +67,6 @@ func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Erro
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return MetadataFolder{}, xerr
 		}
-		debug.IgnoreError(xerr)
 	} else {
 		f.crypt = cryptKey != nil && len(cryptKey) > 0
 		if f.crypt {

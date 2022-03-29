@@ -38,6 +38,6 @@ type Bucket interface {
 	Create(ctx context.Context, name string) fail.Error
 	Delete(ctx context.Context) fail.Error
 	Mount(ctx context.Context, hostname string, path string) fail.Error
-	ToProtocol() (*protocol.BucketResponse, fail.Error)
+	ToProtocol(ctx context.Context) (*protocol.BucketResponse, fail.Error)
 	Unmount(ctx context.Context, hostname string) fail.Error
 }

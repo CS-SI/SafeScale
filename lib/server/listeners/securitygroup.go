@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
-	"github.com/sirupsen/logrus"
-
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
@@ -107,7 +106,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(svc, networkRef)
+	networkInstance, xerr := networkfactory.Load(job.Context(), svc, networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -176,7 +175,7 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -228,7 +227,7 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -280,7 +279,7 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -327,7 +326,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -376,7 +375,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -432,7 +431,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -528,7 +527,7 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}

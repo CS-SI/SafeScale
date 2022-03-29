@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
@@ -35,6 +36,7 @@ type Targetable interface {
 	InstalledFeatures() []string                                                   // returns a list of installed features
 	InstallMethods() (map[uint8]installmethod.Enum, fail.Error)                    // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 	RegisterFeature(f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
+	Service() iaas.Service                                                         // returns the iaas.Service used by the target
 	TargetType() featuretargettype.Enum                                            // returns the type of the target
 }
 
@@ -43,13 +45,15 @@ type Feature interface {
 	data.Clonable
 	data.Identifiable
 
-	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // Add installs the feature on the target
-	Applicable(Targetable) (bool, fail.Error)                                                       // Applicable tells if the feature is installable on the target
-	GetDisplayFilename() string                                                                     // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetFilename() string                                                                            // GetFilename returns the filename of the feature
-	GetRequirements() (map[string]struct{}, fail.Error)                                             // GetRequirements returns the other features needed as requirements
-	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Check if feature is installed on target
-	Remove(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // Remove uninstalls the feature from the target
+	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)   // installs the feature on the target
+	Applicable(Targetable) (bool, fail.Error)                                                      // tells if the feature is installable on the target
+	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // check if feature is installed on target
+	// ControlledParameter(string, Host) (string, fail.Error)                                          // returns the controlled content of a FeatureParameter
+	GetDisplayFilename() string                                                                     // displays the filename of display (optionally adding '[embedded]' for embedded features)
+	GetFilename() string                                                                            // returns the filename of the feature
+	Dependencies() (map[string]struct{}, fail.Error)                                                // returns the other features needed as requirements
+	ListParametersWithControl() []string                                                            // returns a list of parameter containing version information
+	Remove(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // uninstalls the feature from the target
 	ToProtocol() *protocol.FeatureResponse
 }
 

@@ -81,7 +81,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
 	svc := job.Service()
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	rh, xerr := hostfactory.Load(job.Context(), svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -103,7 +103,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		}
 	}()
 
-	out, xerr := shareInstance.ToProtocol()
+	out, xerr := shareInstance.ToProtocol(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -139,7 +139,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	shareInstance, xerr := sharefactory.Load(job.Service(), shareName)
+	shareInstance, xerr := sharefactory.Load(job.Context(), job.Service(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -319,5 +319,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		}
 	}()
 
-	return shareInstance.ToProtocol()
+	return shareInstance.ToProtocol(job.Context())
 }

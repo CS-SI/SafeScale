@@ -17,16 +17,22 @@
 package cache
 
 import (
-	"fmt"
+	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // reservation is a struct to simulate a content of an Entry to "reserve" a key
 type reservation struct {
+	storeName   string
 	key         string
+	requestor   string // contains an identification of what requested the reservation
 	observers   map[string]observer.Observer
 	freedCh     chan struct{}
 	committedCh chan struct{}
@@ -35,13 +41,23 @@ type reservation struct {
 }
 
 // newReservation creates an instance of reservation
-func newReservation(key string /*, duration time.Duration*/) *reservation {
+func newReservation(ctx context.Context, store, key string) *reservation {
+	var requestor string
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr == nil {
+		requestor, _ = task.ID() // nolint
+	}
+	if requestor == "" {
+		requestor = "<unknown>"
+	}
+
 	return &reservation{
+		storeName:   store,
 		key:         key,
+		requestor:   requestor,
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
-		// timeout:     duration,
-		created: time.Now(),
+		created:     time.Now(),
 	}
 }
 
@@ -55,18 +71,40 @@ func (rc reservation) GetName() string {
 	return rc.key
 }
 
+// IsMine tells if the reservation is owned by the current task (taken from context)
+func (rc reservation) IsMine(ctx context.Context) bool {
+	if valid.IsNil(ctx) {
+		return rc.requestor == ""
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return rc.requestor == ""
+	}
+
+	currentTaskID, xerr := task.ID()
+	if xerr != nil {
+		return rc.requestor == ""
+	}
+
+	return rc.requestor == currentTaskID
+}
+
 // AddObserver allows to add an observer to a reservation
 // Note: is it really needed to do something here ?
-func (rc reservation) AddObserver(o observer.Observer) error {
-	if _, ok := rc.observers[o.GetID()]; ok {
-		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+func (rc *reservation) AddObserver(o observer.Observer) error {
+	if valid.IsNil(rc) {
+		return fail.InvalidInstanceError()
 	}
 
 	if len(rc.observers) == 0 {
 		rc.observers = map[string]observer.Observer{}
 	}
-	rc.observers[o.GetID()] = o
+	if _, ok := rc.observers[o.GetID()]; ok {
+		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+	}
 
+	rc.observers[o.GetID()] = o
 	return nil
 }
 
@@ -79,16 +117,25 @@ func (rc reservation) NotifyObservers() error {
 }
 
 // RemoveObserver unregister an Observer identified by its name
-func (rc reservation) RemoveObserver(name string) error {
-	if _, ok := rc.observers[name]; !ok {
-		return fmt.Errorf("not there")
+func (rc *reservation) RemoveObserver(name string) error {
+	if valid.IsNil(rc) {
+		return fail.InvalidInstanceError()
 	}
+
+	if _, ok := rc.observers[name]; !ok {
+		return fail.NotFoundError()
+	}
+
 	delete(rc.observers, name)
 	return nil
 }
 
 // Released is used to inform observers the reservation was released (decreasing the use counter)
-func (rc reservation) Released() error {
+func (rc *reservation) Released() error {
+	if valid.IsNil(rc) {
+		return fail.InvalidInstanceError()
+	}
+
 	for _, ob := range rc.observers {
 		ob.MarkAsFreed(rc.key)
 	}
@@ -96,7 +143,11 @@ func (rc reservation) Released() error {
 }
 
 // Destroyed is used to inform observers the reservation was destroyed
-func (rc reservation) Destroyed() error {
+func (rc *reservation) Destroyed() error {
+	if valid.IsNil(rc) {
+		return fail.InvalidInstanceError()
+	}
+
 	for _, ob := range rc.observers {
 		ob.MarkAsDeleted(rc.key)
 	}
@@ -111,4 +162,31 @@ func (rc reservation) freed() <-chan struct{} {
 // committed returns a read-only channel to be notified when the reservation has been committed
 func (rc reservation) committed() <-chan struct{} {
 	return rc.committedCh
+}
+
+// waitReleased waits until the reservation is released
+// Returns:
+//  - nil: the reservation is released and can be used again
+//  - *fail.ErrTimeout: the reservation has timed out and can be used again
+//  - *fail.ErrDuplicate: the reservation is released but a cache entry exist, so can not be reused
+func (rc reservation) waitReleased() fail.Error {
+	// If key is reserved, we may have to wait reservation committed or freed to determine if
+	waitFor := rc.timeout - time.Since(rc.created)
+
+	if waitFor < 0 {
+		waitFor = 0
+	}
+	select {
+	case <-rc.freed():
+		logrus.Tracef("reservation for key '%s' is freed", rc.key)
+		return nil
+
+	case <-rc.committed():
+		return fail.DuplicateError("reservation for entry with key '%s' in %s store cannot be reused because a corresponding entry now exists", rc.key, rc.storeName)
+
+	case <-time.After(waitFor):
+		xerr := fail.TimeoutError(nil, rc.timeout, "reservation for entry with key '%s' in %s store has expired (requestor=%s)", rc.key, rc.storeName, rc.requestor)
+		logrus.Trace(xerr.Error())
+		return xerr
+	}
 }

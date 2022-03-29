@@ -70,7 +70,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
+	addressedGateway, xerr := subnet.InspectGateway(ctx, addressPrimaryGateway)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -87,7 +87,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	if !present {
 		// try an active check and update InstalledFeatures if found
 		// Check if 'edgeproxy4subnet' feature is installed on host
-		featureInstance, xerr := NewFeature(svc, "edgeproxy4subnet")
+		featureInstance, xerr := NewFeature(ctx, svc, "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -101,7 +101,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 		if results.Successful() {
 			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -109,11 +109,12 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 					item := propertiesv1.NewHostInstalledFeature()
 					item.HostContext = true
-					var inErr fail.Error
-					item.Requires, inErr = featureInstance.GetRequirements()
-					if inErr != nil {
-						return inErr
+					var innerXErr fail.Error
+					item.Requires, innerXErr = featureInstance.Dependencies()
+					if innerXErr != nil {
+						return innerXErr
 					}
+
 					featuresV1.Installed[featureInstance.GetName()] = item
 					return nil
 				})
@@ -134,13 +135,13 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		subnet:  subnet,
 		gateway: addressedGateway,
 	}
-	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP()
+	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP()
+	ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -593,9 +594,13 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 }
 
 func init() {
-	var xerr fail.Error
-	kongProxyCheckedCache, xerr = cache.NewCache("proxychecks")
+	store, xerr := cache.NewMapStore("store:proxychecks")
 	if xerr != nil {
-		panic(xerr)
+		panic(xerr.Error())
+	}
+
+	kongProxyCheckedCache, xerr = cache.NewSingleCache("proxychecks", store)
+	if xerr != nil {
+		panic(xerr.Error())
 	}
 }

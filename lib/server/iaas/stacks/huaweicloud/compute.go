@@ -24,19 +24,18 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
+	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -50,6 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 type blockDevice struct {
@@ -827,10 +827,10 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 	// so we can write something like searchInStruct(in.Properties, ".Properties.image.minDisk")
 
 	properties := in.Properties
-	image := properties["image"].(map[string]interface{}) // nolint
-	d := image["minDisk"].(float64)                       // nolint
-	id := image["id"].(string)                            // nolint
-	name := image["name"].(string)                        // nolint
+	image := properties["image"].(map[string]interface{}) //nolint
+	d := image["minDisk"].(float64)                       //nolint
+	id := image["id"].(string)                            //nolint
+	name := image["name"].(string)                        //nolint
 
 	out := abstract.Image{
 		ID:       id,

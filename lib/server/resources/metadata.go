@@ -17,6 +17,8 @@
 package resources
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
@@ -39,7 +41,7 @@ type Metadata interface {
 	Review(callback Callback) fail.Error                                   // protects the data for shared read without reloading first (uses in-memory data); use with caution
 	Read(ref string) fail.Error                                            // reads the data from Object Storage using ref as id or name
 	ReadByID(id string) fail.Error                                         // reads the data from Object Storage by id
-	Reload() fail.Error                                                    // Reloads the metadata from the Object Storage, overriding what is in the object
+	Reload(ctx context.Context) fail.Error                                 // Reloads the metadata from the Object Storage, overriding what is in the object
 	Serialize() ([]byte, fail.Error)
 	Service() iaas.Service // returns the iaas.Service used
 }

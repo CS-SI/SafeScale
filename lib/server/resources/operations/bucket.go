@@ -74,7 +74,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, ferr fail.Error) {
+func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources.Bucket, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -93,11 +93,11 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, ferr fail.Er
 		return nil, xerr
 	}
 
-	cacheOptions := iaas.CacheMissOption(
+	cacheOptions := cache.MissEventOption(
 		func() (cache.Cacheable, fail.Error) { return onBucketCacheMiss(svc, name) },
 		timings.MetadataTimeout(),
 	)
-	cacheEntry, xerr := bucketCache.Get(name, cacheOptions...)
+	cacheEntry, xerr := bucketCache.Get(ctx, name, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -150,7 +150,7 @@ func (instance *bucket) IsNull() bool {
 }
 
 // carry ...
-func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
+func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -178,7 +178,7 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -186,7 +186,7 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
@@ -199,7 +199,7 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
+	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -228,15 +228,7 @@ func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -278,15 +270,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return "", xerr
-			}
-		default:
-			return "", xerr
-		}
+		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -326,15 +310,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return "", xerr
-			}
-		default:
-			return "", xerr
-		}
+		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -383,15 +359,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -408,7 +376,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	svc := instance.Service()
 
 	// -- check if bucket already exist in SafeScale
-	bucketInstance, xerr := LoadBucket(svc, name)
+	bucketInstance, xerr := LoadBucket(ctx, svc, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -454,7 +422,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- write metadata
-	return instance.carry(&ab)
+	return instance.carry(ctx, &ab)
 }
 
 // Delete a bucket
@@ -467,15 +435,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
@@ -542,15 +502,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -565,7 +517,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	defer instance.lock.Unlock()
 
 	svc := instance.Service()
-	hostInstance, xerr := LoadHost(svc, hostName)
+	hostInstance, xerr := LoadHost(ctx, svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
@@ -718,15 +670,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -741,7 +685,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	defer instance.lock.Unlock()
 
 	svc := instance.Service()
-	hostInstance, xerr := LoadHost(svc, hostName)
+	hostInstance, xerr := LoadHost(ctx, svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -816,7 +760,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 }
 
 // ToProtocol returns the protocol message corresponding to Bucket fields
-func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
+func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketResponse, fail.Error) {
 	out := &protocol.BucketResponse{
 		Name: instance.GetName(),
 	}
@@ -831,7 +775,7 @@ func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 			svc := instance.Service()
 			out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))
 			for k, v := range mountsV1.ByHostID {
-				hostInstance, xerr := LoadHost(svc, k)
+				hostInstance, xerr := LoadHost(ctx, svc, k)
 				if xerr != nil {
 					return xerr
 				}

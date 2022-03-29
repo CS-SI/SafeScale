@@ -249,7 +249,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.Service(), ref)
+	networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -302,7 +302,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(svc, ref)
+	networkInstance, xerr := networkfactory.Load(job.Context(), svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -340,7 +340,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	}
 
 	// Reload from metadata before sending the response
-	xerr = networkInstance.Reload()
+	xerr = networkInstance.Reload(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}

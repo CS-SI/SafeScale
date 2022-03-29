@@ -37,18 +37,10 @@ import (
 
 // delete effectively remove a Security Group
 func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -193,15 +185,15 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 	// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)
 	removingNetworkAbstract := ctx.Value(CurrentNetworkAbstractContextKey)
 	if removingNetworkAbstract == nil {
-		return instance.updateNetworkMetadataOnRemoval(networkID)
+		return instance.updateNetworkMetadataOnRemoval(ctx, networkID)
 	}
 	return nil
 }
 
 // updateNetworkMetadataOnRemoval removes the reference to instance in Network metadata
-func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(networkID string) fail.Error {
+func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(ctx context.Context, networkID string) fail.Error {
 	// -- update Security Groups in Network metadata
-	networkInstance, xerr := LoadNetwork(instance.Service(), networkID)
+	networkInstance, xerr := LoadNetwork(ctx, instance.Service(), networkID)
 	if xerr != nil {
 		return xerr
 	}
@@ -270,18 +262,10 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -339,26 +323,18 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 		return fail.InvalidParameterCannotBeNilError("subnetProps")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	switch enable {
 	case resources.SecurityGroupEnable:
@@ -414,18 +390,10 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {

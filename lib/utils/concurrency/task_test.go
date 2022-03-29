@@ -75,7 +75,15 @@ func TestInjectAndExtractFromContext(t *testing.T) {
 	ctx := context.Background()
 	ctxv := context.WithValue(ctx, KeyForTaskInContext, ta) // nolint
 
-	nt, err := TaskFromContext(ctxv)
+	nt, err := TaskFromContext(ctx)
+	require.NotNil(t, err)
+	require.Nil(t, nt)
+
+	nt, err = TaskFromContextOrVoid(ctx)
+	require.Nil(t, err)
+	require.NotNil(t, nt)
+
+	nt, err = TaskFromContext(ctxv)
 	require.Nil(t, err)
 	rid, err := nt.ID()
 	require.Nil(t, err)

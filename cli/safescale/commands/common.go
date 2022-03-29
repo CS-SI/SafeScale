@@ -66,13 +66,13 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 		return "", nil, clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	var hostInstance *protocol.Host
 	if instanciate {
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
 		var err error
 		hostInstance, err = clientSession.Host.Inspect(hostName, temporal.ExecutionTimeout())
 		if err != nil {
@@ -82,10 +82,6 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 		if hostInstance == nil {
 			return "", nil, clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 		}
-	}
-
-	if hostInstance == nil {
-		return "", nil, clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 	}
 
 	return hostName, hostInstance, nil

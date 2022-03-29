@@ -20,16 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	volumefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/volume"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	volumefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/volume"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -84,7 +84,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.VolumeInspectResponse
 	for _, v := range volumes {
-		pbVolume, xerr := v.ToProtocol()
+		pbVolume, xerr := v.ToProtocol(job.Context())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -129,7 +129,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return rv.ToProtocol()
+	return rv.ToProtocol(job.Context())
 }
 
 // Attach a volume to a host and create a mount point
@@ -300,7 +300,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(job.Service(), ref)
+	volumeInstance, xerr := volumefactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
@@ -315,5 +315,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		}
 	}()
 
-	return volumeInstance.ToProtocol()
+	return volumeInstance.ToProtocol(job.Context())
 }

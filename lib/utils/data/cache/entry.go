@@ -16,6 +16,8 @@
 
 package cache
 
+//go:generate minimock -o mocks/mock_entry.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Entry
+
 import (
 	"sync"
 	"time"
@@ -30,34 +32,34 @@ import (
 type Entry struct {
 	observer.Observer
 
-	content     data.ImmutableKeyValue
+	lock        *sync.Mutex
 	use         uint
+	content     data.ImmutableKeyValue
 	lastUpdated time.Time
-	lock        *sync.RWMutex
 }
 
-// newEntry allocates a new cache entry
+// newEntry allocates a new Store entry
 func newEntry(content Cacheable) Entry {
 	ce := Entry{
 		content: data.NewImmutableKeyValue(content.GetID(), content),
-		lock:    &sync.RWMutex{},
 		use:     0,
+		lock:    &sync.Mutex{},
 	}
 	return ce
 }
 
 // Key returns the key of the cache entry
 func (ce *Entry) Key() string {
-	ce.lock.RLock()
-	defer ce.lock.RUnlock()
+	ce.lock.Lock()
+	defer ce.lock.Unlock()
 
 	return ce.content.Key()
 }
 
 // Content returns the content of the cache
 func (ce *Entry) Content() interface{} {
-	ce.lock.RLock()
-	defer ce.lock.RUnlock()
+	ce.lock.Lock()
+	defer ce.lock.Unlock()
 
 	return ce.content.Value()
 }
@@ -87,7 +89,7 @@ func (ce *Entry) LockContent() uint {
 	return ce.use
 }
 
-// UnlockContent decrements the counter of use of cache entry
+// UnlockContent decrements the counter of use of cached entry
 func (ce *Entry) UnlockContent() uint {
 	ce.lock.Lock()
 	defer ce.lock.Unlock()

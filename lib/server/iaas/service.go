@@ -41,6 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
@@ -70,7 +71,7 @@ type Service interface {
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
-	GetCache(string) (*ResourceCache, fail.Error)
+	GetCache(string) (cache.Cache, fail.Error)
 
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
@@ -175,7 +176,7 @@ func (instance service) GetName() (string, fail.Error) {
 
 // GetCache returns the data.Cache instance corresponding to the name passed as parameter
 // If the cache does not exist, create it
-func (instance *service) GetCache(name string) (_ *ResourceCache, ferr fail.Error) {
+func (instance *service) GetCache(name string) (_ cache.Cache, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}

@@ -16,7 +16,7 @@
 
 package data
 
-//go:generate minimock -o ../mocks/mock_identifyable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Identifiable
+//go:generate minimock -o mocks/mock_identifyable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Identifiable
 
 // Identifiable proposes methods to identify a struct
 type Identifiable interface {

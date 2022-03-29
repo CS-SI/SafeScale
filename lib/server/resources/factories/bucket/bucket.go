@@ -17,6 +17,8 @@
 package bucket
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
@@ -39,6 +41,6 @@ func New(svc iaas.Service) (resources.Bucket, fail.Error) { // nolint
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(svc iaas.Service, name string) (resources.Bucket, fail.Error) { // nolint
-	return operations.LoadBucket(svc, name)
+func Load(ctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) { // nolint
+	return operations.LoadBucket(ctx, svc, name)
 }

@@ -83,19 +83,6 @@ func TestKeyPair_NewKeyPair(t *testing.T) {
 
 }
 
-func Test_almostEqual(t *testing.T) {
-	var a float32 = 0.1
-	var b float32 = 0.2
-	var c float32 = 0.3
-
-	var d float32 = 0.1
-	var e float32 = 0.2
-	var f float32 = 0.3
-
-	require.True(t, almostEqual(c, a+b))
-	require.True(t, almostEqual(f, d+e))
-}
-
 func TestHostSizingRequirements_Equals(t *testing.T) {
 
 	hsr1 := HostSizingRequirements{

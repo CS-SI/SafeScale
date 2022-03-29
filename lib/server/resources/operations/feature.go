@@ -19,15 +19,10 @@ package operations
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -35,33 +30,26 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
-// Feature contains the information about an installable Feature
+// Feature contains the information about a FeatureFile to be installed
 type Feature struct {
-	displayName     string                           // is the name of the service
-	fileName        string                           // is the name of the specification file
-	displayFileName string                           // is the 'beautiful' name of the specification file
-	embedded        bool                             // tells if the Feature is embedded in deploy
-	installers      map[installmethod.Enum]Installer // defines the installers available for the Feature
-	specs           *viper.Viper                     // is the Viper instance containing Feature specification
-	svc             iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
-}
-
-func newFeature(displayName string, fileName string, displayFileName string, embedded bool, installers map[installmethod.Enum]Installer, specs *viper.Viper, svc iaas.Service) *Feature {
-	return &Feature{displayName: displayName, fileName: fileName, displayFileName: displayFileName, embedded: embedded, installers: installers, specs: specs, svc: svc}
-}
-
-// FeatureNullValue returns a *Feature corresponding to a null value
-func FeatureNullValue() *Feature {
-	return newFeature("", "", "", false, make(map[installmethod.Enum]Installer), nil, nil)
+	file                  *FeatureFile
+	installers            map[installmethod.Enum]Installer // defines the installers available for the Feature
+	svc                   iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+	conditionedParameters ConditionedFeatureParameters
 }
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
@@ -69,7 +57,7 @@ func FeatureNullValue() *Feature {
 // error contains :
 //    - fail.ErrNotFound if no Feature is found by its name
 //    - fail.ErrSyntax if Feature found contains syntax error
-func NewFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
+func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -77,65 +65,22 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.E
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	v := viper.New()
-	v.AddConfigPath(".")
-	v.AddConfigPath("./features")
-	v.AddConfigPath("./.safescale/features")
-	v.AddConfigPath("$HOME/.safescale/features")
-	v.AddConfigPath("$HOME/.config/safescale/features")
-	v.AddConfigPath("/etc/safescale/features")
-	v.SetConfigName(name)
-
-	casted := FeatureNullValue()
-	err := v.ReadInConfig()
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		switch err.(type) {
-		case viper.ConfigFileNotFoundError:
-			// Failed to find a spec file on filesystem, trying with embedded ones
-			var ok bool
-			if _, ok = allEmbeddedFeaturesMap[name]; !ok {
-				return nil, fail.NotFoundError("failed to find a Feature named '%s'", name)
-			}
-
-			cloned, cerr := allEmbeddedFeaturesMap[name].Clone()
-			if cerr != nil {
-				return nil, fail.Wrap(cerr)
-			}
-
-			casted, ok = cloned.(*Feature)
-			if !ok {
-				return nil, fail.NewError("embedded feature should be a *Feature")
-			}
-			casted.displayFileName = name + ".yml [embedded]"
-
-		default:
-			return nil, fail.SyntaxError("failed to read the specification file of Feature called '%s': %s", name, err.Error())
-		}
-	} else if v.IsSet("feature") {
-		casted = newFeature(name, v.ConfigFileUsed(), v.ConfigFileUsed(), false, make(map[installmethod.Enum]Installer), v, nil)
+	featureFileInstance, xerr := LoadFeatureFile(ctx, svc, name, false)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	logrus.Tracef("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
-
-	// if we can log the sha256 of the feature, do it
-	filename := v.ConfigFileUsed()
-	if filename != "" {
-		content, err := ioutil.ReadFile(filename)
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-		logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+	featureInstance := &Feature{
+		file: featureFileInstance,
+		svc:  svc,
 	}
-
-	casted.svc = svc
-
-	return casted, nil
+	return featureInstance, nil
 }
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
+func NewEmbeddedFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -143,46 +88,29 @@ func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, fer
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	casted := FeatureNullValue()
-	if _, ok := allEmbeddedFeaturesMap[name]; !ok {
-		return casted, fail.NotFoundError("failed to find a Feature named '%s'", name)
+	featureFileInstance, xerr := LoadFeatureFile(ctx, svc, name, true)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	cloned, cerr := allEmbeddedFeaturesMap[name].Clone()
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
+	featureInstance := &Feature{
+		file: featureFileInstance,
+		svc:  svc,
 	}
 
-	var ok bool
-	casted, ok = cloned.(*Feature)
-	if !ok {
-		return nil, fail.NewError("feature is not a *Feature")
-	}
-	casted.svc = svc
-
-	// if we can log the sha256 of the feature, do it
-	if casted.fileName != "" {
-		content, err := ioutil.ReadFile(casted.fileName)
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-		logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
-	}
-
-	casted.fileName += " [embedded]"
-
-	return casted, nil
+	return featureInstance, nil
 }
 
 // IsNull tells if the instance represents a null value
 func (instance *Feature) IsNull() bool {
-	return instance == nil || instance.displayName == ""
+	return instance == nil || instance.file == nil
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (instance *Feature) Clone() (data.Clonable, error) {
-	res := FeatureNullValue()
+	res := &Feature{}
 	return res.Replace(instance)
 }
 
@@ -212,7 +140,8 @@ func (instance *Feature) GetName() string {
 	if valid.IsNil(instance) {
 		return ""
 	}
-	return instance.displayName
+
+	return instance.file.displayName
 }
 
 // GetID ...
@@ -229,7 +158,7 @@ func (instance *Feature) GetFilename() string {
 		return ""
 	}
 
-	return instance.fileName
+	return instance.file.fileName
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
@@ -237,14 +166,15 @@ func (instance *Feature) GetDisplayFilename() string {
 	if valid.IsNil(instance) {
 		return ""
 	}
-	return instance.displayFileName
+	return instance.file.displayFileName
 }
 
-// installerOfMethod instantiates the right installer corresponding to the method
-func (instance *Feature) installerOfMethod(m installmethod.Enum) Installer {
-	if valid.IsNil(instance) {
+// InstanciateInstallerOfMethod instanciates the right installer corresponding to the method
+func (instance *Feature) InstanciateInstallerOfMethod(m installmethod.Enum) Installer {
+	if instance.IsNull() {
 		return nil
 	}
+
 	var installer Installer
 	switch m {
 	case installmethod.Bash:
@@ -266,8 +196,8 @@ func (instance *Feature) Specs() *viper.Viper {
 	if valid.IsNil(instance) {
 		return &viper.Viper{}
 	}
-	roSpecs := *instance.specs
-	return &roSpecs
+
+	return instance.file.Specs()
 }
 
 // Applicable tells if the Feature is installable on the target
@@ -276,12 +206,41 @@ func (instance *Feature) Applicable(t resources.Targetable) (bool, fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
+	// 1st check Feature is suitable for target
+	switch t.TargetType() {
+	case featuretargettype.Cluster:
+		casted, ok := t.(*Cluster)
+		if !ok {
+			return false, fail.InconsistentError("failed to cast target as '*Cluster'")
+		}
+		flavor, xerr := casted.GetFlavor()
+		if xerr != nil {
+			return false, fail.Wrap(xerr, "failed to get Cluster Flavor")
+		}
+		if _, ok := instance.file.suitableFor[flavor.String()]; !ok {
+			return false, nil
+		}
+
+	case featuretargettype.Host:
+		if _, ok := instance.file.suitableFor["host"]; !ok {
+			return false, nil
+		}
+	}
+
+	// 2nd in case of a cluster, check cluster sizing requirements
+	switch t.TargetType() {
+	case featuretargettype.Cluster:
+		// FIXME: implement this
+	}
+
+	// 2nd check there is an install method the target can use
 	methods, xerr := t.InstallMethods()
 	if xerr != nil {
 		return false, xerr
 	}
+
 	for _, k := range methods {
-		installer := instance.installerOfMethod(k)
+		installer := instance.InstanciateInstallerOfMethod(k)
 		if installer != nil {
 			return true, nil
 		}
@@ -307,15 +266,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	featureName := instance.GetName()
@@ -385,21 +336,16 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	}
 
 	// -- fall back to active check
-	installer, xerr := instance.findInstallerForTarget(target, "check")
+	installer, xerr := instance.determineInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	logrus.Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
-	myV, cerr := v.FakeClone()
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
-	}
 
-	// Inits target parameters
-	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = debug.InjectPlannedFail(xerr)
+	// Inits and checks target parameters
+	myV, xerr := instance.prepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -421,17 +367,83 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	return r, xerr
 }
 
-// findInstallerForTarget isolates the available installer to use for target (one that is defined in the file and applicable on target)
-func (instance *Feature) findInstallerForTarget(target resources.Targetable, action string) (installer Installer, ferr fail.Error) {
+// prepareConditionedParameters builds a map of strings with final value set, picking it from externals if provided (otherwise, default value is set)
+// Returned error may be:
+//  - nil: everything went well
+//  - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
+func (instance Feature) prepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
+	xerr := instance.conditionParameters(ctx, externals, target)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// Inits target specific parameters
+	myV := instance.conditionedParameters.ToMap()
+	xerr = target.ComplementFeatureParameters(ctx, myV)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return myV, nil
+}
+
+// conditionParameters inits if needed the Feature parameters conditioned for final use
+// Returned error may be:
+//  - nil: everything went well
+//  - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
+func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
+	if instance.conditionedParameters == nil {
+		var xerr fail.Error
+		instance.conditionedParameters = make(ConditionedFeatureParameters)
+		for k, v := range instance.file.parameters {
+			var item ConditionedFeatureParameter
+			value, ok := externals[k].(string)
+			if ok {
+				item, xerr = NewConditionedFeatureParameter(v, &value)
+			} else {
+				value, ok := externals[instance.GetName()+":"+k].(string)
+				if ok {
+					item, xerr = NewConditionedFeatureParameter(v, &value)
+				} else {
+					item, xerr = NewConditionedFeatureParameter(v, nil)
+				}
+			}
+			if xerr != nil {
+				return xerr
+			}
+
+			instance.conditionedParameters[k] = item
+
+			if _, ok := instance.file.versionControl[k]; ok {
+				value, xerr := instance.controlledParameter(ctx, k, target)
+				if xerr != nil {
+					logrus.Error(xerr.Error())
+				} else {
+					item.controlled = true
+					item.currentValue = value
+				}
+			}
+
+		}
+	}
+
+	return nil
+}
+
+// determineInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
+func (instance *Feature) determineInstallerForTarget(target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
 	methods, xerr := target.InstallMethods()
 	if xerr != nil {
 		return nil, xerr
 	}
-	w := instance.specs.GetStringMap("feature.install")
+
+	w := instance.file.installers
 	for i := uint8(1); i <= uint8(len(methods)); i++ {
 		meth := methods[i]
 		if _, ok := w[strings.ToLower(meth.String())]; ok {
-			if installer = instance.installerOfMethod(meth); installer != nil {
+			installer = instance.InstanciateInstallerOfMethod(meth)
+			if installer != nil {
 				break
 			}
 		}
@@ -440,28 +452,6 @@ func (instance *Feature) findInstallerForTarget(target resources.Targetable, act
 		return nil, fail.NotAvailableError("failed to find a way to %s '%s'", action, instance.GetName())
 	}
 	return installer, nil
-}
-
-// checkRequiredParameters Check if required parameters defined in specification file have been set in 'v'
-func checkRequiredParameters(f Feature, v data.Map) fail.Error {
-	if f.specs.IsSet("feature.parameters") {
-		params := f.specs.GetStringSlice("feature.parameters")
-		for _, p := range params {
-			if p == "" {
-				continue
-			}
-
-			splitted := strings.Split(p, "=")
-			if _, ok := v[splitted[0]]; !ok {
-				if len(splitted) == 1 {
-					return fail.InvalidRequestError("missing value for parameter '%s'", p)
-				}
-
-				v[splitted[0]] = splitted[1]
-			}
-		}
-	}
-	return nil
 }
 
 // Add installs the Feature on the target
@@ -482,15 +472,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	featureName := instance.GetName()
@@ -505,56 +487,17 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName),
 	)()
 
-	switch ata := target.(type) {
-	case resources.Host:
-		state, xerr := ata.GetState()
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		if state != hoststate.Started {
-			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot add feature on '%s', '%s' is NOT started", targetName, targetName))
-		}
-		// FIXME: Fix deadlock
-		/*
-			case resources.Cluster:
-				state, xerr := ata.GetState()
-				if xerr != nil {
-					return nil, xerr
-				}
-
-				if state != clusterstate.Nominal {
-					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot add feature on '%s', '%s' is NOT nominal", targetName, targetName))
-				}
-		*/
-	default:
-	}
-
-	installer, xerr := instance.findInstallerForTarget(target, "check")
+	installer, xerr := instance.determineInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// 'v' may be updated by concurrent tasks, so use copy of it
-	myV, cerr := v.FakeClone()
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
-	}
-
-	// Inits target parameters
-	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = debug.InjectPlannedFail(xerr)
+	// Inits and checks target parameters
+	myV, xerr := instance.prepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// // Checks required parameters have value
-	// xerr = checkRequiredParameters(*instance, myV)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
 
 	if !s.AddUnconditionally {
 		results, xerr := instance.Check(ctx, target, v, s)
@@ -573,7 +516,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		xerr = instance.installRequirements(ctx, target, v, s)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to install requirements")
+			return nil, fail.Wrap(xerr, "failed to install dependencies")
 		}
 	}
 
@@ -583,7 +526,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		return nil, xerr
 	}
 
-	xerr = registerOnSuccessfulHostsInCluster(instance.svc, target, instance, nil, results)
+	xerr = registerOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, nil, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -612,15 +555,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	featureName := instance.GetName()
@@ -635,7 +570,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		// installer Installer
 	)
 
-	installer, xerr := instance.findInstallerForTarget(target, "check")
+	installer, xerr := instance.determineInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -646,50 +581,11 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		fmt.Sprintf("Ending removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
 	)()
 
-	switch ata := target.(type) {
-	case resources.Host:
-		state, xerr := ata.GetState()
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		if state != hoststate.Started {
-			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot remove feature on '%s', '%s' is NOT started", targetName, targetName))
-		}
-		// FIXME: Fix deadlock
-		/*
-			case resources.Cluster:
-				state, xerr := ata.GetState()
-				if xerr != nil {
-					return nil, xerr
-				}
-
-				if state != clusterstate.Nominal {
-					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot remove feature on '%s', '%s' is NOT nominal", targetName, targetName))
-				}
-		*/
-	default:
-	}
-
-	// 'v' may be updated by parallel tasks, so use copy of it
-	myV, cerr := v.FakeClone()
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
-	}
-
-	// Inits target parameters
-	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = debug.InjectPlannedFail(xerr)
+	// Inits and checks target parameters
+	myV, xerr := instance.prepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// // Checks required parameters have value
-	// xerr = checkRequiredParameters(*instance, myV)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
 
 	results, xerr = installer.Remove(ctx, instance, target, myV, s)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -697,7 +593,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return results, xerr
 	}
 
-	xerr = unregisterOnSuccessfulHostsInCluster(instance.svc, target, instance, results)
+	xerr = unregisterOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -706,27 +602,54 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	return results, target.UnregisterFeature(instance.GetName())
 }
 
-const yamlKey = "feature.requirements.features"
-
-// GetRequirements returns a list of features needed as requirements
-func (instance *Feature) GetRequirements() (map[string]struct{}, fail.Error) {
+// Dependencies returns a list of features needed as dependencies
+func (instance *Feature) Dependencies() (map[string]struct{}, fail.Error) {
 	emptyMap := map[string]struct{}{}
 	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	out := make(map[string]struct{}, len(instance.specs.GetStringSlice(yamlKey)))
-	for _, r := range instance.specs.GetStringSlice(yamlKey) {
-		out[r] = struct{}{}
-	}
-	return out, nil
+	return instance.file.getDependencies(), nil
 }
 
-// installRequirements walks through requirements and installs them if needed
+// ClusterSizingRequirements returns the cluster sizing requirements for all flavors
+// FIXME: define a type to return instead of a map[string]interface{}
+func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fail.Error) {
+	emptyMap := map[string]interface{}{}
+	if instance.IsNull() {
+		return emptyMap, fail.InvalidInstanceError()
+	}
+	if instance.file == nil {
+		return nil, fail.InvalidInstanceContentError("instance.file", "cannot be nil")
+	}
+
+	return instance.file.getClusterSizingRequirements(), nil
+}
+
+// ClusterSizingRequirementsForFlavor returns the cluster sizing requirements for specified flavors
+// returns:
+//   - nil, nil: no sizing requirements defined for the flavor
+//   - map[string]interface{}, nil: sizing requirements defined for the flavor
+//   - nil, *fail.ErrInvalidInstance: called from a null valued instance
+// FIXME: define a type to return instead of a map[string]interface{}
+func (instance *Feature) ClusterSizingRequirementsForFlavor(flavor string) (map[string]interface{}, fail.Error) {
+	emptyMap := map[string]interface{}{}
+	if instance.IsNull() {
+		return emptyMap, fail.InvalidInstanceError()
+	}
+	if instance.file == nil {
+		return nil, fail.InvalidInstanceContentError("instance.file", "cannot be nil")
+	}
+
+	return instance.file.getClusterSizingRequirementsForFlavor(flavor), nil
+}
+
+// installRequirements walks through dependencies and installs them if needed
 func (instance *Feature) installRequirements(ctx context.Context, t resources.Targetable, v data.Map, s resources.FeatureSettings) fail.Error {
-	if instance.specs.IsSet(yamlKey) {
+	requirements := instance.file.getDependencies()
+	if len(requirements) > 0 {
 		{
-			msgHead := fmt.Sprintf("Checking requirements of Feature '%s'", instance.GetName())
+			msgHead := fmt.Sprintf("Checking dependencies of Feature '%s'", instance.GetName())
 			var msgTail string
 			switch t.TargetType() {
 			case featuretargettype.Host:
@@ -740,10 +663,8 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 		}
 
 		targetIsCluster := t.TargetType() == featuretargettype.Cluster
-
-		// clone FeatureSettings to set DoNotUpdateHostMetadataInClusterContext
-		for _, requirement := range instance.specs.GetStringSlice(yamlKey) {
-			needed, xerr := NewFeature(instance.svc, requirement)
+		for requirement := range requirements {
+			needed, xerr := NewFeature(ctx, instance.svc, requirement)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to find required Feature '%s'", requirement)
@@ -774,12 +695,11 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 				}
 			}
 		}
-
 	}
 	return nil
 }
 
-func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
+func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}
@@ -795,7 +715,7 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 			}
 		}
 		for k := range successfulHosts {
-			host, xerr := LoadHost(svc, k)
+			host, xerr := LoadHost(ctx, svc, k)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -811,7 +731,7 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 	return nil
 }
 
-func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
+func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}
@@ -827,7 +747,7 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 			}
 		}
 		for k := range successfulHosts {
-			host, xerr := LoadHost(svc, k)
+			host, xerr := LoadHost(ctx, svc, k)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -852,6 +772,76 @@ func (instance Feature) ToProtocol() *protocol.FeatureResponse {
 	return out
 }
 
+// ListParametersWithControl returns a slice of parameter names that have control script
+func (instance Feature) ListParametersWithControl() []string {
+	out := make([]string, 0, len(instance.file.versionControl))
+	for k := range instance.file.versionControl {
+		out = append(out, k)
+	}
+	return out
+}
+
+// controlledParameter ...
+func (instance Feature) controlledParameter(ctx context.Context, p string, target resources.Targetable) (string, fail.Error) {
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if p == "" {
+		return "", fail.InvalidParameterCannotBeEmptyStringError("p")
+	}
+	if target == nil {
+		return "", fail.InvalidParameterCannotBeNilError("target")
+	}
+
+	if cc, ok := instance.file.versionControl[p]; ok {
+		var host resources.Host
+		switch target.TargetType() {
+		case featuretargettype.Host, featuretargettype.Node:
+			host, ok = target.(resources.Host)
+			if !ok {
+				return "", fail.InconsistentError("failed to cast target to 'resources.Host'")
+			}
+		case featuretargettype.Cluster:
+			var xerr fail.Error
+			cluster, ok := target.(*Cluster)
+			if !ok {
+				return "", fail.InconsistentError("failed to cast target to 'resources.Host'")
+			}
+
+			host, xerr = cluster.FindAvailableMaster(ctx)
+			if xerr != nil {
+				return "", xerr
+			}
+		}
+
+		cmd, xerr := replaceVariablesInString(cc, data.Map{"ParameterValue": instance.conditionedParameters[p].currentValue})
+		if xerr != nil {
+			return "", xerr
+		}
+
+		timings, xerr := instance.svc.Timings()
+		if xerr != nil {
+			return "", xerr
+		}
+
+		retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+		if xerr != nil {
+			return "", xerr
+		}
+		if retcode != 0 {
+			msg := fmt.Sprintf("failed to control value of parameter '%s'", p)
+			if stderr != "" {
+				msg += fmt.Sprintf(" (%s)", stderr)
+			}
+			return "", fail.ExecutionError(nil, msg)
+		}
+
+		return stdout, nil
+	}
+
+	return "", fail.NotFoundError("no way to control the value of parameter '%s'", p)
+}
+
 // ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
 func ExtractFeatureParameters(params []string) data.Map {
 	out := data.Map{}
@@ -864,4 +854,54 @@ func ExtractFeatureParameters(params []string) data.Map {
 		}
 	}
 	return out
+}
+
+// featureFilter represents the filter to apply on Features
+type featureFilter string
+
+const (
+	embeddedOnly    featureFilter = "embedded"
+	allWithEmbedded featureFilter = "all"
+	withoutEmbedded featureFilter = "withoutEmbedded"
+)
+
+// filterEligibleFeatures lists the available features than can be installed on target
+func filterEligibleFeatures(ctx context.Context, target resources.Targetable, filter featureFilter) ([]resources.Feature, fail.Error) {
+	if target == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("target")
+	}
+
+	// walk through the folders that may contain Feature files
+	list, xerr := walkInsideFeatureFileFolders(filter)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var out []resources.Feature
+	for _, v := range list {
+		entry, xerr := NewFeature(ctx, target.Service(), v)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// ignore a feature file not found; weird, but fs may have changed (will be handled properly later with fswatcher)
+			case *fail.ErrSyntax:
+				// When a synta error occurs, log but do not fail
+				logrus.Error(fail.Wrap(xerr, "failed to load Feature '%s'", v))
+				continue
+			default:
+				return nil, xerr
+			}
+		}
+
+		ok, xerr := entry.Applicable(target)
+		if xerr != nil {
+			return nil, xerr
+		}
+		if ok {
+			out = append(out, entry)
+		}
+	}
+
+	return out, nil
+
 }

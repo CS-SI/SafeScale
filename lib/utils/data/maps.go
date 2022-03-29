@@ -172,3 +172,12 @@ func (ilos IndexedListOfStrings) Values() []string {
 	}
 	return values
 }
+
+// ToMapStringOfString converts a map[interface{}]interface{} (something that viper may return for example) to a map[string]string
+func ToMapStringOfString(in map[interface{}]interface{}) map[string]string {
+	out := make(map[string]string)
+	for k, v := range in {
+		out[fmt.Sprintf("%v", k)] = fmt.Sprintf("%v", v)
+	}
+	return out
+}

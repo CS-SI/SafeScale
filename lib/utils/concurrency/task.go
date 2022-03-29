@@ -187,7 +187,11 @@ const (
 )
 
 // TaskFromContext extracts the task instance from context
-// If there is no task in the context, returns a VoidTask()
+// returns:
+//    - Task, nil: Task found in 'ctx'
+//    - nil, *fail.ErrNotAvailable: there is no Task value in 'ctx'
+//    - nil, *fail.ErrInconsistent: value stored as Task in "ctx' is not of type Task
+//    - nil, *ErrInvalidParameter: 'ctx' is nil
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
 		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
@@ -200,6 +204,19 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	}
 
 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
+}
+
+// TaskFromContextOrVoid extracts the task instance from context.
+// If there is no task in the context, returns a VoidTask()
+// returns:
+//    - Task, nil: Task found in 'ctx' or VoidTask() is returned
+//    - nil, *fail.ErrInconsistent: value stored as Task in 'ctx' is not of type Task
+func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
+	if ctx == nil || ctx == context.Background() {
+		return VoidTask()
+	}
+
+	return TaskFromContext(ctx)
 }
 
 // NewTask creates a new instance of Task

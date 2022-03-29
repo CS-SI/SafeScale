@@ -17,6 +17,7 @@
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -297,7 +298,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 			return fail.InvalidParameterError("instance", "should be *operations.Host")
 		}
 
-		networkInstance, xerr := subnetInstance.InspectNetwork()
+		networkInstance, xerr := subnetInstance.InspectNetwork(context.Background())
 		if xerr != nil {
 			return xerr
 		}

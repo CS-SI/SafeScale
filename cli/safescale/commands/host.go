@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/codes"
@@ -30,6 +28,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -800,7 +800,7 @@ var hostFeatureCommands = &cli.Command{
 // hostFeatureListCommand handles 'safescale host feature list'
 var hostFeatureListCommand = &cli.Command{
 	Name:      "list",
-	Aliases:   []string{"ls", "list-availables"},
+	Aliases:   []string{"ls"},
 	Usage:     "List the available features for the host",
 	ArgsUsage: "HOSTNAME",
 	Flags: []cli.Flag{
@@ -818,17 +818,22 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
+	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	clientSession, xerr := client.New(c.String("server"))
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	features, err := clientSession.Host.ListFeatures(c.Args().First(), c.Bool("all"), 0)
+	list, err := clientSession.Host.ListFeatures(hostName, c.Bool("all"), 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 	}
-	return clitools.SuccessResponse(features)
+	return clitools.SuccessResponse(list)
 }
 
 // hostFeatureInspectCommand handles 'safescale host feature inspect <cluster name or id> <feature name>'
@@ -854,11 +859,6 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
@@ -867,6 +867,11 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
+	}
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
 	details, err := clientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
@@ -880,8 +885,8 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 
 // hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
 var hostFeatureExportCommand = &cli.Command{
-	Name:      "list",
-	Aliases:   []string{"ls"},
+	Name:      "export",
+	Aliases:   []string{"dump"},
 	Usage:     "Export feature file content",
 	ArgsUsage: "",
 
@@ -905,11 +910,6 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
@@ -918,6 +918,11 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
+	}
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
 	export, err := clientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
@@ -1009,6 +1014,7 @@ var hostFeatureCheckCommand = &cli.Command{
 func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
+
 	_, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
@@ -1060,6 +1066,7 @@ var hostFeatureRemoveCommand = &cli.Command{
 func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
+
 	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)

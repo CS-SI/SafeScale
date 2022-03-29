@@ -17,28 +17,33 @@
 package cache
 
 import (
-	"sync"
+	"context"
 	"testing"
+	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 func TestEntry_Key(t *testing.T) {
 
-	var nilCache *cache = nil
-	_, err := nilCache.Entry("What")
+	var nilCache *mapStore = nil
+	_, err := nilCache.Entry(context.Background(), "What")
 	if err == nil {
 		t.Error("Should throw a fail.InvalidInstanceError")
 		t.FailNow()
 	}
 
-	nukaCola, err := NewCache("nuka")
+	nukaCola, err := NewMapStore("nuka")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
-	_, err = nukaCola.Entry("")
+	_, err = nukaCola.Entry(context.Background(), "")
 	if err == nil {
 		t.Error("Should throw a fail.InvalidParameterCannotBeEmptyStringError")
 		t.FailNow()
@@ -46,10 +51,69 @@ func TestEntry_Key(t *testing.T) {
 
 	ce := Entry{
 		content: data.NewImmutableKeyValue("ID", "Data"),
-		lock:    &sync.RWMutex{},
 		use:     0,
 	}
 	result := ce.Key()
 	require.EqualValues(t, result, "ID")
 
+}
+
+func TestEntry_LockContent(t *testing.T) {
+	content := newReservation(context.Background(), "store", "content")
+	cacheEntry := newEntry(content)
+
+	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
+
+	cacheEntry.LockContent()
+	assert.EqualValues(t, uint(1), cacheEntry.LockCount())
+
+	cacheEntry.LockContent()
+	assert.EqualValues(t, uint(2), cacheEntry.LockCount())
+
+	cacheEntry.UnlockContent()
+	assert.EqualValues(t, uint(1), cacheEntry.LockCount())
+
+	cacheEntry.UnlockContent()
+	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
+}
+
+func TestEntry_ParallelLockContent(t *testing.T) {
+	content := newReservation(context.Background(), "store", "content")
+	cacheEntry := newEntry(content)
+
+	task1, _ := concurrency.NewUnbreakableTask()
+	task2, _ := concurrency.NewUnbreakableTask()
+
+	_, _ = task1.Start(func(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+		cacheEntry.LockContent()
+		assert.Equal(t, uint(1), cacheEntry.LockCount())
+
+		time.Sleep(time.Second)
+
+		assert.Equal(t, uint(2), cacheEntry.LockCount())
+
+		cacheEntry.UnlockContent()
+
+		return nil, nil
+	}, nil)
+
+	_, _ = task2.Start(func(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+		time.Sleep(time.Millisecond * 250)
+		assert.Equal(t, uint(1), cacheEntry.LockCount())
+
+		cacheEntry.LockContent()
+		assert.Equal(t, uint(2), cacheEntry.LockCount())
+
+		time.Sleep(time.Second)
+
+		cacheEntry.UnlockContent()
+		assert.Equal(t, uint(0), cacheEntry.LockCount())
+
+		return nil, nil
+	}, nil)
+
+	_, _ = task1.Wait()
+	_, _ = task2.Wait()
+
+	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
 }

@@ -285,7 +285,7 @@ func (c cluster) RemoveFeature(clusterName, featureName string, params map[strin
 }
 
 // ListFeatures ...
-func (c cluster) ListFeatures(clusterName string, installed bool, duration time.Duration) (*protocol.FeatureListResponse, error) {
+func (c cluster) ListFeatures(clusterName string, all bool, duration time.Duration) (*protocol.FeatureListResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -302,7 +302,7 @@ func (c cluster) ListFeatures(clusterName string, installed bool, duration time.
 	request := &protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_CLUSTER,
 		TargetRef:     &protocol.Reference{Name: clusterName},
-		InstalledOnly: installed,
+		InstalledOnly: !all,
 	}
 	list, err := service.List(ctx, request)
 	if err != nil {

@@ -80,7 +80,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -172,7 +172,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}

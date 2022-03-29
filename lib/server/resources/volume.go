@@ -44,5 +44,5 @@ type Volume interface {
 	GetAttachments() (*propertiesv1.VolumeAttachments, fail.Error)                                       // returns the property containing where the volume is attached
 	GetSize() (int, fail.Error)                                                                          // returns the size of volume in GB
 	GetSpeed() (volumespeed.Enum, fail.Error)                                                            // returns the speed of the volume (more or less the type of hardware)
-	ToProtocol() (*protocol.VolumeInspectResponse, fail.Error)                                           // converts volume to equivalent protocol message
+	ToProtocol(ctx context.Context) (*protocol.VolumeInspectResponse, fail.Error)                        // converts volume to equivalent protocol message
 }

@@ -21,7 +21,30 @@ feature:
         cluster: all
 
     parameters:
-        - DockerComposeVersion=latest # docker-compose version to install
+        - name: DockerComposeVersion
+          value: latest
+          description: |-
+              docker-compose version to install (default: latest)
+          control: |
+              VERSION="{{.ParameterValue}}"
+              if [[ "latest" = "${VERSION}" ]]; then
+                  VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq -r .name") && op=$? || true
+                  [ $op -ne 0 ] && sfFail 192 "error getting latest docker-compose version"
+              fi
+              echo $VERSION
+              sfExit 0
+
+        - name: DockerHubUsername
+          value: ''
+          description: |-
+              Username to use to authenticate DockerHub (default: empty, disabling authentication)
+              Note: not handled yet
+
+        - name: DockerHubPassword
+          value: ''
+          description: |-
+              Password to use to authenticate DockerHub (default: empty, useless if DockerHubUsername is empty)
+              Note: not handle yet...
 
     install:
         bash:

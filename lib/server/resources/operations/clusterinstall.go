@@ -64,7 +64,10 @@ func (instance *Cluster) InstallMethods() (map[uint8]installmethod.Enum, fail.Er
 	}
 
 	out := make(map[uint8]installmethod.Enum)
-	instance.installMethods.Range(func(k, v interface{}) bool {
+	instance.localCache.RLock()
+	defer instance.localCache.RUnlock()
+
+	instance.localCache.installMethods.Range(func(k, v interface{}) bool {
 		var ok bool
 		out[k.(uint8)], ok = v.(installmethod.Enum)
 		return ok
@@ -174,7 +177,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 			return xerr
 		}
 
-		v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP()
+		v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -256,7 +259,7 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 
 			var item *propertiesv1.ClusterInstalledFeature
 			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.GetRequirements()
+				requirements, innerXErr := feat.Dependencies()
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -312,38 +315,38 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
-	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		list = featuresV1.Installed
-	// 		return nil
-	// 	})
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
-	//
-	// out := make([]resources.Feature, 0, len(list))
-	// for k := range list {
-	// 	item, xerr := NewFeature(instance.Service(), k)
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return emptySlice, xerr
-	// 	}
-	//
-	// 	out = append(out, item)
-	// }
-	// return out, nil
-	return nil, fail.NotImplementedError()
+	// FIXME: 'allWithEmbedded' should be passed as parameter...
+	// walk through the folders that may contain Feature files
+	list, xerr := walkInsideFeatureFileFolders(allWithEmbedded)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var out []resources.Feature
+	for _, v := range list {
+		entry, xerr := NewFeature(ctx, instance.Service(), v)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// ignore a feature file not found; weird, but fs may have changed (will be handled properly later with fswatcher)
+			default:
+				return nil, xerr
+			}
+		}
+
+		ok, xerr := entry.Applicable(instance)
+		if xerr != nil {
+			return nil, xerr
+		}
+		if ok {
+			out = append(out, entry)
+		}
+	}
+
+	return out, nil
 }
 
 // ListInstalledFeatures returns a slice of installed features
@@ -355,12 +358,12 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	list := instance.InstalledFeatures()
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// xerr := instance.Inspect(func(_ data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
 	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 	// 		if !ok {
@@ -378,7 +381,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
-		item, xerr := NewFeature(instance.Service(), v)
+		item, xerr := NewFeature(ctx, instance.Service(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr
@@ -401,7 +404,7 @@ func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -422,7 +425,7 @@ func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars dat
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	feat, xerr := NewFeature(instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -443,7 +446,7 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	feat, xerr := NewFeature(instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -473,15 +476,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return invalid, "", "", xerr
-			}
-		default:
-			return invalid, "", "", xerr
-		}
+		return invalid, "", "", xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -731,15 +726,15 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
+		return fail.Wrap(xerr, "[%s] system dependencies installation failed", hostLabel)
 	}
 	if retcode != 0 {
-		xerr = fail.ExecutionError(nil, "failed to install common node requirements")
+		xerr = fail.ExecutionError(nil, "failed to install common node dependencies")
 		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 
-	logrus.Debugf("[%s] system requirements installation successful.", hostLabel)
+	logrus.Debugf("[%s] system dependencies installation successful.", hostLabel)
 	return nil
 }
 
@@ -793,7 +788,7 @@ func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Ma
 
 	if !disabled {
 		logrus.Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
-		feat, xerr := NewFeature(instance.Service(), "edgeproxy4subnet")
+		feat, xerr := NewFeature(ctx, instance.Service(), "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -870,7 +865,7 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.M
 	if !disabled {
 		logrus.Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
 
-		feat, xerr := NewFeature(instance.Service(), "remotedesktop")
+		feat, xerr := NewFeature(ctx, instance.Service(), "remotedesktop")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -933,7 +928,7 @@ func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (f
 		logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
 
 		// 1st, Feature 'ansible'
-		feat, xerr := NewFeature(instance.Service(), "ansible")
+		feat, xerr := NewFeature(ctx, instance.Service(), "ansible")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -958,7 +953,7 @@ func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (f
 		logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
 
 		// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
-		feat, xerr = NewFeature(instance.Service(), "ansible-for-cluster")
+		feat, xerr = NewFeature(ctx, instance.Service(), "ansible-for-cluster")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1027,7 +1022,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 		return xerr
 	}
 	if !disabled {
-		feat, xerr := NewFeature(instance.Service(), "proxycache-client")
+		feat, xerr := NewFeature(ctx, instance.Service(), "proxycache-client")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1099,7 +1094,7 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 	}
 
 	if !disabled {
-		feat, xerr := NewFeature(instance.Service(), "proxycache-server")
+		feat, xerr := NewFeature(ctx, instance.Service(), "proxycache-server")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1146,7 +1141,7 @@ func (instance *Cluster) installDocker(ctx context.Context, host resources.Host,
 	}
 
 	// uses NewFeature() to let a chance to the user to use its own docker feature
-	feat, xerr := NewFeature(instance.Service(), "docker")
+	feat, xerr := NewFeature(ctx, instance.Service(), "docker")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

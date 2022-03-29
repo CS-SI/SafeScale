@@ -28,8 +28,6 @@ import (
 	txttmpl "text/template"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -45,7 +43,9 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -108,8 +108,7 @@ type worker struct {
 	settings  resources.FeatureSettings
 	startTime time.Time
 
-	host *Host
-	// node    bool
+	host    *Host
 	cluster *Cluster
 
 	availableMaster  resources.Host
@@ -312,7 +311,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 			return nil, xerr
 		}
 		for _, i := range masters {
-			hostInstance, xerr := LoadHost(w.cluster.Service(), i)
+			hostInstance, xerr := LoadHost(ctx, w.cluster.Service(), i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -364,7 +363,7 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 			return nil, xerr
 		}
 		for _, i := range list {
-			hostInstance, xerr := LoadHost(w.cluster.Service(), i)
+			hostInstance, xerr := LoadHost(ctx, w.cluster.Service(), i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -391,7 +390,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 
 	// Not in cluster context
 	if w.cluster == nil {
-		subnetInstance, xerr := w.host.GetDefaultSubnet()
+		subnetInstance, xerr := w.host.GetDefaultSubnet(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -400,7 +399,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		// look 1st for primary gateway, if not found then for the secondary gateway
 		found := true
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
-		gw, xerr := subnetInstance.InspectGateway(true)
+		gw, xerr := subnetInstance.InspectGateway(ctx, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil && xerr != nilErrNotFound {
 			if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care of in previous line
@@ -411,7 +410,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		if !found {
-			if gw, xerr = subnetInstance.InspectGateway(false); xerr != nil {
+			if gw, xerr = subnetInstance.InspectGateway(ctx, false); xerr != nil {
 				return nil, fail.NotAvailableError("no gateway available")
 			}
 		}
@@ -436,7 +435,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		var gw resources.Host
 		svc := w.cluster.Service()
-		gw, xerr = LoadHost(svc, netCfg.GatewayID)
+		gw, xerr = LoadHost(ctx, svc, netCfg.GatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil && xerr != nilErrNotFound {
 			if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care of in previous line
@@ -447,7 +446,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		if !found {
-			gw, xerr = LoadHost(svc, netCfg.SecondaryGatewayID)
+			gw, xerr = LoadHost(ctx, svc, netCfg.SecondaryGatewayID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to find an available gateway")
@@ -510,13 +509,13 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 		if xerr != nil {
 			return nil, xerr
 		}
-		rs, xerr = LoadSubnet(w.service, "", netCfg.SubnetID)
+		rs, xerr = LoadSubnet(ctx, w.service, "", netCfg.SubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 	} else {
-		rs, xerr = w.host.GetDefaultSubnet()
+		rs, xerr = w.host.GetDefaultSubnet(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -524,13 +523,13 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 	}
 
 	defer func() {
-		issue := rs.Released() // mark the instance as released at the end of the function, for cache considerations
+		issue := rs.Released() // mark the instance as unsafeReleased at the end of the function, for cache considerations
 		if issue != nil {
 			logrus.Warn(issue)
 		}
 	}()
 
-	gw, xerr := rs.InspectGateway(true)
+	gw, xerr := rs.InspectGateway(ctx, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		debug.IgnoreError(xerr)
@@ -542,7 +541,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 		}
 	}
 
-	if gw, xerr = rs.InspectGateway(false); xerr != nil {
+	if gw, xerr = rs.InspectGateway(ctx, false); xerr != nil {
 		debug.IgnoreError(xerr)
 	} else {
 		if _, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout()); xerr != nil {
@@ -581,14 +580,14 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		order    []string
 	)
 	if w.method != installmethod.None {
-		pace = w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
+		pace = w.feature.Specs().GetString(w.rootKey + "." + yamlPaceKeyword)
 		if pace == "" {
 			return nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
 		}
 
 		// 'steps' describes the steps of the action
 		stepsKey = w.rootKey + "." + yamlStepsKeyword
-		steps = w.feature.specs.GetStringMap(stepsKey)
+		steps = w.feature.Specs().GetStringMap(stepsKey)
 		if len(steps) == 0 {
 			return nil, fail.InvalidRequestError("nothing to do")
 		}
@@ -637,14 +636,14 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		return nil, xerr
 	}
 
-	w.reduceFeatureParameters(&params)
-
-	// Checks required parameters have their values
-	xerr = checkRequiredParameters(*w.feature, params)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// w.reduceFeatureParameters(&params)
+	//
+	// // Checks required parameters have their values
+	// xerr = checkRequiredParameters(*w.feature, params)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
@@ -691,7 +690,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 			continue
 		}
 
-		// Marks hosts instances as released after use
+		// Marks hosts instances as unsafeReleased after use
 		//goland:noinspection GoDeferInLoop
 		defer func(hlist []resources.Host) {
 			for _, v := range hlist {
@@ -750,30 +749,30 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 	return outcomes, nil
 }
 
-// reduceFeatureParameters cleans up params accordingly to the current context. Ensures that:
-// - every parameter that is not prefixed by feature name are kept
-// - every parameter that is prefixed by current feature name sees it's prefix removed
-// - every parameter that is not prefixed by current feature name is removed
-//
-// Example:
-//   if current feature is docker, and we have these params:
-//     - Version -> 21.03
-//     - kubernetes:Version -> 18.1
-//     - docker:HubLogin -> toto
-//   the call to this method will leave this:
-//     - Version -> 21.03
-//     - HubLogin -> toto
-func (w *worker) reduceFeatureParameters(params *data.Map) {
-	for k, v := range *params {
-		splitted := strings.Split(k, ":")
-		if len(splitted) > 1 {
-			if splitted[0] == w.feature.GetName() {
-				(*params)[splitted[1]] = v
-			}
-			delete(*params, k)
-		}
-	}
-}
+// // reduceFeatureParameters cleans up params accordingly to the current context. Ensures that:
+// // - every parameter that is not prefixed by feature name are kept
+// // - every parameter that is prefixed by current feature name sees it's prefix removed
+// // - every parameter that is not prefixed by current feature name is removed
+// //
+// // Example:
+// //   if current feature is docker, and we have these params:
+// //     - Version -> 21.03
+// //     - kubernetes:Version -> 18.1
+// //     - docker:HubLogin -> toto
+// //   the call to this method will leave this:
+// //     - Version -> 21.03
+// //     - HubLogin -> toto
+// func (w *worker) reduceFeatureParameters(params *data.Map) {
+// 	for k, v := range *params {
+// 		splitted := strings.Split(k, ":")
+// 		if len(splitted) > 1 {
+// 			if splitted[0] == w.feature.GetName() {
+// 				(*params)[splitted[1]] = v
+// 			}
+// 			delete(*params, k)
+// 		}
+// 	}
+// }
 
 type taskLaunchStepParameters struct {
 	stepName  string
@@ -885,7 +884,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	// 	return nil, nil
 	// }
 
-	// // Marks hosts instances as released after use
+	// // Marks hosts instances as unsafeReleased after use
 	// defer func() {
 	// 	for _, v := range hostsList {
 	// 		v.Released()
@@ -1030,8 +1029,8 @@ func (w *worker) validateContextForCluster() fail.Error {
 	}
 
 	const yamlKey = "feature.suitableFor.cluster"
-	if w.feature.specs.IsSet(yamlKey) {
-		yamlFlavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
+	if w.feature.Specs().IsSet(yamlKey) {
+		yamlFlavors := strings.Split(w.feature.Specs().GetString(yamlKey), ",")
 		for _, k := range yamlFlavors {
 			k = strings.ToLower(k)
 			e, xerr := clusterflavor.Parse(k)
@@ -1052,8 +1051,8 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 
 	ok := false
 	const yamlKey = "feature.suitableFor.host"
-	if w.feature.specs.IsSet(yamlKey) {
-		value := strings.ToLower(w.feature.specs.GetString(yamlKey))
+	if w.feature.Specs().IsSet(yamlKey) {
+		value := strings.ToLower(w.feature.Specs().GetString(yamlKey))
 		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
 	}
 	if ok {
@@ -1069,12 +1068,21 @@ func (w *worker) validateClusterSizing(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(clusterFlavor.String())
-	if !w.feature.specs.IsSet(yamlKey) {
+
+	// yamlKey := "feature.dependencies.clusterSizing." + strings.ToLower(clusterFlavor.String())
+	// if !w.feature.Specs().IsSet(yamlKey) {
+	// 	return nil
+	// }
+	sizing, xerr := w.feature.ClusterSizingRequirementsForFlavor(strings.ToLower(clusterFlavor.String()))
+	if xerr != nil {
+		return xerr
+	}
+
+	if sizing == nil {
+		// No sizing requirement for the cluster flavor, so everything is ok
 		return nil
 	}
 
-	sizing := w.feature.specs.GetStringMap(yamlKey)
 	if anon, ok := sizing["masters"]; ok {
 		request, ok := anon.(string)
 		if !ok {
@@ -1126,20 +1134,21 @@ func (w *worker) validateClusterSizing(ctx context.Context) (ferr fail.Error) {
 }
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
-func (w *worker) parseClusterSizingRequest(_ /*request*/ string) (int, int, float32, fail.Error) {
+func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
+	_ = request
 	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	const yamlKey = "feature.proxy.rules"
-	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
+	rules, ok := w.feature.Specs().Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
@@ -1170,13 +1179,13 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	subnetInstance, xerr := LoadSubnet(w.service, "", netprops.SubnetID)
+	subnetInstance, xerr := LoadSubnet(ctx, w.service, "", netprops.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		issue := subnetInstance.Released() // mark instance as released at the end of the function, for cache considerations
+		issue := subnetInstance.Released() // mark instance as unsafeReleased at the end of the function, for cache considerations
 		if issue != nil {
 			logrus.Warn(issue)
 		}
@@ -1235,7 +1244,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		}(hosts)
 
 		for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
-			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
+			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1276,7 +1285,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			// FIXME: Refactoring, this defer is actually dangerous
 			// each host iteration will trigger a defer function, and ALL the functions run at the same time at the end, triggered by the ferr error
 			// shared by everyone, this it clearly a bad idea, this needs refactoring
-			defer func(tag concurrency.TaskGroup, iwaited *bool, iright *bool) {
+			defer func(tag concurrency.TaskGroup, iwaited *bool, iright *bool) { // nolint
 				if ferr != nil {
 					if !*iright { // not for us
 						return
@@ -1310,7 +1319,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 
 			if secondaryKongController != nil {
-				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
+				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -1568,18 +1577,18 @@ func (w *worker) setSecurity(ctx context.Context) (ferr fail.Error) {
 
 // setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
 func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	const yamlKey = "feature.security.networking"
-	if ok := w.feature.specs.IsSet(yamlKey); !ok {
+	if ok := w.feature.Specs().IsSet(yamlKey); !ok {
 		return nil
 	}
 
-	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
+	rules, ok := w.feature.Specs().Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
@@ -1593,14 +1602,14 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 		} else {
-			rs, xerr = LoadSubnet(w.service, netprops.NetworkID, netprops.SubnetID)
+			rs, xerr = LoadSubnet(ctx, w.service, netprops.NetworkID, netprops.SubnetID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		}
 	} else if w.host != nil {
-		rs, xerr = w.host.GetDefaultSubnet()
+		rs, xerr = w.host.GetDefaultSubnet(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1608,7 +1617,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	}
 
 	defer func() {
-		issue := rs.Released() // mark instance as released at the end of the function, for cache considerations
+		issue := rs.Released() // mark instance as unsafeReleased at the end of the function, for cache considerations
 		if issue != nil {
 			logrus.Warn(issue)
 		}
@@ -1638,7 +1647,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)
 			}
 
-			gwSG, xerr := rs.InspectGatewaySecurityGroup()
+			gwSG, xerr := rs.InspectGatewaySecurityGroup(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1751,7 +1760,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	// 		}
 	// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
 	// 		domain := ""
-	// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
 	// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 	// 				hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 	// 				if !ok {
@@ -1786,7 +1795,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	// 			}
 	// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
 	// 			domain = ""
-	// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
 	// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 	// 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 	// 					if !ok {

@@ -17,12 +17,12 @@
 package operations
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -55,10 +56,10 @@ type MetadataCore struct {
 	name  atomic.Value
 	taken atomic.Value
 
-	lock       sync.RWMutex
 	shielded   *shielded.Shielded
 	properties *serializer.JSONProperties
 	observers  map[string]observer.Observer
+	sync.RWMutex
 
 	kind              string
 	folder            MetadataFolder
@@ -177,16 +178,16 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Erro
 	}
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
-	myself.lock.Lock()
-	xerr = myself.reload()
-	myself.lock.Unlock() // nolint
+	myself.Lock()
+	xerr = myself.unsafeReload()
+	myself.Unlock() // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to reload metadata")
+		return fail.Wrap(xerr, "failed to unsafeReload metadata")
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
 	return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
 		return callback(clonable, myself.properties)
@@ -209,8 +210,8 @@ func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error
 		return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
 	return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
 		return callback(clonable, myself.properties)
@@ -234,8 +235,8 @@ func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.I
 		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	// Make sure myself.properties is populated
 	if myself.properties == nil {
@@ -260,10 +261,10 @@ func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.I
 	}
 	// Reload reloads data from object storage to be sure to have the last revision
 	if doReload {
-		xerr = myself.reload()
+		xerr = myself.unsafeReload()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to reload metadata")
+			return fail.Wrap(xerr, "failed to unsafeReload metadata")
 		}
 	}
 
@@ -289,7 +290,7 @@ func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.I
 	}
 
 	// notify observers there has been changed in the instance
-	return fail.ConvertError(myself.notifyObservers())
+	return fail.ConvertError(myself.unsafeNotifyObservers())
 }
 
 // Carry links metadata with real data
@@ -322,8 +323,8 @@ func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.NotAvailableError("already carrying a value")
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	var cerr error
 	myself.shielded, cerr = shielded.NewShielded(clonable)
@@ -375,7 +376,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 	myself.taken.Store(true)
 
 	// notify observers there has been changed in the instance
-	err := myself.notifyObservers()
+	err := myself.unsafeNotifyObservers()
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return fail.ConvertError(err)
@@ -400,8 +401,8 @@ func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	xerr = myself.readByReference(ref)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -435,8 +436,8 @@ func (myself *MetadataCore) ReadByID(id string) (ferr fail.Error) {
 		return xerr
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	if myself.kindSplittedStore {
 		xerr = retry.WhileUnsuccessful(
@@ -496,12 +497,12 @@ func (myself *MetadataCore) readByID(id string) fail.Error {
 		path = byIDFolderName
 	}
 	return myself.folder.Read(path, id, func(buf []byte) fail.Error {
-		if innerXErr := myself.deserialize(buf); innerXErr != nil {
+		if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrSyntax:
-				return fail.Wrap(innerXErr, "failed to deserialize %s resource", myself.kind)
+				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
 			default:
-				return fail.Wrap(innerXErr, "failed to deserialize %s resource", myself.kind)
+				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
 			}
 		}
 		return nil
@@ -569,8 +570,8 @@ func (myself *MetadataCore) readByName(name string) fail.Error {
 		path = byNameFolderName
 	}
 	return myself.folder.Read(path, name, func(buf []byte) fail.Error {
-		if innerXErr := myself.deserialize(buf); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", myself.kind, name)
+		if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
 		}
 		return nil
 	})
@@ -579,7 +580,7 @@ func (myself *MetadataCore) readByName(name string) fail.Error {
 // write updates the metadata corresponding to the host in the Object Storage
 func (myself *MetadataCore) write() fail.Error {
 	if !myself.committed {
-		jsoned, xerr := myself.serialize()
+		jsoned, xerr := myself.unsafeSerialize()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -622,20 +623,20 @@ func (myself *MetadataCore) write() fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *MetadataCore) Reload() (ferr fail.Error) {
+func (myself *MetadataCore) Reload(ctx context.Context) (ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	return myself.reload()
+	return myself.unsafeReload()
 }
 
-// reload loads the content from the Object Storage
+// unsafeReload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (myself *MetadataCore) reload() (ferr fail.Error) {
+func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	timings, xerr := myself.Service().Timings()
@@ -644,7 +645,7 @@ func (myself *MetadataCore) reload() (ferr fail.Error) {
 	}
 
 	if myself.loaded && !myself.committed {
-		return fail.InconsistentError("cannot reload a not committed data")
+		return fail.InconsistentError("cannot unsafeReload a not committed data")
 	}
 
 	if myself.kindSplittedStore {
@@ -719,7 +720,7 @@ func (myself *MetadataCore) reload() (ferr fail.Error) {
 	myself.loaded = true
 	myself.committed = true
 
-	return fail.ConvertError(myself.notifyObservers())
+	return fail.ConvertError(myself.unsafeNotifyObservers())
 }
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
@@ -733,8 +734,8 @@ func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
 	if myself.kindSplittedStore {
 		return myself.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
@@ -754,8 +755,8 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	var (
 		idFound, nameFound bool
@@ -857,7 +858,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 		return fail.NewErrorList(errors)
 	}
 
-	myself.destroyed() // notifies cache that the instance has been deleted
+	myself.unsafeDestroyed() // notifies cache that the instance has been deleted
 	return nil
 }
 
@@ -867,15 +868,15 @@ func (myself *MetadataCore) Serialize() (_ []byte, ferr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return myself.serialize()
+	return myself.unsafeSerialize()
 }
 
-// serialize serializes instance into bytes (output json code)
+// unsafeSerialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (myself *MetadataCore) serialize() (_ []byte, ferr fail.Error) {
+func (myself *MetadataCore) unsafeSerialize() (_ []byte, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var (
@@ -932,15 +933,15 @@ func (myself *MetadataCore) Deserialize(buf []byte) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	return myself.deserialize(buf)
+	return myself.unsafeDeserialize(buf)
 }
 
-// deserialize reads json code and reinstantiates
+// unsafeDeserialize reads json code and reinstantiates
 // Note: must be called after locking the instance
-func (myself *MetadataCore) deserialize(buf []byte) (ferr fail.Error) {
+func (myself *MetadataCore) unsafeDeserialize(buf []byte) (ferr fail.Error) {
 	if myself.properties == nil {
 		var xerr fail.Error
 		myself.properties, xerr = serializer.NewJSONProperties("resources." + myself.kind)
@@ -989,7 +990,7 @@ func (myself *MetadataCore) deserialize(buf []byte) (ferr fail.Error) {
 		xerr = myself.properties.Deserialize(jsoned)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to deserialize properties")
+			return fail.Wrap(xerr, "failed to unsafeDeserialize properties")
 		}
 	}
 	return nil
@@ -997,23 +998,22 @@ func (myself *MetadataCore) deserialize(buf []byte) (ferr fail.Error) {
 
 // Released is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
-// Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (myself *MetadataCore) Released() error {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return myself.released()
+	return myself.unsafeReleased()
 }
 
-// released is used to tell cache that the instance has been used and will not be anymore.
+// unsafeReleased is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: must be called after locking the instance
-func (myself *MetadataCore) released() error {
+func (myself *MetadataCore) unsafeReleased() error {
 	id, ok := myself.id.Load().(string)
 	if !ok {
 		return fail.InconsistentError("field 'id' is not set with string")
@@ -1026,24 +1026,22 @@ func (myself *MetadataCore) released() error {
 }
 
 // Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
-// Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (myself *MetadataCore) Destroyed() error {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	myself.destroyed()
+	myself.unsafeDestroyed()
 	return nil
 }
 
-// destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
+// unsafeDestroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
-// Note: must be called after locking the instance
-func (myself *MetadataCore) destroyed() {
+func (myself *MetadataCore) unsafeDestroyed() {
 	id, ok := myself.id.Load().(string)
 	if !ok {
 		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
@@ -1065,8 +1063,8 @@ func (myself *MetadataCore) AddObserver(o observer.Observer) error {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	if pre, ok := myself.observers[o.GetID()]; ok {
 		if pre == o {
@@ -1085,15 +1083,15 @@ func (myself *MetadataCore) NotifyObservers() error {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.lock.RLock()
-	defer myself.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return myself.notifyObservers()
+	return myself.unsafeNotifyObservers()
 }
 
-// notifyObservers sends a signal to all registered Observers to notify change
+// unsafeNotifyObservers sends a signal to all registered Observers to notify change
 // Note: must be called after locking the instance
-func (myself *MetadataCore) notifyObservers() error {
+func (myself *MetadataCore) unsafeNotifyObservers() error {
 	id, ok := myself.id.Load().(string)
 	if !ok {
 		return fail.InconsistentError("field 'id' is not set with string")
@@ -1114,8 +1112,8 @@ func (myself *MetadataCore) RemoveObserver(name string) error {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	myself.lock.Lock()
-	defer myself.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	delete(myself.observers, name)
 	return nil
