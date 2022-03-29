@@ -363,7 +363,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 	list := instance.InstalledFeatures()
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 	// 		if !ok {

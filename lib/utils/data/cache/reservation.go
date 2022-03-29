@@ -47,9 +47,6 @@ func newReservation(ctx context.Context, store, key string) *reservation {
 	if xerr == nil {
 		requestor, _ = task.ID() // nolint
 	}
-	if requestor == "" {
-		requestor = "<unknown>"
-	}
 
 	return &reservation{
 		storeName:   store,
@@ -72,9 +69,16 @@ func (rc reservation) GetName() string {
 }
 
 // IsMine tells if the reservation is owned by the current task (taken from context)
+// requestor being the ID of the task that has reserved, returns:
+//    - false: if requestor is empty string and 'ctx' does contain Task instance
+//    - false: if requestor is not empty string and 'ctx' does not contain Task instance or is context.Background()
+//    - false: if requestor is not empty string and 'ctx' does contain Task instance and Task ID is not equal to requestor
+//    - true:  if requestor is empty string and 'ctx' does not contain Task instance or is equal to context.Background()
+//    - true:  if requestor is not empty string and 'ctx' does contain Task instance and Task ID is equal to requestor
 func (rc reservation) IsMine(ctx context.Context) bool {
-	if valid.IsNil(ctx) {
-		return rc.requestor == ""
+	if valid.IsNil(ctx) || ctx == context.Background() {
+		val := rc.requestor == ""
+		return val
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)

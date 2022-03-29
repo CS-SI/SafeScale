@@ -63,9 +63,10 @@ func TestSingleCache_ReserveEntry(t *testing.T) {
 	}
 	err = c2.ReserveEntry(context.Background(), "key", 3*time.Second)
 	require.NoError(t, err)
-	// VPL: second reservation will wait 3s the previous reservation expires
+
+	// Note: in same goroutine, second reservation will return *fail.ErrDuplicate
 	err = c2.ReserveEntry(context.Background(), "key", 1*time.Second)
-	require.NoError(t, err)
+	require.NotNil(t, err)
 
 }
 

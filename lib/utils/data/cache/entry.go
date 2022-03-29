@@ -32,7 +32,7 @@ import (
 type Entry struct {
 	observer.Observer
 
-	lock        *sync.Mutex
+	lock        sync.Mutex
 	use         uint
 	content     data.ImmutableKeyValue
 	lastUpdated time.Time
@@ -43,7 +43,6 @@ func newEntry(content Cacheable) Entry {
 	ce := Entry{
 		content: data.NewImmutableKeyValue(content.GetID(), content),
 		use:     0,
-		lock:    &sync.Mutex{},
 	}
 	return ce
 }

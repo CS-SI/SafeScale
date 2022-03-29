@@ -504,7 +504,7 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 
 // GetIdentity returns the identity of the Cluster
 func (instance *Cluster) GetIdentity() (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
 	}
 
@@ -516,7 +516,7 @@ func (instance *Cluster) GetIdentity() (clusterIdentity abstract.ClusterIdentity
 
 // GetFlavor returns the flavor of the Cluster
 func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -533,7 +533,7 @@ func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, ferr fail.Error
 func (instance *Cluster) GetComplexity() (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -622,7 +622,7 @@ func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

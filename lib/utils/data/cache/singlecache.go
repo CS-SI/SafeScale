@@ -60,7 +60,7 @@ func NewSingleCache(name string, store Store) (*SingleCache, fail.Error) {
 //    - nil, *fail.ErrInconsistentError: something is inconsistent in options
 //    - nil, *fail.ErrNotFoundError: no entry associated with 'key' in cache
 func (instance *SingleCache) Get(ctx context.Context, key string, options ...data.ImmutableKeyValue) (ce *Entry, ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -231,7 +231,7 @@ func (instance *SingleCache) unsafeFreeEntry(ctx context.Context, key string) fa
 
 // AddEntry ...
 func (instance *SingleCache) AddEntry(ctx context.Context, content Cacheable) (ce *Entry, xerr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

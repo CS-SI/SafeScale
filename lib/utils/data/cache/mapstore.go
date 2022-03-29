@@ -166,7 +166,7 @@ func (instance *mapStore) Reserve(ctx context.Context, key string, timeout time.
 			}
 		} else {
 			if reservation.IsMine(ctx) {
-				return fail.InconsistentError("cannot reserve key '%s' in Store '%s', current task has already done it", key, instance.GetName())
+				return fail.DuplicateError("cannot reserve key '%s' in Store '%s' twice", key, instance.GetName())
 			}
 
 			tracer.Trace("found reservation that may not be committed, waiting for the reservation to disappear")
