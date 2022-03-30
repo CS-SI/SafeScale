@@ -129,7 +129,6 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
-
 	_ = cacheEntry.LockContent()
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
@@ -144,7 +143,7 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
 	return networkInstance, nil
 }

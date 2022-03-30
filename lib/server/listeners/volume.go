@@ -302,9 +302,6 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 
 	volumeInstance, xerr := volumefactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); ok {
-			return nil, abstract.ResourceNotFoundError("volume", ref)
-		}
 		return nil, xerr
 	}
 

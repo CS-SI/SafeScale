@@ -193,10 +193,10 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 	}
 
 	var ok bool
-	if shareInstance, ok = cacheEntry.Content().(resources.Share); !ok {
+	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
-	if shareInstance == nil {
+	if rs == nil {
 		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
@@ -214,9 +214,9 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
-	return shareInstance, nil
+	return rs, nil
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'

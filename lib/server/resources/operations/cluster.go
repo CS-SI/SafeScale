@@ -211,12 +211,7 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...
 		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
 	}
 
-	_ = cacheEntry.LockContent()
-	defer func() {
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
+	cacheEntry.LockContent()
 
 	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
 	if updateCachedInformation && cacheEntry.LockCount() > 1 {

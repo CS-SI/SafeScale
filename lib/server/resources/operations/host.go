@@ -162,12 +162,9 @@ func LoadHost(ctx context.Context, svc iaas.Service, ref string, options ...data
 	if hostInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
-	_ = cacheEntry.LockContent()
+	_ = ce.LockContent()
 	defer func() {
-		if ferr != nil {
-			ferr = debug.InjectPlannedFail(ferr)
-			_ = cacheEntry.UnlockContent()
-		}
+		_ = ce.UnlockContent()
 	}()
 
 	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
@@ -223,7 +220,9 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError(
+					"'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
 			}
 
 			if len(hnV2.IPv4Addresses) > 0 {
@@ -255,6 +254,11 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
+				}
+				if instance.publicIP != "" {
+					instance.accessIP = instance.publicIP
+				} else {
+					instance.accessIP = instance.privateIP
 				}
 
 				gwErr := gwInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -326,13 +330,44 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 					if gwErr != nil {
 						return gwErr
 					}
+
+					// Secondary gateway may not exist...
+					rgw, xerr = subnetInstance.unsafeInspectGateway(false)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// continue
+							debug.IgnoreError(xerr)
+						default:
+							return xerr
+						}
+					} else {
+						gwErr = rgw.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+							gwahc, ok := clonable.(*abstract.HostCore)
+							if !ok {
+								return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							}
+
+							secondaryGatewayConfig = &system.SSHConfig{
+								PrivateKey: gwahc.PrivateKey,
+								Port:       int(gwahc.SSHPort),
+								IPAddress:  rgw.(*Host).accessIP,
+								Hostname:   rgw.GetName(),
+								User:       opUser,
+							}
+							return nil
+						})
+						if gwErr != nil {
+							return gwErr
+						}
+					}
 				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
 			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
 
 		instance.localCache.sshProfile = &system.SSHConfig{
 			Port:                   int(ahc.SSHPort),
@@ -364,7 +399,31 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 					index++
 					instance.localCache.installMethods.Store(index, installmethod.Dnf)
 				}
+				if systemV1.Type == "linux" {
+					switch systemV1.Flavor {
+					case "centos", "redhat":
+						index++
+						instance.installMethods.Store(index, installmethod.Yum)
+					case "debian":
+						fallthrough
+					case "ubuntu":
+						index++
+						instance.installMethods.Store(index, installmethod.Apt)
+					case "fedora", "rhel":
+						index++
+						instance.installMethods.Store(index, installmethod.Dnf)
+					}
+				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
 			}
+
+			index++
+			instance.installMethods.Store(index, installmethod.Bash)
+			index++
+			instance.installMethods.Store(index, installmethod.None)
 			return nil
 		})
 		if innerXErr != nil {
@@ -581,7 +640,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -598,7 +657,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
-			return fail.NotFoundErrorWithCause(xerr, nil, "metadata of Host '%s' not found; Host deleted?", instance.GetName())
+			return fail.NotFoundError("metadata of Host '%s' not found; Host deleted?", instance.GetName())
 		default:
 			return xerr
 		}
@@ -641,7 +700,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 			return innerXErr
 		}
 
-		// Updates Host property propertiesv1.HostNetworking
+		// Updates Host property propertiesv1.HostNetworking from "ground" (Cloud Provider side)
 		innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -665,6 +724,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		if innerXErr != nil {
 			return innerXErr
 		}
+
 		if !changed {
 			return fail.AlteredNothingError()
 		}
@@ -1581,7 +1641,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 	return nil
 }
 
-func (instance *Host) thePhaseDoesSomething(_ context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
+func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
 	// assume yes
 	result := true
 

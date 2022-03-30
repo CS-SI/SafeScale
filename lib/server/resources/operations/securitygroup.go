@@ -185,7 +185,7 @@ func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, option
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
 	return sgInstance, nil
 }

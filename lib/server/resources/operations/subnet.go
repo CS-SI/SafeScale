@@ -318,6 +318,15 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 		return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 	}
 
+	// FIXME: The reload problem
+	// VPL: what state of Subnet would you like to be updated by Reload?
+	/*
+		xerr = subnetInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	// -- deal with instance not found and unable to create --
 	if subnetInstance == nil {
 		if networkRef != "" {
