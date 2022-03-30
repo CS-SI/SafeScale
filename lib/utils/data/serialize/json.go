@@ -177,9 +177,8 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 	}
 
 	x.RLock()
-	defer x.RUnlock()
-
 	clone, err := item.Clone()
+	x.RUnlock() //nolint
 	if err != nil {
 		return fail.Wrap(err)
 	}

@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
@@ -49,10 +48,8 @@ func TestEntry_Key(t *testing.T) {
 		t.FailNow()
 	}
 
-	ce := Entry{
-		content: data.NewImmutableKeyValue("ID", "Data"),
-		use:     0,
-	}
+	content := newReservation(context.Background(), "store", "ID")
+	ce := newEntry(content)
 	result := ce.Key()
 	require.EqualValues(t, result, "ID")
 
