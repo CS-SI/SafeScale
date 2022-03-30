@@ -67,10 +67,9 @@ func (instance *Subnet) unsafeInspectGateway(ctx context.Context, primary bool) 
 		instance.localCache.RLock()
 		out = instance.localCache.gateways[gwIdx]
 		instance.localCache.RUnlock() //nolint
-	}
-
-	if out == nil {
-		return nil, fail.NotFoundError("failed to find gateway")
+		if out == nil {
+			return nil, fail.NotFoundError("failed to find gateway")
+		}
 	}
 
 	return out, nil
