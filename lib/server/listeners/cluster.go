@@ -218,9 +218,9 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 	defer func() {
-		derr := instance.Released()
-		if derr != nil {
-			logrus.Warn(derr)
+		issue := instance.Released()
+		if issue != nil {
+			logrus.Warn(issue)
 		}
 	}()
 

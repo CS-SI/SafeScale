@@ -119,7 +119,6 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
-
 	_ = cacheEntry.LockContent()
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
@@ -128,13 +127,14 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		}
 	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
+	// FIXME: The reload problem
+	// VPL: what state of a Network/VPC would you like to be updated by Reload?
+	/*
 		xerr = networkInstance.Reload()
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
 	return networkInstance, nil
 }

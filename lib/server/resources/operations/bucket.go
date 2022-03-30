@@ -121,11 +121,6 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, ferr fail.Er
 	}
 
 	_ = cacheEntry.LockContent()
-	defer func() {
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
 
 	return b, nil
 }
@@ -211,7 +206,9 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through Bucket metadata folder and executes a callback for each entry
-func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error) (ferr fail.Error) {
+func (instance *bucket) Browse(
+	ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value

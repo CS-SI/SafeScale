@@ -20,10 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	volumefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/volume"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
@@ -300,20 +297,11 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(job.Service(), ref)
+	handler := VolumeHandler(job)
+	rv, xerr := handler.Inspect(ref)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); ok {
-			return nil, abstract.ResourceNotFoundError("volume", ref)
-		}
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := volumeInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	return volumeInstance.ToProtocol()
+	return rv.ToProtocol()
 }

@@ -296,18 +296,18 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 				_ = cacheEntry.UnlockContent()
 			}
 		}()
-
-		// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-		if cacheEntry.LockCount() > 1 {
-			xerr = subnetInstance.Reload()
-			if xerr != nil {
-				return nil, xerr
-			}
-		}
-
 	} else {
 		return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 	}
+
+	// FIXME: The reload problem
+	// VPL: what state of Subnet would you like to be updated by Reload?
+	/*
+		xerr = subnetInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
 
 	// -- deal with instance not found and unable to create --
 	if subnetInstance == nil {

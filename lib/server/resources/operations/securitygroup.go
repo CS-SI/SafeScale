@@ -170,13 +170,14 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		}
 	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
+	// FIXME: The reload problem
+	// VPL: what state of Security Group would you like to be updated by Reload?
+	/*
 		xerr = sgInstance.Reload()
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
 	return sgInstance, nil
 }

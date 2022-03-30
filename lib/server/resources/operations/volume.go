@@ -81,7 +81,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, ferr fail.Error) {
+func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -120,11 +120,11 @@ func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, 
 	}
 
 	var ok bool
-	volumeInstance, ok = cacheEntry.Content().(resources.Volume)
+	rv, ok = cacheEntry.Content().(resources.Volume)
 	if !ok {
 		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
 	}
-	if volumeInstance == nil {
+	if rv == nil {
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
 
@@ -136,15 +136,16 @@ func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, 
 		}
 	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
-		xerr = volumeInstance.Reload()
+	// FIXME: The reload problem
+	// VPL: what state of Volume would you like to be updated by Reload?
+	/*
+		xerr = rv.Reload()
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
-	return volumeInstance, nil
+	return rv, nil
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'

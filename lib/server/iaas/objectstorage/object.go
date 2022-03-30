@@ -143,7 +143,6 @@ func (instance *object) Reload() fail.Error {
 			return fail.ConvertError(err)
 		}
 	}
-
 	return instance.reloadFromItem(item)
 }
 

@@ -144,7 +144,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, ferr fail.Error) {
+func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -183,10 +183,10 @@ func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, fer
 	}
 
 	var ok bool
-	if shareInstance, ok = cacheEntry.Content().(resources.Share); !ok {
+	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
-	if shareInstance == nil {
+	if rs == nil {
 		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
@@ -198,15 +198,16 @@ func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, fer
 		}
 	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if cacheEntry.LockCount() > 1 {
-		xerr = shareInstance.Reload()
+	// FIXME: The reload problem
+	// VPL: what state of Share would you like to be updated by Reload?
+	/*
+		xerr = rs.Reload()
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	*/
 
-	return shareInstance, nil
+	return rs, nil
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
