@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
@@ -40,6 +38,7 @@ import (
 	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -143,7 +142,7 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 		if xerr != nil {
 			return nil, xerr
 		}
-	*/
+	}
 
 	return networkInstance, nil
 }

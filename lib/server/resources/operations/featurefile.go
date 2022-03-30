@@ -918,8 +918,19 @@ func reduceFilename(name string) string {
 	return strings.TrimLeft(last, "/")
 }
 
-// StartFeatureFileWatcher creates the Feature File cache and inits the watcher
+// StartFeatureFileWatcher inits the watcher of Feature File changes
 func StartFeatureFileWatcher() {
+	// Starts go routine watching changes in Feature File folders
+	go func() {
+		err := watchFeatureFileFolders(context.Background())
+		if err != nil {
+			logrus.Error(err)
+		}
+	}()
+}
+
+// init creates the FeatureFile cache
+func init() {
 	store, xerr := cache.NewMapStore("store:" + featureFileKind)
 	if xerr != nil {
 		panic(xerr.Error())
@@ -929,12 +940,4 @@ func StartFeatureFileWatcher() {
 	if xerr != nil {
 		panic(xerr.Error())
 	}
-
-	// Starts go routine watching changes in Feature File folders
-	go func() {
-		err := watchFeatureFileFolders(context.Background())
-		if err != nil {
-			logrus.Error(err)
-		}
-	}()
 }

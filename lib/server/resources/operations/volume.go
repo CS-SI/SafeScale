@@ -129,11 +129,11 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 	}
 
 	var ok bool
-	rv, ok = cacheEntry.Content().(resources.Volume)
+	volumeInstance, ok = cacheEntry.Content().(resources.Volume)
 	if !ok {
 		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
 	}
-	if rv == nil {
+	if volumeInstance == nil {
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
 
@@ -151,9 +151,9 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		if xerr != nil {
 			return nil, xerr
 		}
-	*/
+	}
 
-	return rv, nil
+	return volumeInstance, nil
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'

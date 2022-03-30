@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	volumefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/volume"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"

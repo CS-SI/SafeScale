@@ -445,7 +445,13 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 
 	v["PublicIP"], xerr = instance.GetPublicIP(ctx)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// Host may not have Public IP, ignore this error
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
 	}
 
 	if _, ok := v["Username"]; !ok {

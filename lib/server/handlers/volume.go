@@ -173,7 +173,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	objv, xerr := volumefactory.Load(handler.job.Service(), ref)
+	objv, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
