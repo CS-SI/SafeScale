@@ -234,7 +234,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 	var pgw, sgw *protocol.Host
 	gwIDs := subnet.GetGatewayIds()
 
-	var gateways = make([]map[string]string, len(gwIDs))
+	var gateways = make(map[string]string, len(gwIDs))
 	if len(gwIDs) > 0 {
 		pgw, err = session.Host.Inspect(gwIDs[0], temporal.ExecutionTimeout())
 		if err != nil {
@@ -246,7 +246,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 			xerr := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
-		gateways[0] = map[string]string{pgw.Name: pgw.Id}
+		gateways[pgw.Name] = pgw.Id
 	}
 	if len(gwIDs) > 1 {
 		sgw, err = session.Host.Inspect(gwIDs[1], temporal.ExecutionTimeout())
@@ -255,7 +255,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
-		gateways[1] = map[string]string{sgw.Name: sgw.Id}
+		gateways[sgw.Name] = sgw.Id
 	}
 	if len(gateways) > 0 {
 		switch subnetContext {
@@ -1058,41 +1058,17 @@ var subnetList = &cli.Command{
 		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "list of subnets", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
 		}
 		var result []map[string]interface{}
 		subnets := resp.GetSubnets()
 		if len(subnets) > 0 {
 			jsoned, err := json.Marshal(subnets)
 			if err != nil {
-				return clitools.FailureResponse(
-					clitools.ExitOnRPC(
-						strprocess.Capitalize(
-							client.DecorateTimeoutError(
-								err, "list of subnets", false,
-							).Error(),
-						),
-					),
-				)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
 			}
 			if err := json.Unmarshal(jsoned, &result); err != nil {
-				return clitools.FailureResponse(
-					clitools.ExitOnRPC(
-						strprocess.Capitalize(
-							client.DecorateTimeoutError(
-								err, "list of subnets", false,
-							).Error(),
-						),
-					),
-				)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
 			}
 			for _, v := range result {
 				delete(v, "gateway_ids")
@@ -1196,15 +1172,7 @@ var subnetInspect = &cli.Command{
 		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "inspection of subnet", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
 		}
 
 		// Convert struct to map using struct to json then json to map
@@ -1221,6 +1189,9 @@ var subnetInspect = &cli.Command{
 		if err = queryGatewaysInformation(clientSession, subnet, mapped, true); err != nil {
 			return err
 		}
+
+		mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
+		mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
 		return clitools.SuccessResponse(mapped)
 	},
 }

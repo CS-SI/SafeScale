@@ -961,8 +961,7 @@ func (instance *Cluster) createHostResources(
 
 	// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
 	if haveSecondaryGateway && primaryGateway.GetID() == secondaryGateway.GetID() {
-		return fail.InconsistentError("primary and secondary gateways have the same idea %s", primaryGateway.GetID())
-		haveSecondaryGateway = false
+		return fail.InconsistentError("primary and secondary gateways have the same id %s", primaryGateway.GetID())
 	}
 
 	_, xerr = primaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
