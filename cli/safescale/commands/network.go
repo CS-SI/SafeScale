@@ -1191,7 +1191,6 @@ var subnetInspect = &cli.Command{
 		}
 
 		mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
-		mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
 		return clitools.SuccessResponse(mapped)
 	},
 }
