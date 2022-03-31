@@ -960,8 +960,8 @@ func (instance *Cluster) createHostResources(
 	}
 
 	// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
-	if primaryGateway.GetID() == secondaryGateway.GetID() {
-		logrus.Errorf("We have a primary gateway with name %s and id %s and a secondary gateway with name %s and id %s", primaryGateway.GetName(), primaryGateway.GetID(), secondaryGateway.GetName(), secondaryGateway.GetID())
+	if haveSecondaryGateway && primaryGateway.GetID() == secondaryGateway.GetID() {
+		return fail.InconsistentError("primary and secondary gateways have the same idea %s", primaryGateway.GetID())
 		haveSecondaryGateway = false
 	}
 

@@ -489,12 +489,11 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		if xerr != nil {
 			return xerr
 		}
-		defer func() {
-			issue := gwInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
+		defer func(h resources.Host) {
+			if derr := h.Released(); derr != nil {
+				logrus.Warn(derr)
 			}
-		}()
+		}(gwInstance)
 
 		v["PrimaryGatewayIP"], xerr = gwInstance.GetPrivateIP(ctx)
 		if xerr != nil {

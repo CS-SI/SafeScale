@@ -989,19 +989,6 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 					return xerr
 				}
 			}
-
-			xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				abstractSubnet, ok := clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, primaryGateway.GetID())
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
 		}
 	}
 
@@ -1039,20 +1026,6 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				return fail.InvalidParameterError("result[userdata] shoulde be a *userdate.Content")
 			}
 			secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-
-			// register gateway id in subnet metadata
-			xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				abstractSubnet, ok := clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, secondaryGateway.GetID())
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
 
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
