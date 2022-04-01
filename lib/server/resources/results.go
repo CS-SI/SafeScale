@@ -18,6 +18,10 @@ package resources
 
 import "github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.UnitResult -o mocks/mock_unitresult.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.UnitResults -o mocks/mock_unitresults.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Results -o mocks/mock_results.go
+
 // UnitResult ...
 type UnitResult interface {
 	Successful() bool

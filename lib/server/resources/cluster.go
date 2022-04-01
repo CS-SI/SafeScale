@@ -31,6 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Cluster -o mocks/mock_cluster.go
+
 // IndexedListOfClusterNodes ...
 type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
 

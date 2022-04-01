@@ -10,6 +10,7 @@ generate:
 	@(mkdir -p mocks) || true
 	@(cd enums && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))
+	@(GO) generate .
 
 vet:
 	@$(GO) vet ./...

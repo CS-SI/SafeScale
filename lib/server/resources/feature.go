@@ -27,6 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Feature -o mocks/mock_feature.go
+
 // Targetable is an interface that target must satisfy to be able to install something on it
 type Targetable interface {
 	data.Identifiable

@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Network -o mocks/mock_network.go
+
 // Network links Object Storage folder and Network
 type Network interface {
 	Metadata

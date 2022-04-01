@@ -31,6 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Subnet -o mocks/mock_subnet.go
+
 // Subnet links Object Storage folder and Network
 type Subnet interface {
 	Metadata

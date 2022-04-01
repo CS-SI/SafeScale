@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
+
 // SecurityGroupActivation represents activation state of a Security Group
 type SecurityGroupActivation bool
 
