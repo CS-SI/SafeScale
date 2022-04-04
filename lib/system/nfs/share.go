@@ -87,7 +87,7 @@ func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
 		"Options": s.Options,
 	}
 
-	if _, xerr := executeScript(ctx, timings, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
+	if _, xerr := executeScript(ctx, timings, s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
 		return fail.Wrap(xerr, "failed to export a shared directory")
 	}
 	return nil

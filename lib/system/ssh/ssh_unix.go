@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package system
+package ssh
 
 import "syscall"
 

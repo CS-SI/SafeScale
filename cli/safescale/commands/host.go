@@ -21,19 +21,20 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/client"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const hostCmdLabel = "host"
@@ -453,7 +454,7 @@ var hostSSH = cli.Command{
 	},
 }
 
-func formatSSHConfig(in system.SSHConfig) (map[string]interface{}, fail.Error) {
+func formatSSHConfig(in ssh.Config) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
 		return nil, fail.ConvertError(err)

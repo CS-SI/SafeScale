@@ -19,21 +19,38 @@ package converters
 // Contains functions that are used to convert from system
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-// SSHConfigFromSystemToProtocol converts a system.SSHConfig into a SshConfig
-func SSHConfigFromSystemToProtocol(from *system.SSHConfig) *protocol.SshConfig {
-	var gw *protocol.SshConfig
-	if from.GatewayConfig != nil {
-		gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)
+// SSHConfigFromSystemToProtocol converts a system.Config into a SshConfig
+func SSHConfigFromSystemToProtocol(from ssh.Config) (*protocol.SshConfig, fail.Error) {
+	var pgw, sgw *protocol.SshConfig
+	pgwConf, xerr := from.PrimaryGatewayConfig()
+	if xerr == nil && pgwConf != nil {
+		pgw, xerr = SSHConfigFromSystemToProtocol(pgwConf)
 	}
-	return &protocol.SshConfig{
-		Gateway:    gw,
-		Host:       from.IPAddress,
-		Port:       int32(from.Port),
-		PrivateKey: from.PrivateKey,
-		User:       from.User,
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	sgwConf, xerr := from.SecondaryGatewayConfig()
+	if xerr == nil && sgwConf != nil {
+		sgw, xerr = SSHConfigFromSystemToProtocol(sgwConf)
+	}
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := protocol.SshConfig{
+		HostName:         from.Hostname(),
+		Host:             from.IPAddress(),
+		Port:             int32(from.Port()),
+		PrivateKey:       from.PrivateKey(),
+		User:             from.User(),
+		Gateway:          pgw,
+		SecondaryGateway: sgw,
+	}
+	return &out, nil
 }

@@ -21,36 +21,37 @@ package converters
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
-	var pgw, sgw *system.SSHConfig
+// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.Config
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) (ssh.Config, fail.Error) {
+	var (
+		pgw, sgw ssh.Config
+		xerr     fail.Error
+	)
 	if from.Gateway != nil {
-		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
+		pgw, xerr = SSHConfigFromProtocolToSystem(from.Gateway)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
 	if from.SecondaryGateway != nil {
-		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
+		sgw, xerr = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
-	return &system.SSHConfig{
-		User:                   from.User,
-		Hostname:               from.HostName,
-		IPAddress:              from.Host,
-		PrivateKey:             from.PrivateKey,
-		Port:                   int(from.Port),
-		GatewayConfig:          pgw,
-		SecondaryGatewayConfig: sgw,
-	}
+	return ssh.NewConfig(from.HostName, from.Host, uint(from.Port), from.User, from.PrivateKey, pgw, sgw)
 }
 
 // FeatureSettingsFromProtocolToResource ...
