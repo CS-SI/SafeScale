@@ -179,7 +179,7 @@ func uploadContentToFile(
 	ctx context.Context, content, name, owner, rights string, host resources.Host,
 ) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
-	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return "", xerr
 	}

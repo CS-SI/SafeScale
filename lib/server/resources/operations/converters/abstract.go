@@ -17,15 +17,17 @@
 package converters
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // Contains the function used to convert from abstract structures
@@ -259,26 +261,42 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 }
 
 // SSHConfigFromAbstractToProtocol ...
-func SSHConfigFromAbstractToProtocol(in ssh.Profile) *protocol.SshConfig {
+func SSHConfigFromAbstractToProtocol(in ssh.Config) (*protocol.SshConfig, fail.Error) {
+	if valid.IsNil(in) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
-	if in.GatewayConfig != nil {
-		pbPrimaryGateway = SSHConfigFromAbstractToProtocol(*in.GatewayConfig)
+	gwSSHConf, xerr := in.PrimaryGatewayConfig()
+	if xerr == nil && !valid.IsNil(gwSSHConf) {
+		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
-	if in.SecondaryGatewayConfig != nil {
-		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig)
+	gwSSHConf, xerr = in.SecondaryGatewayConfig()
+	if xerr == nil && !valid.IsNil(gwSSHConf) {
+		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
-	if in.Port == 0 {
-		in.Port = 22
+
+	port := in.Port()
+	if port == 0 {
+		port = 22
 	}
-	return &protocol.SshConfig{
-		HostName:         in.Hostname,
-		User:             in.User,
-		Host:             in.IPAddress,
-		Port:             int32(in.Port),
-		PrivateKey:       in.PrivateKey,
+
+	out := protocol.SshConfig{
+		HostName:         in.Hostname(),
+		User:             in.User(),
+		Host:             in.IPAddress(),
+		Port:             int32(port),
+		PrivateKey:       in.PrivateKey(),
 		Gateway:          pbPrimaryGateway,
 		SecondaryGateway: pbSecondaryGateway,
 	}
+	return &out, nil
 }
 
 // HostStatusFromAbstractToProtocol ...
