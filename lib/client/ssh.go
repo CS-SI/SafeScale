@@ -28,20 +28,20 @@ import (
 	"strings"
 	"time"
 
+	ssh2 "github.com/CS-SI/SafeScale/v21/lib/system/ssh"
+	utils2 "github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // ssh is the part of the safescale client that handles SSH stuff
@@ -83,7 +83,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 				return innerXErr
 			}
 
-			defer func(cmd *ssh.Command) {
+			defer func(cmd *ssh2.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerErr != nil {
@@ -146,7 +146,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Profile, fail.Error) {
+func (s ssh) getHostSSHConfig(hostname string) (*ssh2.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -425,7 +425,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 }
 
 // getSSHConfigFromName ...
-func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Profile, fail.Error) {
+func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*ssh2.Config, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -476,7 +476,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 	}
 
 	if sshCfg.GatewayConfig == nil {
-		sshCfg.GatewayConfig = &ssh.Profile{
+		sshCfg.GatewayConfig = &ssh2.Config{
 			User:          sshCfg.User,
 			IPAddress:     sshCfg.IPAddress,
 			Hostname:      sshCfg.Hostname,
@@ -516,7 +516,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	}
 
 	if sshCfg.GatewayConfig == nil {
-		sshCfg.GatewayConfig = &ssh.Profile{
+		sshCfg.GatewayConfig = &ssh2.Config{
 			User:          sshCfg.User,
 			IPAddress:     sshCfg.IPAddress,
 			Hostname:      sshCfg.Hostname,
