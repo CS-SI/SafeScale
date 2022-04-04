@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -542,7 +543,7 @@ var hostSSH = cli.Command{
 	},
 }
 
-func formatSSHConfig(in ssh.Profile) (map[string]interface{}, fail.Error) {
+func formatSSHConfig(in ssh.Config) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
 		return nil, fail.ConvertError(err)

@@ -21,19 +21,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
 	"github.com/stretchr/testify/require"
-
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func Test_HostTemplateToHostEffectiveSizing(t *testing.T) {
@@ -469,32 +468,32 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gw_scfg := ssh.Profile{
-		Hostname:               "Profile GW Hostname",
-		IPAddress:              "Profile GW Hostname",
+	gw_scfg := ssh.Config{
+		Hostname:               "Config GW Hostname",
+		IPAddress:              "Config GW Hostname",
 		Port:                   42,
-		User:                   "Profile GW Hostname",
-		PrivateKey:             "Profile GW Hostname",
+		User:                   "Config GW Hostname",
+		PrivateKey:             "Config GW Hostname",
 		LocalPort:              43,
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	gw2_scfg := ssh.Profile{
-		Hostname:               "Profile GW2 Hostname",
-		IPAddress:              "Profile GW2 Hostname",
+	gw2_scfg := ssh.Config{
+		Hostname:               "Config GW2 Hostname",
+		IPAddress:              "Config GW2 Hostname",
 		Port:                   0,
-		User:                   "Profile GW2 Hostname",
-		PrivateKey:             "Profile GW2 Hostname",
+		User:                   "Config GW2 Hostname",
+		PrivateKey:             "Config GW2 Hostname",
 		LocalPort:              45,
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	scfg := ssh.Profile{
-		Hostname:               "Profile Hostname",
-		IPAddress:              "Profile Hostname",
+	scfg := ssh.Config{
+		Hostname:               "Config Hostname",
+		IPAddress:              "Config Hostname",
 		Port:                   46,
-		User:                   "Profile Hostname",
-		PrivateKey:             "Profile Hostname",
+		User:                   "Config Hostname",
+		PrivateKey:             "Config Hostname",
 		LocalPort:              47,
 		GatewayConfig:          &gw_scfg,
 		SecondaryGatewayConfig: &gw2_scfg,
