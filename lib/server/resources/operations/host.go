@@ -312,7 +312,6 @@ func (instance *Host) updateCachedInformation() fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
-
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
