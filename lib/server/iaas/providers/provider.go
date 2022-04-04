@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_providerapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers.Provider
+//go:generate minimock -o mocks/mock_providerapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers.Provider
 
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack

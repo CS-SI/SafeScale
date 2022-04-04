@@ -7,6 +7,7 @@ all: generate
 generate:
 	@(mkdir -p mocks) || true
 	@(mkdir -p data/mocks) || true
+	@(mkdir -p data/cache/mocks) || true
 	@$(GO) generate -run stringer ./...
 	@echo "package valid" > ./valid/consts.go
 	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go

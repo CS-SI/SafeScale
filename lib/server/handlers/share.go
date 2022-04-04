@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ShareHandler
+//go:generate minimock -o mocks/mock_share.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ShareHandler
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 

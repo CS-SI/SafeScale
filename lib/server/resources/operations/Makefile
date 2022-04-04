@@ -5,7 +5,8 @@ include ../../../../common.mk
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
 generate: clean
-	@:
+	@(mkdir -p mocks) || true
+	@$(GO) generate ./...
 
 vet:
 	@$(GO) vet ./...
