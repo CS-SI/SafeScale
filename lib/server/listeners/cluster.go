@@ -1160,7 +1160,7 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 		}
 	}()
 
-	xerr = hostInstance.Stop(ctx)
+	xerr = hostInstance.Stop(job.Context())
 	return empty, xerr
 }
 
@@ -1212,7 +1212,7 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 		}
 	}()
 
-	masterList, xerr := clusterInstance.ListMasters(ctx)
+	masterList, xerr := clusterInstance.ListMasters(job.Context())
 	if xerr != nil {
 		return empty, xerr
 	}

@@ -340,7 +340,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	var taskErr fail.Error
 	subtasks := map[string]concurrency.Task{}
 	for _, h := range hosts {
-		clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v)
+		clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v) // FIXME: Profile this
 		taskErr = debug.InjectPlannedFail(taskErr)
 		if taskErr != nil {
 			abErr := tg.AbortWithCause(taskErr)

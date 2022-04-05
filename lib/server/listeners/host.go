@@ -556,7 +556,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 
 	// Gather host state from Cloud Provider
-	state, xerr := hostInstance.ForceGetState(ctx)
+	state, xerr := hostInstance.ForceGetState(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}

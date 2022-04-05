@@ -80,7 +80,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -88,7 +88,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var innerXErr fail.Error
-		outcomes, innerXErr = feat.Add(ctx, instance, vars, settings)
+		outcomes, innerXErr = feat.Add(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -149,13 +149,13 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Check(ctx, instance, vars, settings)
+	return feat.Check(task.Context(), instance, vars, settings)
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
@@ -197,14 +197,14 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		outcomes, innerXErr := feat.Remove(ctx, instance, vars, settings)
+		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}

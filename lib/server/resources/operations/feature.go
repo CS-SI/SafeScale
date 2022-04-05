@@ -345,7 +345,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	logrus.Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(ctx, v, target)
+	myV, xerr := instance.prepareParameters(task.Context(), v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -357,7 +357,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	// 	return nil, xerr
 	// }
 	//
-	r, xerr := installer.Check(ctx, instance, target, myV, s)
+	r, xerr := installer.Check(task.Context(), instance, target, myV, s)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -432,12 +432,13 @@ func (instance *Feature) conditionParameters(ctx context.Context, externals data
 }
 
 // determineInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
-func (instance *Feature) determineInstallerForTarget(target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
+func (instance *Feature) determineInstallerForTarget(target resources.Targetable, action string) (_ Installer, ferr fail.Error) {
 	methods, xerr := target.InstallMethods()
 	if xerr != nil {
 		return nil, xerr
 	}
 
+	var installer Installer
 	w := instance.file.installers
 	for i := uint8(1); i <= uint8(len(methods)); i++ {
 		meth := methods[i]
@@ -494,13 +495,13 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	}
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(ctx, v, target)
+	myV, xerr := instance.prepareParameters(task.Context(), v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	if !s.AddUnconditionally {
-		results, xerr := instance.Check(ctx, target, v, s)
+		results, xerr := instance.Check(task.Context(), target, v, s)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check Feature '%s'", featureName)
@@ -513,20 +514,20 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	}
 
 	if !s.SkipFeatureRequirements {
-		xerr = instance.installRequirements(ctx, target, v, s)
+		xerr = instance.installRequirements(task.Context(), target, v, s)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to install dependencies")
 		}
 	}
 
-	results, xerr := installer.Add(ctx, instance, target, myV, s)
+	results, xerr := installer.Add(task.Context(), instance, target, myV, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = registerOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, nil, results)
+	xerr = registerOnSuccessfulHostsInCluster(task.Context(), instance.svc, target, instance, nil, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -582,18 +583,18 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	)()
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(ctx, v, target)
+	myV, xerr := instance.prepareParameters(task.Context(), v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	results, xerr = installer.Remove(ctx, instance, target, myV, s)
+	results, xerr = installer.Remove(task.Context(), instance, target, myV, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return results, xerr
 	}
 
-	xerr = unregisterOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, results)
+	xerr = unregisterOnSuccessfulHostsInCluster(task.Context(), instance.svc, target, instance, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

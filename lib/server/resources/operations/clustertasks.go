@@ -60,10 +60,9 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
 	}
-	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
-	existing, xerr := LoadCluster(ctx, instance.Service(), req.Name)
+	existing, xerr := LoadCluster(task.Context(), instance.Service(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -81,7 +80,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Create first metadata of Cluster after initialization
-	xerr = instance.firstLight(ctx, req)
+	xerr = instance.firstLight(task.Context(), req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -161,7 +160,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
 			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
-			if derr := subnetInstance.Delete(context.Background()); derr != nil {
+			if derr := subnetInstance.Delete(task.Context()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Subnet is considered as a successful deletion, continue
@@ -177,7 +176,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					subnetInstance.GetName())
 				if req.NetworkID == "" {
 					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
-					if derr := networkInstance.Delete(context.Background()); derr != nil {
+					if derr := networkInstance.Delete(task.Context()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Network is considered as a successful deletion, continue
@@ -278,7 +277,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}()
 
 	// configure Cluster as a whole
-	xerr = instance.configureCluster(ctx, req)
+	xerr = instance.configureCluster(task.Context(), req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -477,7 +476,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	}
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if imageQuery == "" && makers.DefaultImage != nil {
 		imageQuery = makers.DefaultImage(instance)
 	}
@@ -647,7 +646,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	// Creates Network
 	var networkInstance resources.Network
 	if req.NetworkID != "" {
-		networkInstance, xerr = LoadNetwork(ctx, svc, req.NetworkID)
+		networkInstance, xerr = LoadNetwork(task.Context(), svc, req.NetworkID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)
@@ -666,7 +665,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			return nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")
 		}
 
-		xerr = networkInstance.Create(ctx, networkReq)
+		xerr = networkInstance.Create(task.Context(), networkReq)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)
@@ -674,8 +673,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 
 		defer func() {
 			if ferr != nil && !req.KeepOnFailure {
-				// Using context.Background() here disables abort
-				if derr := networkInstance.Delete(context.Background()); derr != nil {
+				if derr := networkInstance.Delete(task.Context()); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// missing Network is considered as a successful deletion, continue
@@ -737,7 +735,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, xerr
 	}
 
-	xerr = subnetInstance.Create(ctx, subnetReq, "", gatewaysDef)
+	xerr = subnetInstance.Create(task.Context(), subnetReq, "", gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -765,7 +763,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			}
 			subnetInstance = newSubnetInstance // replace the external reference
 
-			if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
+			if subXErr := subnetInstance.Create(task.Context(), subnetReq, "", gatewaysDef); subXErr != nil {
 				return nil, nil, fail.Wrap(
 					subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)",
 					subnetReq.Name, subnetReq.CIDR, networkInstance.GetName(), req.CIDR,
@@ -784,7 +782,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := subnetInstance.Delete(context.Background()); derr != nil {
+			if derr := subnetInstance.Delete(task.Context()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Subnet is considered as a successful deletion, continue
@@ -812,14 +810,14 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			primaryGateway, innerXErr := subnetInstance.InspectGateway(ctx, true)
+			primaryGateway, innerXErr := subnetInstance.InspectGateway(task.Context(), true)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			var secondaryGateway resources.Host
 			if !gwFailoverDisabled {
-				secondaryGateway, innerXErr = subnetInstance.InspectGateway(ctx, false)
+				secondaryGateway, innerXErr = subnetInstance.InspectGateway(task.Context(), false)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -880,7 +878,6 @@ func (instance *Cluster) createHostResources(
 		return fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ctx := task.Context()
 	var startedTasks []concurrency.Task
 
 	timings, xerr := instance.Service().Timings()
@@ -939,14 +936,14 @@ func (instance *Cluster) createHostResources(
 		mastersStatus, privateNodesStatus fail.Error
 	)
 
-	primaryGateway, xerr = subnet.InspectGateway(ctx, true)
+	primaryGateway, xerr = subnet.InspectGateway(task.Context(), true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	haveSecondaryGateway := true
-	secondaryGateway, xerr = subnet.InspectGateway(ctx, false)
+	secondaryGateway, xerr = subnet.InspectGateway(task.Context(), false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -964,14 +961,14 @@ func (instance *Cluster) createHostResources(
 		return fail.InconsistentError("primary and secondary gateways have the same id %s", primaryGateway.GetID())
 	}
 
-	_, xerr = primaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
+	_, xerr = primaryGateway.WaitSSHReady(task.Context(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
 	if haveSecondaryGateway {
-		_, xerr = secondaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
+		_, xerr = secondaryGateway.WaitSSHReady(task.Context(), timings.ExecutionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
@@ -1606,7 +1603,7 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.ConfigureGateway != nil {
 		xerr = makers.ConfigureGateway(instance)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1858,7 +1855,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	svc := instance.Service()
-	subnet, xerr := LoadSubnet(ctx, svc, "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task.Context(), svc, "", netCfg.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1912,7 +1909,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			if derr := hostInstance.Delete(context.Background()); derr != nil {
+			if derr := hostInstance.Delete(task.Context()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
@@ -2054,8 +2051,6 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ctx := task.Context()
-
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
@@ -2090,7 +2085,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 	for i, master := range masters {
 		captured := i
 		capturedMaster := master
-		host, xerr := LoadHost(ctx, instance.Service(), capturedMaster.ID)
+		host, xerr := LoadHost(task.Context(), instance.Service(), capturedMaster.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			loadErrors = append(loadErrors, xerr)
@@ -2218,7 +2213,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	// Configure master for flavor
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.ConfigureMaster != nil {
 		xerr = makers.ConfigureMaster(instance, p.Index, p.Host)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2441,7 +2436,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	svc := instance.Service()
-	subnet, xerr := LoadSubnet(ctx, svc, "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task.Context(), svc, "", netCfg.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2493,7 +2488,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			if derr := hostInstance.Delete(context.Background()); derr != nil {
+			if derr := hostInstance.Delete(task.Context()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
@@ -2817,7 +2812,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	// Now configures node specifically for Cluster flavor
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.ConfigureNode == nil {
 		return nil, nil
 	}
@@ -2876,7 +2871,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 		}
 	}
 
-	return nil, deleteHostOnFailure(hostInstance)
+	return nil, deleteHostOnFailure(task.Context(), hostInstance)
 }
 
 type taskDeleteNodeParameters struct {
@@ -3037,16 +3032,16 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteHostOnFailureParameters'")
 	}
 
-	return nil, deleteHostOnFailure(casted.host)
+	return nil, deleteHostOnFailure(task.Context(), casted.host)
 }
 
 // deleteHostOnFailure deletes a Host with appropriate logs
-func deleteHostOnFailure(instance resources.Host) fail.Error {
+func deleteHostOnFailure(ctx context.Context, instance resources.Host) fail.Error {
 	prefix := "Cleaning up on failure, "
 	hostName := instance.GetName()
 	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 
-	xerr := instance.Delete(context.Background())
+	xerr := instance.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
