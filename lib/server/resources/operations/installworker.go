@@ -599,14 +599,14 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 	switch w.action {
 	case installaction.Add:
 		if !settings.SkipProxy {
-			xerr = w.setReverseProxy(ctx)
+			xerr = w.setReverseProxy(task.Context())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
 			}
 		}
 
-		xerr := w.setSecurity(ctx)
+		xerr := w.setSecurity(task.Context())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
@@ -1158,7 +1158,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
-	rgw, xerr := w.identifyAvailableGateway(ctx)
+	rgw, xerr := w.identifyAvailableGateway(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1244,7 +1244,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		}(hosts)
 
 		for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
-			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
+			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task.Context())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1319,7 +1319,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 
 			if secondaryKongController != nil {
-				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
+				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task.Context())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -1602,14 +1602,14 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 		} else {
-			rs, xerr = LoadSubnet(ctx, w.service, netprops.NetworkID, netprops.SubnetID)
+			rs, xerr = LoadSubnet(task.Context(), w.service, netprops.NetworkID, netprops.SubnetID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		}
 	} else if w.host != nil {
-		rs, xerr = w.host.GetDefaultSubnet(ctx)
+		rs, xerr = w.host.GetDefaultSubnet(task.Context())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1647,7 +1647,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)
 			}
 
-			gwSG, xerr := rs.InspectGatewaySecurityGroup(ctx)
+			gwSG, xerr := rs.InspectGatewaySecurityGroup(task.Context())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

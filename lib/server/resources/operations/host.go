@@ -875,7 +875,7 @@ func (instance *Host) Create(
 			if !ok {
 				return nil, fail.InconsistentError("failed to cast 'defaultSubnet' to '*Subnet'")
 			}
-			hostReq.DefaultRouteIP, xerr = s.unsafeGetDefaultRouteIP(ctx)
+			hostReq.DefaultRouteIP, xerr = s.unsafeGetDefaultRouteIP(task.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -1068,7 +1068,7 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	xerr = instance.updateCachedInformation(ctx)
+	xerr = instance.updateCachedInformation(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1152,7 +1152,7 @@ func (instance *Host) Create(
 	}
 
 	// Unbind default security group if needed
-	networkInstance, xerr := defaultSubnet.InspectNetwork(ctx)
+	networkInstance, xerr := defaultSubnet.InspectNetwork(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2009,7 +2009,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
 	}
 
-	xerr = instance.updateCachedInformation(ctx)
+	xerr = instance.updateCachedInformation(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2580,7 +2580,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				continue
 			}
 
-			loopErr = shareInstance.Delete(ctx)
+			loopErr = shareInstance.Delete(task.Context())
 			if loopErr != nil {
 				return loopErr
 			}
@@ -2772,7 +2772,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			return xerr
 		}
 
-		xerr = singleSubnetInstance.Delete(ctx)
+		xerr = singleSubnetInstance.Delete(task.Context())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -2935,7 +2935,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 
 	var stdout, stderr string
 	retcode := -1
-	sshProfile, xerr := instance.GetSSHConfig(ctx)
+	sshProfile, xerr := instance.GetSSHConfig(task.Context())
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
@@ -3173,7 +3173,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload(ctx)
+	xerr = instance.unsafeReload(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3260,7 +3260,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload(ctx)
+	xerr = instance.unsafeReload(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3342,13 +3342,13 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Stop(ctx)
+	xerr = instance.Stop(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = instance.Start(ctx)
+	xerr = instance.Start(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

@@ -440,13 +440,13 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 		return xerr
 	}
 
-	xerr = networkCache.ReserveEntry(ctx, ref, timings.OperationTimeout())
+	xerr = networkCache.ReserveEntry(task.Context(), ref, timings.OperationTimeout())
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
 		if ferr != nil {
-			derr := networkCache.FreeEntry(ctx, ref)
+			derr := networkCache.FreeEntry(task.Context(), ref)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", ref))
 			}
@@ -603,7 +603,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 
 					subnetName := subnetInstance.GetName()
 
-					xerr = subnetInstance.Delete(ctx)
+					xerr = subnetInstance.Delete(task.Context())
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
@@ -830,7 +830,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	parentNetwork, xerr := subnet.InspectNetwork(ctx)
+	parentNetwork, xerr := subnet.InspectNetwork(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

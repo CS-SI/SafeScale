@@ -1651,7 +1651,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 		return nil, xerr
 	}
 
-	return instance.unsafeFindAvailableMaster(ctx)
+	return instance.unsafeFindAvailableMaster(task.Context())
 }
 
 // ListNodes lists node instances corresponding to the nodes in the Cluster
@@ -1791,7 +1791,7 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.unsafeListNodeIDs(ctx)
+	return instance.unsafeListNodeIDs(task.Context())
 }
 
 // ListNodeIPs lists the IPs of the nodes in the Cluster
@@ -1857,7 +1857,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.unsafeFindAvailableNode(ctx)
+	return instance.unsafeFindAvailableNode(task.Context())
 }
 
 // LookupNode tells if the ID of the master passed as parameter is a node
