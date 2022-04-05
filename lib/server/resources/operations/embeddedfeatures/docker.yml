@@ -116,10 +116,10 @@ feature:
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry "sfApt update"
-                                    sfRetry "sfApt remove -y docker docker-engine docker.io containerd runc"
+                                    sfRetry "dpkg --remove --force-remove-reinstreq docker docker-engine docker.io containerd runc"
                                     ;;
                                 centos|redhat)
-                                    sfRetry "yum remove -y docker docker-client ocker-client-latest \
+                                    sfRetry "yum remove -y docker docker-client docker-client-latest \
                                                                    docker-common docker-latest docker-latest-logrotate \
                                                                    docker-logrotate docker-engine"
                                     ;;
@@ -130,7 +130,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 192
+                                    sfFail 192 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
                             sfExit
