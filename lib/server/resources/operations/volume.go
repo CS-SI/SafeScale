@@ -788,7 +788,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
 
 			// Create mount point
-			sshConfig, deeperXErr := host.GetSSHConfig(ctx)
+			sshConfig, deeperXErr := host.GetSSHConfig(task.Context())
 			if deeperXErr != nil {
 				return deeperXErr
 			}
@@ -1185,7 +1185,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 			}
 
 			// -- Unmount the Block Device ...
-			sshConfig, innerXErr := host.GetSSHConfig(ctx)
+			sshConfig, innerXErr := host.GetSSHConfig(task.Context())
 			if innerXErr != nil {
 				return innerXErr
 			}

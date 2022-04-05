@@ -1752,8 +1752,6 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
-	ctx := task.Context()
-
 	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
@@ -1880,7 +1878,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, xerr
 	}
 
-	hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(ctx)
+	hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1937,7 +1935,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 					// Recover public IP of the master if it exists
 					var inErr fail.Error
-					node.PublicIP, inErr = hostInstance.GetPublicIP(ctx)
+					node.PublicIP, inErr = hostInstance.GetPublicIP(task.Context())
 					if inErr != nil {
 						switch inErr.(type) {
 						case *fail.ErrNotFound:
@@ -1948,7 +1946,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 					}
 
 					// Recover the private IP of the master that MUST exist
-					node.PrivateIP, inErr = hostInstance.GetPrivateIP(ctx)
+					node.PrivateIP, inErr = hostInstance.GetPrivateIP(task.Context())
 					if inErr != nil {
 						return inErr
 					}
@@ -2340,8 +2338,6 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	ctx := task.Context()
-
 	// Convert then validate parameters
 	p, ok := params.(taskCreateNodeParameters)
 	if !ok {
@@ -2457,7 +2453,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, xerr
 	}
 
-	hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(ctx)
+	hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2521,7 +2517,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 					node = nodesV3.ByNumericalID[nodeIdx]
 					node.ID = hostInstance.GetID()
 					var inErr fail.Error
-					node.PublicIP, inErr = hostInstance.GetPublicIP(ctx)
+					node.PublicIP, inErr = hostInstance.GetPublicIP(task.Context())
 					if inErr != nil {
 						switch inErr.(type) {
 						case *fail.ErrNotFound:
@@ -2531,7 +2527,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 						}
 					}
 
-					if node.PrivateIP, inErr = hostInstance.GetPrivateIP(ctx); inErr != nil {
+					if node.PrivateIP, inErr = hostInstance.GetPrivateIP(task.Context()); inErr != nil {
 						return inErr
 					}
 

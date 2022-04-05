@@ -451,7 +451,7 @@ func (instance *Share) Create(
 	}
 
 	// Installs NFS getServer software if needed
-	sshConfig, xerr := server.GetSSHConfig(ctx)
+	sshConfig, xerr := server.GetSSHConfig(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -477,7 +477,7 @@ func (instance *Share) Create(
 
 			if len(serverSharesV1.ByID) == 0 {
 				// Host doesn't have shares yet, so install NFS
-				xerr = nfsServer.Install(ctx)
+				xerr = nfsServer.Install(task.Context())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -753,7 +753,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(ctx)
+	rhServer, xerr := instance.unsafeGetServer(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -761,7 +761,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	// serverID = rhServer.ID()
 	// serverName = rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -850,7 +850,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	targetSSHConfig, xerr := target.GetSSHConfig(ctx)
+	targetSSHConfig, xerr := target.GetSSHConfig(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1051,14 +1051,14 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		return xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(ctx)
+	rhServer, xerr := instance.unsafeGetServer(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	serverName := rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1100,7 +1100,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 			}
 
 			// Unmount Share from client
-			sshConfig, inErr := target.GetSSHConfig(ctx)
+			sshConfig, inErr := target.GetSSHConfig(task.Context())
 			if inErr != nil {
 				return inErr
 			}
@@ -1110,7 +1110,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 				return inErr
 			}
 
-			inErr = nfsClient.Unmount(ctx, instance.Service(), serverPrivateIP+":"+hostShare.Path)
+			inErr = nfsClient.Unmount(task.Context(), instance.Service(), serverPrivateIP+":"+hostShare.Path)
 			if inErr != nil {
 				return inErr
 			}
@@ -1195,7 +1195,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	objserver, xerr := instance.unsafeGetServer(ctx)
+	objserver, xerr := instance.unsafeGetServer(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1246,7 +1246,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
 			}
 
-			sshConfig, xerr := objserver.GetSSHConfig(ctx)
+			sshConfig, xerr := objserver.GetSSHConfig(task.Context())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

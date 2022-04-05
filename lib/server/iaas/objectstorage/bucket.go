@@ -90,11 +90,6 @@ func newBucket(location stow.Location) (bucket, fail.Error) {
 	return bucket{stowLocation: location}, nil
 }
 
-// NullBucket returns a bucket instance corresponding to null value
-func NullBucket() Bucket {
-	return &bucket{}
-}
-
 // IsNull tells if the bucket corresponds to its null value
 func (instance *bucket) IsNull() bool {
 	return instance == nil || instance.stowLocation == nil

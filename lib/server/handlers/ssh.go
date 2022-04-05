@@ -119,7 +119,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		user = abstract.DefaultUser
 	}
 
-	ip, xerr := host.GetAccessIP(ctx)
+	ip, xerr := host.GetAccessIP(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -231,12 +231,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(ctx); xerr != nil {
+			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
 			var gwcfg *system.SSHConfig
-			if gwcfg, xerr = gw.GetSSHConfig(ctx); xerr != nil {
+			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
@@ -275,12 +275,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(ctx); xerr != nil {
+			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
 			var gwcfg *system.SSHConfig
-			if gwcfg, xerr = gw.GetSSHConfig(ctx); xerr != nil {
+			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
@@ -344,21 +344,19 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	}
 
 	task := handler.job.Task()
-	ctx := handler.job.Context()
-
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef)
+	host, xerr := hostfactory.Load(task.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, xerr := host.GetSSHConfig(ctx)
+	ssh, xerr := host.GetSSHConfig(task.Context())
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

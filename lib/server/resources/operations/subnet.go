@@ -527,7 +527,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	// --- Updates Subnet state in metadata ---
-	xerr = instance.unsafeFinalizeSubnetCreation(ctx)
+	xerr = instance.unsafeFinalizeSubnetCreation(task.Context())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure in 'unsafe' finalizing subnet creation")
 	}
@@ -938,7 +938,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 			}
 		}
 
-		pubIP, innerXErr := host.GetPublicIP(ctx)
+		pubIP, innerXErr := host.GetPublicIP(task.Context())
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
