@@ -115,7 +115,7 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 
 	// recover Subnets from metadata
 	var list []*abstract.Subnet
-	xerr = subnetInstance.Browse(ctx, func(abstractSubnet *abstract.Subnet) fail.Error {
+	xerr = subnetInstance.Browse(task.Context(), func(abstractSubnet *abstract.Subnet) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
@@ -488,7 +488,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.unsafeCreateSubnet(ctx, req)
+	xerr = instance.unsafeCreateSubnet(task.Context(), req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure in 'unsafe' creating subnet")
@@ -512,7 +512,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	defer func() {
 		if ferr != nil {
 			if instance != nil {
-				derr := instance.unsafeUpdateSubnetStatus(ctx, subnetstate.Error)
+				derr := instance.unsafeUpdateSubnetStatus(task.Context(), subnetstate.Error)
 				if derr != nil {
 					_ = ferr.AddConsequence(derr)
 				}
@@ -521,7 +521,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}()
 
 	// --- Create the gateway(s) ---
-	xerr = instance.unsafeCreateGateways(ctx, req, gwname, gwSizing, nil)
+	xerr = instance.unsafeCreateGateways(task.Context(), req, gwname, gwSizing, nil)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure in 'unsafe' creating gateways")
 	}
@@ -586,7 +586,7 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 				return derr
 			}
 
-			derr = sg.UnbindFromHost(context.Background(), host)
+			derr = sg.UnbindFromHost(ctx, host)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
@@ -927,12 +927,12 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		}
 
 		if subnetAbstract.InternalSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Service(), subnetAbstract.InternalSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(task.Context(), instance.Service(), subnetAbstract.InternalSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			innerXErr = sgInstance.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+			innerXErr = sgInstance.BindToHost(task.Context(), host, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -954,12 +954,12 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		}
 
 		if !isGateway && pubIP != "" && subnetAbstract.PublicIPSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Service(), subnetAbstract.PublicIPSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(task.Context(), instance.Service(), subnetAbstract.PublicIPSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			innerXErr = sgInstance.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+			innerXErr = sgInstance.BindToHost(task.Context(), host, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1049,7 +1049,7 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, ferr
 			}
 			svc := instance.Service()
 			for id := range shV1.ByID {
-				hostInstance, innerErr := LoadHost(ctx, svc, id)
+				hostInstance, innerErr := LoadHost(task.Context(), svc, id)
 				if innerErr != nil {
 					return innerErr
 				}
@@ -1280,7 +1280,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(ctx, svc, k, WithoutReloadOption); innerXErr != nil {
+					if hostInstance, innerXErr := LoadHost(task.Context(), svc, k, WithoutReloadOption); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
 						err := hostInstance.Released()
@@ -1321,7 +1321,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		}
 
 		// 1st delete gateway(s)
-		gwIDs, innerXErr := instance.deleteGateways(ctx, as)
+		gwIDs, innerXErr := instance.deleteGateways(task.Context(), as)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -1350,7 +1350,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, subnetHosts, ssgV1)
+			innerXErr := instance.onRemovalUnbindSecurityGroups(task.Context(), subnetHosts, ssgV1)
 			return innerXErr
 		})
 		if innerXErr != nil {
@@ -1360,7 +1360,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		// 4st free CIDR index if the Subnet has been created for a single Host
 		if as.SingleHostCIDRIndex > 0 {
 			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-			networkInstance, innerXErr := LoadNetwork(ctx, instance.Service(), as.Network)
+			networkInstance, innerXErr := LoadNetwork(task.Context(), instance.Service(), as.Network)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1378,7 +1378,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		}
 
 		// Delete Subnet's own Security Groups
-		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
+		return instance.deleteSecurityGroups(task.Context(), [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1833,7 +1833,7 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resour
 				return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
 			}
 
-			if innerXErr := sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, enabled, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			if innerXErr := sgInstanceImpl.unsafeBindToSubnet(task.Context(), abstractSubnet, subnetHosts, enabled, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -2009,7 +2009,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 					return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
 				}
 
-				if innerXErr = sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
+				if innerXErr = sgInstanceImpl.unsafeBindToSubnet(task.Context(), abstractSubnet, subnetHosts, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrDuplicate:
 						// security group already bound to Subnet with the same state, considered as a success
@@ -2116,7 +2116,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 					return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
 				}
 
-				if innerXErr = sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
+				if innerXErr = sgInstanceImpl.unsafeBindToSubnet(task.Context(), abstractSubnet, subnetHosts, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// security group not bound to Subnet, considered as a success
@@ -2237,14 +2237,14 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.unsafeCreateSubnet(ctx, req)
+	xerr = instance.unsafeCreateSubnet(task.Context(), req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// --- Updates Subnet state in metadata ---
-	xerr = instance.unsafeFinalizeSubnetCreation(ctx)
+	xerr = instance.unsafeFinalizeSubnetCreation(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	return xerr
 }

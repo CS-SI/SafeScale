@@ -175,7 +175,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.BucketRequest
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
 
-	return resp.ToProtocol(ctx)
+	return resp.ToProtocol(job.Context())
 }
 
 // Mount a bucket on the filesystem of the host

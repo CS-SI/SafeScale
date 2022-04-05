@@ -395,7 +395,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if xerr != nil {
 		return xerr
 	}
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.unsafeUpdateClusterInventory(task.Context())
 	if xerr != nil {
 		return xerr
 	}
@@ -1308,9 +1308,9 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	// configure what has to be done Cluster-wide
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.ConfigureCluster != nil {
-		xerr = makers.ConfigureCluster(ctx, instance, parameters)
+		xerr = makers.ConfigureCluster(task.Context(), instance, parameters)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1324,7 +1324,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	// At last join nodes to Cluster
-	xerr = instance.joinNodesFromList(ctx, nodes)
+	xerr = instance.joinNodesFromList(task.Context(), nodes)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1332,7 +1332,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	hosts := make([]resources.Host, 0, len(nodes))
 	for _, v := range nodes {
-		hostInstance, xerr := LoadHost(ctx, svc, v.ID)
+		hostInstance, xerr := LoadHost(task.Context(), svc, v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1340,7 +1340,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hosts = append(hosts, hostInstance)
 	}
 
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.unsafeUpdateClusterInventory(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1429,9 +1429,9 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 
 	var selectedMaster resources.Host
 	if selectedMasterID != "" {
-		selectedMaster, xerr = LoadHost(ctx, instance.Service(), selectedMasterID)
+		selectedMaster, xerr = LoadHost(task.Context(), instance.Service(), selectedMasterID)
 	} else {
-		selectedMaster, xerr = instance.unsafeFindAvailableMaster(ctx)
+		selectedMaster, xerr = instance.unsafeFindAvailableMaster(task.Context())
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1466,7 +1466,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
-	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host), WithReloadOption)
+	xerr = instance.deleteNode(task.Context(), node, selectedMaster.(*Host), WithReloadOption)
 	if xerr != nil {
 		return xerr
 	}
@@ -2023,7 +2023,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 		return nil, fail.NotFoundError("failed to find node %s in Cluster '%s'", hostID, instance.GetName())
 	}
 
-	return LoadHost(ctx, instance.Service(), hostID)
+	return LoadHost(task.Context(), instance.Service(), hostID)
 }
 
 // deleteMaster deletes the master specified by its ID
@@ -2101,7 +2101,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 	}()
 
 	// Finally delete host
-	xerr = host.Delete(ctx)
+	xerr = host.Delete(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2194,7 +2194,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	}()
 
 	// Deletes node
-	hostInstance, xerr := LoadHost(ctx, instance.Service(), nodeRef, loadHostMethod)
+	hostInstance, xerr := LoadHost(task.Context(), instance.Service(), nodeRef, loadHostMethod)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2206,7 +2206,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	} else {
 		// host still exists, leave it from Cluster, if master is not null
 		if master != nil && !valid.IsNil(master) {
-			xerr = instance.leaveNodesFromList(ctx, []resources.Host{hostInstance}, master)
+			xerr = instance.leaveNodesFromList(task.Context(), []resources.Host{hostInstance}, master)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -2214,7 +2214,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 
 			instance.localCache.RLock()
 			makers := instance.localCache.makers
-			instance.localCache.RUnlock() //nolint
+			instance.localCache.RUnlock() // nolint
 			if makers.UnconfigureNode != nil {
 				xerr = makers.UnconfigureNode(instance, hostInstance, master)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2225,7 +2225,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 		}
 
 		// Finally delete host
-		xerr = hostInstance.Delete(ctx)
+		xerr = hostInstance.Delete(task.Context())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -2503,7 +2503,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// --- Deletes the Network, Subnet and gateway ---
-	networkInstance, deleteNetwork, subnetInstance, xerr := instance.extractNetworkingInfo(ctx)
+	networkInstance, deleteNetwork, subnetInstance, xerr := instance.extractNetworkingInfo(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2530,7 +2530,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
-				innerXErr := subnetInstance.Delete(ctx)
+				innerXErr := subnetInstance.Delete(task.Context())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotAvailable, *fail.ErrNotFound:
@@ -2573,7 +2573,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
-				innerXErr := networkInstance.Delete(ctx)
+				innerXErr := networkInstance.Delete(task.Context())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound, *fail.ErrInvalidRequest:
@@ -2700,21 +2700,21 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 
 	// Install reverse-proxy feature on Cluster (gateways)
 	parameters := ExtractFeatureParameters(req.FeatureParameters)
-	xerr = instance.installReverseProxy(ctx, parameters)
+	xerr = instance.installReverseProxy(task.Context(), parameters)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Install remote-desktop feature on Cluster (all masters)
-	xerr = instance.installRemoteDesktop(ctx, parameters)
+	xerr = instance.installRemoteDesktop(task.Context(), parameters)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Install ansible feature on Cluster (all masters)
-	xerr = instance.installAnsible(ctx, parameters)
+	xerr = instance.installAnsible(task.Context(), parameters)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2723,9 +2723,9 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 	// configure what has to be done Cluster-wide
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.ConfigureCluster != nil {
-		return makers.ConfigureCluster(ctx, instance, parameters)
+		return makers.ConfigureCluster(task.Context(), instance, parameters)
 	}
 
 	// Not finding a callback isn't an error, so return nil in this case
@@ -2735,7 +2735,7 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 func (instance *Cluster) determineRequiredNodes() (uint, uint, uint, fail.Error) {
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.MinimumRequiredServers != nil {
 		g, m, n, xerr := makers.MinimumRequiredServers(func() abstract.ClusterIdentity { out, _ := instance.unsafeGetIdentity(); return out }())
 		xerr = debug.InjectPlannedFail(xerr)
@@ -3095,10 +3095,10 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 	// may fail (depending on the Cluster Flavor)
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.JoinNodeToCluster != nil {
 		for _, v := range nodes {
-			hostInstance, xerr := LoadHost(ctx, instance.Service(), v.ID)
+			hostInstance, xerr := LoadHost(task.Context(), instance.Service(), v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -3131,7 +3131,7 @@ func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resourc
 	// may fail (depending on the Cluster Flavor)
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.LeaveNodeFromCluster != nil {
 		var xerr fail.Error
 		for _, node := range hosts {
@@ -3483,7 +3483,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			return emptySlice, xerr
 		}
 
-		selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
+		selectedMaster, xerr := instance.unsafeFindAvailableMaster(task.Context())
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -3513,7 +3513,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	if len(errors) > 0 {
 		return emptySlice, fail.NewErrorList(errors)
 	}
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.unsafeUpdateClusterInventory(task.Context())
 	if xerr != nil {
 		return emptySlice, xerr
 	}

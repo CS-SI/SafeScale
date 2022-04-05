@@ -1340,13 +1340,13 @@ func TestStartWithTimeoutAbortedWithCauseTask(t *testing.T) {
 }
 
 func TestLikeBeforeWithoutAbort(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 80; i++ {
 		single, xerr := NewTask()
 		require.NotNil(t, single)
 		require.Nil(t, xerr)
 
 		single, xerr = single.StartWithTimeout(
-			taskgen(100, 200, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond,
+			taskgen(200, 300, 10, 0, 0, 0, false), nil, time.Duration(50)*time.Millisecond,
 		)
 		require.Nil(t, xerr)
 
@@ -1372,9 +1372,9 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			// expected
-			require.True(t, rv) // rv must be true
+			require.True(t, rv) // rv must be true // FIXME: Here fails too
 		default:
-			t.Errorf("Unexpected error, with rv: %v, %v", xerr, rv)
+			t.Errorf("Unexpected error, with rv: %v, %v", xerr, rv) // FIXME: Failure here
 			t.FailNow()
 		}
 

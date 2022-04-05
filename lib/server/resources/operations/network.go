@@ -204,6 +204,9 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
+	childCtx, cancel := context.WithCancel(task.Context())
+	defer cancel()
+
 	svc := instance.Service()
 	networkCache, xerr := svc.GetCache(networkKind)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -217,7 +220,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	// Check if Network already exists and is managed by SafeScale
-	existing, xerr := LoadNetwork(ctx, svc, req.Name)
+	existing, xerr := LoadNetwork(childCtx, svc, req.Name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -241,13 +244,13 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	// reserve cache entry for new Network
-	xerr = networkCache.ReserveEntry(ctx, req.Name, timings.OperationTimeout()+timings.MetadataReadAfterWriteTimeout())
+	xerr = networkCache.ReserveEntry(childCtx, req.Name, timings.OperationTimeout()+timings.MetadataReadAfterWriteTimeout())
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
 		if ferr != nil {
-			derr := networkCache.FreeEntry(ctx, req.Name)
+			derr := networkCache.FreeEntry(childCtx, req.Name)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", req.Name))
 			}
@@ -313,7 +316,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	// Write subnet object metadata
 	logrus.Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
 	abstractNetwork.Imported = false
-	return instance.carry(ctx, abstractNetwork)
+	return instance.carry(childCtx, abstractNetwork)
 }
 
 // carry registers clonable as core value and deals with cache
@@ -386,7 +389,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.Service()
-	existing, xerr := LoadNetwork(ctx, svc, ref)
+	existing, xerr := LoadNetwork(task.Context(), svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -453,7 +456,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	// Write subnet object metadata
 	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
 	abstractNetwork.Imported = true
-	return instance.carry(ctx, abstractNetwork)
+	return instance.carry(task.Context(), abstractNetwork)
 }
 
 // Browse walks through all the metadata objects in subnet
@@ -585,7 +588,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 				if k == instance.GetName() {
 					found = true
 					// the single subnet present is a subnet named like the Network, delete it first
-					subnetInstance, xerr := LoadSubnet(ctx, svc, "", v)
+					subnetInstance, xerr := LoadSubnet(task.Context(), svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -623,7 +626,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 				}
 
 				for k := range nsgV1.ByID {
-					sgInstance, propsXErr := LoadSecurityGroup(ctx, svc, k)
+					sgInstance, propsXErr := LoadSecurityGroup(task.Context(), svc, k)
 					if propsXErr != nil {
 						switch propsXErr.(type) {
 						case *fail.ErrNotFound:
@@ -638,7 +641,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 					// //goland:noinspection GoDeferInLoop
 					// defer sgInstance.lock.Unlock()
 
-					propsXErr = sgInstance.unsafeDelete(ctx, true)
+					propsXErr = sgInstance.unsafeDelete(task.Context(), true)
 					if propsXErr != nil {
 						return propsXErr
 					}

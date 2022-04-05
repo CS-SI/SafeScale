@@ -547,7 +547,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	// If is 126, try again 6 times, if not return the error
 	rounds := 10
 	for {
-		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
+		rc, stdout, stderr, err := host.Run(task.Context(), cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
 		if rc == 126 {
 			logrus.Debugf("Text busy happened")
 		}
