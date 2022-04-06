@@ -29,7 +29,6 @@ import (
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"golang.org/x/sys/unix"
 	"gopkg.in/fsnotify.v1"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -738,7 +737,7 @@ func walkInsideFeatureFileFolders(filter featureFilter) ([]string, fail.Error) {
 					switch casted := err.(type) {
 					case *fs.PathError:
 						switch casted.Err {
-						case unix.ENOENT:
+						case NOTFOUND:
 							// entry not found, ignore it
 							debug.IgnoreError(err)
 							return nil
@@ -822,7 +821,7 @@ func addPathToWatch(w *rfsnotify.RWatcher, path string) error {
 		switch casted := err.(type) {
 		case *fs.PathError:
 			switch casted.Err {
-			case unix.ENOENT:
+			case NOTFOUND:
 				// folder not found, ignore it
 				debug.IgnoreError(err)
 				return nil
