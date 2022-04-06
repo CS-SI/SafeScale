@@ -49,7 +49,7 @@ type causer interface {
 	RootCause() error // returns the root cause of an error
 }
 
-//DISABLED go:generate minimock -o mocks/mock_error.go -i github.com/CS-SI/SafeScale/v21/lib/utils/fail.Error
+// DISABLED go:generate minimock -o mocks/mock_error.go -i github.com/CS-SI/SafeScale/v21/lib/utils/fail.Error
 
 // Error defines the interface of a SafeScale error
 type Error interface {

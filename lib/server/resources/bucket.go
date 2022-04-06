@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//DISABLED go:generate minimock -o mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Bucket
+// DISABLED go:generate minimock -o mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Bucket
 
 // Bucket GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {

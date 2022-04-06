@@ -7,5 +7,8 @@ all: generate
 vet:
 	@$(GO) vet ./...
 
+generate:
+	@:
+
 clean:
 	@:

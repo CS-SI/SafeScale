@@ -31,7 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Host -o mocks/mock_host.go
+// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Host -o mocks/mock_host.go
 
 // Host links Object Storage folder and Host
 type Host interface {

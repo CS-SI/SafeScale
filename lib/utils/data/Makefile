@@ -6,7 +6,7 @@ all: generate
 
 generate:
 	@(mkdir -p ./mocks) || true
-	@$(GO) generate -run minimock . >/dev/null || true
+	@$(GO) generate -run minimock . >/dev/null 2>&1 || true
 	@(cd cache && $(MAKE) $@)
 	@(cd observer && $(MAKE) $@)
 	@(cd serialize && $(MAKE) $@)

@@ -44,7 +44,6 @@ generate: gensrc sdk
 	@(cd server && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
-	@($(GO) generate -run minimock ./... || true)
 
 sdk: gensrc
 	@(cd protocol && $(MAKE) $@)
