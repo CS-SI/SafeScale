@@ -10,4 +10,4 @@ generate:
 	@$(GO) generate -run minimock . >/dev/null || true
 
 clean:
-	@($RM) -f mocks/*.go || true
+	@($RM) -f mocks/mock_*.go || true

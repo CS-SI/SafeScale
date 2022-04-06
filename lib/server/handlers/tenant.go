@@ -146,8 +146,8 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
-	Scan(string, bool, []string) (_ *protocol.ScanResultList, ferr fail.Error)
-	Inspect(string) (_ *protocol.TenantInspectResponse, ferr fail.Error)
+	Scan(string, bool, []string) (ptp *protocol.ScanResultList, ferr fail.Error)
+	Inspect(string) (ptp *protocol.TenantInspectResponse, ferr fail.Error)
 }
 
 // tenantHandler service
@@ -163,7 +163,7 @@ func NewTenantHandler(job server.Job) TenantHandler {
 }
 
 // Inspect displays tenant configuration
-func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
+func (handler *tenantHandler) Inspect(tenantName string) (ptp *protocol.TenantInspectResponse, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -304,7 +304,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 }
 
 // Scan scans the tenant and updates the database
-func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
+func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (ptp *protocol.ScanResultList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -546,7 +546,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	return nil
 }
 
-func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
+func (handler *tenantHandler) dryRun(templateNamesToScan []string) (ptp *protocol.ScanResultList, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	var resultList []*protocol.ScanResult
