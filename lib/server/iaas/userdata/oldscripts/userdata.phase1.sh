@@ -176,7 +176,7 @@ EOF
   cat >> /home/{{.User}}/.bashrc <<- 'EOF'
 pathremove() {
 		local IFS=':'
-		local NEWPATH
+		local NEWPATH=""
 		local DIR
 		local PATHVARIABLE=${2:-PATH}
 		for DIR in ${!PATHVARIABLE} ; do

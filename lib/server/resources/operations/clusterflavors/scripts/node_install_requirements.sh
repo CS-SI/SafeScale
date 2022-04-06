@@ -58,7 +58,7 @@ install_common_requirements() {
   cat >> ~{{.ClusterAdminUsername}}/.bashrc <<- 'EOF'
   pathremove() {
     local IFS=':'
-    local NEWPATH
+    local NEWPATH=""
     local DIR
     local PATHVARIABLE=${2:-PATH}
     for DIR in ${!PATHVARIABLE} ; do

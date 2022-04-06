@@ -136,7 +136,7 @@ function reset_fw() {
           sudo dnf config-manager -y --disable epel-modular
           sudo dnf config-manager -y --disable epel
         fi
-        sfRetry4 "sfYum install -q -y firewalld" || failure 220 "reset_fw(): failure installing firewalld"
+        sfRetry4 "sfYum install -q -y firewalld python3 python3-pip" || failure 220 "reset_fw(): failure installing firewalld"
       fi
     fi
     ;;

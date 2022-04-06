@@ -978,7 +978,7 @@ function sfDetectFacts() {
   redhat | rhel | centos | fedora)
     FACTS["redhat_like"]=1
     FACTS["debian_like"]=0
-    FACTS["docker_version"]=$(yum info docker-ce || true)
+    FACTS["docker_version"]=$(rpm -qi docker-ce 2> /dev/null | grep "^Version" | cut -d: -f2 || true)
     ;;
   debian | ubuntu)
     FACTS["redhat_like"]=0
