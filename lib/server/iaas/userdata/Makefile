@@ -8,8 +8,7 @@ REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 all: generate
 
 generate: clean gensrc
-	@$(GO) generate .
-	@gofmt $(VERSIONFILE) > /dev/null 2>&1
+	@:
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true

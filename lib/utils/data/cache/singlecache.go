@@ -16,8 +16,6 @@
 
 package cache
 
-//go:generate minimock -o mocks/mock_singlememorycache.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.SingleMemoryCache
-
 import (
 	"context"
 	"sync"

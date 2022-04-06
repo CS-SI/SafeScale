@@ -138,10 +138,11 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdEphemeralDiskSize,
 	cmdDiskSpeed,
 	cmdRotational,
-	cmdNetSpeed,
-)
+	cmdNetSpeed)
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
+
+//go:generate minimock -o mocks/mock_tenant.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.TenantHandler
 
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {

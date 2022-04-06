@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ImageHandler
+//go:generate minimock -o mocks/mock_image.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ImageHandler
 
 // TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 

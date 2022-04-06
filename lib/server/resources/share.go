@@ -21,18 +21,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
+
+// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Share -o mocks/mock_share.go
 
 // Share contains information to maintain in Object Storage a list of shared folders
 type Share interface {
 	Metadata
-	data.Identifiable
-	observer.Observable
-	cache.Cacheable
 
 	Browse(ctx context.Context, callback func(hostName string, shareID string) fail.Error) fail.Error
 	Create(ctx context.Context, shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host

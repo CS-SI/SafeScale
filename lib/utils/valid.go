@@ -16,7 +16,7 @@
 
 package utils
 
-//go:generate minimock -o ./mocks/mock_valid.go -i github.com/CS-SI/SafeScale/v21/lib/utils.Valid
+//go:generate minimock -o mocks/mock_valid.go -i github.com/CS-SI/SafeScale/v21/lib/utils.Valid
 
 // Valid interface is used to check data validity
 type Valid interface {

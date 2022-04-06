@@ -70,7 +70,7 @@ const (
 	defaultBigDelay = 30 * time.Second
 )
 
-//go:generate minimock -o ../mocks/mock_timeout.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Timings
+//go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Timings
 
 type Timings interface {
 	// OperationTimeout ...

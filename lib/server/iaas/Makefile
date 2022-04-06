@@ -5,19 +5,19 @@ GO?=go
 all: generate
 
 generate: clean
-	@(mkdir -p mocks) || true
-	@(mkdir -p providers/mocks) || true
-	@(mkdir -p ../mocks) || true
+	@mkdir -p mocks || true
+	@$(GO) generate -run minimock . >/dev/null 2>&1 || true
+	@(cd objectstorage && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
 	@(cd stacks && $(MAKE) $(@))
-	@$(GO) generate ./... > /dev/null 2>&1 || true
 
 vet:
 	@$(GO) vet ./...
 
 clean:
+	@(cd objectstorage && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
 	@(cd stacks && $(MAKE) $(@))
-	@$(RM) ./mocks/mock_*.go || true
+	@$(RM) ./mocks/*.go || true

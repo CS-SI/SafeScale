@@ -26,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Metadata -o mocks/mock_metadata.go
+
 // Callback describes the function prototype to use to inspect metadata
 type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 
