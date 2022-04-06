@@ -244,7 +244,7 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
@@ -499,7 +499,7 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 		return fail.InvalidInstanceError()
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -512,7 +512,7 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.unsafeDelete(ctx, force)
+	return instance.unsafeDelete(task.Context(), force)
 }
 
 // deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
@@ -1426,11 +1426,17 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 		return fail.InvalidParameterCannotBeNilError("subnetInstance")
 	}
 
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
 	var subnetHosts *propertiesv1.SubnetHosts
-	xerr := subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
@@ -1444,7 +1450,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 		return xerr
 	}
 
-	return instance.unsafeUnbindFromSubnet(ctx, taskUnbindFromHostsAttachedToSubnetParams{subnetID: subnetInstance.GetID(), subnetName: subnetInstance.GetName(), subnetHosts: subnetHosts})
+	return instance.unsafeUnbindFromSubnet(task.Context(), taskUnbindFromHostsAttachedToSubnetParams{subnetID: subnetInstance.GetID(), subnetName: subnetInstance.GetName(), subnetHosts: subnetHosts})
 }
 
 // unbindFromSubnetHosts unbinds the security group from Hosts attached to a Subnet

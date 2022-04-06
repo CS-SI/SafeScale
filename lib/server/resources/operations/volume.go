@@ -213,7 +213,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
@@ -817,7 +817,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 						// Disable abort signal during the cleanup
 						defer task.DisarmAbortSignal()()
 
-						if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+						if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
 						}
 					}

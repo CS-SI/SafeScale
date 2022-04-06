@@ -324,7 +324,7 @@ func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (fer
 	}
 	defer func() {
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
 						derr, "cleaning up on failure, failed to free %s cache entry for key '%s'",

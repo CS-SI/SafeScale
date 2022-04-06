@@ -434,7 +434,7 @@ func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
@@ -512,7 +512,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	defer func() {
 		if ferr != nil {
 			if instance != nil {
-				derr := instance.unsafeUpdateSubnetStatus(task.Context(), subnetstate.Error)
+				derr := instance.unsafeUpdateSubnetStatus(context.Background(), subnetstate.Error)
 				if derr != nil {
 					_ = ferr.AddConsequence(derr)
 				}
@@ -575,18 +575,24 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 
 	if xerr != nil && *xerr != nil && keepOnFailure {
 		_ = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			task, cerr := concurrency.TaskFromContextOrVoid(ctx)
+			cerr = debug.InjectPlannedFail(cerr)
+			if cerr != nil {
+				return cerr
+			}
+
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sg, derr := LoadSecurityGroup(ctx, instance.Service(), as.InternalSecurityGroupID)
+			sg, derr := LoadSecurityGroup(task.Context(), instance.Service(), as.InternalSecurityGroupID)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
 			}
 
-			derr = sg.UnbindFromHost(ctx, host)
+			derr = sg.UnbindFromHost(task.Context(), host)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
@@ -1242,7 +1248,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1397,13 +1403,19 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 
 // deleteSecurityGroups deletes the Security Groups created for the Subnet
 func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (ferr fail.Error) {
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	svc := instance.Service()
 	for _, v := range sgs {
 		if v == "" {
 			return fail.NewError("unexpected empty security group")
 		}
 
-		sgInstance, xerr := LoadSecurityGroup(ctx, svc, v)
+		sgInstance, xerr := LoadSecurityGroup(task.Context(), svc, v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1418,7 +1430,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 		sgName := sgInstance.GetName()
 		sgID := sgInstance.GetID()
 		logrus.Debugf("Deleting Security Group '%s' (%s)...", sgName, sgID)
-		xerr = sgInstance.Delete(ctx, true)
+		xerr = sgInstance.Delete(task.Context(), true)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:

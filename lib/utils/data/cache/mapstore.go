@@ -81,7 +81,7 @@ func (instance *mapStore) Entry(ctx context.Context, key string) (*Entry, fail.E
 	// If key is reserved, we may have to wait reservation committed, freed or timed out
 	instance.lock.Lock()
 	reservedContent, reserved := instance.reserved[key]
-	instance.lock.Unlock() //nolint
+	instance.lock.Unlock() // nolint
 	if reserved {
 		xerr := reservedContent.waitReleased()
 		if xerr != nil {
@@ -104,7 +104,7 @@ func (instance *mapStore) Entry(ctx context.Context, key string) (*Entry, fail.E
 
 	instance.lock.RLock()
 	ce, ok := instance.cached[key]
-	instance.lock.RUnlock() //nolint
+	instance.lock.RUnlock() // nolint
 	if ok {
 		return ce, nil
 	}
@@ -395,7 +395,7 @@ func (instance *mapStore) Add(ctx context.Context, content Cacheable) (_ *Entry,
 
 	defer func() {
 		if ferr != nil {
-			derr := instance.Free(ctx, id)
+			derr := instance.Free(context.Background(), id)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free entry '%s' in cache %s", id, instance.GetName()))
 			}
