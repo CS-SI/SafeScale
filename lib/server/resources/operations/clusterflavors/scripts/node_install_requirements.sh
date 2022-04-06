@@ -76,8 +76,8 @@ install_common_requirements() {
     local PATHVARIABLE=${2:-PATH}
     export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
   }
-  pathprepend $HOME/.local/bin
-  pathprepend /usr/local/bin
+  pathprepend $HOME/.local/bin ''
+  pathprepend /usr/local/bin ''
 EOF
   chown -R {{ .ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
 
