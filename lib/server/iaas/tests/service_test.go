@@ -27,8 +27,8 @@ import (
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
 
-	"../mocks"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/mocks"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 
