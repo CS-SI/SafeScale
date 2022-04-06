@@ -78,14 +78,14 @@ print_error() {
 }
 trap print_error ERR
 
-set +x
-sudo rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
-exec 1<&-
-exec 2<&-
-exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
-exec 2>&1
-sudo chown {{.Username}}:{{.Username}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+# Redirects outputs
+LOGFILE=%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
+
+date
 
 {{ .reserved_BashLibrary }}
 
