@@ -5,10 +5,14 @@ GO?=go
 all: generate
 
 generate:
-	@(mkdir -p mocks) || true
-	@(mkdir -p data/mocks) || true
-	@(mkdir -p data/cache/mocks) || true
-	@$(GO) generate -run stringer ./...
+	@mkdir -p ./mocks || true
+	@$(GO) generate -run minimock . >/dev/null || true
+	@(cd concurrency && make $@)
+	@(cd cli && make $@)
+	@(cd data && make $@)
+	@(cd debug && make $@)
+	@(cd fail && make $@)
+	@(cd temporal && make $@)
 	@echo "package valid" > ./valid/consts.go
 	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go
 
@@ -20,4 +24,10 @@ test:
 
 clean:
 	@(find . | grep _string | xargs rm 2>/dev/null || true)
+	@(cd concurrency && make $@)
+	@(cd cli && make $@)
+	@(cd data && make $@)
+	@(cd debug && make $@)
+	@(cd fail && make $@)
+	@(cd temporal && make $@)
 

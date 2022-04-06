@@ -1,15 +1,12 @@
-include ../../../common.mk
+GO?=go
 
 .PHONY: clean generate vet
 
 all: generate
 
 generate:
-	@(mkdir -p ./mocks) || true
+	@mkdir -p ./mocks || true
 	@$(GO) generate -run minimock . >/dev/null || true
-	@(cd cache && $(MAKE) $@)
-	@(cd observer && $(MAKE) $@)
-	@(cd serialize && $(MAKE) $@)
 
 vet:
 	@$(GO) vet ./...

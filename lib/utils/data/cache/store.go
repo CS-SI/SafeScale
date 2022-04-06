@@ -16,7 +16,7 @@
 
 package cache
 
-//go:generate minimock -o mocks/mock_store.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Store
+//go:generate minimock -o mocks/mock_store.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/cache.Store
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-include ../../../../common.mk
+GO?=go
 
 .PHONY:	clean vet
 
@@ -12,4 +12,4 @@ vet:
 	@$(GO) vet ./...
 
 clean:
-	@:
+	@rm -f mocks/*.go || true

@@ -69,12 +69,16 @@ type TaskResult interface{}
 // }, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, fail.Error)
 
+//go:generate minimock -o mocks/mock_taskguard.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskGuard
+
 // TaskGuard ...
 type TaskGuard interface {
 	TryWait() (bool, TaskResult, fail.Error)
 	Wait() (TaskResult, fail.Error)
 	WaitFor(time.Duration) (bool, TaskResult, fail.Error)
 }
+
+//go:generate minimock -o mocks/mock_taskcore.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskCore
 
 // TaskCore is the interface of core methods to control Task and TaskGroup
 type TaskCore interface {
@@ -95,6 +99,8 @@ type TaskCore interface {
 	Start(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
 	StartWithTimeout(fn TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error)
 }
+
+//go:generate minimock -o mocks/mock_task.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.Task
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
 type Task interface {

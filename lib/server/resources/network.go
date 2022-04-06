@@ -22,20 +22,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Network -o mocks/mock_network.go
+//DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Network -o mocks/mock_network.go
 
 // Network links Object Storage folder and Network
 type Network interface {
 	Metadata
-	data.Identifiable
-	observer.Observable
-	cache.Cacheable
 
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network
 	AdoptSubnet(ctx context.Context, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network

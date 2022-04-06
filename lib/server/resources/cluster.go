@@ -26,12 +26,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Cluster -o mocks/mock_cluster.go
+//DISABLED go:generate minimock -o mocks/mock_cluster.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Cluster
 
 // IndexedListOfClusterNodes ...
 type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
@@ -40,8 +38,6 @@ type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
 type Cluster interface {
 	Metadata
 	Targetable
-	observer.Observable
-	cache.Cacheable
 
 	AddFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) ([]Host, fail.Error) // adds several nodes

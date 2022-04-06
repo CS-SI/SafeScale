@@ -1,12 +1,12 @@
-GO?=go
+include ../../../../common.mk
 
 .PHONY: clean generate vet
 
 all: generate
 
 generate:
-	@(mkdir -p mocks) || true
-	@$(GO) generate -run minimock .
+	@(mkdir -p ./mocks || true)
+	@$(GO) generate -run minimock . >/dev/null || true
 
 vet:
 	@$(GO) vet ./...
@@ -15,5 +15,5 @@ test:
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) 2>&1
 
 clean:
-	@(rm -f mocks/*)
+	@$(RM) ./mocks/*.go || true)
 

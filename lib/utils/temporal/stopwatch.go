@@ -25,6 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/commonlog"
 )
 
+//go:generate minimock -o mocks/mock_stopwatch.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Stopwatch
+
 // Stopwatch interface to expose methods available for a stopwatch
 type Stopwatch interface {
 	// Start starts the stopwatch, either for the first time or after a Pause()

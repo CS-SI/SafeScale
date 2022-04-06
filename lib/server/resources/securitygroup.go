@@ -22,13 +22,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
-
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
 
 // SecurityGroupActivation represents activation state of a Security Group
 type SecurityGroupActivation bool
@@ -48,12 +43,11 @@ const (
 	KeepCurrentSecurityGroupMark    = false // Do not change current Security Group mark
 )
 
+//DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
+
 // SecurityGroup links Object Storage folder and SecurityGroup
 type SecurityGroup interface {
 	Metadata
-	data.Identifiable
-	observer.Observable
-	cache.Cacheable
 
 	AddRule(ctx context.Context, _ *abstract.SecurityGroupRule) fail.Error                                         // returns true if the host is member of a cluster
 	AddRules(ctx context.Context, _ abstract.SecurityGroupRules) fail.Error                                        // returns true if the host is member of a cluster

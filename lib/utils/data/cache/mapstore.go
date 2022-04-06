@@ -16,8 +16,6 @@
 
 package cache
 
-//go:generate minimock -o mocks/mock_mapstore.go -i github.com/CS-SI/SafeScale/lib/utils/data/cached.MapStore
-
 import (
 	"context"
 	"fmt"

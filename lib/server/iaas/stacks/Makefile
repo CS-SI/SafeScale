@@ -1,13 +1,14 @@
 GO?=go
 
+#.PHONY:	all clean generate vet
 .PHONY:	clean vet
 
-generate:
-	@(mkdir -p mocks) || true
-	@(mkdir -p api/mocks) || true
+generate: clean
+	@(mkdir -p ./mocks) || true
+	@$(GO) generate -run minimock ./... >/dev/null 2>&1 || true
 
 vet:
-	@$(GO) vet $($(GO) list ./...)
+	@$(GO) vet ./...
 
 clean:
-	@$(RM) ./mocks/mock_*.go || true
+	@$(RM) ./mocks/*.go || true
