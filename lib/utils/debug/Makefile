@@ -14,4 +14,4 @@ vet:
 
 clean:
 	@(find . | grep _string | xargs rm 2>/dev/null || true)
-	@$(RM) ./mocks/*.go || true
+	@$(RM) ./mocks/mock_*.go || true

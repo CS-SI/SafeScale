@@ -19,6 +19,6 @@ test:
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -v ./...
 
 clean:
-	@$(RM) ./mocks/*.go || true
+	@$(RM) ./mocks/mock_*.go || true
 	@(cd enums && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))

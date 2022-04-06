@@ -12,4 +12,4 @@ vet:
 	@$(GO) vet ./...
 
 clean:
-	@rm -f mocks/*.go || true
+	@rm -f mocks/mock_*.go || true
