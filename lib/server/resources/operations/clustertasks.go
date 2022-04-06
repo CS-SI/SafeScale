@@ -160,7 +160,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
 			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
-			if derr := subnetInstance.Delete(task.Context()); derr != nil {
+			if derr := subnetInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Subnet is considered as a successful deletion, continue
@@ -176,7 +176,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					subnetInstance.GetName())
 				if req.NetworkID == "" {
 					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
-					if derr := networkInstance.Delete(task.Context()); derr != nil {
+					if derr := networkInstance.Delete(context.Background()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Network is considered as a successful deletion, continue
@@ -673,7 +673,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 
 		defer func() {
 			if ferr != nil && !req.KeepOnFailure {
-				if derr := networkInstance.Delete(task.Context()); derr != nil {
+				if derr := networkInstance.Delete(context.Background()); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// missing Network is considered as a successful deletion, continue
@@ -782,7 +782,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := subnetInstance.Delete(task.Context()); derr != nil {
+			if derr := subnetInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Subnet is considered as a successful deletion, continue
@@ -1907,7 +1907,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			if derr := hostInstance.Delete(task.Context()); derr != nil {
+			if derr := hostInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
@@ -2484,7 +2484,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			if derr := hostInstance.Delete(task.Context()); derr != nil {
+			if derr := hostInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue

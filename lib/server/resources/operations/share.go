@@ -274,7 +274,7 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
@@ -538,7 +538,7 @@ func (instance *Share) Create(
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
-			if derr := nfsServer.RemoveShare(ctx, sharePath); derr != nil {
+			if derr := nfsServer.RemoveShare(context.Background(), sharePath); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
 		}

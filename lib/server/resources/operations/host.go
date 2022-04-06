@@ -442,7 +442,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(ctx, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
 						derr, "cleaning up on failure, failed to free %s cache entry for key '%s'",
@@ -1079,7 +1079,7 @@ func (instance *Host) Create(
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer instance.undoSetSecurityGroups(task.Context(), &ferr, hostReq.KeepOnFailure)
+	defer instance.undoSetSecurityGroups(context.Background(), &ferr, hostReq.KeepOnFailure)
 
 	logrus.Infof("Compute resource '%s' created", instance.GetName())
 
@@ -1136,7 +1136,7 @@ func (instance *Host) Create(
 
 	defer func() {
 		if ferr != nil {
-			instance.undoUpdateSubnets(task.Context(), hostReq, &ferr)
+			instance.undoUpdateSubnets(context.Background(), hostReq, &ferr)
 		}
 	}()
 
@@ -1895,6 +1895,12 @@ func (instance *Host) undoUpdateSubnets(ctx context.Context, req abstract.HostRe
 
 		xerr := instance.Alter(
 			func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+
 				return props.Alter(
 					hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 						hsV1, ok := clonable.(*propertiesv2.HostNetworking)
@@ -1909,7 +1915,7 @@ func (instance *Host) undoUpdateSubnets(ctx context.Context, req abstract.HostRe
 						hostName := instance.GetName()
 						svc := instance.Service()
 						for _, as := range req.Subnets {
-							subnetInstance, innerXErr := LoadSubnet(ctx, svc, "", as.ID)
+							subnetInstance, innerXErr := LoadSubnet(task.Context(), svc, "", as.ID)
 							if innerXErr != nil {
 								return innerXErr
 							}
@@ -2258,7 +2264,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 
 			defer func() {
 				if ferr != nil && !singleHostRequest.KeepOnFailure {
-					derr := subnetInstance.Delete(ctx)
+					derr := subnetInstance.Delete(context.Background())
 					if derr != nil {
 						_ = ferr.AddConsequence(
 							fail.Wrap(
@@ -2515,7 +2521,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				}(shareInstance)
 
 				// Retrieve data about the server serving the Share
-				hostServer, loopErr := shareInstance.GetServer(ctx)
+				hostServer, loopErr := shareInstance.GetServer(task.Context())
 				if loopErr != nil {
 					return loopErr
 				}

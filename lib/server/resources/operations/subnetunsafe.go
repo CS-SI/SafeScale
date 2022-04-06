@@ -585,7 +585,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			derr := instance.deleteSecurityGroups(ctx, [3]string{subnetGWSG.GetID(), subnetInternalSG.GetID(), subnetPublicIPSG.GetID()})
+			derr := instance.deleteSecurityGroups(context.Background(), [3]string{subnetGWSG.GetID(), subnetInternalSG.GetID(), subnetPublicIPSG.GetID()})
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
 			}
@@ -710,7 +710,13 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 }
 
 func (instance *Subnet) unsafeUpdateSubnetStatus(ctx context.Context, target subnetstate.Enum) fail.Error {
-	xerr := instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -724,7 +730,7 @@ func (instance *Subnet) unsafeUpdateSubnetStatus(ctx context.Context, target sub
 		return xerr
 	}
 
-	return instance.updateCachedInformation(ctx)
+	return instance.updateCachedInformation(task.Context())
 }
 
 func (instance *Subnet) unsafeFinalizeSubnetCreation(ctx context.Context) fail.Error {
@@ -980,7 +986,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 					}
 				}()
 
-				defer instance.undoBindInternalSecurityGroupToGateway(ctx, primaryGateway, req.KeepOnFailure, &ferr)
+				defer instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
 
 				// Bind Internal Security Group to gateway
 				xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
@@ -1030,7 +1036,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if ferr != nil && !req.KeepOnFailure {
-					derr := secondaryGateway.RelaxedDeleteHost(ctx)
+					derr := secondaryGateway.RelaxedDeleteHost(context.Background())
 					derr = debug.InjectPlannedFail(derr)
 					if derr != nil {
 						switch derr.(type) {
@@ -1048,7 +1054,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				}
 			}()
 
-			defer instance.undoBindInternalSecurityGroupToGateway(ctx, secondaryGateway, req.KeepOnFailure, &ferr)
+			defer instance.undoBindInternalSecurityGroupToGateway(context.Background(), secondaryGateway, req.KeepOnFailure, &ferr)
 			// Bind Internal Security Group to gateway
 
 			xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)

@@ -250,7 +250,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 	defer func() {
 		if ferr != nil {
-			derr := networkCache.FreeEntry(childCtx, req.Name)
+			derr := networkCache.FreeEntry(context.Background(), req.Name)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", req.Name))
 			}
@@ -446,7 +446,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	}
 	defer func() {
 		if ferr != nil {
-			derr := networkCache.FreeEntry(task.Context(), ref)
+			derr := networkCache.FreeEntry(context.Background(), ref)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", ref))
 			}
@@ -532,7 +532,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

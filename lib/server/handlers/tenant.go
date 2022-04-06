@@ -321,7 +321,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
-	task := handler.job.Task()
 
 	isScannable, err := handler.checkScannable()
 	if err != nil {
@@ -379,7 +378,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := network.Delete(task.Context())
+		derr := network.Delete(context.Background())
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
 			_ = ferr.AddConsequence(derr)
