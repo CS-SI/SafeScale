@@ -68,8 +68,19 @@ export -f return_failure
 LOGFILE=/opt/safescale/var/log/user_data.netsec.log
 
 ### All output to one file and all output to the screen
+{{- if .Debug }}
+if [[ -e /home/{{.Username}}/tss ]]; then
+  exec > >(/home/{{.Username}}/tss | tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+else
+  exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+fi
+{{- else }}
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- end }}
+
 set -x
+
+date
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
 uptime > /opt/safescale/var/state/user_data.netsec.done
@@ -84,9 +95,10 @@ function reset_fw() {
   case $LINUX_KIND in
   debian)
     echo "Reset firewall"
-    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 207 "reset_fw(): failure running apt update"
-    sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 210 "reset_fw(): failure installing iptables"
-    sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 211 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt update &>/dev/null" || failure 207 "reset_fw(): failure running apt update"
+    sfRetry4 "sfApt -y autoclean autoremove &>/dev/null" || failure 210 "reset_fw(): failure running cleanup"
+    sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 210 "reset_fw(): failure installing iptables"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 211 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -95,14 +107,15 @@ function reset_fw() {
     systemctl is-enabled ufw &> /dev/null && {
       systemctl disable ufw || true # set to true to fix issues
     }
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null" || failure 212 "reset_fw(): failure purging ufw"
+    dpkg --purge --force-remove-reinstreq ufw &>/dev/null || failure 212 "reset_fw(): failure purging ufw"
     ;;
 
   ubuntu)
     echo "Reset firewall"
-    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 213 "reset_fw(): failure running apt update"
-    sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 214 "reset_fw(): failure installing iptables"
-    sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 215 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt update &>/dev/null" || failure 213 "reset_fw(): failure running apt update"
+    sfRetry4 "sfApt -y autoclean autoremove &>/dev/null" || failure 213 "reset_fw(): failure running cleanup"
+    sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 214 "reset_fw(): failure installing iptables"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 215 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -111,7 +124,7 @@ function reset_fw() {
     systemctl is-enabled ufw &> /dev/null && {
       systemctl disable ufw || true # set to true to fix issues
     }
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null" || failure 216 "reset_fw(): failure purging ufw"
+    dpkg --purge --force-remove-reinstreq ufw &>/dev/null || failure 216 "reset_fw(): failure purging ufw"
     ;;
 
   redhat | rhel | centos | fedora)
@@ -123,7 +136,7 @@ function reset_fw() {
           sudo dnf config-manager -y --disable epel-modular
           sudo dnf config-manager -y --disable epel
         fi
-        sfRetryEx 3m 5 "sfYum install -q -y firewalld" || failure 220 "reset_fw(): failure installing firewalld"
+        sfRetry4 "sfYum install -q -y firewalld" || failure 220 "reset_fw(): failure installing firewalld"
       fi
     fi
     ;;
@@ -345,13 +358,13 @@ function ensure_curl_is_installed() {
       return 0
     fi
     DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt-get update || return 1
-    DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt-get install -y curl || return 1
+    DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt-get install --no-install-recommends -y curl || return 1
     ;;
   redhat | rhel | centos | fedora)
     if [[ -n $(which curl) ]]; then
       return 0
     fi
-    sfRetryEx 3m 5 "sfYum install -y -q curl &>/dev/null" || return 1
+    sfRetry4 "sfYum install -y -q curl &>/dev/null" || return 1
     ;;
   *)
     failure 216 "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -431,22 +444,30 @@ function install_route_if_needed() {
   case $LINUX_KIND in
   debian)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfApt install -y net-tools" || return 1
+      for iter in {1..4}
+      do
+        sfApt install -y --no-install-recommends net-tools && break
+        [[ "$iter" == '4' ]] && return 1
+      done
     fi
     ;;
   ubuntu)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfApt install -y net-tools" || return 1
+      for iter in {1..4}
+      do
+        sfApt install -y --no-install-recommends net-tools && break
+        [[ "$iter" == '4' ]] && return 1
+      done
     fi
     ;;
   redhat | rhel | centos)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfYum install -y net-tools" || return 1
+      sfRetry4 "sfYum install -y net-tools" || return 1
     fi
     ;;
   fedora)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfYum install -y net-tools" || return 1
+      sfRetry4 "sfYum install -y net-tools" || return 1
     fi
     ;;
   *)
@@ -859,7 +880,7 @@ function configure_network_redhat_without_nmcli() {
   stop_svc NetworkManager &> /dev/null
   disable_svc NetworkManager &> /dev/null
   if [[ ${FEN} -eq 0 ]]; then
-    sfRetryEx 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
+    sfRetry4 "sfYum remove -y NetworkManager &>/dev/null"
     echo "exclude=NetworkManager" >> /etc/yum.conf
 
     if which dnf; then
@@ -925,10 +946,6 @@ EOF
 
   echo "exclude=NetworkManager" >> /etc/yum.conf
   sleep 5
-
-  is_network_reachable || {
-    failure 206 "without network"
-  }
 
   reset_fw || failure 206 "problem resetting firewall"
 
@@ -1013,10 +1030,10 @@ function check_for_network_refined() {
   [ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
 
   [ ! -z "$PU_IF" ] && {
-    sfRetryEx 3m 10 check_for_ip $PU_IF || return 1
+    sfRetry4 check_for_ip $PU_IF || return 1
   }
   for i in $PR_IFs; do
-    sfRetryEx 3m 10 check_for_ip $i || return 1
+    sfRetry4 check_for_ip $i || return 1
   done
   return 0
 }
@@ -1065,7 +1082,6 @@ EOF
   # Applies fw rules
 
   # Update ssh port
-  [ ! -f /etc/firewalld/services/ssh.xml ] && [ -f /usr/etc/firewalld/services/ssh.xml ] && cp /usr/etc/firewalld/services/ssh.xml /etc/firewalld/services/ssh.xml
   [ ! -f /etc/firewalld/services/ssh.xml ] && [ -f /usr/lib/firewalld/services/ssh.xml ] && cp /usr/lib/firewalld/services/ssh.xml /etc/firewalld/services/ssh.xml
   sed -i -E "s/<port(.*)protocol=\"tcp\"(.*)port=\"([0-9]+)\"(.*)\/>/<port\1protocol=\"tcp\"\2port=\"{{ .SSHPort }}\"\4\/>/gm" /etc/firewalld/services/ssh.xml
   sed -i -E "s/<port(.*)port=\"([0-9]+)\"(.*)protocol=\"tcp\"(.*)\/>/<port\1port=\"{{ .SSHPort }}\"\3protocol=\"tcp\"\4\/>/gm" /etc/firewalld/services/ssh.xml
@@ -1259,9 +1275,9 @@ function install_drivers_nvidia() {
   ubuntu)
     sfFinishPreviousInstall
     add-apt-repository -y ppa:graphics-drivers &> /dev/null
-    sfRetryEx 3m 5 "sfApt update" || failure 201 "apt update failed"
-    sfRetryEx 3m 5 "sfApt -y install nvidia-410 &>/dev/null" || {
-      sfRetryEx 3m 5 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
+    sfRetry4 "sfApt update" || failure 201 "apt update failed"
+    sfRetry4 "sfApt -y install nvidia-410 &>/dev/null" || {
+      sfRetry4 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
     }
     ;;
 
@@ -1270,11 +1286,11 @@ function install_drivers_nvidia() {
       echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >> /etc/modprobe.d/blacklist-nouveau.conf
       rmmod nouveau
     fi
-    sfRetryEx 3m 5 "sfApt update &>/dev/null"
-    sfRetryEx 3m 5 "sfApt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
+    sfRetry4 "sfApt update &>/dev/null"
+    sfRetry4 "sfApt install -y --no-install-recommends dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
     dpkg --add-architecture i386 &> /dev/null
-    sfRetryEx 3m 5 "sfApt update &>/dev/null"
-    sfRetryEx 3m 5 "sfApt install -y lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
+    sfRetry4 "sfApt update &>/dev/null"
+    sfRetry4 "sfApt install -y --no-install-recommends lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &> /dev/null || failure 204 "failure downloading nvidia installer"
     bash NVIDIA-Linux-x86_64-410.78.run -s || failure 205 "failure running nvidia installer"
     ;;
@@ -1285,7 +1301,7 @@ function install_drivers_nvidia() {
       dracut --force
       rmmod nouveau
     fi
-    sfRetryEx 3m 5 "sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null" || failure 206 "failure installing nvidia requirements"
+    sfRetry4 "sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null" || failure 206 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || failure 207 "failure downloading nvidia installer"
     # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
     if [ $(uname -r) == $(sfYum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
@@ -1296,16 +1312,6 @@ function install_drivers_nvidia() {
   *)
     failure 209 "Unsupported Linux distribution '$LINUX_KIND'!"
     ;;
-  esac
-}
-
-function disable_upgrades() {
-  case $LINUX_KIND in
-  ubuntu)
-    sfApt remove -y unattended-upgrades || true
-    ;;
-  *) ;;
-
   esac
 }
 
@@ -1326,7 +1332,10 @@ EOF
     # # Force use of IPv4 addresses when installing packages
     # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    sfApt update
+    sfApt update || {
+      echo "problem updating package repos"
+      return 209
+    }
     # Force update of systemd, pciutils
     sfApt install -q -y systemd pciutils sudo || {
       echo "failure installing systemd and other basic requirements"
@@ -1343,8 +1352,6 @@ EOF
     # # Force use of IPv4 addresses when installing packages
     # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    disable_upgrades
-
     sfApt update || {
       echo "problem updating package repos"
       return 210
@@ -1352,31 +1359,31 @@ EOF
     # Force update of systemd, pciutils and netplan
 
     if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-      sfApt install -y --force-yes pciutils || {
+      sfApt install -y --no-install-recommends --force-yes pciutils || {
         echo "problem installing pciutils"
         return 210
       }
       if [[ ! -z ${FEN} && ${FEN} -eq 0 ]]; then
         which netplan || {
-          sfApt install -y --force-yes netplan.io || {
+          sfApt install -y --no-install-recommends --force-yes netplan.io || {
             echo "problem installing netplan.io"
             return 210
           }
         }
       else
-        sfApt install -y --force-yes netplan.io || {
+        sfApt install -y --no-install-recommends --force-yes netplan.io || {
           echo "problem installing netplan.io"
           return 210
         }
       fi
       # netplan.io may break networking... So ensure networking is working as expected
       ensure_network_connectivity
-      sfApt install -y --force-yes sudo || {
+      sfApt install -y --no-install-recommends --force-yes sudo || {
         echo "problem installing sudo"
         return 210
       }
     else
-      sfApt install -y systemd pciutils sudo || {
+      sfApt install -y --no-install-recommends systemd pciutils sudo || {
         echo "problem installing pciutils and sudo"
         return 211
       }
@@ -1386,13 +1393,13 @@ EOF
       if [ "{{.ProviderName}}" == "aws" ]; then
         : # do nothing
       else
-        sfApt install -y --force-yes systemd || {
+        sfApt install -y --no-install-recommends --force-yes systemd || {
           echo "problem installing systemd"
           return 210
         }
       fi
     else
-      sfApt install -y --force-yes systemd || {
+      sfApt install -y --no-install-recommends --force-yes systemd || {
         echo "problem installing systemd"
         return 210
       }
@@ -1426,7 +1433,7 @@ EOF
 function install_packages() {
   case $LINUX_KIND in
   ubuntu | debian)
-    sfApt install -y -qq wget curl jq zip unzip time at &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
+    sfApt install -y -qq --no-install-recommends wget curl jq zip unzip time at &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
     ;;
   redhat | centos)
     if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
@@ -1531,17 +1538,17 @@ function add_common_repos() {
       # Install EPEL repo ...
       if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
         sudo bash -c "echo '8-stream' > /etc/yum/vars/releasever"
-        sfRetryEx 3m 5 "dnf install -y epel-release" || {
+        sfRetry4 "dnf install -y epel-release" || {
           echo "failure installing custom epel repo"
           return 217
         }
       else
-        sfRetryEx 3m 5 "dnf install -y epel-release" || {
+        sfRetry4 "dnf install -y epel-release" || {
           echo "failure installing default epel repo"
           return 217
         }
       fi
-      sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || {
+      sfRetry4 "dnf makecache fast -y || dnf makecache -y" || {
         echo "failure updating cache"
         return 218
       }
@@ -1549,11 +1556,11 @@ function add_common_repos() {
       dnf config-manager --set-disabled epel &> /dev/null || true
     else
       # Install EPEL repo ...
-      sfRetryEx 3m 5 "yum install -y epel-release" || {
+      sfRetry4 "yum install -y epel-release" || {
         echo "failure installing epel repo"
         return 217
       }
-      sfRetryEx 3m 5 "yum makecache fast || yum makecache" || {
+      sfRetry4 "yum makecache fast || yum makecache" || {
         echo "failure updating cache"
         return 218
       }
@@ -1562,7 +1569,7 @@ function add_common_repos() {
     fi
     ;;
   fedora)
-    sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || {
+    sfRetry4 "dnf makecache fast -y || dnf makecache -y" || {
       echo "failure updating cache"
       return 218
     }
@@ -1662,7 +1669,7 @@ function enable_at_daemon() {
         echo "@reboot sleep 30 && /usr/sbin/dhclient eth0"
       } | crontab -
     fi
-    sfRetryEx 1m 5 "service atd start" || true
+    sfRetry4 "service atd start" || true
     sleep 4
     ;;
   *) ;;
@@ -1727,23 +1734,19 @@ check_dns_configuration || {
 ensure_network_connectivity || echo "Network not ready yet"
 {{- end }}
 
+cr=-1
+ep=-1
 is_network_reachable && {
-  add_common_repos || echo "failure adding common repos, 1st try"
-}
-is_network_reachable && {
-  early_packages_update || echo "failure in early packages update, 1st try"
+  add_common_repos && cr=0 || echo "failure adding common repos, 1st try"
+  early_packages_update && ep=0 || echo "failure in early packages update, 1st try"
 }
 
 identify_nics
 configure_network || failure 215 "failure configuring network"
 is_network_reachable || failure 215 "network is NOT ready after trying changing its DNS and configuration"
 
-is_network_reachable && {
-  add_common_repos || failure 215 "failure adding common repos, 2nd try"
-}
-is_network_reachable && {
-  early_packages_update || failure 215 "failure in early packages update, 2nd try"
-}
+[[ $cr -eq -1 ]] && add_common_repos || failure 215 "failure adding common repos, 2nd try"
+[[ $ep -eq -1 ]] && early_packages_update || failure 215 "failure in early packages update, 2nd try"
 
 install_packages || failure 215 "failure installing packages"
 install_rclone || failure 216 "failure installing rclone"

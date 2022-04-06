@@ -158,8 +158,8 @@ EOF
       local PATHVARIABLE=${2:-PATH}
       export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
 		}
-		pathprepend $HOME/.local/bin
-		pathappend /opt/safescale/bin
+		pathprepend $HOME/.local/bin ''
+		pathappend /opt/safescale/bin ''
 EOF
 
   chown -R {{.Username}}:{{.Username}} /opt/safescale
