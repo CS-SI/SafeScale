@@ -60,8 +60,19 @@ export -f fail
 LOGFILE=/opt/safescale/var/log/user_data.final.log
 
 ### All output to one file and all output to the screen
+{{- if .Debug }}
+if [[ -e /home/{{.Username}}/tss ]]; then
+  exec > >(/home/{{.Username}}/tss | tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+else
+  exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+fi
+{{- else }}
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- end }}
+
 set -x
+
+date
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'user_data.final' is already done (otherwise will deadlock)
 uptime > /opt/safescale/var/state/user_data.final.done
@@ -117,25 +128,8 @@ function install_drivers_nvidia() {
   esac
 }
 
-function install_python3() {
-  case $LINUX_KIND in
-  debian | ubuntu)
-    sfFinishPreviousInstall || fail 200 "failure finishing previous install"
-    sfApt update || fail 201 "failure updating packages"
-    sfApt -y install python3 python3-pip &> /dev/null || fail 210 "failure installing python3"
-    ;;
-  redhat | rhel | centos)
-    sfYum install -y python3 python3-pip || fail 210 "failure installing python3"
-    ;;
-  *)
-    fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
-    ;;
-  esac
-}
-
 # ---- Main
 install_drivers_nvidia
-install_python3
 # ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.final.done

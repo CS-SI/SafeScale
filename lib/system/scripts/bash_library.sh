@@ -327,6 +327,15 @@ function sfRetry {
 }
 export -f sfRetry
 
+function sfRetry4 {
+  for iter in {1..4}
+  do
+    $* && break
+    [[ "$iter" == '4' ]] && return 1
+  done
+  return 0
+}
+
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
 # Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dusb as dependency to

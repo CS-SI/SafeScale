@@ -974,7 +974,7 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
+                                    dpkg --purge --force-remove-reinstreq kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
                                     ;;
                                 redhat|rhel|fedora|centos)
                                     yum remove -y kubectl kubeadm kubelet || sfFail 193 "failure purging kubernetes"

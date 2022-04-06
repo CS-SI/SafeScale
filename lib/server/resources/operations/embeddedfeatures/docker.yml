@@ -342,7 +342,7 @@ feature:
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y docker-ce*
+                                    dpkg --purge --force-remove-reinstreq docker-ce*
                                     ;;
                                 centos|redhat|rhel)
                                     yum remove -y docker-ce*
