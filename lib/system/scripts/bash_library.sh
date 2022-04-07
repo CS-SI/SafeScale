@@ -426,7 +426,7 @@ function sfInstall() {
   debian | ubuntu)
     export DEBIAN_FRONTEND=noninteractive
     export UCF_FORCE_CONFFNEW=1
-    sfRetryEx 5m 3 "sfApt update"
+    sfRetry4 "sfApt update"
     sfApt install $1 -y --force-yes || return 194
     command -v $1 || return 194
     ;;
