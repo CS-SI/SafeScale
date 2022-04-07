@@ -216,6 +216,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Primary gateway not found ? let's try with the secondary one later...
+				debug.IgnoreError(xerr)
 			default:
 				return nil, xerr
 			}
@@ -383,7 +384,11 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		timings.HostOperationTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
+				if t.Err != nil {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", host.GetName(), t.Err.Error())
+				} else {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
+				}
 			}
 		},
 	)
