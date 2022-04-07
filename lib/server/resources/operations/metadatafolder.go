@@ -22,9 +22,10 @@ import (
 	"time"
 
 	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
@@ -205,25 +206,14 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 		return xerr
 	}
 
-	var goodBuffer bytes.Buffer
+	var buffer bytes.Buffer
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			var buffer bytes.Buffer
 			bucket, iErr := instance.getBucket()
 			if iErr != nil {
 				return iErr
 			}
-			iErr = instance.service.ReadObject(bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
-			if iErr != nil {
-				switch iErr.(type) {
-				case *fail.ErrNotFound:
-					return retry.StopRetryError(iErr, "does NOT exist")
-				default:
-					return iErr
-				}
-			}
-			goodBuffer = buffer
-			return nil
+			return instance.service.ReadObject(bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
 		},
 		timings.CommunicationTimeout(),
 	)
@@ -260,7 +250,7 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 		default:
 		}
 	}
-	datas := goodBuffer.Bytes()
+	datas := buffer.Bytes()
 	if doCrypt {
 		var err error
 		datas, err = crypt.Decrypt(datas, instance.cryptKey)
@@ -270,7 +260,7 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 		}
 	}
 
-	xerr = callback(datas) // FIXME: Here we have to look for deserializing problems...
+	xerr = callback(datas)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
@@ -338,11 +328,11 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 			}
 
 			// inner retry does read-after-write; if timeout consider write has failed, then retry write
+			var target bytes.Buffer
 			innerXErr = retry.Action(
 				func() error {
-					var target bytes.Buffer
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
-					if innerErr := instance.service.ReadObject(bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
+					if innerErr := instance.service.ReadObject(bucketName, absolutePath, &target, 0, 0); innerErr != nil {
 						return innerErr
 					}
 
@@ -423,8 +413,8 @@ func (instance MetadataFolder) Browse(path string, callback folderDecoderCallbac
 		return nil
 	}
 
+	var err error
 	for _, i := range list {
-		var err error
 		i = strings.Trim(i, "/")
 		if i == absPath {
 			continue
