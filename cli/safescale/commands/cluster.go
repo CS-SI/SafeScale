@@ -511,7 +511,7 @@ var clusterCreateCommand = &cli.Command{
 			Parameters:     c.StringSlice("param"),
 			DefaultSshPort: gatewaySSHPort,
 		}
-		res, err := clientSession.Cluster.Create(&req, 2*time.Hour)
+		res, err := clientSession.Cluster.Create(&req, 3*time.Hour)
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)

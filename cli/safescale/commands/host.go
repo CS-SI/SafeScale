@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -346,7 +347,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			SizingAsString: sizing,
 			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
-		resp, err := clientSession.Host.Create(&req, temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.Create(&req, 20*time.Minute)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -983,7 +984,7 @@ func hostFeatureAddAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
+	err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 30*time.Minute)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())

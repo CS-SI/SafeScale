@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -375,7 +376,7 @@ var networkCreate = &cli.Command{
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
 			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.ExecutionTimeout(),
+			20*time.Minute,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
