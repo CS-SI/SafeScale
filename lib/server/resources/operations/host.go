@@ -1504,6 +1504,12 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 		svc := instance.Service()
 		derr := instance.Alter(
 			func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+
 				return props.Alter(
 					hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (innerXErr fail.Error) {
 						hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -1522,10 +1528,10 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 
 						// unbind security groups
 						for _, v := range hsgV1.ByName {
-							if sg, opXErr = LoadSecurityGroup(ctx, svc, v); opXErr != nil {
+							if sg, opXErr = LoadSecurityGroup(task.Context(), svc, v); opXErr != nil {
 								errors = append(errors, opXErr)
 							} else {
-								opXErr = sg.UnbindFromHost(ctx, instance)
+								opXErr = sg.UnbindFromHost(task.Context(), instance)
 								if opXErr != nil {
 									errors = append(errors, opXErr)
 								}
