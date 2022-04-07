@@ -195,6 +195,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	metadataBucketName = strings.ReplaceAll(metadataBucketName, ".", "-")
+
 	customDNS, _ := computeCfg["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {

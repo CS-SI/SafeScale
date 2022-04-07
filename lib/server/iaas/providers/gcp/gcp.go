@@ -170,6 +170,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, err
 	}
 
+	metadataBucketName = strings.ReplaceAll(metadataBucketName, ".", "-")
+
 	var timings *temporal.MutableTimings
 	if tc, ok := params["timings"]; ok {
 		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
