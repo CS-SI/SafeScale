@@ -177,21 +177,44 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Erro
 		return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
 	}
 
-	// Reload reloads data from Object Storage to be sure to have the last revision
-	myself.Lock()
-	xerr = myself.unsafeReload()
-	myself.Unlock() // nolint
-	xerr = debug.InjectPlannedFail(xerr)
+	timings, xerr := myself.Service().Timings()
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to unsafeReload metadata")
+		return xerr
+	}
+
+	// Reload reloads data from Object Storage to be sure to have the last revision
+	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		myself.Lock()
+		xerr = myself.unsafeReload()
+		myself.Unlock() // nolint
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to unsafeReload metadata")
+		}
+		return nil
+	},
+		timings.SmallDelay(),
+		timings.ContextTimeout(),
+		6)
+	if xerr != nil {
+		return fail.ConvertError(xerr.Cause())
 	}
 
 	myself.RLock()
 	defer myself.RUnlock()
 
-	return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
-		return callback(clonable, myself.properties)
-	})
+	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
+			return callback(clonable, myself.properties)
+		})
+	},
+		timings.SmallDelay(),
+		timings.ConnectionTimeout(),
+		6)
+	if xerr != nil {
+		return fail.ConvertError(xerr.Cause())
+	}
+	return nil
 }
 
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
@@ -496,17 +519,45 @@ func (myself *MetadataCore) readByID(id string) fail.Error {
 	if myself.kindSplittedStore {
 		path = byIDFolderName
 	}
-	return myself.folder.Read(path, id, func(buf []byte) fail.Error {
-		if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrSyntax:
-				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	rerr := retry.WhileUnsuccessful(func() error {
+		werr := myself.folder.Read(path, id, func(buf []byte) fail.Error {
+			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotAvailable:
+					return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+				case *fail.ErrSyntax:
+					return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+				default:
+					return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+				}
+			}
+			return nil
+		})
+		if werr != nil {
+			switch werr.Cause().(type) {
+			case *fail.ErrNotFound:
+				return retry.StopRetryError(werr, "quit trying")
 			default:
-				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+				return werr
 			}
 		}
 		return nil
-	})
+	},
+		timings.SmallDelay(),
+		timings.ContextTimeout())
+
+	if rerr != nil {
+		return fail.ConvertError(rerr.Cause())
+	}
+
+	return nil
+
 }
 
 // readByReference gets the data from Object Storage
@@ -569,12 +620,37 @@ func (myself *MetadataCore) readByName(name string) fail.Error {
 	if myself.kindSplittedStore {
 		path = byNameFolderName
 	}
-	return myself.folder.Read(path, name, func(buf []byte) fail.Error {
-		if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
+
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	rerr := retry.WhileUnsuccessful(func() error {
+		werr := myself.folder.Read(path, name, func(buf []byte) fail.Error {
+			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
+				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
+			}
+			return nil
+		})
+		if werr != nil {
+			switch werr.Cause().(type) {
+			case *fail.ErrNotFound:
+				return retry.StopRetryError(werr, "quit trying")
+			default:
+				return werr
+			}
 		}
 		return nil
-	})
+	},
+		timings.SmallDelay(),
+		timings.ContextTimeout())
+
+	if rerr != nil {
+		return fail.ConvertError(rerr.Cause())
+	}
+
+	return nil
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
@@ -961,6 +1037,9 @@ func (myself *MetadataCore) unsafeDeserialize(buf []byte) (ferr fail.Error) {
 		err := json.Unmarshal(buf, &mapped)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
+			if strings.Contains(err.Error(), "unexpected end of input") {
+				return fail.NotAvailableErrorWithCause(err, nil, "server returned incomplete data")
+			}
 			return fail.SyntaxErrorWithCause(err, nil, "unmarshalling JSON to map failed")
 		}
 		if props, ok = mapped["properties"].(map[string]interface{}); ok {
