@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
@@ -32,29 +32,28 @@ import (
 var templateCmdName = "template"
 
 // TemplateCommand command
-var TemplateCommand = &cli.Command{
+var TemplateCommand = cli.Command{
 	Name:  "template",
 	Usage: "template COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		templateList,
 		templateMatch,
 		templateInspect,
 	},
 }
 
-var templateList = &cli.Command{
+var templateList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available templates",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "all",
 			Usage: "Lists all available templates (ignoring any filter set in tenant file)",
 		},
-		&cli.BoolFlag{
-			Name:    "scanned-only",
-			Aliases: []string{"S"},
-			Usage:   "Display only templates with scanned information",
+		cli.BoolFlag{
+			Name:  "scanned-only, S",
+			Usage: "Display only templates with scanned information",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -75,7 +74,7 @@ var templateList = &cli.Command{
 	},
 }
 
-var templateMatch = &cli.Command{
+var templateMatch = cli.Command{
 	Name:      "match",
 	Usage:     "List templates that match the SIZING",
 	ArgsUsage: "SIZING",
@@ -100,7 +99,7 @@ var templateMatch = &cli.Command{
 	},
 }
 
-var templateInspect = &cli.Command{
+var templateInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Display available template information",

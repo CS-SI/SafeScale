@@ -19,7 +19,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -30,17 +30,6 @@ import (
 const (
 	DoNotInstanciate = false
 	DoInstanciate    = true
-)
-
-var (
-	// Verbose tells if user asks more verbosity
-	Verbose bool
-	// Debug tells if user asks debug information
-	Debug bool
-
-	// hostName     string
-	// hostInstance *protocol.Host
-	// featureName  string
 )
 
 // extractFeatureArgument returns the name of the feature from the command arguments
