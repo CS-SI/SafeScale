@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -39,10 +38,10 @@ import (
 var volumeCmdName = "volume"
 
 // VolumeCommand volume command
-var VolumeCommand = &cli.Command{
+var VolumeCommand = cli.Command{
 	Name:  "volume",
 	Usage: "volume COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		volumeList,
 		volumeInspect,
 		volumeDelete,
@@ -52,15 +51,14 @@ var VolumeCommand = &cli.Command{
 	},
 }
 
-var volumeList = &cli.Command{
+var volumeList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available volumes",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
@@ -80,7 +78,7 @@ var volumeList = &cli.Command{
 	},
 }
 
-var volumeInspect = &cli.Command{
+var volumeInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
@@ -107,7 +105,7 @@ var volumeInspect = &cli.Command{
 	},
 }
 
-var volumeDelete = &cli.Command{
+var volumeDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove volume",
@@ -138,18 +136,18 @@ var volumeDelete = &cli.Command{
 	},
 }
 
-var volumeCreate = &cli.Command{
+var volumeCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a volume",
 	ArgsUsage: "<Volume_name>",
 	Flags: []cli.Flag{
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "size",
 			Value: 10,
 			Usage: "Size of the volume (in Go)",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "speed",
 			Value: "HDD",
 			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
@@ -192,27 +190,27 @@ var volumeCreate = &cli.Command{
 	},
 }
 
-var volumeAttach = &cli.Command{
+var volumeAttach = cli.Command{
 	Name:      "attach",
 	Aliases:   []string{"bind"},
 	Usage:     "Attach a volume to a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "path",
 			Value: abstract.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "format",
 			Value: "ext4",
 			Usage: "Filesystem format",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "do-not-format",
 			Usage: "Prevent the volume to be formatted (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so would not be mounted with this option)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "do-not-mount",
 			Usage: "Prevent the volume to be mounted",
 		},
@@ -247,7 +245,7 @@ var volumeAttach = &cli.Command{
 	},
 }
 
-var volumeDetach = &cli.Command{
+var volumeDetach = cli.Command{
 	Name:      "detach",
 	Aliases:   []string{"unbind"},
 	Usage:     "Detach a volume from a host",
