@@ -25,6 +25,6 @@ import (
 // cleanerCtx copies the task id value into a new context derived from context.Background
 // the idea is to use cleanerCtx for cleanup (or undo) operations -> if the main task is cancelled, it stops, but its cleanup (that initially shared the same task id, and because of that it might be cancelled too, won't)
 func cleanerCtx(ctx context.Context) (context.Context, error) {
-	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, ctx.Value(concurrency.KeyForTaskInContext))
+	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, ctx.Value(concurrency.KeyForTaskInContext)) // nolint
 	return derived, nil
 }
