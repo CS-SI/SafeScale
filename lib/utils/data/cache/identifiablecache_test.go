@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/stretchr/testify/require"
 )
 
@@ -163,4 +164,24 @@ func TestIdentifiableCache_AddEntry(t *testing.T) {
 	_, err = rc2.AddEntry(context.Background(), content)
 	require.NoError(t, err)
 
+}
+
+func TestFreeEntry(t *testing.T) {
+	task, xerr := concurrency.NewTask()
+	song := task.Context()
+
+	store, xerr := NewMapStore("store")
+	require.NoError(t, xerr)
+	rc2, err := NewSingleCache("cache", store)
+	require.NoError(t, err)
+	content := newReservation(song, "store", "content")
+	_ = content
+
+	err = rc2.ReserveEntry(song, "days", 1*time.Second)
+	require.NoError(t, err)
+
+	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, song.Value(concurrency.KeyForTaskInContext))
+
+	err = rc2.FreeEntry(derived, "days")
+	require.NoError(t, err)
 }

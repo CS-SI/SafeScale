@@ -250,7 +250,8 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 	defer func() {
 		if ferr != nil {
-			derr := networkCache.FreeEntry(context.Background(), req.Name)
+			derived, _ := cleanerCtx(ctx)
+			derr := networkCache.FreeEntry(derived, req.Name)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", req.Name))
 			}
@@ -446,7 +447,8 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	}
 	defer func() {
 		if ferr != nil {
-			derr := networkCache.FreeEntry(context.Background(), ref)
+			derived, _ := cleanerCtx(ctx)
+			derr := networkCache.FreeEntry(derived, ref)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", ref))
 			}

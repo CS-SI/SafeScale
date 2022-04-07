@@ -181,7 +181,8 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := kindCache.FreeEntry(context.Background(), identifiable.GetID()); derr != nil {
+			derived, _ := cleanerCtx(ctx)
+			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}

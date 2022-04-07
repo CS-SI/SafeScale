@@ -393,7 +393,7 @@ func (instance *mapStore) Add(ctx context.Context, content Cacheable) (_ *Entry,
 
 	defer func() {
 		if ferr != nil {
-			derr := instance.Free(context.Background(), id)
+			derr := instance.Free(ctx, id)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free entry '%s' in cache %s", id, instance.GetName()))
 			}
