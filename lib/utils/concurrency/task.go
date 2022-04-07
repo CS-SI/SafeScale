@@ -206,7 +206,7 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 			}
 			return nil, fail.InconsistentError("context value for '%s' is not a 'concurrency.Task'", KeyForTaskInContext)
 		}
-		return nil, fail.NotAvailableError("cannot find a value for '%s' in context", KeyForTaskInContext)
+		return nil, fail.InconsistentError("cannot find a value for '%s' in context", KeyForTaskInContext)
 	}
 
 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
