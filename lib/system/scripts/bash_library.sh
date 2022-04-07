@@ -303,7 +303,6 @@ function sfRetryEx() {
     local r
     local rc
     while true; do
-      echo "Running iteration..."
       r=\$($*)
       rc=\$?
       [ \$rc -eq 0 ] && echo \$r && break
