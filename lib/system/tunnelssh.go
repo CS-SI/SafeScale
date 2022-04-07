@@ -145,15 +145,37 @@ func (sc *SSHCommand) Display() string {
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	tu, _, err := sc.cfg.CreateTunneling()
-	if err != nil {
-		return 0, "", "", fail.NewError("failure creating tunnel: %w", err)
-	}
-	sc.tunnels = tu
-	defer tu.Close()
+	var rc int
+	var rout string
+	var rerr string
+	var pb fail.Error
 
-	rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
-	return rv, out, sterr, xerr
+	xerr := retry.WhileUnsuccessful(func() error { // retry only if we have a tunnel problem
+		tu, _, err := sc.cfg.CreateTunneling()
+		if err != nil {
+			return fail.NewError("failure creating tunnel: %w", err)
+		}
+		sc.tunnels = tu
+		defer tu.Close()
+
+		rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
+		if rv == -2 {
+			return fmt.Errorf("tunnel problem")
+		}
+		rc = rv
+		rout = out
+		rerr = sterr
+		pb = xerr
+		return nil
+	},
+		time.Second,
+		timeout+5*time.Second) // no need to increase this, if there is a tunnel problem, it happens really fast
+
+	if xerr != nil {
+		return -1, "", "", xerr
+	}
+
+	return rc, rout, rerr, pb
 }
 
 // PublicKeyFromStr ...
@@ -245,6 +267,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 		beginDial := time.Now()
 		retries := 0
+		eofCount := 0
 
 		var session *ssh.Session
 
@@ -255,8 +278,14 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			var newsession *ssh.Session
 			newsession, internalErr = client.NewSession()
 			if internalErr != nil {
-				retries++
+				retries = retries + 1 // nolint
 				logrus.Debugf("problem creating session: %s", internalErr.Error())
+				if strings.Contains(internalErr.Error(), "EOF") {
+					eofCount = eofCount + 1
+					if eofCount >= 10 {
+						return retry.StopRetryError(internalErr, "client seems dead")
+					}
+				}
 				return internalErr
 			}
 			if session != nil { // race condition mitigation
@@ -335,7 +364,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 				if _, ok := err.(*ssh.ExitMissingError); ok {
 					logrus.Warnf("Found exit missing error of command '%s'", sc.cmd.String())
-					errorCode = -1
+					errorCode = -2
 				}
 
 				if _, ok := err.(net.Error); ok {
@@ -543,7 +572,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 			cmd, _ := sc.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 10*time.Second) // FIXME: Remove hardcoded timeout
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 20*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				return xerr
 			}
