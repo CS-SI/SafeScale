@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var shareCmdName = "share"
@@ -123,7 +122,7 @@ var shareCreate = &cli.Command{
 			SecurityModes: c.StringSlice("securityModes"),
 		}
 
-		err := clientSession.Share.Create(&def, temporal.ExecutionTimeout())
+		err := clientSession.Share.Create(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "creation of share", true).Error()))
@@ -159,7 +158,7 @@ var shareDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		if err := clientSession.Share.Delete(shareList, temporal.ExecutionTimeout()); err != nil {
+		if err := clientSession.Share.Delete(shareList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of share", false).Error())))
 		}
@@ -227,7 +226,7 @@ var shareMount = &cli.Command{
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
 		}
-		err := clientSession.Share.Mount(&def, temporal.ExecutionTimeout())
+		err := clientSession.Share.Mount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "mount of nas", true).Error()))
@@ -260,7 +259,7 @@ var shareUnmount = &cli.Command{
 			Host:  &protocol.Reference{Name: hostName},
 			Share: &protocol.Reference{Name: shareName},
 		}
-		err := clientSession.Share.Unmount(&def, temporal.ExecutionTimeout())
+		err := clientSession.Share.Unmount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "unmount of share", true).Error()))
@@ -287,7 +286,7 @@ var shareInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, err := clientSession.Share.Inspect(c.Args().Get(0), temporal.ExecutionTimeout())
+		list, err := clientSession.Share.Inspect(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "inspection of share", false).Error()))

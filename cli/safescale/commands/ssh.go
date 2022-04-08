@@ -179,7 +179,7 @@ var sshConnect = &cli.Command{
 		}
 
 		// Check host status 1st
-		resp, err := clientSession.Host.GetStatus(c.Args().Get(0), temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.GetStatus(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))

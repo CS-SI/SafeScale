@@ -44,8 +44,16 @@ func (t tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	return service.List(newCtx, &googleprotobuf.Empty{})
@@ -63,8 +71,16 @@ func (t tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	return service.Get(newCtx, &googleprotobuf.Empty{})
@@ -81,8 +97,16 @@ func (t tenant) Set(name string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	_, err := service.Set(newCtx, &protocol.TenantName{Name: name})
@@ -100,8 +124,16 @@ func (t tenant) Inspect(name string, timeout time.Duration) (*protocol.TenantIns
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	return service.Inspect(newCtx, &protocol.TenantName{Name: name})
@@ -118,8 +150,16 @@ func (t tenant) Cleanup(name string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	_, err := service.Cleanup(newCtx, &protocol.TenantCleanupRequest{Name: name, Force: false})
@@ -137,8 +177,16 @@ func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	results, err := service.Scan(newCtx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
@@ -156,8 +204,16 @@ func (t tenant) Upgrade(name string, dryRun bool, timeout time.Duration) ([]stri
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	results, err := service.Upgrade(newCtx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})

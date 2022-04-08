@@ -41,8 +41,16 @@ func (img image) List(all bool, timeout time.Duration) (*protocol.ImageList, err
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	return service.List(newCtx, &protocol.ImageListRequest{All: all})
 }

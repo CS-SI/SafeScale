@@ -41,8 +41,16 @@ func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 	return service.List(newCtx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
@@ -59,8 +67,16 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 	return service.Match(newCtx, &protocol.TemplateMatchRequest{Sizing: sizing})
@@ -77,8 +93,16 @@ func (t template) Inspect(name string, timeout time.Duration) (*protocol.HostTem
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 

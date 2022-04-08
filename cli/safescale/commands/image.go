@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var imageCmdName = "image"
@@ -57,7 +56,7 @@ var imageList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		images, err := clientSession.Image.List(c.Bool("all"), temporal.ExecutionTimeout())
+		images, err := clientSession.Image.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))

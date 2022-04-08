@@ -45,8 +45,16 @@ func (n network) List(all bool, timeout time.Duration) (*protocol.NetworkList, e
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	return service.List(newCtx, &protocol.NetworkListRequest{
 		All: all,
@@ -115,8 +123,16 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	return service.Inspect(newCtx, &protocol.Reference{Name: name})
 
@@ -140,8 +156,16 @@ func (n network) Create(
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	def := &protocol.NetworkCreateRequest{
 		Name:          name,

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -75,7 +74,7 @@ var networkList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		networks, err := clientSession.Network.List(c.Bool("all"), temporal.ExecutionTimeout())
+		networks, err := clientSession.Network.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -158,7 +157,7 @@ var networkInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		network, err := clientSession.Network.Inspect(c.Args().First(), temporal.ExecutionTimeout())
+		network, err := clientSession.Network.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
@@ -177,7 +176,7 @@ var networkInspect = &cli.Command{
 
 		if len(network.Subnets) == 1 {
 			if network.Subnets[0] == network.Name {
-				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.ExecutionTimeout())
+				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, 0)
 				if err != nil {
 					err = fail.FromGRPCStatus(err)
 					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
@@ -237,7 +236,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 
 	var gateways = make(map[string]string, len(gwIDs))
 	if len(gwIDs) > 0 {
-		pgw, err = session.Host.Inspect(gwIDs[0], temporal.ExecutionTimeout())
+		pgw, err = session.Host.Inspect(gwIDs[0], 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			var what string
@@ -250,7 +249,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 		gateways[pgw.Name] = pgw.Id
 	}
 	if len(gwIDs) > 1 {
-		sgw, err = session.Host.Inspect(gwIDs[1], temporal.ExecutionTimeout())
+		sgw, err = session.Host.Inspect(gwIDs[1], 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
@@ -376,7 +375,7 @@ var networkCreate = &cli.Command{
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
 			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			20*time.Minute,
+			temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -445,7 +444,7 @@ var networkSecurityGroupList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, err := clientSession.SecurityGroup.List(c.Bool("all"), temporal.ExecutionTimeout())
+		list, err := clientSession.SecurityGroup.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -503,7 +502,7 @@ var networkSecurityGroupInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.SecurityGroup.Inspect(c.Args().Get(1), temporal.ExecutionTimeout())
+		resp, err := clientSession.SecurityGroup.Inspect(c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -598,7 +597,7 @@ var networkSecurityGroupCreate = &cli.Command{
 			Name:        c.Args().Get(1),
 			Description: c.String("description"),
 		}
-		resp, err := clientSession.SecurityGroup.Create(c.Args().First(), req, temporal.ExecutionTimeout())
+		resp, err := clientSession.SecurityGroup.Create(c.Args().First(), req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -642,7 +641,7 @@ var networkSecurityGroupClear = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), temporal.ExecutionTimeout())
+		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -692,7 +691,7 @@ var networkSecurityGroupDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), temporal.ExecutionTimeout())
+		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -744,7 +743,7 @@ var networkSecurityGroupBonds = &cli.Command{
 
 		kind := strings.ToLower(c.String("kind"))
 
-		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.ExecutionTimeout())
+		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
@@ -990,7 +989,7 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			rule.Targets = c.StringSlice("cidr")
 		}
 
-		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.ExecutionTimeout())
+		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1056,7 +1055,7 @@ var subnetList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.ExecutionTimeout())
+		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
@@ -1170,7 +1169,7 @@ var subnetInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), temporal.ExecutionTimeout())
+		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
@@ -1192,6 +1191,7 @@ var subnetInspect = &cli.Command{
 		}
 
 		mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
+		mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
 		return clitools.SuccessResponse(mapped)
 	},
 }

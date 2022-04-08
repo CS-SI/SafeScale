@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var templateCmdName = "template"
@@ -67,7 +66,7 @@ var templateList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), temporal.ExecutionTimeout())
+		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -92,7 +91,7 @@ var templateMatch = &cli.Command{
 		sizing = append(sizing, c.Args().First())
 		sizing = append(sizing, c.Args().Tail()...)
 		sizingAsString := strings.Join(sizing, ",")
-		templates, err := clientSession.Template.Match(sizingAsString, temporal.ExecutionTimeout())
+		templates, err := clientSession.Template.Match(sizingAsString, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -115,7 +114,7 @@ var templateInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		template, err := clientSession.Template.Inspect(c.Args().First(), temporal.ExecutionTimeout())
+		template, err := clientSession.Template.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))

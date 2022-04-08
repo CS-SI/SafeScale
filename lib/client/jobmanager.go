@@ -44,8 +44,16 @@ func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	return service.List(newCtx, &googleprotobuf.Empty{})
 }
@@ -62,8 +70,16 @@ func (c jobManager) Stop(uuid string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	var newCtx context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		newCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		newCtx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 
 	_, err := service.Stop(newCtx, &protocol.JobDefinition{Uuid: uuid})
 	return err
