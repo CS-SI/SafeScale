@@ -29,9 +29,8 @@ require (
 	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
-	github.com/pelletier/go-toml/v2 v2.0.0-beta.6
+	github.com/pelletier/go-toml/v2 v2.0.0-beta.7
 	github.com/pkg/sftp v1.13.4
-	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/sanity-io/litter v1.5.4
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
