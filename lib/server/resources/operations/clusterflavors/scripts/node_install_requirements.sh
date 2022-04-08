@@ -54,31 +54,6 @@ install_common_requirements() {
   echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/10-admins
   chmod o-rwx /etc/sudoers.d/10-admins
 
-  mkdir -p ~{{.ClusterAdminUsername}}/.local/bin && find ~{{.ClusterAdminUsername}}/.local -exec chmod 0770 {} \;
-  cat >> ~{{.ClusterAdminUsername}}/.bashrc <<- 'EOF'
-  pathremove() {
-    local IFS=':'
-    local NEWPATH=""
-    local DIR
-    local PATHVARIABLE=${2:-PATH}
-    for DIR in ${!PATHVARIABLE} ; do
-      [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-    done
-    export $PATHVARIABLE="$NEWPATH"
-  }
-  pathprepend() {
-    pathremove $1 $2
-    local PATHVARIABLE=${2:-PATH}
-    export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-  }
-  pathappend() {
-    pathremove $1 $2
-    local PATHVARIABLE=${2:-PATH}
-    export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-  }
-  pathprepend $HOME/.local/bin ''
-  pathprepend /usr/local/bin ''
-EOF
   chown -R {{ .ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
 
   for i in ~{{.ClusterAdminUsername}}/.hushlogin ~{{.ClusterAdminUsername}}/.cloud-warnings.skip; do

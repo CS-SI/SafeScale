@@ -1745,8 +1745,13 @@ identify_nics
 configure_network || failure 215 "failure configuring network"
 is_network_reachable || failure 215 "network is NOT ready after trying changing its DNS and configuration"
 
-[[ $cr -eq -1 ]] && add_common_repos || failure 215 "failure adding common repos, 2nd try"
-[[ $ep -eq -1 ]] && early_packages_update || failure 215 "failure in early packages update, 2nd try"
+[[ $cr -eq -1 ]] && {
+  add_common_repos || failure 215 "failure adding common repos, 2nd try"
+}
+
+[[ $ep -eq -1 ]] && {
+  early_packages_update || failure 215 "failure in early packages update, 2nd try"
+}
 
 install_packages || failure 215 "failure installing packages"
 install_rclone || failure 216 "failure installing rclone"
