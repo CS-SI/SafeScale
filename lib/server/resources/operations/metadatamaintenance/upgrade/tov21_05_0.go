@@ -146,7 +146,6 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (ferr fail.Error) {
 		}
 
 		innerXErr = tv.upgradeNetworkMetadataIfNeeded(owningInstance, networkInstance)
-		_ = networkInstance.Released()
 		innerXErr = debug.InjectPlannedFail(innerXErr)
 		return innerXErr
 	})
@@ -272,10 +271,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
-			defer func() {
-				_ = subnetInstance.Released()
-			}()
-
 			// -- create Security groups --
 			ctx := context.Background()
 			// owningInstance may be identical to currentInstance, so we need to pass the properties of currentInstance through context,
@@ -306,10 +301,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 					if derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
-				} else {
-					_ = gwSG.Released()
-					_ = internalSG.Released()
-					_ = publicSG.Released()
 				}
 			}()
 
@@ -472,10 +463,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			if innerXErr != nil {
 				return innerXErr
 			}
-			//goland:noinspection GoDeferInLoop
-			defer func(item resources.Host) {
-				_ = item.Released()
-			}(hostInstance)
 
 			innerXErr = tv.upgradeHostMetadataIfNeeded(hostInstance.(*operations.Host))
 			if innerXErr != nil {
@@ -507,9 +494,6 @@ func (tv toV21_05_0) upgradeHosts(svc iaas.Service) fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
-		defer func() {
-			_ = hostInstance.Released()
-		}()
 
 		return tv.upgradeHostMetadataIfNeeded(hostInstance.(*operations.Host))
 	})
@@ -559,9 +543,6 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 				if innerXErr != nil {
 					return innerXErr
 				}
-				defer func() {
-					_ = subnetInstance.Released()
-				}()
 
 				var previousID string
 				subnetID := subnetInstance.GetID()
@@ -955,10 +936,6 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 		if xerr != nil {
 			return xerr
 		}
-		//goland:noinspection GoDeferInLoop
-		defer func(item resources.Host) { // nolint
-			_ = item.Released()
-		}(host)
 
 		xerr = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -1166,12 +1143,6 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					}
 					return nErr
 				}
-				defer func() {
-					_ = networkInstance.Released()
-				}()
-				defer func() {
-					_ = subnetInstance.Released()
-				}()
 
 				config = &propertiesv3.ClusterNetwork{
 					NetworkID:          networkInstance.GetID(),
@@ -1204,12 +1175,6 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 				if nErr != nil {
 					return nErr
 				}
-				defer func() {
-					_ = networkInstance.Released()
-				}()
-				defer func() {
-					_ = subnetInstance.Released()
-				}()
 
 				config = &propertiesv3.ClusterNetwork{
 					NetworkID:      networkInstance.GetID(),
@@ -1361,10 +1326,6 @@ func (tv toV21_05_0) cleanupDeprecatedNetworkMetadata(svc iaas.Service) fail.Err
 			return innerXErr
 		}
 
-		defer func() {
-			_ = networkInstance.Released()
-		}()
-
 		return networkInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			abstractNetwork, ok := clonable.(*abstract.Network)
 			if !ok {
@@ -1395,9 +1356,6 @@ func (tv toV21_05_0) cleanupDeprecatedHostMetadata(svc iaas.Service) fail.Error 
 			return innerXErr
 		}
 
-		defer func() {
-			_ = hostInstance.Released()
-		}()
 		return hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if props.Lookup(hostproperty.NetworkV1) {
 				innerXErr = props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
@@ -1450,9 +1408,6 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 			return innerXErr
 		}
 
-		defer func() {
-			_ = clusterInstance.Released()
-		}()
 		return clusterInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if props.Lookup(clusterproperty.NodesV2) {
 				innerXErr := props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
@@ -1544,9 +1499,6 @@ func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
-		defer func() {
-			_ = subnetInstance.Released()
-		}()
 
 		var (
 			subnetHosts    map[string]string
@@ -1576,25 +1528,16 @@ func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
-		defer func() {
-			_ = sgGW.Released()
-		}()
 
-		sgPubIP, innerXErr := operations.LoadSecurityGroup(context.Background(), svc, subnetAbstract.PublicIPSecurityGroupID)
+		_, innerXErr = operations.LoadSecurityGroup(context.Background(), svc, subnetAbstract.PublicIPSecurityGroupID)
 		if innerXErr != nil {
 			return innerXErr
 		}
-		defer func() {
-			_ = sgPubIP.Released()
-		}()
 
 		sgLAN, innerXErr := operations.LoadSecurityGroup(context.Background(), svc, subnetAbstract.InternalSecurityGroupID)
 		if innerXErr != nil {
 			return innerXErr
 		}
-		defer func() {
-			_ = sgLAN.Released()
-		}()
 
 		// Bind gateways to appropriate Security Groups...
 		for _, v := range abstractSubnet.GatewayIDs {
@@ -1602,11 +1545,6 @@ func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			//goland:noinspection ALL
-			defer func(item resources.Host) {
-				_ = item.Released()
-			}(hostInstance)
 
 			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgLAN, true)
 			if innerXErr != nil {
@@ -1625,11 +1563,6 @@ func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			//goland:noinspection ALL
-			defer func(item resources.Host) {
-				_ = item.Released()
-			}(hostInstance)
 
 			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgLAN, true)
 			if innerXErr != nil {

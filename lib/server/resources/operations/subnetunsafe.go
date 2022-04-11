@@ -93,12 +93,6 @@ func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (ip string,
 			if innerErr != nil {
 				return innerErr
 			}
-			defer func() {
-				issue := hostInstance.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}()
 
 			var inErr fail.Error
 			ip, inErr = hostInstance.GetPrivateIP(ctx)

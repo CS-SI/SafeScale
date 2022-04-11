@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
@@ -152,81 +151,30 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	timings, xerr := svc.Timings()
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	shareCache, xerr := svc.GetCache(shareKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	updateCachedInformation := true
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := shareCache.Get(ctx, ref, cacheOptions...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find a Share '%s'", ref)
-		default:
-			return nil, xerr
-		}
 	}
 
 	var ok bool
-	if shareInstance, ok = cacheEntry.Content().(resources.Share); !ok {
+	if shareInstance, ok = anon.(resources.Share); !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
 	if shareInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
-	_ = cacheEntry.LockContent()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
-
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if updateCachedInformation && cacheEntry.LockCount() > 1 {
-		xerr = shareInstance.Reload(ctx)
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
-
 	return shareInstance, nil
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
-func onShareCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onShareCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	shareInstance, innerXErr := NewShare(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 	if innerXErr = shareInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -250,51 +198,13 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
@@ -1336,13 +1246,6 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 			logrus.Errorf(xerr.Error())
 			continue
 		}
-		//goland:noinspection ALL
-		defer func(hostInstance resources.Host) {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}(h)
 
 		mounts, xerr := h.GetMounts()
 		xerr = debug.InjectPlannedFail(xerr)

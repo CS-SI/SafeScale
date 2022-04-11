@@ -23,7 +23,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	uuid "github.com/gofrs/uuid"
@@ -41,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
@@ -71,8 +69,6 @@ type Service interface {
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
-	GetCache(string) (cache.Cache, fail.Error)
-
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
 
@@ -97,9 +93,6 @@ type service struct {
 	blacklistTemplateREs []*regexp.Regexp
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
-
-	cache     serviceCache
-	cacheLock *sync.Mutex
 }
 
 const (
@@ -172,30 +165,6 @@ func (instance service) GetName() (string, fail.Error) {
 	}
 
 	return instance.tenantName, nil
-}
-
-// GetCache returns the data.Cache instance corresponding to the name passed as parameter
-// If the cache does not exist, create it
-func (instance *service) GetCache(name string) (_ cache.Cache, ferr fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
-	}
-
-	instance.cacheLock.Lock()
-	defer instance.cacheLock.Unlock()
-
-	if _, ok := instance.cache.resources[name]; !ok {
-		rc, xerr := NewResourceCache(name)
-		if xerr != nil {
-			return rc, xerr
-		}
-
-		instance.cache.resources[name] = rc
-	}
-	return instance.cache.resources[name], nil
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket

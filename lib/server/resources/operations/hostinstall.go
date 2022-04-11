@@ -489,11 +489,6 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		if xerr != nil {
 			return xerr
 		}
-		defer func(h resources.Host) {
-			if derr := h.Released(); derr != nil {
-				logrus.Warn(derr)
-			}
-		}(gwInstance)
 
 		v["PrimaryGatewayIP"], xerr = gwInstance.GetPrivateIP(ctx)
 		if xerr != nil {
@@ -518,13 +513,6 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 				return xerr
 			}
 		} else {
-			defer func() {
-				issue := gwInstance.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}()
-
 			v["SecondaryGatewayIP"], xerr = gwInstance.GetPrivateIP(ctx)
 			if xerr != nil {
 				return xerr

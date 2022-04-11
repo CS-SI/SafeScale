@@ -6,6 +6,9 @@ all: generate
 
 generate:
 	@mkdir -p ./mocks || true
+	@echo "package valid" > ./valid/consts.go
+	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go
+	@$(GO) generate -run stringer . >/dev/null || true
 	@$(GO) generate -run minimock . >/dev/null || true
 	@(cd concurrency && make $@)
 	@(cd cli && make $@)
@@ -13,8 +16,7 @@ generate:
 	@(cd debug && make $@)
 	@(cd fail && make $@)
 	@(cd temporal && make $@)
-	@echo "package valid" > ./valid/consts.go
-	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go
+	@(cd retry && make $@)
 
 vet:
 	@$(GO) vet ./...
@@ -30,4 +32,4 @@ clean:
 	@(cd debug && make $@)
 	@(cd fail && make $@)
 	@(cd temporal && make $@)
-
+	@(cd retry && make $@)

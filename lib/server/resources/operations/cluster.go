@@ -53,7 +53,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
@@ -107,7 +106,7 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 		return nil, xerr
 	}
 
-	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
+	xerr = instance.updateCachedInformation()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -160,65 +159,21 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	updateCachedInformation := false
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
-	clusterCache, xerr := svc.GetCache(clusterKind)
-	xerr = debug.InjectPlannedFail(xerr)
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := clusterCache.Get(ctx, name, cacheOptions...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Cluster '%s'", name)
-		default:
-			return nil, xerr
-		}
 	}
 
 	var (
 		clusterInstance *Cluster
 		ok              bool
 	)
-	if clusterInstance, ok = cacheEntry.Content().(*Cluster); !ok {
+	if clusterInstance, ok = anon.(*Cluster); !ok {
 		return nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)
 	}
 	if clusterInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
-	}
-
-	cacheEntry.LockContent()
-
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if updateCachedInformation && cacheEntry.LockCount() > 1 {
-		xerr = clusterInstance.Reload(ctx)
-		if xerr != nil {
-			return nil, xerr
-		}
 	}
 
 	if clusterInstance.randomDelayCh == nil {
@@ -232,7 +187,7 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...
 }
 
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
-func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (cache.Cacheable, fail.Error) {
+func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (data.Identifiable, fail.Error) {
 	clusterInstance, xerr := NewCluster(ctx, svc)
 	if xerr != nil {
 		return nil, xerr
@@ -252,18 +207,24 @@ func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (cac
 		return nil, xerr
 	}
 
-	clusterInstance.updateCachedInformation()
+	xerr = clusterInstance.updateCachedInformation()
+	if xerr != nil {
+		return nil, xerr
+	}
 	return clusterInstance, nil
 }
 
 // updateCachedInformation updates information cached in the instance
-func (instance *Cluster) updateCachedInformation() {
+func (instance *Cluster) updateCachedInformation() fail.Error {
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
 
 	var index uint8
 	flavor, err := instance.unsafeGetFlavor()
-	if err == nil && flavor == clusterflavor.K8S {
+	if err != nil {
+		return err
+	}
+	if flavor == clusterflavor.K8S {
 		index++
 		instance.localCache.installMethods.Store(index, installmethod.Helm)
 	}
@@ -272,6 +233,7 @@ func (instance *Cluster) updateCachedInformation() {
 	instance.localCache.installMethods.Store(index, installmethod.Bash)
 	index++
 	instance.localCache.installMethods.Store(index, installmethod.None)
+	return nil
 }
 
 // IsNull tells if the instance should be considered as a null value
@@ -301,56 +263,13 @@ func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (fer
 			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 		}
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on failure, failed to free %s cache entry for key '%s'",
-						instance.MetadataCore.GetKind(), identifiable.GetID(),
-					),
-				)
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
-	instance.updateCachedInformation()
 
 	return nil
 }
@@ -3104,14 +3023,6 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 			if xerr != nil {
 				return xerr
 			}
-
-			//goland:noinspection ALL
-			defer func(i resources.Host) { // nolint
-				issue := i.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(hostInstance)
 
 			xerr = makers.JoinNodeToCluster(instance, hostInstance)
 			xerr = debug.InjectPlannedFail(xerr)

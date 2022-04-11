@@ -31,9 +31,6 @@ test:
 bashtest:
 	@(cd system && $(MAKE) $(@))
 
-beta:
-	@$(eval GO = "go1.18beta1")
-
 gensrc:
 	@(mkdir -p mocks) || true
 	@(cd server/iaas/userdata && $(MAKE) $(@))
@@ -41,9 +38,9 @@ gensrc:
 
 generate: gensrc sdk
 	@(cd protocol && $(MAKE) $@)
+	@(cd utils && $(MAKE) $@)
 	@(cd server && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
-	@(cd utils && $(MAKE) $@)
 
 sdk: gensrc
 	@(cd protocol && $(MAKE) $@)

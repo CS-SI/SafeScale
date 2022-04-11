@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 )
 
 // safescale share create --path="/shared/data" share1 host1
@@ -96,13 +95,6 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := shareInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	out, xerr := shareInstance.ToProtocol(job.Context())
 	if xerr != nil {
 		return nil, xerr
@@ -143,13 +135,6 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := shareInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = shareInstance.Delete(job.Context()); xerr != nil {
 		return empty, xerr
@@ -311,13 +296,6 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	if shareInstance == nil {
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
-
-	defer func() {
-		issue := shareInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return shareInstance.ToProtocol(job.Context())
 }

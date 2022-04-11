@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -44,12 +43,8 @@ const (
 	featureFileKind = "featurefile"
 )
 
-type featureFileSingleton struct {
-	cache *cache.SingleCache
-}
-
 var (
-	featureFileController featureFileSingleton
+	featureFileController = make(map[string]interface{})
 	featureFileFolders    = []string{
 		"$HOME/.safescale/features",
 		"$HOME/.config/safescale/features",
@@ -277,7 +272,7 @@ func (ff *FeatureFile) RemoveObserver(name string) error {
 //    - nil: everything worked as expected
 //    - fail.ErrNotFound: no FeatureFile is found with the name
 //    - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(ctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (_ *FeatureFile, xerr fail.Error) {
+func LoadFeatureFile(ctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (_ *FeatureFile, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -285,43 +280,25 @@ func LoadFeatureFile(ctx context.Context, svc iaas.Service, name string, embedde
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	timings, xerr := svc.Timings()
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) },
-		timings.MetadataTimeout(),
-	)
-	ce, xerr := featureFileController.cache.Get(ctx, name, cacheOptions...)
-	if xerr != nil {
-		// logrus.Error(callstack.DecorateWith("", xerr.Error(), "", 0))
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			return nil, fail.NotFoundError("failed to find Feature '%s'", name)
-		default:
-			return nil, xerr
-		}
-	}
-
-	featureFileInstance, ok := ce.Content().(*FeatureFile)
+	featureFileInstance, ok := anon.(*FeatureFile)
 	if !ok {
 		return nil, fail.InconsistentError("cache content for key '%s' is not a resources.Feature", name)
 	}
 	if featureFileInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Feature cache for key '%s'", name)
 	}
-	_ = ce.LockContent()
-	defer func() {
-		_ = ce.UnlockContent()
-	}()
 
 	return featureFileInstance, nil
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache
-func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (cache.Cacheable, fail.Error) {
+func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
 	var (
 		newInstance *FeatureFile
 		xerr        fail.Error
@@ -876,20 +853,7 @@ func onFeatureFileEvent(ctx context.Context, w *rfsnotify.RWatcher, e fsnotify.E
 		// From here, we need to invalidate cache entry, either because content has changed or file have been removed/renamed or updated
 		featureName := strings.TrimPrefix(strings.TrimSuffix(relativeName, extension), "/")
 		if len(featureName) != len(relativeName) {
-			_, xerr := featureFileController.cache.Get(ctx, featureName)
-			if xerr == nil {
-				xerr = featureFileController.cache.FreeEntry(ctx, featureName)
-			}
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// No cache corresponding, ignore the error
-					debug.IgnoreError(xerr)
-				default:
-					// otherwise, log it
-					logrus.Error(xerr)
-				}
-			}
+			delete(featureFileController, featureName)
 		}
 
 	case e.Op&fsnotify.Create == fsnotify.Create:
@@ -926,17 +890,4 @@ func StartFeatureFileWatcher() {
 			logrus.Error(err)
 		}
 	}()
-}
-
-// init creates the FeatureFile cache
-func init() {
-	store, xerr := cache.NewMapStore("store:" + featureFileKind)
-	if xerr != nil {
-		panic(xerr.Error())
-	}
-
-	featureFileController.cache, xerr = cache.NewSingleCache(featureFileKind, store)
-	if xerr != nil {
-		panic(xerr.Error())
-	}
 }

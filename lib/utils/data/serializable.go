@@ -14,21 +14,13 @@
  * limitations under the License.
  */
 
-package objectstorage
+package data
 
-import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-)
+//go:generate minimock -o mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Serializable
 
-func normalizeError(err error) fail.Error { // nolint
-	if err != nil {
-		switch realErr := err.(type) {
-		case fail.Error:
-			return realErr
-		default:
-			return fail.ConvertError(err)
-		}
-	}
-
-	return nil
+// Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
+// and reverse operation (Deserialize()
+type Serializable interface {
+	Serialize() ([]byte, error)
+	Deserialize([]byte) error
 }

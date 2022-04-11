@@ -40,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
@@ -88,48 +87,14 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	timings, xerr := svc.Timings()
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	updateCachedInformation := false
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
-	volumeCache, xerr := svc.GetCache(volumeKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := volumeCache.Get(ctx, ref, cacheOptions...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Volume '%s'", ref)
-		default:
-			return nil, xerr
-		}
 	}
 
 	var ok bool
-	volumeInstance, ok = cacheEntry.Content().(resources.Volume)
+	volumeInstance, ok = anon.(resources.Volume)
 	if !ok {
 		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
 	}
@@ -137,33 +102,16 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
 
-	_ = cacheEntry.LockContent()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
-
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if updateCachedInformation && cacheEntry.LockCount() > 1 {
-		xerr = volumeInstance.Reload(ctx)
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
-
 	return volumeInstance, nil
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
-func onVolumeCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	volumeInstance, innerXErr := NewVolume(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 	if innerXErr = volumeInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -189,51 +137,14 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 	return nil
 }
 
@@ -410,12 +321,12 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			xerr = fail.ConvertError(fail.Cause(xerr))
-		default:
-		}
-	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
+			default:
+				return xerr
+			}
 		case *fail.ErrNotFound:
 			logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
 		default:
@@ -468,7 +379,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.Service()
-	existing, xerr := LoadVolume(ctx, svc, req.Name)
+	_, xerr = LoadVolume(ctx, svc, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -478,10 +389,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
 	} else {
-		issue := existing.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
@@ -1300,14 +1207,6 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		//goland:noinspection ALL
-		defer func(item resources.Host) {
-			issue := item.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}(hostInstance)
 
 		vols, _ := hostInstance.(*Host).unsafeGetVolumes()
 		device, ok := vols.DevicesByID[volumeID]

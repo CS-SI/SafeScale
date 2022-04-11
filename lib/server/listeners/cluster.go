@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -103,12 +102,6 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	req, xerr := converters.ClusterRequestFromProtocolToAbstract(in)
 	if xerr != nil {
@@ -123,13 +116,6 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return instance.ToProtocol()
 }
@@ -167,13 +153,6 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	st, xerr := instance.GetState()
 	if xerr != nil {
@@ -217,12 +196,6 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return instance.ToProtocol()
 }
@@ -258,12 +231,6 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return empty, instance.Start(job.Context())
 }
@@ -302,12 +269,6 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return empty, instance.Stop(job.Context())
 }
@@ -395,12 +356,6 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	// Instructs adding nodes
 	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, operations.ExtractFeatureParameters(in.GetParameters()), in.GetKeepOnFailure())
@@ -417,10 +372,6 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		}
 
 		out.Nodes = append(out.Nodes, h)
-		err := v.Released()
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
 	}
 	return out, nil
 }
@@ -459,12 +410,6 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	count := uint(in.GetCount())
 	if count == 0 {
@@ -523,12 +468,6 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	list, xerr := instance.ListNodes(job.Context())
 	if xerr != nil {
@@ -588,12 +527,6 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	nodeList, xerr := clusterInstance.ListNodes(job.Context())
 	if xerr != nil {
@@ -609,12 +542,6 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return hostInstance.ToProtocol(job.Context())
 }
@@ -657,12 +584,6 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	nodeList, xerr := clusterInstance.ListNodes(job.Context())
 	if xerr != nil {
@@ -721,12 +642,6 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	nodeList, xerr := clusterInstance.ListNodes(jobCtx)
 	if xerr != nil {
@@ -742,12 +657,6 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return empty, hostInstance.Stop(jobCtx)
 }
@@ -793,12 +702,6 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	nodeList, xerr := clusterInstance.ListNodes(job.Context())
 	if xerr != nil {
@@ -814,12 +717,6 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = hostInstance.Start(job.Context())
 	return empty, xerr
@@ -865,12 +762,6 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	nodeList, xerr := clusterInstance.ListNodes(job.Context())
 	if xerr != nil {
@@ -886,12 +777,6 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	state, xerr := hostInstance.ForceGetState(job.Context())
 	if xerr != nil {
@@ -935,12 +820,6 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	list, xerr := instance.ListMasters(job.Context())
 	if xerr != nil {
@@ -989,23 +868,11 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	master, xerr := instance.FindAvailableMaster(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := master.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	out, xerr := master.ToProtocol(job.Context())
 	if xerr != nil {
@@ -1055,12 +922,6 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := instance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	masterList, xerr := instance.ListMasters(job.Context())
 	if xerr != nil {
@@ -1076,12 +937,6 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := master.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	out, xerr := master.ToProtocol(job.Context())
 	if xerr != nil {
@@ -1132,12 +987,6 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	masterList, xerr := clusterInstance.ListMasters(job.Context())
 	if xerr != nil {
@@ -1153,12 +1002,6 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = hostInstance.Stop(job.Context())
 	return empty, xerr
@@ -1205,12 +1048,6 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	masterList, xerr := clusterInstance.ListMasters(job.Context())
 	if xerr != nil {
@@ -1226,12 +1063,6 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		return empty, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = hostInstance.Start(job.Context())
 	return empty, xerr
@@ -1277,12 +1108,6 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := clusterInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	masterList, xerr := clusterInstance.ListMasters(job.Context())
 	if xerr != nil {
@@ -1298,12 +1123,6 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	state, xerr := hostInstance.ForceGetState(job.Context())
 	if xerr != nil {

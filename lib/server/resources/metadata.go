@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
@@ -31,10 +30,10 @@ import (
 // Callback describes the function prototype to use to inspect metadata
 type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 
+//go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v21/lib/server/resources -i Metadata -t ./microfallback.tmpl -o mfall.go -l ""
+
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
-	cache.Cacheable
-
 	IsNull() bool
 	Alter(callback Callback, options ...data.ImmutableKeyValue) fail.Error // protects the data for exclusive write
 	BrowseFolder(callback func(buf []byte) fail.Error) fail.Error          // walks through host folder and executes a callback for each entries
