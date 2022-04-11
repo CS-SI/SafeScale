@@ -9,8 +9,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
-	github.com/dgraph-io/ristretto v0.1.0
-	github.com/eko/gocache/v2 v2.2.0
+	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
 	github.com/felixge/fgprof v0.9.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofrs/uuid v4.2.0+incompatible
@@ -21,6 +20,7 @@ require (
 	github.com/itchyny/gojq v0.12.7
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
+	github.com/makholm/covertool v0.0.0-20210624102319-bb1c7c716204
 	github.com/mitchellh/mapstructure v1.4.3
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
@@ -29,23 +29,25 @@ require (
 	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
+	github.com/pelletier/go-toml/v2 v2.0.0-beta.8
 	github.com/pkg/sftp v1.13.4
-	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/sanity-io/litter v1.5.4
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli/v2 v2.4.0
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.71.0
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.27.1
+	gopkg.in/fsnotify.v1 v1.4.7
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
