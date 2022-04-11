@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,11 @@ func (n share) Create(def *protocol.ShareDefinition, timeout time.Duration) erro
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	_, err := service.Create(newCtx, def)
 	if err != nil {
@@ -65,6 +71,11 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	var (
 		mutex sync.Mutex
@@ -110,6 +121,11 @@ func (n share) List(timeout time.Duration) (*protocol.ShareList, error) {
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	list, err := service.List(newCtx, &protocol.Reference{})
 	if err != nil {
@@ -130,6 +146,11 @@ func (n share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) 
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	_, err := service.Mount(newCtx, def)
 	if err != nil {
@@ -150,6 +171,11 @@ func (n share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	_, err := service.Unmount(newCtx, def)
 	if err != nil {
@@ -170,6 +196,11 @@ func (n share) Inspect(name string, timeout time.Duration) (*protocol.ShareMount
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	list, err := service.Inspect(newCtx, &protocol.Reference{Name: name})
 	if err != nil {

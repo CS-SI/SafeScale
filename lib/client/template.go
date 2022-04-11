@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -41,6 +42,11 @@ func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 	return service.List(newCtx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
@@ -58,6 +64,11 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 	return service.Match(newCtx, &protocol.TemplateMatchRequest{Sizing: sizing})
@@ -75,6 +86,11 @@ func (t template) Inspect(name string, timeout time.Duration) (*protocol.HostTem
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 

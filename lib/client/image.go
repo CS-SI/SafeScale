@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -41,6 +42,11 @@ func (img image) List(all bool, timeout time.Duration) (*protocol.ImageList, err
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	return service.List(newCtx, &protocol.ImageListRequest{All: all})
 }

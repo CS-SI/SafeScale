@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +46,11 @@ func (c bucket) List(all bool, timeout time.Duration) (*protocol.BucketListRespo
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	r, err := service.List(newCtx, &protocol.BucketListRequest{All: all})
 	if err != nil {
@@ -66,6 +72,11 @@ func (c bucket) Create(name string, timeout time.Duration) error {
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	_, err := service.Create(newCtx, &protocol.BucketRequest{Name: name})
 	return err
@@ -89,6 +100,11 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	bucketDeleter := func(aname string) {
 		var crash error
@@ -127,6 +143,11 @@ func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketRes
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	return service.Inspect(newCtx, &protocol.BucketRequest{Name: name})
 }
@@ -143,6 +164,11 @@ func (c bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dura
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	_, err := service.Mount(newCtx, &protocol.BucketMountRequest{
 		Bucket: bucketName,
@@ -164,6 +190,11 @@ func (c bucket) Unmount(bucketName, hostName string, timeout time.Duration) erro
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	_, err := service.Unmount(newCtx, &protocol.BucketMountRequest{
 		Bucket: bucketName,

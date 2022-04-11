@@ -84,7 +84,7 @@ var sshRun = &cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
-			timeout = temporal.HostOperationTimeout()
+			timeout = 0
 		}
 		retcode, _, _, err := clientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
@@ -133,7 +133,7 @@ var sshCopy = &cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
-			timeout = temporal.HostOperationTimeout()
+			timeout = 0
 		}
 		retcode, _, _, err := clientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
 		if err != nil {

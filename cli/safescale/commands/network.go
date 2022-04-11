@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const networkCmdLabel = "network"
@@ -122,7 +121,7 @@ var networkDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), c.Bool("force"))
+		err := clientSession.Network.Delete(networkList, 0, c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -375,7 +374,7 @@ var networkCreate = &cli.Command{
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
 			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.ExecutionTimeout(),
+			0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -887,7 +886,7 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 		}
 
 		if err := clientSession.SecurityGroup.AddRule(
-			c.Args().Get(1), rule, temporal.ExecutionTimeout(),
+			c.Args().Get(1), rule, 0,
 		); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1123,7 +1122,7 @@ var subnetDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.Delete(networkRef, list, temporal.ExecutionTimeout(), c.Bool("force"))
+		err := clientSession.Subnet.Delete(networkRef, list, 0, c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1290,7 +1289,7 @@ var subnetCreate = &cli.Command{
 			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
 			c.String("gwname"), uint32(c.Int("gwport")), c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.ExecutionTimeout(),
+			0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1590,7 +1589,7 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.BindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1642,7 +1641,7 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.UnbindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1711,7 +1710,7 @@ var subnetSecurityGroupListCommand = &cli.Command{
 		}
 
 		list, err := clientSession.Subnet.ListSecurityGroups(
-			networkRef, c.Args().Get(1), state, temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), state, 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1763,7 +1762,7 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.EnableSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1815,7 +1814,7 @@ var subnetSecurityGroupDisableCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.DisableSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)

@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,11 @@ func (sg securityGroup) List(all bool, timeout time.Duration) (*protocol.Securit
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	rv, err := service.List(newCtx, &protocol.SecurityGroupListRequest{All: all})
@@ -71,6 +77,11 @@ func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.Se
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	rv, err := service.Inspect(newCtx, &protocol.Reference{Name: ref})
@@ -94,6 +105,11 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	protoRequest := &protocol.SecurityGroupCreateRequest{
 		Network:     &protocol.Reference{Name: networkRef},
@@ -126,6 +142,11 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	var (
 		mutex sync.Mutex
@@ -175,6 +196,11 @@ func (sg securityGroup) Clear(ref string, timeout time.Duration) error {
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.Clear(newCtx, &protocol.Reference{Name: ref})
@@ -196,6 +222,11 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.Reset(newCtx, &protocol.Reference{Name: ref})
@@ -217,6 +248,11 @@ func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, 
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	req := &protocol.SecurityGroupRuleRequest{
@@ -242,6 +278,11 @@ func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRul
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	def := &protocol.SecurityGroupRuleDeleteRequest{
 		Group: &protocol.Reference{Name: group},
@@ -267,6 +308,11 @@ func (sg securityGroup) Bonds(group, kind string, timeout time.Duration) (*proto
 
 	// finally, using context
 	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	req := &protocol.SecurityGroupBondsRequest{
 		Target: &protocol.Reference{Name: group},

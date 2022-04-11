@@ -511,7 +511,7 @@ var clusterCreateCommand = &cli.Command{
 			Parameters:     c.StringSlice("param"),
 			DefaultSshPort: gatewaySSHPort,
 		}
-		res, err := clientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
+		res, err := clientSession.Cluster.Create(&req, 0)
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -575,7 +575,7 @@ var clusterDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.Delete(clusterName, force, temporal.HostLongOperationTimeout())
+		err = clientSession.Cluster.Delete(clusterName, force, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -750,7 +750,7 @@ var clusterExpandCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		hosts, err := clientSession.Cluster.Expand(&req, temporal.HostLongOperationTimeout())
+		hosts, err := clientSession.Cluster.Expand(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -812,7 +812,7 @@ var clusterShrinkCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		if _, err = clientSession.Cluster.Shrink(&req, temporal.HostLongOperationTimeout()); err != nil {
+		if _, err = clientSession.Cluster.Shrink(&req, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
