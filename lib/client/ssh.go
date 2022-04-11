@@ -563,27 +563,3 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 
 	return nil
 }
-
-// WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
-func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.Duration) error {
-	task, xerr := s.session.GetTask()
-	if xerr != nil {
-		return xerr
-	}
-	ctx := task.Context()
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	if timeout < temporal.HostOperationTimeout() {
-		timeout = temporal.HostOperationTimeout()
-	}
-	sshCfg, err := s.getHostSSHConfig(hostName)
-	if err != nil {
-		return err
-	}
-
-	_, xerr = sshCfg.WaitServerReady(ctx, "ready", timeout)
-	return xerr
-}

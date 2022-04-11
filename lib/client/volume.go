@@ -17,7 +17,6 @@
 package client
 
 import (
-	"context"
 	"strings"
 	"sync"
 	"time"
@@ -45,16 +44,7 @@ func (v volume) List(all bool, timeout time.Duration) (*protocol.VolumeListRespo
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	return service.List(newCtx, &protocol.VolumeListRequest{All: all})
@@ -71,16 +61,7 @@ func (v volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeIns
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	return service.Inspect(newCtx, &protocol.Reference{Name: name})
@@ -97,16 +78,7 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	var (
 		mutex sync.Mutex
@@ -154,16 +126,7 @@ func (v volume) Create(def *protocol.VolumeCreateRequest, timeout time.Duration)
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	return service.Create(newCtx, def)
@@ -180,16 +143,7 @@ func (v volume) Attach(def *protocol.VolumeAttachmentRequest, timeout time.Durat
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	_, err := service.Attach(newCtx, def)
@@ -208,16 +162,7 @@ func (v volume) Detach(volumeName string, hostName string, timeout time.Duration
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	_, err := service.Detach(newCtx, &protocol.VolumeDetachmentRequest{

@@ -17,7 +17,6 @@
 package client
 
 import (
-	"context"
 	"strings"
 	"sync"
 	"time"
@@ -48,16 +47,7 @@ func (h host) List(all bool, timeout time.Duration) (*protocol.HostList, error) 
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	return service.List(newCtx, &protocol.HostListRequest{All: all})
@@ -74,16 +64,7 @@ func (h host) Inspect(name string, timeout time.Duration) (*protocol.Host, error
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	return service.Inspect(newCtx, &protocol.Reference{Name: name})
@@ -100,16 +81,7 @@ func (h host) GetStatus(name string, timeout time.Duration) (*protocol.HostStatu
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	return service.Status(newCtx, &protocol.Reference{Name: name})
@@ -126,16 +98,7 @@ func (h host) Reboot(name string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.Reboot(newCtx, &protocol.Reference{Name: name})
@@ -153,16 +116,7 @@ func (h host) Start(name string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.Start(newCtx, &protocol.Reference{Name: name})
@@ -180,16 +134,7 @@ func (h host) Stop(name string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	_, err := service.Stop(newCtx, &protocol.Reference{Name: name})
 	return err
@@ -206,16 +151,7 @@ func (h host) Create(req *protocol.HostDefinition, timeout time.Duration) (*prot
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	return service.Create(newCtx, req)
@@ -232,16 +168,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	var (
 		mutex sync.Mutex
@@ -307,16 +234,7 @@ func (h host) Resize(def *protocol.HostDefinition, timeout time.Duration) (*prot
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	return service.Resize(newCtx, def)
@@ -333,16 +251,7 @@ func (h host) ListFeatures(hostRef string, all bool, timeout time.Duration) (*pr
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_HOST,
@@ -368,16 +277,7 @@ func (h host) InspectFeature(hostRef, featureName string, embedded bool, timeout
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_HOST,
@@ -400,16 +300,7 @@ func (h host) ExportFeature(hostRef, featureName string, embedded bool, timeout 
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_HOST,
@@ -432,16 +323,7 @@ func (h host) CheckFeature(hostRef, featureName string, params map[string]string
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
@@ -466,16 +348,7 @@ func (h host) AddFeature(hostRef, featureName string, params map[string]string, 
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
@@ -500,16 +373,7 @@ func (h host) RemoveFeature(hostRef, featureName string, params map[string]strin
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
@@ -534,16 +398,7 @@ func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	var state protocol.SecurityGroupState
 	switch enable {
@@ -573,16 +428,7 @@ func (h host) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) 
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.SecurityGroupHostBindRequest{
 		Group: &protocol.Reference{Name: sgRef},
@@ -604,16 +450,7 @@ func (h host) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) 
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.SecurityGroupHostBindRequest{
 		Group: &protocol.Reference{Name: sgRef},
@@ -635,16 +472,7 @@ func (h host) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration)
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.SecurityGroupHostBindRequest{
 		Group: &protocol.Reference{Name: sgRef},
@@ -666,16 +494,7 @@ func (h host) ListSecurityGroups(hostRef, state string, timeout time.Duration) (
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 

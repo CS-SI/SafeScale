@@ -47,16 +47,7 @@ func (s subnet) List(networkRef string, all bool, timeout time.Duration) (*proto
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	return service.List(newCtx, &protocol.SubnetListRequest{
 		Network: &protocol.Reference{Name: networkRef},
@@ -124,16 +115,7 @@ func (s subnet) Inspect(networkRef, name string, timeout time.Duration) (*protoc
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.SubnetInspectRequest{
 		Network: &protocol.Reference{Name: networkRef},
@@ -162,16 +144,7 @@ func (s subnet) Create(
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	def := &protocol.SubnetCreateRequest{
 		Name:     name,
@@ -200,16 +173,7 @@ func (s subnet) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable bo
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	var state protocol.SecurityGroupState
 	switch enable {
@@ -240,16 +204,7 @@ func (s subnet) UnbindSecurityGroup(networkRef, subnetRef, sgRef string, timeout
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.SecurityGroupSubnetBindRequest{
 		Group:   &protocol.Reference{Name: sgRef},
@@ -272,16 +227,7 @@ func (s subnet) EnableSecurityGroup(networkRef, subnetRef, sgRef string, timeout
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	req := &protocol.SecurityGroupSubnetBindRequest{
 		Group:   &protocol.Reference{Name: sgRef},
@@ -304,16 +250,7 @@ func (s subnet) DisableSecurityGroup(networkRef, subnetRef, sgRef string, timeou
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 
@@ -338,16 +275,7 @@ func (s subnet) ListSecurityGroups(networkRef, subnetRef, state string, timeout 
 	}
 
 	// finally, using context
-	var newCtx context.Context
-	var cancel context.CancelFunc
-
-	if timeout > 0 {
-		newCtx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
-	} else {
-		newCtx, cancel = context.WithCancel(ctx)
-		defer cancel()
-	}
+	newCtx := ctx
 
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 
