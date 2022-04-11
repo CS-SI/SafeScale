@@ -587,6 +587,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 				return fe
 			}
 
+			// FIXME: Last line MUST start with 0, if not -> there was an error, and we cannot recover from that one
 			return nil
 		},
 		temporal.DefaultDelay(),
@@ -649,6 +650,9 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 	<-rCh
 	if ctx.Err() != nil {
 		return -1, "", "", fail.Wrap(ctx.Err())
+	}
+	if currentCtx.Err() != nil {
+		return -1, "", "", fail.Wrap(currentCtx.Err())
 	}
 	return -1, "", "", fail.NewError("timeout copying...")
 }
