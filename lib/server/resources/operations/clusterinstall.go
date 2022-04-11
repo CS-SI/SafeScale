@@ -890,8 +890,11 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.M
 
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
-			return fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
+			xerr := fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
+			_ = xerr.Annotate("ran_but_failed", true)
+			return xerr
 		}
+
 		logrus.Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
 	}
 	return nil

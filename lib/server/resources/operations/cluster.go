@@ -2711,7 +2711,10 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 	xerr = instance.installRemoteDesktop(task.Context(), parameters)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
+		// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+		if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+			return xerr
+		}
 	}
 
 	// Install ansible feature on Cluster (all masters)
