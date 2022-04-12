@@ -22,7 +22,7 @@ type locationcache struct {
 	inner        Location
 	cacheManager *cache.Cache
 
-	locks map[string]sync.RWMutex
+	locks map[string]*sync.RWMutex
 	mutex *sync.Mutex
 }
 
@@ -39,7 +39,7 @@ func newLocationcache(inner Location) (*locationcache, error) {
 
 	cacheManager := cache.New(ristrettoStore)
 
-	return &locationcache{inner: inner, cacheManager: cacheManager, locks: make(map[string]sync.RWMutex), mutex: &sync.Mutex{}}, nil
+	return &locationcache{inner: inner, cacheManager: cacheManager, locks: make(map[string]*sync.RWMutex), mutex: &sync.Mutex{}}, nil
 }
 
 func (l locationcache) Protocol() (string, fail.Error) {
@@ -138,12 +138,12 @@ func (l locationcache) getLock(s string, s2 string) *sync.RWMutex {
 
 	key := fmt.Sprintf("%s:%s", s, s2)
 	if mu, ok := l.locks[key]; ok {
-		return &mu
+		return mu
 	}
 
-	l.locks[key] = sync.RWMutex{}
-	mu, _ := l.locks[key]
-	return &mu
+	l.locks[key] = &sync.RWMutex{}
+	mu, _ := l.locks[key] // nolint
+	return mu
 }
 
 func (l locationcache) ReadObject(s string, s2 string, writer io.Writer, i int64, i2 int64) fail.Error {

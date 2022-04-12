@@ -345,7 +345,7 @@ func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStor
 }
 
 // GetBucket ...
-func (instance location) GetBucket(bucketName string) (_ bucket, ferr fail.Error) {
+func (instance *location) GetBucket(bucketName string) (_ bucket, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {

@@ -39,10 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-const (
-	featureFileKind = "featurefile"
-)
-
 var (
 	featureFileController = make(map[string]interface{})
 	featureFileFolders    = []string{

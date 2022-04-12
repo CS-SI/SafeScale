@@ -66,5 +66,8 @@ func main() {
 		panic(err)
 	}
 
-	cacheManager.Delete(ctx, "my-key")
+	err = cacheManager.Delete(ctx, "my-key")
+	if err != nil {
+		panic(err)
+	}
 }
