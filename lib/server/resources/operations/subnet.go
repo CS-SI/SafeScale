@@ -1000,7 +1000,7 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (ferr fai
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

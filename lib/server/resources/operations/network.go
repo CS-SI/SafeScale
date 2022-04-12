@@ -875,7 +875,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

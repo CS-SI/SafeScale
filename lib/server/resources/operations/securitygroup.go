@@ -775,7 +775,7 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -802,7 +802,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -946,7 +946,7 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 		return xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1135,7 +1135,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 		return fail.InvalidParameterError("hostInstance", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1189,7 +1189,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1465,7 +1465,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1550,7 +1550,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 		return fail.InvalidParameterError("rs", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

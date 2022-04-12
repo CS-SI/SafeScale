@@ -1004,7 +1004,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		return fail.InvalidParameterCannotBeNilError("target")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1161,7 +1161,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

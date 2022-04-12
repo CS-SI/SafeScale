@@ -359,7 +359,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1027,7 +1027,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

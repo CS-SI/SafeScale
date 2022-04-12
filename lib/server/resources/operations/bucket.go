@@ -665,7 +665,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("hostName")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
