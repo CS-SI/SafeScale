@@ -1176,10 +1176,14 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		}
 	}
 
+	if !strings.HasPrefix(stdout, "0,") {
+		return stdout, fail.NewError("PROVISIONING ERROR: host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.IPAddress, originalPhase,
+			temporal.FormatDuration(time.Since(begins)), stdout)
+	}
+
 	logrus.Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname, originalPhase,
-		temporal.FormatDuration(time.Since(begins)), stdout,
-	)
+		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 

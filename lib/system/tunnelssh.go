@@ -587,7 +587,6 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 				return fe
 			}
 
-			// FIXME: Last line MUST start with 0, if not -> there was an error, and we cannot recover from that one
 			return nil
 		},
 		temporal.DefaultDelay(),
@@ -597,10 +596,15 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 		logrus.Debugf("WaitServerReady: the wait finished with: %v", retryErr)
 		return stdout, retryErr
 	}
+
+	if !strings.HasPrefix(stdout, "0,") {
+		return stdout, fail.NewError("PROVISIONING ERROR: host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sc.IPAddress, originalPhase,
+			temporal.FormatDuration(time.Since(begins)), stdout)
+	}
+
 	logrus.Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sc.IPAddress, originalPhase,
-		temporal.FormatDuration(time.Since(begins)), stdout,
-	)
+		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
