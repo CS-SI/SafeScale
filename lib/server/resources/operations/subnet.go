@@ -1211,7 +1211,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 	var force bool
 	var ok bool
 	if cv := ctx.Value("force"); cv != nil {
-		logrus.Warnf("value: %s", spew.Sdump(cv))
+		logrus.Warningf("value: %s", spew.Sdump(cv))
 		force, ok = cv.(bool)
 		if !ok {
 			return fail.InvalidRequestError("force flag must be a bool")
@@ -1222,18 +1222,26 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		logrus.Tracef("forcing subnet deletion")
 	}
 
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	lastCtx := task.Context()
+
 	var (
 		subnetAbstract *abstract.Subnet
 		subnetHosts    *propertiesv1.SubnetHosts
 	)
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		subnetAbstract, ok = clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
-		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)        // nolint
+		lastCtx = context.WithValue(lastCtx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
+		lastCtx = context.WithValue(lastCtx, currentSubnetPropertiesContextKey, props)        // nolint
 
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
@@ -1245,12 +1253,6 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			return nil
 		})
 	})
-	if xerr != nil {
-		return xerr
-	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1287,7 +1289,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(task.Context(), svc, k, WithoutReloadOption); innerXErr != nil {
+					if hostInstance, innerXErr := LoadHost(lastCtx, svc, k, WithoutReloadOption); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
 						err := hostInstance.Released()
@@ -1328,7 +1330,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		}
 
 		// 1st delete gateway(s)
-		gwIDs, innerXErr := instance.deleteGateways(task.Context(), as)
+		gwIDs, innerXErr := instance.deleteGateways(lastCtx, as)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -1357,7 +1359,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.onRemovalUnbindSecurityGroups(task.Context(), subnetHosts, ssgV1)
+			innerXErr := instance.onRemovalUnbindSecurityGroups(lastCtx, subnetHosts, ssgV1)
 			return innerXErr
 		})
 		if innerXErr != nil {
@@ -1367,7 +1369,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		// 4st free CIDR index if the Subnet has been created for a single Host
 		if as.SingleHostCIDRIndex > 0 {
 			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-			networkInstance, innerXErr := LoadNetwork(task.Context(), instance.Service(), as.Network)
+			networkInstance, innerXErr := LoadNetwork(lastCtx, instance.Service(), as.Network)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1385,7 +1387,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		}
 
 		// Delete Subnet's own Security Groups
-		return instance.deleteSecurityGroups(task.Context(), [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
+		return instance.deleteSecurityGroups(lastCtx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
