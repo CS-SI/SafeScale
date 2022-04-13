@@ -68,9 +68,12 @@ func (n network) Delete(names []string, timeout time.Duration, force bool) error
 	}
 
 	// finally, using context
-	aCtx, cancel := context.WithTimeout(ctx, timeout)
-	newCtx := context.WithValue(aCtx, "force", force) // nolint
-	defer cancel()
+	newCtx := context.WithValue(ctx, "force", force)
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	var (
 		mutex sync.Mutex
