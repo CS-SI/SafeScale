@@ -37,7 +37,6 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli v1.22.1
-	github.com/urfave/cli/v2 v2.4.0
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee

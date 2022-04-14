@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	urfcli "github.com/urfave/cli/v2"
+	urfcli "github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/cmdstatus"
 )
@@ -141,7 +141,7 @@ func FailureResponse(err error) error {
 	r := newResponse()
 	_ = r.Failure(err)
 	if r.Error != nil {
-		return urfcli.Exit("", r.Error.ExitCode())
+		return urfcli.NewExitError("", r.Error.ExitCode())
 	}
 	return nil
 }
