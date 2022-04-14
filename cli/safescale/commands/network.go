@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -34,17 +34,16 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const networkCmdLabel = "network"
 
 // NetworkCommand command
-var NetworkCommand = &cli.Command{
+var NetworkCommand = cli.Command{
 	Name:    "network",
 	Aliases: []string{"net"},
 	Usage:   "network COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		networkCreate,
 		networkDelete,
 		networkInspect,
@@ -54,15 +53,14 @@ var NetworkCommand = &cli.Command{
 	},
 }
 
-var networkList = &cli.Command{
+var networkList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List existing Networks (created by SafeScale)",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "provider",
-			Aliases: []string{"all", "a"},
-			Usage:   "Lists all Networks available on tenant (not only those created by SafeScale)",
+		cli.BoolFlag{
+			Name:  "provider, all, a",
+			Usage: "Lists all Networks available on tenant (not only those created by SafeScale)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -91,16 +89,15 @@ var networkList = &cli.Command{
 	},
 }
 
-var networkDelete = &cli.Command{
+var networkDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete NETWORKREF",
 	ArgsUsage: "NETWORKREF [NETWORKREF ...]",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "force",
-			Aliases: []string{"f"},
-			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -122,24 +119,18 @@ var networkDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), c.Bool("force"))
+		err := clientSession.Network.Delete(networkList, 0, c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "deletion of network", false,
-						).Error(),
-					),
-				),
+				clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network", false).Error())),
 			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var networkInspect = &cli.Command{
+var networkInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Show details of a network",
@@ -275,54 +266,47 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 	return nil
 }
 
-var networkCreate = &cli.Command{
+var networkCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a network",
 	ArgsUsage: "NETWORKREF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:    "cidr",
-			Aliases: []string{"N"},
-			Value:   "",
-			Usage:   "CIDR of the Network (default: 192.168.0.0/23)",
+		cli.StringFlag{
+			Name:  "cidr, N",
+			Value: "",
+			Usage: "CIDR of the Network (default: 192.168.0.0/23)",
 		},
-		&cli.BoolFlag{
-			Name:    "empty",
-			Aliases: []string{"no-default-subnet"},
-			Value:   false,
-			Usage:   "Do not create a default Subnet with the same name than the Network",
+		cli.BoolFlag{
+			Name:  "empty, no-default-subnet",
+			Usage: "Do not create a default Subnet with the same name than the Network",
 		},
-		&cli.BoolFlag{
-			Name:    "keep-on-failure",
-			Aliases: []string{"k"},
-			Usage:   "If used, the resource(s) is(are) not deleted on failure (default: not set)",
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If used, the resource(s) is(are) not deleted on failure (default: not set)",
 		},
-		&cli.StringFlag{
-			Name: "os",
-			// Value: "Ubuntu 20.04",
-			Usage: "Image name for the gateway",
+		cli.StringFlag{
+			Name:  "os",
+			Usage: `Image name for the gateway`,
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "gwname",
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
-		&cli.IntFlag{
-			Name:    "gwport",
-			Aliases: []string{"default-ssh-port"},
-			Value:   22,
+		cli.IntFlag{
+			Name:  "gwport, default-ssh-port",
+			Value: 22,
 			Usage: `Define the port to use for SSH (default: 22) in default subnet;
 			Meaningful only if --empty is not used`,
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name: "failover",
 			Usage: `creates 2 gateways for the network with a VIP used as internal default route;
 			Meaningful only if --empty is not used`,
 		},
-		&cli.StringFlag{
-			Name:    "sizing",
-			Aliases: []string{"S"},
+		cli.StringFlag{
+			Name: "sizing, S",
 			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 					<component> can be cpu, cpufreq, gpu, ram, disk
 					<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
@@ -375,39 +359,31 @@ var networkCreate = &cli.Command{
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
 			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.ExecutionTimeout(),
+			0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "creation of network", true,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network", true).Error())))
 		}
 		return clitools.SuccessResponse(network)
 	},
 }
 
 // networkSecurityGroupCommand command
-var networkSecurityCommands = &cli.Command{
+var networkSecurityCommands = cli.Command{
 	Name:  securityCmdLabel,
 	Usage: "manages security of networks",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		networkSecurityGroupCommands,
 	},
 }
 
 // networkSecurityGroupCommand command
-var networkSecurityGroupCommands = &cli.Command{
+var networkSecurityGroupCommands = cli.Command{
 	Name:    groupCmdLabel,
 	Aliases: []string{"sg"},
 	Usage:   groupCmdLabel + " COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		networkSecurityGroupList,
 		networkSecurityGroupCreate,
 		networkSecurityGroupDelete,
@@ -418,16 +394,15 @@ var networkSecurityGroupCommands = &cli.Command{
 	},
 }
 
-var networkSecurityGroupList = &cli.Command{
+var networkSecurityGroupList = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "List available Security Groups (created by SafeScale)",
 	ArgsUsage: "[NETWORKREF]",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Usage:   "List all Security Groups on tenant (not only those created by SafeScale)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all Security Groups on tenant (not only those created by SafeScale)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -447,15 +422,7 @@ var networkSecurityGroupList = &cli.Command{
 		list, err := clientSession.SecurityGroup.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "list of Security Groups", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
 		}
 		if len(list.SecurityGroups) > 0 {
 			var resp []interface{}
@@ -476,7 +443,7 @@ var networkSecurityGroupList = &cli.Command{
 	},
 }
 
-var networkSecurityGroupInspect = &cli.Command{
+var networkSecurityGroupInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Shows details of Security Group",
@@ -560,16 +527,15 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 	return out, nil
 }
 
-var networkSecurityGroupCreate = &cli.Command{
+var networkSecurityGroupCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a new Security Group",
 	ArgsUsage: "NETWORKREF GROUPREF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:    "description",
-			Aliases: []string{"comment,d"},
-			Usage:   "Describe the group",
+		cli.StringFlag{
+			Name:  "description, comment, d",
+			Usage: "Describe the Security Group",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -601,21 +567,14 @@ var networkSecurityGroupCreate = &cli.Command{
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "creation of security-group", true,
-						).Error(),
-					),
-				),
-			)
+				clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of security-group", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
 // networkSecurityGroupClear ...
-var networkSecurityGroupClear = &cli.Command{
+var networkSecurityGroupClear = cli.Command{
 	Name:      "clear",
 	Aliases:   []string{"reset"},
 	Usage:     "deletes all rules of a Security Group",
@@ -644,30 +603,21 @@ var networkSecurityGroupClear = &cli.Command{
 		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "reset of a security-group", true,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var networkSecurityGroupDelete = &cli.Command{
+var networkSecurityGroupDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove Security Group",
 	ArgsUsage: "NETWORKREF GROUPREF [GROUPREF ...]",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "force",
 			Usage: "Force deletion, removing from hosts and networks if needed",
-			Value: false,
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -694,27 +644,19 @@ var networkSecurityGroupDelete = &cli.Command{
 		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "deletion of security-group", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var networkSecurityGroupBonds = &cli.Command{
+var networkSecurityGroupBonds = cli.Command{
 	Name:      "bonds",
 	Aliases:   []string{"links", "attachments"},
 	Usage:     "List resources Security Group is bound to",
 	ArgsUsage: "NETWORKREF GROUPREF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "kind",
 			Value: "all",
 			Usage: "Narrow to the kind of resource specified; can be 'hosts', 'subnets' or 'all' (default: 'all')",
@@ -785,11 +727,11 @@ var networkSecurityGroupBonds = &cli.Command{
 const ruleCmdLabel = "rule"
 
 // networkSecurityGroupRuleCommand command
-var networkSecurityGroupRuleCommand = &cli.Command{
+var networkSecurityGroupRuleCommand = cli.Command{
 	Name:      ruleCmdLabel,
 	Usage:     "manages rules in Security Groups of Networks",
 	ArgsUsage: "NETWORKREF|- GROUPREF",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		networkSecurityGroupRuleAdd,
 		networkSecurityGroupRuleDelete,
 	},
@@ -797,45 +739,43 @@ var networkSecurityGroupRuleCommand = &cli.Command{
 
 // networkSecurityGroupRuleAdd ...
 // NETWORKREF is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
-var networkSecurityGroupRuleAdd = &cli.Command{
+var networkSecurityGroupRuleAdd = cli.Command{
 	Name:      "add",
 	Aliases:   []string{"new"},
 	Usage:     "add a new rule to a Security Group",
 	ArgsUsage: "NETWORKREF|- GROUPREF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "description",
 			Value: "",
 		},
-		&cli.StringFlag{
-			Name:    "direction",
-			Aliases: []string{"D"},
-			Value:   "",
-			Usage:   "ingress or egress",
+		cli.StringFlag{
+			Name:  "direction, D",
+			Value: "",
+			Usage: "ingress or egress",
 		},
-		&cli.StringFlag{
-			Name:  "protocol",
+		cli.StringFlag{
+			Name:  "protocol, P",
 			Value: "tcp",
 			Usage: "Protocol",
 		},
-		&cli.StringFlag{
-			Name:    "type",
-			Aliases: []string{"T"},
-			Value:   "ipv4",
-			Usage:   "ipv4 or ipv6",
+		cli.StringFlag{
+			Name:  "type, T",
+			Value: "ipv4",
+			Usage: "ipv4 or ipv6",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "port-from",
 			Value: 0,
 			Usage: "first port of the rule",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "port-to",
 			Value: 0,
 			Usage: "last port of the rule",
 		},
-		&cli.StringSliceFlag{
-			Name:  "cidr",
+		cli.StringSliceFlag{
+			Name:  "cidr, N",
 			Usage: "source/target of the rule; may be used multiple times",
 		},
 	},
@@ -887,18 +827,10 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 		}
 
 		if err := clientSession.SecurityGroup.AddRule(
-			c.Args().Get(1), rule, temporal.ExecutionTimeout(),
+			c.Args().Get(1), rule, 0,
 		); err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "addition of a rule to a security-group", true,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -906,41 +838,39 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 
 // networkSecurityGroupRuleDelete ...
 // NETWORKREF is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
-var networkSecurityGroupRuleDelete = &cli.Command{
+var networkSecurityGroupRuleDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove", "destroy"},
 	Usage:     "delete a rule from a Security Group",
 	ArgsUsage: "NETWORKREF|- GROUPREF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name: "direction",
-			// Aliases: []string{"D"},
+		cli.StringFlag{
+			Name:  "direction, D",
 			Value: "",
 			Usage: "ingress or egress",
 		},
-		&cli.StringFlag{
-			Name:  "protocol",
+		cli.StringFlag{
+			Name:  "protocol, P",
 			Value: "tcp",
 			Usage: "Protocol",
 		},
-		&cli.StringFlag{
-			Name: "type",
-			// Aliases: []string{"T"},
+		cli.StringFlag{
+			Name:  "type, T",
 			Value: "ipv4",
 			Usage: "ipv4 or ipv6",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "port-from",
 			Value: 0,
 			Usage: "first port of the rule",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "port-to",
 			Value: 0,
 			Usage: "last port of the rule",
 		},
-		&cli.StringSliceFlag{
-			Name:  "cidr",
+		cli.StringSliceFlag{
+			Name:  "cidr, N",
 			Usage: "source/target of the rule",
 		},
 	},
@@ -992,15 +922,7 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "deletion of a rule from a security-group", true,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1009,10 +931,10 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 const subnetCmdLabel = "subnet"
 
 // SubnetCommands command
-var subnetCommands = &cli.Command{
+var subnetCommands = cli.Command{
 	Name:  subnetCmdLabel,
 	Usage: "manages Subnets of Networks",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		subnetCreate,
 		subnetDelete,
 		subnetInspect,
@@ -1022,16 +944,15 @@ var subnetCommands = &cli.Command{
 	},
 }
 
-var subnetList = &cli.Command{
+var subnetList = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "List existing Subnets (created by SafeScale)",
 	ArgsUsage: "NETWORKREF",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Usage:   "List all Subnets on tenant (not only those created by SafeScale)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all Subnets on tenant (not only those created by SafeScale)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -1079,21 +1000,20 @@ var subnetList = &cli.Command{
 	},
 }
 
-var subnetDelete = &cli.Command{
+var subnetDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete SUBNETREF",
 	ArgsUsage: "NETWORKREF SUBNETREF [SUBNETREF ...]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
+		cli.StringFlag{
+			Name:  "network, net",
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
-		&cli.BoolFlag{
-			Name:    "force",
-			Aliases: []string{"f"},
-			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -1123,24 +1043,16 @@ var subnetDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.Delete(networkRef, list, temporal.ExecutionTimeout(), c.Bool("force"))
+		err := clientSession.Subnet.Delete(networkRef, list, 0, c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "deletion of subnet", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var subnetInspect = &cli.Command{
+var subnetInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Show details of a subnet",
@@ -1196,45 +1108,42 @@ var subnetInspect = &cli.Command{
 	},
 }
 
-var subnetCreate = &cli.Command{
+var subnetCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:    "cidr",
-			Aliases: []string{"N"},
-			Value:   "",
-			Usage:   "cidr of the network",
+		cli.StringFlag{
+			Name:  "cidr, N",
+			Value: "",
+			Usage: "cidr of the network",
 		},
-		&cli.StringFlag{
-			Name: "os",
-			// Value: "Ubuntu 20.04",
-			Usage: "Image name for the gateway",
+		cli.StringFlag{
+			Name:  "os",
+			Value: "",
+			Usage: `Image name for the gateway`,
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "gwname",
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "gwport",
 			Value: 22,
 			Usage: "port to use for SSH on the gateway",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "failover",
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
-		&cli.BoolFlag{
-			Name:    "keep-on-failure",
-			Aliases: []string{"k"},
-			Usage:   "If used, the resource(s) is(are) not deleted on failure (default: not set)",
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If used, the resource(s) is(are) not deleted on failure (default: not set)",
 		},
-		&cli.StringFlag{
-			Name:    "sizing",
-			Aliases: []string{"S"},
+		cli.StringFlag{
+			Name: "sizing, S",
 			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
@@ -1259,9 +1168,7 @@ var subnetCreate = &cli.Command{
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1290,19 +1197,11 @@ var subnetCreate = &cli.Command{
 			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
 			c.String("gwname"), uint32(c.Int("gwport")), c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.ExecutionTimeout(),
+			0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "creation of subnet", true,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of subnet", true).Error())))
 		}
 		return clitools.SuccessResponse(network)
 	},
@@ -1311,13 +1210,13 @@ var subnetCreate = &cli.Command{
 const vipCmdLabel = "vip"
 
 // subnetVIPCommands handles 'network vip' commands
-var subnetVIPCommands = &cli.Command{
+var subnetVIPCommands = cli.Command{
 	Name:      vipCmdLabel,
 	Aliases:   []string{"virtualip"},
 	Usage:     "manage subnet virtual IP",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		subnetVIPCreateCommand,
 		subnetVIPInspectCommand,
 		subnetVIPDeleteCommand,
@@ -1326,7 +1225,7 @@ var subnetVIPCommands = &cli.Command{
 	},
 }
 
-var subnetVIPCreateCommand = &cli.Command{
+var subnetVIPCreateCommand = cli.Command{
 	Name:    "create",
 	Aliases: []string{"new"},
 	Usage: `creates a VIP in a Subnet of a Network.
@@ -1351,22 +1250,18 @@ var subnetVIPCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		return clitools.FailureResponse(
-			clitools.ExitOnErrorWithMessage(
-				exitcode.NotImplemented, "creation of subnet VIP not yet implemented",
-			),
-		)
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
 	},
 }
 
-var subnetVIPInspectCommand = &cli.Command{
+var subnetVIPInspectCommand = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Show details of a VIP of a Subnet in a Network",
 	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
+		cli.StringFlag{
+			Name:  "network, net",
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
@@ -1390,23 +1285,18 @@ var subnetVIPInspectCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		return clitools.FailureResponse(
-			clitools.ExitOnErrorWithMessage(
-				exitcode.NotImplemented, "inspection of subnet VIP not yet implemented",
-			),
-		)
-
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
 	},
 }
 
-var subnetVIPDeleteCommand = &cli.Command{
+var subnetVIPDeleteCommand = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "destroy"},
 	Usage:     "Deletes a VIP from a Subnet in a Network",
 	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
+		cli.StringFlag{
+			Name:  "network, net",
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
@@ -1430,22 +1320,18 @@ var subnetVIPDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		return clitools.FailureResponse(
-			clitools.ExitOnErrorWithMessage(
-				exitcode.NotImplemented, "deletion of subnet VIP not yet implemented",
-			),
-		)
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
 	},
 }
 
-var subnetVIPBindCommand = &cli.Command{
+var subnetVIPBindCommand = cli.Command{
 	Name:      "bind",
 	Aliases:   []string{"attach"},
 	Usage:     "Attach a VIP to a host",
 	ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
+		cli.StringFlag{
+			Name:  "network, net",
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
@@ -1472,32 +1358,26 @@ var subnetVIPBindCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 		}
 
-		return clitools.FailureResponse(
-			clitools.ExitOnErrorWithMessage(
-				exitcode.NotImplemented, "bind host to subnet VIP not yet implemented",
-			),
-		)
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
 	},
 }
 
-var subnetVIPUnbindCommand = &cli.Command{
+var subnetVIPUnbindCommand = cli.Command{
 	Name:      "unbind",
 	Aliases:   []string{"detach"},
 	Usage:     "unbind NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 	ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "network",
+		cli.StringFlag{
+			Name:  "network, net",
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+			c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1514,22 +1394,18 @@ var subnetVIPUnbindCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 		}
 
-		return clitools.FailureResponse(
-			clitools.ExitOnErrorWithMessage(
-				exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented",
-			),
-		)
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
 	},
 }
 
 const securityCmdLabel = "security"
 
 // subnetSecurityGroupCommand command
-var subnetSecurityCommands = &cli.Command{
+var subnetSecurityCommands = cli.Command{
 	Name:      securityCmdLabel,
 	Usage:     "manages security of subnets",
 	ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		subnetSecurityGroupCommands,
 	},
 }
@@ -1537,10 +1413,10 @@ var subnetSecurityCommands = &cli.Command{
 const groupCmdLabel = "group"
 
 // subnetSecurityGroupCommand command
-var subnetSecurityGroupCommands = &cli.Command{
+var subnetSecurityGroupCommands = cli.Command{
 	Name:  groupCmdLabel,
 	Usage: "manages security group of subnets",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		subnetSecurityGroupAddCommand,
 		subnetSecurityGroupRemoveCommand,
 		subnetSecurityGroupEnableCommand,
@@ -1549,24 +1425,20 @@ var subnetSecurityGroupCommands = &cli.Command{
 	},
 }
 
-var subnetSecurityGroupAddCommand = &cli.Command{
+var subnetSecurityGroupAddCommand = cli.Command{
 	Name:      "add",
 	Aliases:   []string{"attach", "bind"},
 	Usage:     "Add a security group to a subnet",
 	ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "disabled",
-			Value: false,
 			Usage: "adds the security group to the network without applying its rules",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
-			groupCmdLabel, c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1590,35 +1462,24 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.BindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "adding security group to network", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "adding security group to network", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var subnetSecurityGroupRemoveCommand = &cli.Command{
+var subnetSecurityGroupRemoveCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm", "detach", "unbind"},
 	Usage:     "removes a security group from a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
-			groupCmdLabel, c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1642,37 +1503,27 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.UnbindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "removing security group from network", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "removing security group from network", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var subnetSecurityGroupListCommand = &cli.Command{
+var subnetSecurityGroupListCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"show", "ls"},
 	Usage:     "lists security groups bound to subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Value:   true,
-			Usage:   "List all security groups no matter what is the status (enabled or disabled)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all security groups no matter what is the status (enabled or disabled)",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "state",
 			Value: "all",
 			Usage: "Narrows to the security groups in defined state; can be 'enabled', 'disabled' or 'all' (default: 'all')",
@@ -1680,10 +1531,7 @@ var subnetSecurityGroupListCommand = &cli.Command{
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
-			groupCmdLabel, c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1711,35 +1559,24 @@ var subnetSecurityGroupListCommand = &cli.Command{
 		}
 
 		list, err := clientSession.Subnet.ListSecurityGroups(
-			networkRef, c.Args().Get(1), state, temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), state, 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "listing bound security groups of subnet", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
 		}
 		return clitools.SuccessResponse(list.Subnets)
 	},
 }
 
-var subnetSecurityGroupEnableCommand = &cli.Command{
+var subnetSecurityGroupEnableCommand = cli.Command{
 	Name:      "enable",
 	Aliases:   []string{"activate"},
 	Usage:     "Enables a security group on a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
-			groupCmdLabel, c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1763,7 +1600,7 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.EnableSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1781,7 +1618,7 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 	},
 }
 
-var subnetSecurityGroupDisableCommand = &cli.Command{
+var subnetSecurityGroupDisableCommand = cli.Command{
 	Name:      "disable",
 	Aliases:   []string{"deactivate"},
 	Usage:     "disable SUBNETREF GROUPREF",
@@ -1815,7 +1652,7 @@ var subnetSecurityGroupDisableCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.DisableSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), 0,
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)

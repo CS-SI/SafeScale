@@ -18,7 +18,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -30,7 +29,7 @@ import (
 	"syscall"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/v21/lib/client"
@@ -82,7 +81,7 @@ func main() {
 		clientSession *client.Session
 	)
 
-	mainCtx, cancelfunc := context.WithCancel(context.Background())
+	// mainCtx, cancelfunc := context.WithCancel(context.Background())
 
 	signalCh := make(chan os.Signal, 1)
 
@@ -95,7 +94,7 @@ func main() {
 	len(Tags) > 1 { // nolint
 		app.Version += fmt.Sprintf(", with Tags: (%s)", Tags)
 	}
-	app.Authors = []*cli.Author{
+	app.Authors = []cli.Author{
 		{
 			Name:  "CS-SI",
 			Email: "safescale@csgroup.eu",
@@ -105,21 +104,18 @@ func main() {
 	app.EnableBashCompletion = true
 
 	cli.VersionFlag = &cli.BoolFlag{
-		Name:    "version",
-		Aliases: []string{"V"},
-		Usage:   "Print program version",
+		Name:  "version, V",
+		Usage: "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "verbose",
-			Aliases: []string{"v"},
-			Usage:   "Increase verbosity",
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
 		},
 		&cli.BoolFlag{
-			Name:    "debug",
-			Aliases: []string{"d"},
-			Usage:   "Show debug information",
+			Name:  "debug, d",
+			Usage: "Show debug information",
 		},
 		&cli.StringFlag{
 			Name: "profile",
@@ -131,15 +127,13 @@ func main() {
                 for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
 		},
 		&cli.StringFlag{
-			Name:    "server",
-			Aliases: []string{"S"},
-			Usage:   "Connect to daemon on server SERVER (default: localhost:50051)",
-			Value:   "",
+			Name:  "server, S",
+			Usage: "Connect to daemon on server SERVER (default: localhost:50051)",
+			Value: "",
 		},
 		&cli.StringFlag{
-			Name:    "tenant",
-			Aliases: []string{"T"},
-			Usage:   "Use tenant TENANT (default: none)",
+			Name:  "tenant, T",
+			Usage: "Use tenant TENANT (default: none)",
 		},
 	}
 
@@ -197,7 +191,7 @@ func main() {
 				<-signalCh
 				atomic.StoreUint32(&onAbort, 1)
 				cleanup(clientSession, &onAbort)
-				cancelfunc()
+				// cancelfunc()
 			}
 		}()
 		return nil
@@ -255,7 +249,9 @@ func main() {
 		}
 	*/
 
-	err := app.RunContext(mainCtx, os.Args)
+	// VPL: there is no RunContext in urfave/cli/v1
+	// err := app.RunContext(mainCtx, os.Args)
+	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println("Error Running App : " + err.Error())
 	}

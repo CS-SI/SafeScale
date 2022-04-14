@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
 	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -203,28 +203,25 @@ func main() {
 	app.Usage = "safescaled [OPTIONS]"
 	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
 
-	app.Authors = []*cli.Author{
+	app.Authors = []cli.Author{
 		{
 			Name:  "CS-SI",
 			Email: "safescale@csgroup.eu",
 		},
 	}
 	cli.VersionFlag = &cli.BoolFlag{
-		Name:    "version",
-		Aliases: []string{"V"},
-		Usage:   "Print program version",
+		Name:  "version, V",
+		Usage: "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "verbose",
-			Aliases: []string{"v"},
-			Usage:   "Increase verbosity",
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
 		},
 		&cli.BoolFlag{
-			Name:    "debug",
-			Aliases: []string{"d"},
-			Usage:   "Show debug information",
+			Name:  "debug, d",
+			Usage: "Show debug information",
 		},
 		&cli.StringFlag{
 			Name: "profile",
@@ -236,9 +233,8 @@ func main() {
                 for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
 		},
 		&cli.StringFlag{
-			Name:    "listen",
-			Aliases: []string{"l"},
-			Usage:   "Listen on specified port `IP:PORT` (default: localhost:50051)",
+			Name:  "listen, l",
+			Usage: "Listen on specified port `IP:PORT` (default: localhost:50051)",
 		},
 	}
 

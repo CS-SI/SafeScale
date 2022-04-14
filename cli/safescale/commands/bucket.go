@@ -18,7 +18,7 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
@@ -30,10 +30,10 @@ import (
 const bucketCmdLabel = "bucket"
 
 // BucketCommand bucket command
-var BucketCommand = &cli.Command{
+var BucketCommand = cli.Command{
 	Name:  "bucket",
 	Usage: "bucket COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		bucketList,
 		bucketCreate,
 		bucketDelete,
@@ -43,15 +43,14 @@ var BucketCommand = &cli.Command{
 	},
 }
 
-var bucketList = &cli.Command{
+var bucketList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List buckets",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Usage:   "List all Buckets on tenant (not only those created by SafeScale)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all Buckets on tenant (not only those created by SafeScale)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -72,7 +71,7 @@ var bucketList = &cli.Command{
 	},
 }
 
-var bucketCreate = &cli.Command{
+var bucketCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
@@ -99,7 +98,7 @@ var bucketCreate = &cli.Command{
 	},
 }
 
-var bucketDelete = &cli.Command{
+var bucketDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Remove a bucket",
@@ -130,7 +129,7 @@ var bucketDelete = &cli.Command{
 	},
 }
 
-var bucketInspect = &cli.Command{
+var bucketInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
@@ -157,12 +156,12 @@ var bucketInspect = &cli.Command{
 	},
 }
 
-var bucketMount = &cli.Command{
+var bucketMount = cli.Command{
 	Name:      "mount",
 	Usage:     "Mount a bucket on the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "path",
 			Value: abstract.DefaultBucketMountPoint,
 			Usage: "Mount point of the bucket",
@@ -195,7 +194,7 @@ var bucketMount = &cli.Command{
 	},
 }
 
-var bucketUnmount = &cli.Command{
+var bucketUnmount = cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a Bucket from the filesystem of a host",

@@ -18,23 +18,22 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
-
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
 var tenantCmdLabel = "tenant"
 
 // TenantCommand command
-var TenantCommand = &cli.Command{
+var TenantCommand = cli.Command{
 	Name:  tenantCmdLabel,
 	Usage: "manages tenants",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		tenantListCommand,
 		tenantGetCommand,
 		tenantSetCommand,
@@ -45,7 +44,7 @@ var TenantCommand = &cli.Command{
 }
 
 // tenantListCommand handles 'safescale tenant list'
-var tenantListCommand = &cli.Command{
+var tenantListCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available tenants",
@@ -68,7 +67,7 @@ var tenantListCommand = &cli.Command{
 }
 
 // tenantGetCommand handles 'safescale tenant get'
-var tenantGetCommand = &cli.Command{
+var tenantGetCommand = cli.Command{
 	Name:    "get",
 	Aliases: []string{"current"},
 	Usage:   "Get current tenant",
@@ -91,7 +90,7 @@ var tenantGetCommand = &cli.Command{
 }
 
 // tenantSetCommand handles 'safescale tenant set'
-var tenantSetCommand = &cli.Command{
+var tenantSetCommand = cli.Command{
 	Name:  "set",
 	Usage: "Set tenant to work with",
 	Action: func(c *cli.Context) (ferr error) {
@@ -118,7 +117,7 @@ var tenantSetCommand = &cli.Command{
 }
 
 // tenantInspectCommand handles 'safescale tenant inspect'
-var tenantInspectCommand = &cli.Command{
+var tenantInspectCommand = cli.Command{
 	Name:    "inspect",
 	Aliases: []string{"show"},
 	Usage:   "Inspect tenant",
@@ -146,12 +145,16 @@ var tenantInspectCommand = &cli.Command{
 }
 
 // tenantScanCommand handles 'safescale tenant scan' command
-var tenantScanCommand = &cli.Command{
+var tenantScanCommand = cli.Command{
 	Name:  "scan",
 	Usage: "Scan tenant's templates [--dry-run] [--template <template name>]",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{Name: "dry-run", Aliases: []string{"n"}},
-		&cli.StringSliceFlag{Name: "template", Aliases: []string{"t"}},
+		cli.BoolFlag{
+			Name: "dry-run, n",
+		},
+		cli.StringSliceFlag{
+			Name: "template, t",
+		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
@@ -179,12 +182,12 @@ var tenantScanCommand = &cli.Command{
 const tenantMetadataCmdLabel = "metadata"
 
 // tenantMetadataCommands handles 'safescale tenant metadata' commands
-var tenantMetadataCommands = &cli.Command{
+var tenantMetadataCommands = cli.Command{
 	Name:      tenantMetadataCmdLabel,
 	Usage:     "manage tenant metadata",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		tenantMetadataUpgradeCommand,
 		// tenantMetadataBackupCommand,
 		// tenantMetadataRestoreCommand,
@@ -194,11 +197,11 @@ var tenantMetadataCommands = &cli.Command{
 
 const tenantMetadataUpgradeLabel = "upgrade"
 
-var tenantMetadataUpgradeCommand = &cli.Command{
+var tenantMetadataUpgradeCommand = cli.Command{
 	Name:  tenantMetadataUpgradeLabel,
 	Usage: "Upgrade tenant metadata if needed",
 	// Flags: []cli.Flag{
-	// 	&cli.BoolFlag{
+	// 	cli.BoolFlag{
 	// 		Name: "dry-run",
 	// 		Aliases: []string{"n"},
 	// 	},
@@ -229,7 +232,7 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 
 const tenantMetadataDeleteCmdLabel = "delete"
 
-var tenantMetadataDeleteCommand = &cli.Command{
+var tenantMetadataDeleteCommand = cli.Command{
 	Name:    tenantMetadataDeleteCmdLabel,
 	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
 	Usage:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",

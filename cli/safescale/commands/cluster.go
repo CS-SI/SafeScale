@@ -24,8 +24,9 @@ import (
 	"strings"
 	"time"
 
+	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -50,12 +51,12 @@ var (
 const clusterCmdLabel = "cluster"
 
 // ClusterCommand command
-var ClusterCommand = &cli.Command{
+var ClusterCommand = cli.Command{
 	Name:      "cluster",
 	Aliases:   []string{"datacenter", "dc", "platform"},
 	Usage:     "create and manage cluster",
 	ArgsUsage: "COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		clusterNodeCommands,
 		clusterMasterCommands,
 		clusterFeatureCommands,
@@ -82,7 +83,7 @@ var ClusterCommand = &cli.Command{
 }
 
 // clusterListCommand handles 'deploy cluster list'
-var clusterListCommand = &cli.Command{
+var clusterListCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available clusters",
@@ -164,18 +165,22 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 		}
 		if remotedesktopInstalled {
 			nodes, ok := config["nodes"].(map[string][]*protocol.Host)
-			if ok { // FIXME: What if it fails ?, we should return an error too
+			if ok {
 				masters := nodes["masters"]
 				if len(masters) > 0 {
 					urls := make(map[string]string, len(masters))
 					endpointIP, ok := config["endpoint_ip"].(string)
-					if ok { // FIXME: What if it fails ?, we should return an error too
+					if ok {
 						for _, v := range masters {
 							urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
 						}
 						config["remote_desktop"] = urls
+					} else {
+						return nil, fail.InconsistentError("'endpoint_ip' should be a string")
 					}
 				}
+			} else {
+				return nil, fail.InconsistentError("'nodes' should be a map[string][]*protocol.Host")
 			}
 		} else {
 			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
@@ -185,7 +190,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterInspectCommand = &cli.Command{
+var clusterInspectCommand = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "get"},
 	Usage:     "inspect CLUSTERNAME",
@@ -321,68 +326,63 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 }
 
 // clusterCreateCmd handles 'deploy cluster <clustername> create'
-var clusterCreateCommand = &cli.Command{
+var clusterCreateCommand = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a cluster",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:    "complexity",
-			Aliases: []string{"C"},
-			Value:   "Small",
+		cli.StringFlag{
+			Name:  "complexity, C",
+			Value: "Small",
 			Usage: `Defines the sizing of the cluster: Small, Normal, Large
 	Default number of machines (#master, #nodes) depending of flavor are:
 		BOH: Small(1,1), Normal(3,3), Large(5,6)
 		K8S: Small(1,1), Normal(3,3), Large(5,6)
 	`,
 		},
-		&cli.StringFlag{
-			Name:    "flavor",
-			Aliases: []string{"F"},
-			Value:   "K8S",
+		cli.StringFlag{
+			Name:  "flavor, F",
+			Value: "K8S",
 			Usage: `Defines the type of the cluster; can be BOH, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])
 	`,
 		},
-		&cli.BoolFlag{
-			Name:    "keep-on-failure",
-			Aliases: []string{"k"},
-			Usage:   "If used, the resources are not deleted on failure (default: not set)",
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If used, the resources are not deleted on failure (default: not set)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "force, f",
 			Usage: "If used, it forces the cluster creation even if requested sizing is less than recommended",
 		},
-		&cli.IntFlag{
-			Name:    "gwport",
-			Aliases: []string{"default-ssh-port"},
-			Value:   22,
-			Usage:   `Define the port to use for SSH (default: 22) in gateways`,
+		cli.IntFlag{
+			Name:  "gwport, default-ssh-port",
+			Value: 22,
+			Usage: `Define the port to use for SSH (default: 22) in gateways`,
 		},
-		&cli.StringFlag{
-			Name:    "cidr",
-			Aliases: []string{"N"},
-			Value:   stacks.DefaultNetworkCIDR,
-			Usage:   "Defines the CIDR of the network to use with cluster",
+		cli.StringFlag{
+			Name:  "cidr, N",
+			Value: stacks.DefaultNetworkCIDR,
+			Usage: "Defines the CIDR of the network to use with cluster",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "domain",
 			Value: "cluster.local",
 			Usage: "domain name of the hosts in the cluster (default: cluster.local)",
 		},
-		&cli.StringSliceFlag{
+		cli.StringSliceFlag{
 			Name:  "disable",
 			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "os",
 			Usage: "Defines the operating system to use",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name: "sizing",
 			Usage: `Describe sizing for any type of host in format "<component><operator><value>[,...]" where:
 	<component> can be cpu, cpufreq, gpu, ram, disk, template (the latter takes precedence over the formers, but corrupting the cloud-agnostic principle)
@@ -408,15 +408,15 @@ var clusterCreateCommand = &cli.Command{
 	Can be used with --gw-sizing and friends to set a global host sizing and refine for a particular type of host.
 `,
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "gw-sizing",
 			Usage: `Describe gateway sizing in format "<component><operator><value>[,...] (cf. --sizing for details)`,
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "master-sizing",
 			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name: "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details),
 		This parameter accepts a supplemental <component> named count, with only = as <operator> and an int as <value> corresponding to the
@@ -424,10 +424,9 @@ var clusterCreateCommand = &cli.Command{
 	example:
 		--node-sizing "cpu~4, ram~15, count=8" will create 8 nodes`,
 		},
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -511,7 +510,7 @@ var clusterCreateCommand = &cli.Command{
 			Parameters:     c.StringSlice("param"),
 			DefaultSshPort: gatewaySSHPort,
 		}
-		res, err := clientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
+		res, err := clientSession.Cluster.Create(&req, 0)
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -531,7 +530,7 @@ var clusterCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
 		}
 
-		if !Debug {
+		if !appwide.Debug {
 			delete(formatted, "defaults")
 		}
 		return clitools.SuccessResponse(formatted)
@@ -539,20 +538,18 @@ var clusterCreateCommand = &cli.Command{
 }
 
 // clusterDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterDeleteCommand = &cli.Command{
+var clusterDeleteCommand = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"destroy", "remove", "rm"},
 	Usage:     "delete CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "assume-yes",
-			Aliases: []string{"yes", "y"},
+		cli.BoolFlag{
+			Name: "assume-yes, yes, y",
 		},
-		&cli.BoolFlag{
-			Name:    "force",
-			Aliases: []string{"f"},
+		cli.BoolFlag{
+			Name: "force, f",
 		},
 	},
 
@@ -575,7 +572,7 @@ var clusterDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.Delete(clusterName, force, temporal.HostLongOperationTimeout())
+		err = clientSession.Cluster.Delete(clusterName, force, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -585,7 +582,7 @@ var clusterDeleteCommand = &cli.Command{
 }
 
 // clusterStopCmd handles 'deploy cluster <clustername> stop'
-var clusterStopCommand = &cli.Command{
+var clusterStopCommand = cli.Command{
 	Name:      "stop",
 	Aliases:   []string{"freeze", "halt"},
 	Usage:     "stop CLUSTERNAME",
@@ -613,7 +610,7 @@ var clusterStopCommand = &cli.Command{
 	},
 }
 
-var clusterStartCommand = &cli.Command{
+var clusterStartCommand = cli.Command{
 	Name:      "start",
 	Aliases:   []string{"unfreeze"},
 	Usage:     "start CLUSTERNAME",
@@ -642,7 +639,7 @@ var clusterStartCommand = &cli.Command{
 }
 
 // clusterStateCmd handles 'deploy cluster <clustername> state'
-var clusterStateCommand = &cli.Command{
+var clusterStateCommand = cli.Command{
 	Name:      "state",
 	Usage:     "state CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
@@ -675,38 +672,35 @@ var clusterStateCommand = &cli.Command{
 }
 
 // clusterExpandCmd handles 'deploy cluster <clustername> expand'
-var clusterExpandCommand = &cli.Command{
+var clusterExpandCommand = cli.Command{
 	Name:      "expand",
 	Usage:     "expand CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		&cli.UintFlag{
-			Name:    "count",
-			Aliases: []string{"n"},
-			Usage:   "Define the number of nodes wanted (default: 1)",
-			Value:   1,
+		cli.UintFlag{
+			Name:  "count, n",
+			Usage: "Define the number of nodes wanted (default: 1)",
+			Value: 1,
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "os",
 			Usage: "Define the Operating System wanted",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name: "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" where:
 	<component> can be cpu, cpufreq, gpu, ram, disk, os
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
 		},
-		&cli.BoolFlag{
-			Name:    "keep-on-failure",
-			Aliases: []string{"k"},
-			Usage:   `do not delete resources on failure`,
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: `do not delete resources on failure`,
 		},
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -750,7 +744,7 @@ var clusterExpandCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		hosts, err := clientSession.Cluster.Expand(&req, temporal.HostLongOperationTimeout())
+		hosts, err := clientSession.Cluster.Expand(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -760,22 +754,20 @@ var clusterExpandCommand = &cli.Command{
 }
 
 // clusterShrinkCommand handles 'deploy cluster <clustername> shrink'
-var clusterShrinkCommand = &cli.Command{
+var clusterShrinkCommand = cli.Command{
 	Name:      "shrink",
 	Usage:     "shrink CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
-		&cli.UintFlag{
-			Name:    "count",
-			Aliases: []string{"n"},
-			Usage:   "Define the number of nodes to remove; default: 1",
-			Value:   1,
+		cli.UintFlag{
+			Name:  "count, n",
+			Usage: "Define the number of nodes to remove; default: 1",
+			Value: 1,
 		},
-		&cli.BoolFlag{
-			Name:    "assume-yes",
-			Aliases: []string{"yes", "y"},
-			Usage:   "Don't ask deletion confirmation",
+		cli.BoolFlag{
+			Name:  "assume-yes, yes, y",
+			Usage: "Don't ask deletion confirmation",
 		},
 	},
 
@@ -812,7 +804,7 @@ var clusterShrinkCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		if _, err = clientSession.Cluster.Shrink(&req, temporal.HostLongOperationTimeout()); err != nil {
+		if _, err = clientSession.Cluster.Shrink(&req, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
@@ -820,7 +812,7 @@ var clusterShrinkCommand = &cli.Command{
 	},
 }
 
-var clusterKubectlCommand = &cli.Command{
+var clusterKubectlCommand = cli.Command{
 	Name:      "kubectl",
 	Category:  "Administrative commands",
 	Usage:     "kubectl CLUSTERNAME [KUBECTL_COMMAND]... [-- [KUBECTL_OPTIONS]...]",
@@ -865,17 +857,17 @@ var clusterKubectlCommand = &cli.Command{
 						// Check for file
 						st, err := os.Stat(localFile)
 						if err != nil {
-							return cli.Exit(err.Error(), 1)
+							return cli.NewExitError(err.Error(), 1)
 						}
 						// If it's a link, get the target of it
 						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 							link, err := filepath.EvalSymlinks(localFile)
 							if err != nil {
-								return cli.Exit(err.Error(), 1)
+								return cli.NewExitError(err.Error(), 1)
 							}
 							_, err = os.Stat(link)
 							if err != nil {
-								return cli.Exit(err.Error(), 1)
+								return cli.NewExitError(err.Error(), 1)
 							}
 						}
 
@@ -914,7 +906,7 @@ var clusterKubectlCommand = &cli.Command{
 	},
 }
 
-var clusterHelmCommand = &cli.Command{
+var clusterHelmCommand = cli.Command{
 	Name:      "helm",
 	Category:  "Administrative commands",
 	Usage:     "helm CLUSTERNAME COMMAND [[--][PARAMS ...]]",
@@ -946,7 +938,7 @@ var clusterHelmCommand = &cli.Command{
 			//	useTLS = ""
 			case "init":
 				if idx == 0 {
-					return cli.Exit("helm init is forbidden", int(exitcode.InvalidArgument))
+					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
 			// case "search", "repo", "help", "install", "uninstall":
 			//	if idx == 0 {
@@ -970,17 +962,17 @@ var clusterHelmCommand = &cli.Command{
 						// Check for file
 						st, err := os.Stat(localFile)
 						if err != nil {
-							return cli.Exit(err.Error(), 1)
+							return cli.NewExitError(err.Error(), 1)
 						}
 						// If it's a link, get the target of it
 						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 							link, err := filepath.EvalSymlinks(localFile)
 							if err != nil {
-								return cli.Exit(err.Error(), 1)
+								return cli.NewExitError(err.Error(), 1)
 							}
 							_, err = os.Stat(link)
 							if err != nil {
-								return cli.Exit(err.Error(), 1)
+								return cli.NewExitError(err.Error(), 1)
 							}
 						}
 
@@ -1016,7 +1008,7 @@ var clusterHelmCommand = &cli.Command{
 	},
 }
 
-var clusterRunCommand = &cli.Command{
+var clusterRunCommand = cli.Command{
 	Name:      "run",
 	Aliases:   []string{"execute", "exec"},
 	Usage:     "run CLUSTERNAME COMMAND",
@@ -1043,7 +1035,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
 	}
 
 	if files != nil && files.Count() > 0 {
-		if !Debug {
+		if !appwide.Debug {
 			defer files.Cleanup(clientSession, master.GetId())
 		}
 		xerr := files.Upload(clientSession, master.GetId())
@@ -1058,28 +1050,27 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		return cli.Exit("" /*msg*/, retcode)
+		return cli.NewExitError("" /*msg*/, retcode)
 	}
 	return nil
 }
 
 // clusterListFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
-var clusterListFeaturesCommand = &cli.Command{
+var clusterListFeaturesCommand = cli.Command{
 	Name:      "list-features",
 	Aliases:   []string{"list-installed-features"},
 	Usage:     "List the features installed on the cluster",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		// &cli.StringSliceFlag{
+		// cli.StringSliceFlag{
 		//	Name:    "param",
 		//	Aliases: []string{"p"},
 		//	Usage:   "Allow to define content of feature parameters",
 		// },
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Usage:   "If used, list all features eligible to be installed on the cluster",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "If used, list all features eligible to be installed on the cluster",
 		},
 	},
 
@@ -1087,19 +1078,18 @@ var clusterListFeaturesCommand = &cli.Command{
 }
 
 // clusterAddFeatureCommand handles 'deploy cluster add-feature CLUSTERNAME FEATURENAME'
-var clusterAddFeatureCommand = &cli.Command{
+var clusterAddFeatureCommand = cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
 	Usage:     "add-feature CLUSTERNAME FEATURENAME",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of Feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of Feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "skip-proxy",
 			Usage: "Disables reverse proxy rules",
 		},
@@ -1109,32 +1099,30 @@ var clusterAddFeatureCommand = &cli.Command{
 }
 
 // clusterCheckFeatureCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
-var clusterCheckFeatureCommand = &cli.Command{
+var clusterCheckFeatureCommand = cli.Command{
 	Name:      "check-feature",
 	Aliases:   []string{"verify-feature"},
 	Usage:     "check-feature CLUSTERNAME FEATURENAME",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureCheckAction,
 }
 
 // clusterRemoveFeatureCommand handles 'deploy host <host name or id> package <pkgname> delete'
-var clusterRemoveFeatureCommand = &cli.Command{
+var clusterRemoveFeatureCommand = cli.Command{
 	Name:      "remove-feature",
 	Aliases:   []string{"destroy-feature", "delete-feature", "rm-feature", "uninstall-feature"},
 	Usage:     "delete-feature CLUSTERNAME FEATURENAME",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureRemoveAction,
@@ -1143,12 +1131,12 @@ var clusterRemoveFeatureCommand = &cli.Command{
 const clusterNodeCmdLabel = "node"
 
 // clusterNodeCommands handles 'safescale cluster node' commands
-var clusterNodeCommands = &cli.Command{
+var clusterNodeCommands = cli.Command{
 	Name:      clusterNodeCmdLabel,
 	Usage:     "manage cluster nodes",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		clusterNodeListCommand,
 		clusterNodeInspectCommand,
 		clusterNodeStartCommand,
@@ -1159,7 +1147,7 @@ var clusterNodeCommands = &cli.Command{
 }
 
 // clusterNodeListCommand handles 'deploy cluster node list CLUSTERNAME'
-var clusterNodeListCommand = &cli.Command{
+var clusterNodeListCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "Lists the nodes of a cluster",
@@ -1196,7 +1184,7 @@ var clusterNodeListCommand = &cli.Command{
 }
 
 // clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterNodeInspectCommand = &cli.Command{
+var clusterNodeInspectCommand = cli.Command{
 	Name:      "inspect",
 	Usage:     "Show details about a cluster node",
 	ArgsUsage: "CLUSTERNAME HOSTNAME",
@@ -1229,20 +1217,18 @@ var clusterNodeInspectCommand = &cli.Command{
 }
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterNodeDeleteCommand = &cli.Command{
+var clusterNodeDeleteCommand = cli.Command{
 	Name:    "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "yes",
-			Aliases: []string{"y"},
-			Usage:   "If set, respond automatically yes to all questions",
+		cli.BoolFlag{
+			Name:  "yes, y",
+			Usage: "If set, respond automatically yes to all questions",
 		},
-		&cli.BoolFlag{
-			Name:    "force",
-			Aliases: []string{"f"},
-			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
 		},
 	},
 
@@ -1290,7 +1276,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 }
 
 // clusterNodeStopCmd handles 'deploy cluster <clustername> node <nodename> stop'
-var clusterNodeStopCommand = &cli.Command{
+var clusterNodeStopCommand = cli.Command{
 	Name:      "stop",
 	Aliases:   []string{"freeze"},
 	Usage:     "node stop CLUSTERNAME HOSTNAME",
@@ -1323,7 +1309,7 @@ var clusterNodeStopCommand = &cli.Command{
 }
 
 // clusterNodeStartCmd handles 'deploy cluster <clustername> node <nodename> start'
-var clusterNodeStartCommand = &cli.Command{
+var clusterNodeStartCommand = cli.Command{
 	Name:      "start",
 	Aliases:   []string{"unfreeze"},
 	Usage:     "node start CLUSTERNAME HOSTNAME",
@@ -1356,7 +1342,7 @@ var clusterNodeStartCommand = &cli.Command{
 }
 
 // clusterNodeStateCmd handles 'deploy cluster <clustername> state'
-var clusterNodeStateCommand = &cli.Command{
+var clusterNodeStateCommand = cli.Command{
 	Name:      "state",
 	Usage:     "node state CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME NODENAME",
@@ -1396,19 +1382,22 @@ var clusterNodeStateCommand = &cli.Command{
 const clusterMasterCmdLabel = "master"
 
 // clusterMasterCommands handles 'safescale cluster master ...
-var clusterMasterCommands = &cli.Command{
+var clusterMasterCommands = cli.Command{
 	Name:      clusterMasterCmdLabel,
 	Usage:     "manage cluster masters",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		clusterMasterListCommand,
 		clusterMasterInspectCommand,
+		clusterMasterStartCommand,
+		clusterMasterStopCommand,
+		clusterMasterStateCommand,
 	},
 }
 
 // clusterMasterListCommand handles 'safescale cluster master list CLUSTERNAME'
-var clusterMasterListCommand = &cli.Command{
+var clusterMasterListCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "list CLUSTERNAME",
@@ -1446,7 +1435,7 @@ var clusterMasterListCommand = &cli.Command{
 }
 
 // clusterMasterInspectCmd handles 'cluster master inspect <clustername> <masterref>'
-var clusterMasterInspectCommand = &cli.Command{
+var clusterMasterInspectCommand = cli.Command{
 	Name:      "inspect",
 	Usage:     "Show details about a Cluster master",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
@@ -1479,7 +1468,7 @@ var clusterMasterInspectCommand = &cli.Command{
 }
 
 // clusterMasterStopCmd handles 'safescale cluster master stop <clustername> <mastername>'
-var clusterMasterStopCommand = &cli.Command{ // nolint
+var clusterMasterStopCommand = cli.Command{
 	Name:      "stop",
 	Aliases:   []string{"freeze"},
 	Usage:     "master stop CLUSTERNAME MASTERNAME",
@@ -1512,7 +1501,7 @@ var clusterMasterStopCommand = &cli.Command{ // nolint
 }
 
 // clusterMasterStartCmd handles 'deploy cluster <clustername> node <nodename> start'
-var clusterMasterStartCommand = &cli.Command{ // nolint
+var clusterMasterStartCommand = cli.Command{
 	Name:      "start",
 	Aliases:   []string{"unfreeze"},
 	Usage:     "master start CLUSTERNAME MASTERNAME",
@@ -1545,7 +1534,7 @@ var clusterMasterStartCommand = &cli.Command{ // nolint
 }
 
 // clusterMasterNodeStateCmd handles 'safescale cluster master state <clustername> <mastername>'
-var clusterMasterStateCommand = &cli.Command{ // nolint
+var clusterMasterStateCommand = cli.Command{
 	Name:      "state",
 	Usage:     "master state CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
@@ -1585,11 +1574,11 @@ var clusterMasterStateCommand = &cli.Command{ // nolint
 const clusterFeatureCmdLabel = "feature"
 
 // clusterFeatureCommands commands
-var clusterFeatureCommands = &cli.Command{
+var clusterFeatureCommands = cli.Command{
 	Name:      clusterFeatureCmdLabel,
 	Usage:     "create and manage features on a cluster",
 	ArgsUsage: "COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		clusterFeatureListCommand,
 		clusterFeatureInspectCommand,
 		clusterFeatureExportCommand,
@@ -1600,18 +1589,17 @@ var clusterFeatureCommands = &cli.Command{
 }
 
 // clusterFeatureListCommand handles 'safescale cluster feature list <cluster name or id>'
-var clusterFeatureListCommand = &cli.Command{
+var clusterFeatureListCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "List features installed on the cluster",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Value:   false,
-			Usage:   "if used, list all features that are eligible to be installed on the cluster",
+		cli.BoolFlag{
+			Name: "all, a",
+			// Value:   false,
+			Usage: "if used, list all features that are eligible to be installed on the cluster",
 		},
 	},
 
@@ -1642,16 +1630,16 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 
 // clusterFeatureInspectCommand handles 'safescale cluster feature inspect <cluster name or id> <feature name>'
 // Displays information about the feature (parameters, if eligible on cluster, if installed, ...)
-var clusterFeatureInspectCommand = &cli.Command{
+var clusterFeatureInspectCommand = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspects the feature",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "embedded",
-			Value: false,
+		cli.BoolFlag{
+			Name: "embedded",
+			// Value: false,
 			Usage: "if used, tells to show details of embedded feature (if it exists)",
 		},
 	},
@@ -1687,21 +1675,21 @@ func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
 }
 
 // clusterFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
-var clusterFeatureExportCommand = &cli.Command{
+var clusterFeatureExportCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "List features installed on the cluster",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "embedded",
-			Value: false,
+		cli.BoolFlag{
+			Name: "embedded",
+			// Value: false,
 			Usage: "if used, tells to export embedded feature (if it exists)",
 		},
-		&cli.BoolFlag{
-			Name:  "raw",
-			Value: false,
+		cli.BoolFlag{
+			Name: "raw",
+			// Value: false,
 			Usage: "outputs only the feature content, without json",
 		},
 	},
@@ -1742,19 +1730,18 @@ func clusterFeatureExportAction(c *cli.Context) (ferr error) {
 }
 
 // clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'
-var clusterFeatureAddCommand = &cli.Command{
+var clusterFeatureAddCommand = cli.Command{
 	Name:      "add",
 	Aliases:   []string{"install"},
 	Usage:     "Installs a feature on a cluster",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Define value of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "skip-proxy",
 			Usage: "Disables reverse proxy rules",
 		},
@@ -1805,16 +1792,15 @@ func parametersToMap(params []string) map[string]string {
 }
 
 // clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
-var clusterFeatureCheckCommand = &cli.Command{
+var clusterFeatureCheckCommand = cli.Command{
 	Name:      "check",
 	Aliases:   []string{"verify"},
 	Usage:     "Checks if a Feature is already installed on cluster",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureCheckAction,
@@ -1852,16 +1838,15 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 }
 
 // clusterFeatureRemoveCommand handles 'safescale cluster feature remove <cluster name> <pkgname>'
-var clusterFeatureRemoveCommand = &cli.Command{
+var clusterFeatureRemoveCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"destroy", "delete", "rm", "uninstall"},
 	Usage:     "Remove a feature from a cluster",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureRemoveAction,
@@ -1898,19 +1883,19 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 	return clitools.SuccessResponse(nil)
 }
 
-var clusterAnsibleCommands = &cli.Command{
+var clusterAnsibleCommands = cli.Command{
 	Name:      "ansible",
 	Usage:     "Administrative commands",
 	ArgsUsage: "COMMAND",
 
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		clusterAnsibleInventoryCommands,
 		clusterAnsibleRunCommands,
 		clusterAnsiblePlaybookCommands,
 	},
 }
 
-var clusterAnsibleInventoryCommands = &cli.Command{
+var clusterAnsibleInventoryCommands = cli.Command{
 	Name:      "inventory",
 	Category:  "Administrative commands",
 	Usage:     "inventory CLUSTERNAME COMMAND [[--][PARAMS ...]]",
@@ -1994,13 +1979,13 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 		}
 		if retcode != 0 {
-			return cli.Exit(stderr, retcode)
+			return cli.NewExitError(stderr, retcode)
 		}
 		return nil
 	},
 }
 
-var clusterAnsibleRunCommands = &cli.Command{
+var clusterAnsibleRunCommands = cli.Command{
 	Name:      "run",
 	Category:  "Administrative commands",
 	Usage:     "run CLUSTERNAME COMMAND [[--][PARAMS ...]]",
@@ -2087,13 +2072,13 @@ var clusterAnsibleRunCommands = &cli.Command{
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 		}
 		if retcode != 0 {
-			return cli.Exit(stderr, retcode)
+			return cli.NewExitError(stderr, retcode)
 		}
 		return nil
 	},
 }
 
-var clusterAnsiblePlaybookCommands = &cli.Command{
+var clusterAnsiblePlaybookCommands = cli.Command{
 	Name:      "playbook",
 	Category:  "Administrative commands",
 	Usage:     "playbook CLUSTERNAME COMMAND [[--][PARAMS ...]]",
