@@ -189,7 +189,7 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 
 // NewRunWithTimeout ...
 func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, "", "", xerr
@@ -279,12 +279,15 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			newsession, internalErr = client.NewSession()
 			if internalErr != nil {
 				retries = retries + 1 // nolint
-				logrus.Debugf("problem creating session: %s", internalErr.Error())
+				logrus.Tracef("problem creating session: %s", internalErr.Error())
 				if strings.Contains(internalErr.Error(), "EOF") {
 					eofCount = eofCount + 1
-					if eofCount >= 10 {
+					if eofCount >= 14 {
 						return retry.StopRetryError(internalErr, "client seems dead")
 					}
+				}
+				if strings.Contains(internalErr.Error(), "unexpected packet") {
+					return retry.StopRetryError(internalErr, "client seems dead")
 				}
 				return internalErr
 			}
@@ -294,13 +297,22 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			logrus.Debugf("creating the session took %s and %d retries", time.Since(beginDial), retries)
 			session = newsession
 			return nil
-		}, time.Second, 150*time.Second)
+		}, 2*time.Second, 150*time.Second)
 		if err != nil {
-			results <- result{
-				errorcode: -1,
-				stdout:    "",
-				stderr:    "",
-				reserr:    err,
+			if strings.Contains(err.Error(), "seems dead") {
+				results <- result{
+					errorcode: -2,
+					stdout:    "",
+					stderr:    "",
+					reserr:    err,
+				}
+			} else {
+				results <- result{
+					errorcode: -1,
+					stdout:    "",
+					stderr:    "",
+					reserr:    err,
+				}
 			}
 			return
 		}
@@ -354,7 +366,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 			beginIter := time.Now()
 			if err := sshtunnel.RunCommandInSSHSessionWithTimeout(session, sc.cmd.String(), opTimeout); err != nil {
-				logrus.Debugf("Running with session timeout here after %s", time.Since(beginIter))
+				logrus.Debugf("Error running command after %s: %s", time.Since(beginIter), err.Error())
 				errorCode = -1
 
 				if ee, ok := err.(*ssh.ExitError); ok {
