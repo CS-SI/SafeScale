@@ -76,37 +76,8 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 	return instance, nil
 }
 
-// lookupSecurityGroup returns true if security group exists, false otherwise
-func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
-	if svc == nil {
-		return false, fail.InvalidParameterError("svc", "cannot be nil")
-	}
-	if ref == "" {
-		return false, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	sgInstance, xerr := NewSecurityGroup(svc)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
-
-	xerr = sgInstance.Read(ref)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound, *retry.ErrTimeout:
-			return false, nil
-		default:
-			return false, xerr
-		}
-	}
-
-	return true, nil
-}
-
 // LoadSecurityGroup ...
-func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (sgInstance *SecurityGroup, ferr fail.Error) {
+func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ *SecurityGroup, ferr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&ferr)
 
@@ -124,7 +95,7 @@ func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, option
 	}
 
 	var ok bool
-	sgInstance, ok = anon.(*SecurityGroup)
+	sgInstance, ok := anon.(*SecurityGroup)
 	if !ok {
 		return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
 	}
@@ -142,8 +113,17 @@ func onSGCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error)
 		return nil, innerXErr
 	}
 
+	blank, innerXerr := NewSecurityGroup(svc)
+	if innerXErr != nil {
+		return nil, innerXerr
+	}
+
 	if innerXErr = sgInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(sgInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("security group with ref '%s' does NOT exist", ref)
 	}
 
 	return sgInstance, nil
@@ -271,13 +251,17 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 
 	// Check if SecurityGroup exists and is managed by SafeScale
 	svc := instance.Service()
-	var found bool
-	found, xerr = lookupSecurityGroup(svc, name)
+	_, xerr = LoadSecurityGroup(ctx, svc, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
-	}
-	if found {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+		}
+	} else {
 		return fail.DuplicateError("a Security Group named '%s' already exists", name)
 	}
 
@@ -663,7 +647,7 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -690,7 +674,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -834,7 +818,7 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 		return xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1023,7 +1007,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 		return fail.InvalidParameterError("hostInstance", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1077,7 +1061,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1353,7 +1337,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1438,7 +1422,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 		return fail.InvalidParameterError("rs", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

@@ -78,6 +78,14 @@ type errorCore struct {
 	lock                *sync.RWMutex
 }
 
+func IgnoreError(in interface{}, _ Error) interface{} {
+	return in
+}
+
+func TakeError(_ interface{}, xerr Error) error { // nolint
+	return xerr
+}
+
 // Valid errorCore struct should be always created via newError constructor, if it doesn't we might miss e.lock initialization
 func (e errorCore) Valid() bool {
 	err := validation.ValidateStruct(&e,

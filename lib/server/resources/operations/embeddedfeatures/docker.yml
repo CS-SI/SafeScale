@@ -143,20 +143,28 @@ feature:
                             nodes: all
                         run: |
                             case $LINUX_KIND in
-                                debian|ubuntu)
+                                debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes gnupg2 || sfApt install -qqy --force-yes gnupg"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "(apt-cache show gnupg2 && apt install -qqy gnupg2) || (apt-cache show gnupg && apt install -qqy gnupg)"
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    ;;
+                                ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
+                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
                                     ;;
                                 centos|redhat|rhel)
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 196 "error installing yum prerequisites"
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 197 "error adding docker-ce repo"
-                                    kop=0
                                     op=-1
                                     yum install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then
@@ -174,7 +182,6 @@ feature:
                                 fedora)
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 201
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo"
-                                    kop=0
                                     op=-1
                                     dnf install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then

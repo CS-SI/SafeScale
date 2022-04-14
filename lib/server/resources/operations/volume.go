@@ -77,7 +77,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (volumeInstance resources.Volume, ferr fail.Error) {
+func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -94,7 +94,7 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 	}
 
 	var ok bool
-	volumeInstance, ok = anon.(resources.Volume)
+	volumeInstance, ok := anon.(resources.Volume)
 	if !ok {
 		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
 	}
@@ -112,8 +112,17 @@ func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 		return nil, innerXErr
 	}
 
+	blank, innerXErr := NewVolume(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	if innerXErr = volumeInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(volumeInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("volume with ref '%s' does NOT exist", ref)
 	}
 
 	return volumeInstance, nil
@@ -270,7 +279,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -934,7 +943,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

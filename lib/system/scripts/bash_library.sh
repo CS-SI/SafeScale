@@ -89,10 +89,10 @@ export -f sfWaitForApt
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 function sfApt() {
   echo "waiting for apt lock..."
-  rc=-1
   sfWaitForApt
   [ $? -ne 0 ] && return $?
   echo "running apt " "$@"
+  rc=-1
   DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt -o Dpkg::Options::=--force-confnew "$@" && rc=$?
   [ $rc -eq -1 ] && return 1
   return $rc
@@ -426,7 +426,7 @@ function sfInstall() {
     export DEBIAN_FRONTEND=noninteractive
     export UCF_FORCE_CONFFNEW=1
     sfRetry4 "sfApt update"
-    sfApt install $1 -y --force-yes || return 194
+    sfApt install $1 -y || return 194
     command -v $1 || return 194
     ;;
   centos | rhel)

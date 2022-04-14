@@ -172,7 +172,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

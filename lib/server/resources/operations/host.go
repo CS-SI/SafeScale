@@ -138,20 +138,34 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, innerXErr
 	}
 
+	serialized, xerr := hostInstance.Sdump()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if innerXErr = hostInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	xerr := hostInstance.updateCachedInformation(ctx)
+	xerr = hostInstance.updateCachedInformation()
 	if xerr != nil {
-		return hostInstance, xerr
+		return nil, xerr
+	}
+
+	afterSerialized, xerr := hostInstance.Sdump()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if strings.Compare(serialized, afterSerialized) == 0 {
+		return nil, fail.NotFoundError("something is very wrong, either read or updateCachedInformation should have failed: %s", serialized)
 	}
 
 	return hostInstance, nil
 }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
-func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
+func (instance *Host) updateCachedInformation() fail.Error {
 	svc := instance.Service()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(svc)
@@ -161,6 +175,12 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
+
+	task, xerr := concurrency.VoidTask()
+	if xerr != nil {
+		return xerr
+	}
+	ctx := task.Context()
 
 	return instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -483,22 +503,22 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
-func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
+func (instance *Host) Reload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	return instance.unsafeReload(ctx)
+	return instance.unsafeReload()
 }
 
 // FIXME: unsafeXXX may need review, should not be needed anymore after lock sanitization
 // unsafeReload reloads Host from metadata and current Host state on provider state
-func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
+func (instance *Host) unsafeReload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.MetadataCore.Reload(ctx)
+	xerr := instance.MetadataCore.Reload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -586,7 +606,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	return instance.updateCachedInformation(ctx)
+	return instance.updateCachedInformation()
 }
 
 // GetState returns the last known state of the Host, without forced inspect
@@ -972,7 +992,7 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	xerr = instance.updateCachedInformation(task.Context())
+	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1895,7 +1915,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
 	}
 
-	xerr = instance.updateCachedInformation(task.Context())
+	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2636,7 +2656,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 	doRefresh := instance.localCache.sshProfile == nil
 	instance.localCache.RUnlock() // nolint
 	if doRefresh {
-		xerr := instance.updateCachedInformation(ctx)
+		xerr := instance.updateCachedInformation()
 		if xerr != nil {
 			return xerr
 		}
@@ -3001,7 +3021,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload(task.Context())
+	xerr = instance.unsafeReload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3080,7 +3100,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload(task.Context())
+	xerr = instance.unsafeReload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

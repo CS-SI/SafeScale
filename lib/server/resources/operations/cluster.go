@@ -323,19 +323,15 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	return nil
 }
 
-// Serialize converts Cluster data to JSON
-func (instance *Cluster) Serialize() (_ []byte, ferr fail.Error) {
+func (instance *Cluster) Sdump() (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
-		return []byte{}, fail.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	r, err := json.Marshal(instance) // nolint
-	return r, fail.ConvertError(err)
+	dumped, _ := instance.MetadataCore.Sdump()
+	return dumped, nil
 }
 
 // Deserialize reads json code and recreates Cluster metadata
@@ -1324,7 +1320,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

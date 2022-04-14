@@ -17,8 +17,6 @@
 package resources
 
 import (
-	"context"
-
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
@@ -36,13 +34,31 @@ type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 type Metadata interface {
 	IsNull() bool
 	Alter(callback Callback, options ...data.ImmutableKeyValue) fail.Error // protects the data for exclusive write
-	BrowseFolder(callback func(buf []byte) fail.Error) fail.Error          // walks through host folder and executes a callback for each entries
+	BrowseFolder(callback func(buf []byte) fail.Error) fail.Error          // walks through host folder and executes a callback for each entry
 	Deserialize(buf []byte) fail.Error                                     // Transforms a slice of bytes in struct
 	Inspect(callback Callback) fail.Error                                  // protects the data for shared read with first reloading data from Object Storage
 	Review(callback Callback) fail.Error                                   // protects the data for shared read without reloading first (uses in-memory data); use with caution
 	Read(ref string) fail.Error                                            // reads the data from Object Storage using ref as id or name
 	ReadByID(id string) fail.Error                                         // reads the data from Object Storage by id
-	Reload(ctx context.Context) fail.Error                                 // Reloads the metadata from the Object Storage, overriding what is in the object
-	Serialize() ([]byte, fail.Error)
+	Reload() fail.Error                                                    // Reloads the metadata from the Object Storage, overriding what is in the object
+	Sdump() (string, fail.Error)
 	Service() iaas.Service // returns the iaas.Service used
 }
+
+/*
+//go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v21/lib/server/resources -i RawMetadata -t ./microfallback.tmpl -o breakeven.go -l ""
+
+type RawMetadata interface {
+	IsNull() bool
+	Alter(callback Callback, options ...data.ImmutableKeyValue) error // protects the data for exclusive write
+	BrowseFolder(callback func(buf []byte) error) error          // walks through host folder and executes a callback for each entry
+	Deserialize(buf []byte) error                                     // Transforms a slice of bytes in struct
+	Inspect(callback Callback) error                                  // protects the data for shared read with first reloading data from Object Storage
+	Review(callback Callback) error                                   // protects the data for shared read without reloading first (uses in-memory data); use with caution
+	Read(ref string) error                                            // reads the data from Object Storage using ref as id or name
+	ReadByID(id string) error                                         // reads the data from Object Storage by id
+	Reload() error                                 // Reloads the metadata from the Object Storage, overriding what is in the object
+	Sdump() (string, error)
+	Service() iaas.Service // returns the iaas.Service used
+}
+*/

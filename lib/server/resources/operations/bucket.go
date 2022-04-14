@@ -105,9 +105,18 @@ func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 		return nil, innerXErr
 	}
 
+	blank, innerXErr := NewBucket(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 	if innerXErr = bucketInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("bucket with ref '%s' does NOT exist", ref)
 	}
 
 	return bucketInstance, nil
@@ -361,7 +370,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -590,7 +599,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("hostName")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

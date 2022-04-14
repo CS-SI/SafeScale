@@ -104,8 +104,17 @@ func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.E
 		return nil, innerXErr
 	}
 
+	blank, innerXErr := NewNetwork(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(networkInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("network with ref '%s' does NOT exist", ref)
 	}
 
 	return networkInstance, nil
@@ -460,6 +469,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 
 				if k == instance.GetName() {
 					found = true
+					deleted := false
 					// the single subnet present is a subnet named like the Network, delete it first
 					subnetInstance, xerr := LoadSubnet(task.Context(), svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
@@ -468,18 +478,19 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 						case *fail.ErrNotFound:
 							// Subnet is already deleted, considered as a success and continue
 							debug.IgnoreError(xerr)
-							continue
+							deleted = true
 						default:
 							return xerr
 						}
 					}
 
-					subnetName := subnetInstance.GetName()
-
-					xerr = subnetInstance.Delete(task.Context())
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+					if !deleted {
+						subnetName := subnetInstance.GetName()
+						xerr = subnetInstance.Delete(task.Context())
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+						}
 					}
 				}
 			}
@@ -740,7 +751,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

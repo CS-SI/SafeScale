@@ -141,7 +141,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
 // if 'options' contains WithReloadOption, the instance is refreshed from metadata. Otherwise, metadata is not read (except if Share is not in cache)
-func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (shareInstance resources.Share, ferr fail.Error) {
+func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Share, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -158,6 +158,7 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 	}
 
 	var ok bool
+	var shareInstance resources.Share
 	if shareInstance, ok = anon.(resources.Share); !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
 	}
@@ -175,8 +176,17 @@ func onShareCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Err
 		return nil, innerXErr
 	}
 
+	blank, innerXErr := NewShare(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	if innerXErr = shareInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(shareInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("share with ref '%s' does NOT exist", ref)
 	}
 
 	return shareInstance, nil
@@ -914,7 +924,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		return fail.InvalidParameterCannotBeNilError("target")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1071,7 +1081,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

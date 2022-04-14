@@ -53,7 +53,7 @@ debian | ubuntu)
   finishPreviousInstall
 
   sfRetry4 "sfWaitForApt && apt -y update"
-  sfRetry4 "apt-get install -qqy --force-yes nfs-common"
+  sfRetry4 "apt-get install -qqy nfs-common"
   ;;
 
 rhel | centos)
