@@ -74,13 +74,6 @@ var (
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
 )
 
-// OVH api credentials
-var (
-	alternateAPIApplicationKey    string
-	alternateAPIApplicationSecret string
-	alternateAPIConsumerKey       string
-)
-
 // provider is the provider implementation of the OVH provider
 type provider struct {
 	api.Stack
@@ -141,6 +134,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.NewError("Invalid input for 'ProjectName'")
 	}
 
+	var alternateAPIApplicationKey string
+	var alternateAPIApplicationSecret string
+	var alternateAPIConsumerKey string
 	val1, ok1 := identityParams["AlternateApiApplicationKey"]
 	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
 	val3, ok3 := identityParams["AlternateApiConsumerKey"]
@@ -190,6 +186,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
+		AK:               alternateAPIApplicationKey,
+		AS:               alternateAPIApplicationSecret,
+		CK:               alternateAPIConsumerKey,
 	}
 
 	err := validation.ValidateStruct(&authOptions,
@@ -283,9 +282,9 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
-	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
-	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
-	cfg.Set("AlternateApiConsumerKey", alternateAPIConsumerKey)
+	cfg.Set("AlternateApiApplicationKey", opts.AK)
+	cfg.Set("AlternateApiApplicationSecret", opts.AS)
+	cfg.Set("AlternateApiConsumerKey", opts.CK)
 	return cfg, nil
 }
 

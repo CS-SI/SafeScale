@@ -86,6 +86,9 @@ type AuthenticationOptions struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
+	AK string
+	AS string
+	CK string
 	// // Name of the VPC (Virtual Private Cloud)
 	// DefaultNetworkName string
 	// // CIDR of the VPC
