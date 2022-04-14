@@ -216,13 +216,13 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 // If there is no task in the context, returns a VoidTask()
 // returns:
 //    - Task, nil: Task found in 'ctx' or VoidTask() is returned
-//    - nil, *fail.ErrInconsistent: value stored as Task in 'ctx' is not of type Task
 func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
-	if ctx == nil || ctx == context.Background() {
+	nctx, err := TaskFromContext(ctx)
+	if err != nil {
 		return VoidTask()
 	}
 
-	return TaskFromContext(ctx)
+	return nctx, nil
 }
 
 // NewTask creates a new instance of Task
