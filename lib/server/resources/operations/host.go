@@ -3511,7 +3511,7 @@ func (instance *Host) GetDefaultSubnet(ctx context.Context) (subnetInstance reso
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
-		return NullSubnet(), fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.RLock()

@@ -514,7 +514,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullSubnet(), xerr
+		return nil, xerr
 	}
 
 	return subnetInstance, nil

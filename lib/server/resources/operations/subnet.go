@@ -76,11 +76,6 @@ type Subnet struct {
 	}
 }
 
-// NullSubnet returns a *Subnet representing null value
-func NullSubnet() *Subnet {
-	return &Subnet{MetadataCore: nil}
-}
-
 // ListSubnets returns a list of available subnets
 func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -136,13 +131,13 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return NullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, subnetKind, subnetsFolderName, &abstract.Subnet{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullSubnet(), xerr
+		return nil, xerr
 	}
 
 	instance := &Subnet{

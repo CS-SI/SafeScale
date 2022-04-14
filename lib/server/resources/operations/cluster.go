@@ -2570,7 +2570,7 @@ func (instance *Cluster) extractNetworkingInfo(ctx context.Context) (networkInst
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, deleteNetwork, NullSubnet(), xerr
+		return nil, deleteNetwork, nil, xerr
 	}
 
 	return networkInstance, deleteNetwork, subnetInstance, nil
