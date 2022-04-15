@@ -44,12 +44,11 @@ import (
 
 // CreateKeyPair creates a keypair and upload it to AWS
 func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
-	nullAKP := &abstract.KeyPair{}
 	if valid.IsNil(s) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
@@ -61,7 +60,7 @@ func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error)
 	}
 
 	if xerr = s.rpcImportKeyPair(aws.String(keypair.Name), []byte(keypair.PublicKey)); xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 	return keypair, nil
 }
@@ -84,12 +83,11 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 // InspectKeyPair loads a keypair from AWS
 // Note: the private key is not stored by AWS...
 func (s stack) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) {
-	nullAKP := &abstract.KeyPair{}
 	if valid.IsNil(s) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).
@@ -100,7 +98,7 @@ func (s stack) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) 
 
 	resp, xerr := s.rpcDescribeKeyPairByID(aws.String(id))
 	if xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 
 	out := toAbstractKeyPair(*resp)
@@ -443,13 +441,12 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) abstract.HostTemplate {
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAHC := abstract.NewHostCore()
 	if valid.IsNil(s) {
-		return nullAHC, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
@@ -489,13 +486,13 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nullAHC, fail.Wrap(
+			return nil, fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout,
 			)
 		default:
-			return nullAHC, retryErr
+			return nil, retryErr
 		}
 	}
 	return ahf.Core, nil
@@ -505,10 +502,8 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAHF := abstract.NewHostFull()
-	nullUDC := userdata.NewContent()
 	if valid.IsNil(s) {
-		return nullAHF, nullUDC, fail.InvalidInstanceError()
+		return nil, nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
@@ -519,7 +514,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// hostMustHavePublicIP := request.PublicIP
 
 	if len(subnets) == 0 {
-		return nullAHF, nullUDC, fail.InvalidRequestError(
+		return nil, nil, fail.InvalidRequestError(
 			"the Host '%s' must be on at least one Subnet (even if public)", resourceName,
 		)
 	}
@@ -527,7 +522,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// If no credentials (KeyPair and/or Password) are supplied create ones
 	var xerr fail.Error
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for Host")
+		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for Host")
 	}
 	keyPairName := request.KeyPair.Name
 
@@ -542,11 +537,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	if defaultSubnet == nil {
 		if !request.PublicIP {
-			return nullAHF, nullUDC, abstract.ResourceInvalidRequestError(
+			return nil, nil, abstract.ResourceInvalidRequestError(
 				"host creation", "cannot create a host without public IP or attached network",
 			)
 		}
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError(
+		return nil, nil, abstract.ResourceInvalidRequestError(
 			"host creation", "cannot create a host without default subnet",
 		)
 	}
@@ -562,17 +557,17 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	userData = userdata.NewContent()
 	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
 		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
+		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
+		return nil, nil, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
 	}
 
 	rim, xerr := s.InspectImage(request.ImageID)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
+		return nil, nil, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
 	}
 
 	diskSize := request.DiskSize
@@ -610,7 +605,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if s.AwsConfig.Zone == "" {
 		azList, xerr := s.ListAvailabilityZones()
 		if xerr != nil {
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 		var az string
 		for az = range azList {
@@ -635,7 +630,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// Sets provider parameters to create ahf
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	// import keypair on provider side
@@ -645,7 +640,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		PrivateKey: userData.FirstPrivateKey,
 	}
 	if xerr = s.ImportKeyPair(&keypair); xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	// --- query provider for ahf creation ---
@@ -715,11 +710,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
-			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "failed to create Host, stopping retries")
+			return nil, nil, fail.Wrap(fail.Cause(xerr), "failed to create Host, stopping retries")
 		case *fail.ErrTimeout:
-			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "failed to create Host because of timeout")
+			return nil, nil, fail.Wrap(fail.Cause(xerr), "failed to create Host because of timeout")
 		default:
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 	}
 
@@ -817,15 +812,14 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error
 func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	var hostLabel string
 	var xerr fail.Error
 	ahf, hostLabel, xerr = stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
@@ -834,12 +828,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	if ahf.Core.ID != "" {
 		resp, xerr = s.rpcDescribeInstanceByID(aws.String(ahf.Core.ID))
 		if xerr != nil {
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	} else {
 		resp, xerr = s.rpcDescribeInstanceByName(aws.String(ahf.Core.Name))
 		if xerr != nil {
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	}
 
@@ -966,12 +960,11 @@ func (s stack) getTagOfSubnet(subnetID *string, str string) string {
 
 // InspectHostByName returns host information by its name
 func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.Error) {
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
@@ -979,7 +972,7 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.E
 
 	resp, xerr := s.rpcDescribeInstanceByName(aws.String(name))
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 	ahf := abstract.NewHostFull()
 	return ahf, s.inspectInstance(ahf, "'"+name+"'", resp)
@@ -1335,12 +1328,11 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 
 // ResizeHost changes the sizing of an existing host
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
-	return nullAHF, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // BindSecurityGroupToHost ...

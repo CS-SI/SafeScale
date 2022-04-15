@@ -512,14 +512,13 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
 func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
-	nullAHC := abstract.NewHostCore()
 	if valid.IsNil(s) {
-		return nullAHC, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)",
@@ -528,7 +527,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	xerr = retry.WhileUnsuccessfulWithHardTimeout(
@@ -564,11 +563,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return nullAHC, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
-			return nullAHC, xerr
+			return nil, xerr
 		}
 	}
 	return ahf.Core, nil
@@ -821,13 +820,11 @@ func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (osc.Public
 func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAHF := abstract.NewHostFull()
-	nullUDC := userdata.NewContent()
 	if valid.IsNil(s) {
-		return nullAHF, nullUDC, fail.InvalidInstanceError()
+		return nil, nil, fail.InvalidInstanceError()
 	}
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError(
+		return nil, nil, abstract.ResourceInvalidRequestError(
 			"host creation", "cannot create a host without public IP or without attached subnet",
 		)
 	}
@@ -838,25 +835,25 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// Get or create password
 	password, xerr := s.getOrCreatePassword(request)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 	request.Password = password
 
 	// gather default subnet ID
 	subnetID, xerr := s.getDefaultSubnetID(request)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	// Build KeyPair and password if not provided
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for Host")
+		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for Host")
 	}
 
 	// Configure userdata content
 	udc = userdata.NewContent()
 	if xerr = s.prepareUserData(request, udc); xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	// Using udc.FirstPublicKey in creation keypair
@@ -865,7 +862,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		PublicKey: udc.FirstPublicKey,
 	}
 	if xerr = s.ImportKeyPair(creationKeyPair); xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	defer func() {
@@ -879,18 +876,18 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	ahf = abstract.NewHostFull()
 	if xerr = s.initHostProperties(&request, ahf, *udc); xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	// -- prepare userdata phase1 execution --
 	userDataPhase1, xerr := udc.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	vmType, xerr := outscaleTemplateID(request.TemplateID)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	buf := bytes.NewBuffer(userDataPhase1)
@@ -1007,32 +1004,32 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
-			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 	}
 
 	// -- Retrieve default Nic use to create public ip --
 	nics, xerr := s.rpcReadNics("", vm.VmId)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 	if len(nics) == 0 {
-		return nullAHF, nullUDC, fail.InconsistentError("No network interface associated to vm")
+		return nil, nil, fail.InconsistentError("No network interface associated to vm")
 	}
 	defaultNic := nics[0]
 
 	nics, xerr = s.addNICs(&request, vm.VmId)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 	if request.PublicIP {
 		ip, xerr := s.addPublicIPs(defaultNic, nics)
 		if xerr != nil {
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 		udc.PublicIP = ip.PublicIp
 		vm.PublicIp = udc.PublicIP
@@ -1040,7 +1037,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// -- add GPU if asked for --
 	if xerr = s.addGPUs(&request, template, vm.VmId); xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 	_, xerr = s.rpcCreateTags(
 		vm.VmId, map[string]string{
@@ -1053,12 +1050,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		},
 	)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	_, xerr = s.WaitHostState(vm.VmId, hoststate.Started, timings.HostOperationTimeout())
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	ahf = abstract.NewHostFull()
@@ -1170,15 +1167,14 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
 func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	var hostLabel string
 	var xerr fail.Error
 	ahf, hostLabel, xerr = stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
@@ -1188,12 +1184,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	if ahf.Core.ID != "" {
 		vm, xerr = s.rpcReadVMByID(ahf.Core.ID)
 		if xerr != nil {
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	} else {
 		vm, xerr = s.rpcReadVMByName(ahf.Core.Name)
 		if xerr != nil {
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	}
 
@@ -1353,14 +1349,13 @@ func (s stack) perfFromFreq(freq float32) int {
 func (s stack) ResizeHost(
 	hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements,
 ) (ahf *abstract.HostFull, ferr fail.Error) {
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)",

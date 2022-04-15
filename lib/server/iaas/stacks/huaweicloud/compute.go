@@ -416,10 +416,8 @@ func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 // CreateHost creates a new host
 func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
-	nullAhf := abstract.NewHostFull()
-	nullUdc := userdata.NewContent()
 	if valid.IsNil(s) {
-		return nullAhf, nullUdc, fail.InvalidInstanceError()
+		return nil, nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
@@ -429,7 +427,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError(
+		return nil, nil, abstract.ResourceInvalidRequestError(
 			"host creation", "cannot create a host without public IP or without attached network",
 		)
 	}
@@ -437,11 +435,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// Validating name of the host
 	if ok, xerr := validateHostname(request); !ok {
 		if xerr != nil {
-			return nullAhf, nullUdc, fail.InvalidRequestError(
+			return nil, nil, fail.InvalidRequestError(
 				"name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error(),
 			)
 		}
-		return nullAhf, nullUdc, fail.InvalidRequestError(
+		return nil, nil, fail.InvalidRequestError(
 			"name '%s' is invalid for a FlexibleEngine Host", request.ResourceName,
 		)
 	}
@@ -461,31 +459,31 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
+		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "bad timings")
+		return nil, nil, fail.Wrap(xerr, "bad timings")
 	}
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
+		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get template")
+		return nil, nil, fail.Wrap(xerr, "failed to get template")
 	}
 
 	rim, xerr := s.InspectImage(request.ImageID)
 	if xerr != nil {
-		return nullAhf, nullUdc, xerr
+		return nil, nil, xerr
 	}
 
 	diskSize := request.DiskSize
@@ -520,7 +518,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// Select usable availability zone
 	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select Availability Zone")
+		return nil, nil, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
 
 	// Defines boot disk
@@ -900,19 +898,18 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
@@ -925,14 +922,14 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 				ahf.Core.LastState = hoststate.Error
 				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
-			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 		default:
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	}
 
 	if server == nil {
-		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
+		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
 	host, xerr = s.complementHost(ahf.Core, server)

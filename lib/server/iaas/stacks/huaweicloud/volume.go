@@ -81,14 +81,13 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 
 // CreateVolume creates a block volume
 func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	volume, xerr := s.InspectVolume(request.Name)
 	if xerr == nil && volume != nil {
-		return nullAV, fail.DuplicateError("volume '%s' already exists", request.Name)
+		return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
 	}
 
 	az, xerr := s.SelectedAvailabilityZone()
@@ -110,7 +109,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return nullAV, commRetryErr
+		return nil, commRetryErr
 	}
 
 	v := abstract.Volume{
@@ -125,12 +124,11 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	var vol *volumes.Volume
@@ -144,9 +142,9 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	if commRetryErr != nil {
 		switch commRetryErr.(type) {
 		case *fail.ErrNotFound:
-			return nullAV, abstract.ResourceNotFoundError("volume", id)
+			return nil, abstract.ResourceNotFoundError("volume", id)
 		default:
-			return nullAV, commRetryErr
+			return nil, commRetryErr
 		}
 	}
 

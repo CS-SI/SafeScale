@@ -376,12 +376,11 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr 
 
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-	nullAKP := &abstract.KeyPair{}
 	if valid.IsNil(s) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
@@ -392,12 +391,11 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 
 // InspectKeyPair returns the key pair identified by id
 func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-	nullAKP := &abstract.KeyPair{}
 	if valid.IsNil(s) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -746,13 +744,12 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 
 // ResizeHost ...
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
@@ -766,14 +763,13 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
-	nullServer := &servers.Server{}
 	if valid.IsNil(s) {
-		return nullServer, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullServer, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
@@ -781,7 +777,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullServer, xerr
+		return nil, xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
@@ -847,7 +843,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			return nullServer, fail.Wrap(
+			return nil, fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout,
 			)
 		case *fail.ErrAborted:
@@ -857,11 +853,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			}
 			return server, retryErr // Not available error keeps the server info, good
 		default:
-			return nullServer, retryErr
+			return nil, retryErr
 		}
 	}
 	if server == nil {
-		return nullServer, fail.NotFoundError("failed to query Host '%s'", hostLabel)
+		return nil, fail.NotFoundError("failed to query Host '%s'", hostLabel)
 	}
 	return server, nil
 }
@@ -869,14 +865,13 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	nullAHC := abstract.NewHostCore()
 	if valid.IsNil(s) {
-		return nullAHC, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	server, xerr := s.WaitHostState(hostParam, hoststate.Started, timeout)
@@ -889,15 +884,15 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 				ahf.Core.LastState = hoststate.Error
 				return ahf.Core, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
-			return nullAHC, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 		default:
-			return nullAHC, xerr
+			return nil, xerr
 		}
 	}
 
 	ahf, xerr = s.complementHost(ahf.Core, server)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	return ahf.Core, nil
@@ -1037,15 +1032,14 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	nullAVA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
-		return nullAVA, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
@@ -1059,7 +1053,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAVA, xerr
+		return nil, xerr
 	}
 	return &abstract.VolumeAttachment{
 		ID:       va.ID,

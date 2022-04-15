@@ -89,9 +89,8 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
@@ -101,7 +100,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 	az, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
+		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
 	var v abstract.Volume
@@ -168,7 +167,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if xerr != nil {
-		return nullAV, xerr
+		return nil, xerr
 	}
 
 	return &v, nil
@@ -176,12 +175,11 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -197,9 +195,9 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nullAV, abstract.ResourceNotFoundError("volume", id)
+			return nil, abstract.ResourceNotFoundError("volume", id)
 		default:
-			return nullAV, xerr
+			return nil, xerr
 		}
 	}
 
@@ -339,15 +337,15 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	nullAVA := abstract.NewVolumeAttachment()
+	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
-		return nullAVA, fail.InvalidInstanceError()
+		return nilA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nilA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nilA, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
@@ -361,7 +359,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAVA, xerr
+		return nilA, xerr
 	}
 	return &abstract.VolumeAttachment{
 		ID:       va.ID,

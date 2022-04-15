@@ -96,11 +96,9 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	nullSg := abstract.NewSecurityGroup()
-
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
-		return nullSg, xerr
+		return nil, xerr
 	}
 
 	// finally, using context
@@ -120,7 +118,7 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	resp, err := service.Create(newCtx, protoRequest)
 	if err != nil {
-		return nullSg, err
+		return nil, err
 	}
 
 	rv, err := converters.SecurityGroupFromProtocolToAbstract(resp)
