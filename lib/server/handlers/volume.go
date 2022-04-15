@@ -39,7 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
 
-//go:generate minimock -o mocks/mock_volume.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.VolumeHandler
+//go:generate minimock -o ../mocks/mock_volumeapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.VolumeHandler
 
 // VolumeHandler defines API to manipulate hosts
 type VolumeHandler interface {

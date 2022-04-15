@@ -108,13 +108,6 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	xerr = hostInstance.Start(job.Context())
 	if xerr != nil {
 		return empty, xerr
@@ -159,13 +152,6 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	if xerr = hostInstance.Stop(job.Context()); xerr != nil {
 		return empty, xerr
 	}
@@ -206,13 +192,6 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.Reboot(job.Context(), false); xerr != nil { // FIXME: We should run a sync first
 		return empty, xerr
@@ -320,14 +299,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 				return nil, xerr
 			}
 
-			//goland:noinspection GoDeferInLoop
-			defer func(instance resources.Subnet) { // nolint
-				issue := instance.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(subnetInstance)
-
 			xerr = subnetInstance.Review(
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.Subnet)
@@ -351,13 +322,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		defer func() {
-			issue := subnetInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		xerr = subnetInstance.Review(
 			func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -406,13 +370,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	// logrus.Infof("Host '%s' created", name)
 	return hostInstance.ToProtocol(job.Context())
 }
@@ -456,13 +413,6 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	reduce := false
 	xerr = hostInstance.Inspect(
@@ -542,15 +492,8 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		}
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	// Data sync
-	xerr = hostInstance.Reload(job.Context())
+	xerr = hostInstance.Reload()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -601,13 +544,6 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 			return nil, xerr
 		}
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	_, xerr = hostInstance.ForceGetState(jobCtx)
 	if xerr != nil {
@@ -662,10 +598,6 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 
 	xerr = hostInstance.Delete(job.Context())
 	if xerr != nil {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return empty, xerr
 	}
 
@@ -758,24 +690,10 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -835,24 +753,10 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return empty, hostInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 }
@@ -901,24 +805,10 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.EnableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		return empty, xerr
@@ -978,13 +868,6 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		}
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -996,13 +879,6 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 			return empty, xerr
 		}
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.DisableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		switch xerr.(type) {
@@ -1053,13 +929,6 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	bonds, xerr := hostInstance.ListSecurityGroups(securitygroupstate.All)
 	if xerr != nil {

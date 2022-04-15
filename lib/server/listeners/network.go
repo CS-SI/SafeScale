@@ -157,16 +157,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
-
-		err := subnetInstance.Released()
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-	}
-
-	err = networkInstance.Released()
-	if err != nil {
-		return nil, fail.Wrap(err)
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
@@ -252,13 +242,6 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := networkInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return networkInstance.ToProtocol()
 }

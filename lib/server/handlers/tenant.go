@@ -138,16 +138,15 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdEphemeralDiskSize,
 	cmdDiskSpeed,
 	cmdRotational,
-	cmdNetSpeed)
+	cmdNetSpeed,
+)
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
-//go:generate minimock -o mocks/mock_tenant.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.TenantHandler
-
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
-	Scan(string, bool, []string) (ptp *protocol.ScanResultList, ferr fail.Error)
-	Inspect(string) (ptp *protocol.TenantInspectResponse, ferr fail.Error)
+	Scan(string, bool, []string) (_ *protocol.ScanResultList, ferr fail.Error)
+	Inspect(string) (_ *protocol.TenantInspectResponse, ferr fail.Error)
 }
 
 // tenantHandler service
@@ -163,7 +162,7 @@ func NewTenantHandler(job server.Job) TenantHandler {
 }
 
 // Inspect displays tenant configuration
-func (handler *tenantHandler) Inspect(tenantName string) (ptp *protocol.TenantInspectResponse, ferr fail.Error) {
+func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -304,7 +303,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (ptp *protocol.TenantIn
 }
 
 // Scan scans the tenant and updates the database
-func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (ptp *protocol.ScanResultList, ferr fail.Error) {
+func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -546,7 +545,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	return nil
 }
 
-func (handler *tenantHandler) dryRun(templateNamesToScan []string) (ptp *protocol.ScanResultList, ferr fail.Error) {
+func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	var resultList []*protocol.ScanResult

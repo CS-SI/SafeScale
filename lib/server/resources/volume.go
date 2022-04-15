@@ -23,6 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
@@ -31,6 +33,8 @@ import (
 // Volume links Object Storage folder and getVolumes
 type Volume interface {
 	Metadata
+	data.Identifiable
+	observer.Observable
 
 	Attach(ctx context.Context, host Host, path, format string, doNotFormat, doNotMount bool) fail.Error // attaches a volume to a host
 	Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) fail.Error                   // walks through all the metadata objects in network

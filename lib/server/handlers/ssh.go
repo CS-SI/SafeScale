@@ -50,7 +50,7 @@ import (
 
 const protocolSeparator = ":"
 
-//go:generate minimock -o mocks/mock_ssh.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.SSHHandler
+//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.SSHHandler
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 

@@ -18,6 +18,7 @@ package operations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -53,7 +54,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
@@ -115,46 +115,11 @@ func LoadHost(ctx context.Context, svc iaas.Service, ref string, options ...data
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	updateCachedInformation := false
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
-	timings, xerr := svc.Timings()
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onHostCacheMiss(ctx, svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	hostCache, xerr := svc.GetCache(hostKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(ctx, svc, ref) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := hostCache.Get(ctx, ref, cacheOptions...)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata message
-			return nil, fail.NotFoundError("failed to find Host '%s'", ref)
-		default:
-			return nil, xerr
-		}
-	}
-
-	anon := cacheEntry.Content()
 	hostInstance, ok := anon.(*Host)
 	if !ok {
 		return nil, fail.InconsistentError("cache content for key %s is not a resources.Host", ref)
@@ -162,44 +127,45 @@ func LoadHost(ctx context.Context, svc iaas.Service, ref string, options ...data
 	if hostInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
-	_ = cacheEntry.LockContent()
-	defer func() {
-		_ = cacheEntry.UnlockContent()
-	}()
 
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if updateCachedInformation {
-		if cacheEntry.LockCount() > 1 {
-			xerr = hostInstance.Reload(ctx)
-			if xerr != nil {
-				return hostInstance, xerr
-			}
-		}
-		xerr = hostInstance.updateCachedInformation(ctx)
-		if xerr != nil {
-			return hostInstance, xerr
-		}
-	}
 	return hostInstance, nil
 }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
-func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	hostInstance, innerXErr := NewHost(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: MetadataCore.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	serialized, xerr := hostInstance.Sdump()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if innerXErr = hostInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	xerr = hostInstance.updateCachedInformation()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	afterSerialized, xerr := hostInstance.Sdump()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if strings.Compare(serialized, afterSerialized) == 0 {
+		return nil, fail.NotFoundError("something is very wrong, either read or updateCachedInformation should have failed: %s", serialized)
 	}
 
 	return hostInstance, nil
 }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
-func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
+func (instance *Host) updateCachedInformation() fail.Error {
 	svc := instance.Service()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(svc)
@@ -209,6 +175,12 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
+
+	task, xerr := concurrency.VoidTask()
+	if xerr != nil {
+		return xerr
+	}
+	ctx := task.Context()
 
 	return instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -417,58 +389,13 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	svc := instance.Service()
-	kindCache, xerr := svc.GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on failure, failed to free %s cache entry for key '%s'",
-						instance.MetadataCore.GetKind(), identifiable.GetID(),
-					),
-				)
-			}
-
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
@@ -576,22 +503,22 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
-func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
+func (instance *Host) Reload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	return instance.unsafeReload(ctx)
+	return instance.unsafeReload()
 }
 
 // FIXME: unsafeXXX may need review, should not be needed anymore after lock sanitization
 // unsafeReload reloads Host from metadata and current Host state on provider state
-func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
+func (instance *Host) unsafeReload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.MetadataCore.Reload(ctx)
+	xerr := instance.MetadataCore.Reload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -679,7 +606,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	return instance.updateCachedInformation(ctx)
+	return instance.updateCachedInformation()
 }
 
 // GetState returns the last known state of the Host, without forced inspect
@@ -751,7 +678,7 @@ func (instance *Host) Create(
 	}
 
 	// Check if Host exists and is managed bySafeScale
-	hostInstance, xerr := LoadHost(task.Context(), svc, hostReq.ResourceName)
+	_, xerr = LoadHost(task.Context(), svc, hostReq.ResourceName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -762,10 +689,6 @@ func (instance *Host) Create(
 			return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)
 		}
 	} else {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)
 	}
 
@@ -1069,7 +992,7 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	xerr = instance.updateCachedInformation(task.Context())
+	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1329,12 +1252,6 @@ func (instance *Host) setSecurityGroups(
 				if innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), defaultAbstractSubnet.PublicIPSecurityGroupID)
 				}
-				defer func() {
-					issue := pubipsg.Released()
-					if issue != nil {
-						logrus.Warn(issue)
-					}
-				}()
 
 				innerXErr = pubipsg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 				if innerXErr != nil {
@@ -1379,14 +1296,6 @@ func (instance *Host) setSecurityGroups(
 							continue
 						}
 
-						//goland:noinspection ALL
-						defer func(item resources.Subnet) {
-							issue := item.Released()
-							if issue != nil {
-								logrus.Warn(issue)
-							}
-						}(subnetInstance)
-
 						sgName := sg.GetName()
 						deeperXErr = subnetInstance.Review(func(
 							clonable data.Clonable, _ *serialize.JSONProperties,
@@ -1404,10 +1313,6 @@ func (instance *Host) setSecurityGroups(
 									derr = sg.UnbindFromHost(ctx, instance)
 									if derr != nil {
 										errors = append(errors, derr)
-									}
-									issue := sg.Released()
-									if issue != nil {
-										logrus.Warn(issue)
 									}
 								}
 							}
@@ -1435,13 +1340,6 @@ func (instance *Host) setSecurityGroups(
 				if innerXErr != nil {
 					return innerXErr
 				}
-				//goland:noinspection ALL
-				defer func(subnetInstance resources.Subnet) {
-					issue := subnetInstance.Released()
-					if issue != nil {
-						logrus.Warn(issue)
-					}
-				}(otherSubnetInstance)
 
 				var otherAbstractSubnet *abstract.Subnet
 				innerXErr = otherSubnetInstance.Review(func(
@@ -1464,14 +1362,6 @@ func (instance *Host) setSecurityGroups(
 					if innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
 					}
-
-					//goland:noinspection ALL
-					defer func(sgInstance resources.SecurityGroup) {
-						issue := sgInstance.Released()
-						if issue != nil {
-							logrus.Warn(issue)
-						}
-					}(lansg)
 
 					innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 					if innerXErr != nil {
@@ -1504,12 +1394,6 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 		svc := instance.Service()
 		derr := instance.Alter(
 			func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
-
 				return props.Alter(
 					hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (innerXErr fail.Error) {
 						hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -1528,10 +1412,10 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 
 						// unbind security groups
 						for _, v := range hsgV1.ByName {
-							if sg, opXErr = LoadSecurityGroup(task.Context(), svc, v); opXErr != nil {
+							if sg, opXErr = LoadSecurityGroup(ctx, svc, v); opXErr != nil {
 								errors = append(errors, opXErr)
 							} else {
-								opXErr = sg.UnbindFromHost(task.Context(), instance)
+								opXErr = sg.UnbindFromHost(ctx, instance)
 								if opXErr != nil {
 									errors = append(errors, opXErr)
 								}
@@ -2000,6 +1884,15 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
+	if userdataContent.Debug {
+		if _, err := os.Stat("/tmp/tss"); !errors.Is(err, os.ErrNotExist) {
+			_, _, _, xerr = instance.unsafePush(task.Context(), "/tmp/tss", fmt.Sprintf("/home/%s/tss", userdataContent.Username), userdataContent.Username, "755", 10*time.Second)
+			if xerr != nil {
+				debug.IgnoreError(xerr)
+			}
+		}
+	}
+
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
 	xerr = instance.runInstallPhase(task.Context(), userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, getPhase2Timeout(timings))
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2022,7 +1915,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
 	}
 
-	xerr = instance.updateCachedInformation(task.Context())
+	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2173,10 +2066,6 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 				return nil, nil, xerr
 			}
 
-			networkCache, xerr := svc.GetCache(networkKind)
-			_ = xerr
-			_ = networkCache
-
 			request := abstract.NetworkRequest{
 				Name:          networkName,
 				CIDR:          abstract.SingleHostNetworkCIDR,
@@ -2212,12 +2101,6 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			return nil, nil, xerr
 		}
 	}
-	defer func() {
-		issue := networkInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	// Check if Subnet exists
 	var (
@@ -2304,10 +2187,6 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			return nil, nil, xerr
 		}
 	} else {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return nil, nil, fail.DuplicateError("there is already a Subnet named '%s'", singleHostRequest.ResourceName)
 	}
 
@@ -2437,10 +2316,6 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 							debug.IgnoreError(inErr)
 							continue
 						}
-						issue := instance.Released()
-						if issue != nil {
-							logrus.Warn(issue)
-						}
 						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 					}
 				}
@@ -2519,14 +2394,6 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					continue
 				}
 
-				//goland:noinspection ALL
-				defer func(item resources.Share) {
-					issue := item.Released()
-					if issue != nil {
-						logrus.Warn(issue)
-					}
-				}(shareInstance)
-
 				// Retrieve data about the server serving the Share
 				hostServer, loopErr := shareInstance.GetServer(task.Context())
 				if loopErr != nil {
@@ -2563,14 +2430,6 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				debug.IgnoreError(loopErr)
 				continue
 			}
-
-			//goland:noinspection ALL
-			defer func(item resources.Share) {
-				issue := item.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(shareInstance)
 
 			loopErr = shareInstance.Unmount(task.Context(), instance)
 			if loopErr != nil {
@@ -2623,13 +2482,6 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 							errors = append(errors, loopErr)
 							continue
 						}
-						//goland:noinspection ALL
-						defer func(item resources.Subnet) {
-							issue := item.Released()
-							if issue != nil {
-								logrus.Warn(issue)
-							}
-						}(subnetInstance)
 
 						loopErr = subnetInstance.DetachHost(task.Context(), hostID)
 						if loopErr != nil {
@@ -2670,14 +2522,6 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					}
 					continue
 				}
-
-				//goland:noinspection ALL
-				defer func(sgInstance resources.SecurityGroup) {
-					issue := sgInstance.Released()
-					if issue != nil {
-						logrus.Warn(issue)
-					}
-				}(sgInstance)
 
 				derr = sgInstance.UnbindFromHost(task.Context(), instance)
 				if derr != nil {
@@ -2812,7 +2656,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 	doRefresh := instance.localCache.sshProfile == nil
 	instance.localCache.RUnlock() // nolint
 	if doRefresh {
-		xerr := instance.updateCachedInformation(ctx)
+		xerr := instance.updateCachedInformation()
 		if xerr != nil {
 			return xerr
 		}
@@ -3144,15 +2988,6 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	hostCache, xerr := svc.GetCache(hostKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Invalidate Cache
-	_ = hostCache.FreeEntry(task.Context(), hostID)
-
 	xerr = svc.StartHost(hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3186,7 +3021,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload(task.Context())
+	xerr = instance.unsafeReload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3225,19 +3060,11 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	hostName := instance.GetName()
 	hostID := instance.GetID()
 	svc := instance.Service()
-	hostCache, xerr := svc.GetCache(hostKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
 	}
-
-	// Invalidate Cache
-	_ = hostCache.FreeEntry(task.Context(), hostID)
 
 	// FIXME: It has to TRY to run a sync first, if it fails, we log it and continue stopping the host
 	xerr = svc.StopHost(hostID, false)
@@ -3273,7 +3100,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload(task.Context())
+	xerr = instance.unsafeReload()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3684,7 +3511,7 @@ func (instance *Host) GetDefaultSubnet(ctx context.Context) (subnetInstance reso
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
-		return NullSubnet(), fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.RLock()

@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
@@ -303,13 +301,6 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := volumeInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return volumeInstance.ToProtocol(job.Context())
 }

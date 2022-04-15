@@ -32,7 +32,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
@@ -47,8 +46,6 @@ const (
 	curlPut   = "curl -kSsl -X PUT --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 	curlPatch = "curl -kSsl -X PATCH --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
-
-var kongProxyCheckedCache cache.Cache // nolint
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
@@ -590,17 +587,5 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 			return response, httpcode, fail.NewError("post failed: HTTP error code=%s: %s", httpcode, msg.(string))
 		}
 		return response, httpcode, fail.NewError("post failed with HTTP error code '%s'", httpcode)
-	}
-}
-
-func init() {
-	store, xerr := cache.NewMapStore("store:proxychecks")
-	if xerr != nil {
-		panic(xerr.Error())
-	}
-
-	kongProxyCheckedCache, xerr = cache.NewSingleCache("proxychecks", store)
-	if xerr != nil {
-		panic(xerr.Error())
 	}
 }

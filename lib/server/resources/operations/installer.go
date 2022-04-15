@@ -24,6 +24,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
+//go:generate minimock -o ../mocks/mock_installer.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources/operations.Installer
+
 // Installer defines the API of an Installer
 type Installer interface {
 	Check(context.Context, resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)  // checks if a Feature is installed

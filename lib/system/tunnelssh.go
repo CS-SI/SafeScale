@@ -222,7 +222,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				PublicKeyFromStr(sc.cfg.PrivateKey),
 			},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         2 * time.Second,
+			Timeout:         5 * time.Second,
 		}
 
 		logrus.Debugf("Dialing to %s:%d using %s:%d", sc.cfg.LocalHost, sc.cfg.LocalPort, "localhost", sc.tunnels.GetLocalEndpoint().Port())
@@ -294,7 +294,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			if session != nil { // race condition mitigation
 				return fmt.Errorf("too late")
 			}
-			logrus.Debugf("creating the session took %s and %d retries", time.Since(beginDial), retries)
+			logrus.Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
 			session = newsession
 			return nil
 		}, 2*time.Second, 150*time.Second)
@@ -572,6 +572,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			retcode = -1
 			iterations++
 
 			// FIXME: Remove WaitServerReady logs and ensure minimum of iterations
@@ -584,7 +585,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 			cmd, _ := sc.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 20*time.Second) // FIXME: Remove hardcoded timeout
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 30*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				return xerr
 			}

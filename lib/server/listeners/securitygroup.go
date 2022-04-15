@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -111,13 +110,6 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := networkInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.Rules)
 	if xerr != nil {
 		return nil, xerr
@@ -132,13 +124,6 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return sgInstance.ToProtocol()
 }
@@ -179,13 +164,6 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = sgInstance.Clear(job.Context())
 	if xerr != nil {
@@ -232,13 +210,6 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	xerr = sgInstance.Reset(job.Context())
 	if xerr != nil {
 		return empty, xerr
@@ -283,13 +254,6 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return sgInstance.ToProtocol()
 }
@@ -380,13 +344,6 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	xerr = sgInstance.AddRule(job.Context(), rule)
 	if xerr != nil {
 		return nil, xerr
@@ -435,13 +392,6 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = sgInstance.DeleteRule(job.Context(), rule)
 	if xerr != nil {
@@ -531,13 +481,6 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	out := &protocol.SecurityGroupBondsResponse{}
 	switch loweredKind {

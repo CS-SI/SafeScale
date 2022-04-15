@@ -31,7 +31,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -80,83 +79,42 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	updateCachedInformation := false
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
-	networkCache, xerr := svc.GetCache(networkKind)
-	xerr = debug.InjectPlannedFail(xerr)
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := networkCache.Get(ctx, ref, cacheOptions...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Network '%s'", ref)
-		default:
-			return nil, xerr
-		}
 	}
 
 	var ok bool
-	networkInstance, ok = cacheEntry.Content().(resources.Network)
+	networkInstance, ok = anon.(resources.Network)
 	if !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
 	}
 	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
-	_ = cacheEntry.LockContent()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
-
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if updateCachedInformation && cacheEntry.LockCount() > 1 {
-		xerr = networkInstance.Reload(ctx)
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
 
 	return networkInstance, nil
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
-func onNetworkCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	networkInstance, innerXErr := NewNetwork(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	blank, innerXErr := NewNetwork(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(networkInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("network with ref '%s' does NOT exist", ref)
 	}
 
 	return networkInstance, nil
@@ -204,23 +162,13 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
+	svc := instance.Service()
+
 	childCtx, cancel := context.WithCancel(task.Context())
 	defer cancel()
 
-	svc := instance.Service()
-	networkCache, xerr := svc.GetCache(networkKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return xerr
-	}
-
 	// Check if Network already exists and is managed by SafeScale
-	existing, xerr := LoadNetwork(childCtx, svc, req.Name)
+	_, xerr = LoadNetwork(childCtx, svc, req.Name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -230,10 +178,6 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 			return xerr
 		}
 	} else {
-		issue := existing.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
 		_ = xerr.Annotate("managed", true)
 		return xerr
@@ -242,21 +186,6 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
-
-	// reserve cache entry for new Network
-	xerr = networkCache.ReserveEntry(childCtx, req.Name, timings.OperationTimeout()+timings.MetadataReadAfterWriteTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			derr := networkCache.FreeEntry(derived, req.Name)
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", req.Name))
-			}
-		}
-	}()
 
 	// Verify if the subnet already exist and in this case is not managed by SafeScale
 	_, xerr = svc.InspectNetworkByName(req.Name)
@@ -329,31 +258,12 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'cache.Cacheable'")
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetName(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
@@ -390,7 +300,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.Service()
-	existing, xerr := LoadNetwork(task.Context(), svc, ref)
+	_, xerr = LoadNetwork(task.Context(), svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -399,10 +309,6 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 			return xerr
 		}
 	} else {
-		issue := existing.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
 	}
 
@@ -428,32 +334,6 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
-
-	// reserve cache entry for new Network
-	networkCache, xerr := svc.GetCache(networkKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = networkCache.ReserveEntry(task.Context(), ref, timings.OperationTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			derr := networkCache.FreeEntry(derived, ref)
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to free cache entry '%s'", ref))
-			}
-		}
-	}()
 
 	// Write subnet object metadata
 	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
@@ -589,6 +469,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 
 				if k == instance.GetName() {
 					found = true
+					deleted := false
 					// the single subnet present is a subnet named like the Network, delete it first
 					subnetInstance, xerr := LoadSubnet(task.Context(), svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
@@ -597,18 +478,19 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 						case *fail.ErrNotFound:
 							// Subnet is already deleted, considered as a success and continue
 							debug.IgnoreError(xerr)
-							continue
+							deleted = true
 						default:
 							return xerr
 						}
 					}
 
-					subnetName := subnetInstance.GetName()
-
-					xerr = subnetInstance.Delete(task.Context())
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+					if !deleted {
+						subnetName := subnetInstance.GetName()
+						xerr = subnetInstance.Delete(task.Context())
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+						}
 					}
 				}
 			}
@@ -837,12 +719,6 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 	if xerr != nil {
 		return xerr
 	}
-	defer func() {
-		issue := parentNetwork.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if parentNetwork.GetName() != instance.GetName() {
 		return fail.InvalidRequestError("cannot adopt Subnet '%s' because Network '%s' does not own it", subnet.GetName(), instance.GetName())

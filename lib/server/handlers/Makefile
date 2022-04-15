@@ -6,8 +6,7 @@ vet:
 	@$(GO) vet ./...
 
 generate:
-	@(mkdir -p mocks) || true
-	@$(GO) generate -run minimock . >/dev/null || true
+	@(mkdir -p ../mocks) || true
+	@$(GO) generate -run minimock . > /dev/null 2>&1 || true
 
-clean:
-	@($RM) -f mocks/mock_*.go || true
+clean: ;

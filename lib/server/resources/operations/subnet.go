@@ -38,7 +38,6 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
@@ -75,11 +74,6 @@ type Subnet struct {
 		gateways [2]*Host
 		// parentNetwork resources.Network
 	}
-}
-
-// NullSubnet returns a *Subnet representing null value
-func NullSubnet() *Subnet {
-	return &Subnet{MetadataCore: nil}
 }
 
 // ListSubnets returns a list of available subnets
@@ -137,13 +131,13 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return NullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, subnetKind, subnetsFolderName, &abstract.Subnet{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullSubnet(), xerr
+		return nil, xerr
 	}
 
 	instance := &Subnet{
@@ -153,7 +147,7 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (subnetInstance *Subnet, ferr fail.Error) {
+func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (_ *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -163,13 +157,9 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
 
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	// -- First step: identify subnetID from (networkRef, subnetRef) --
 	var (
+		xerr            fail.Error
 		subnetID        string
 		networkInstance resources.Network
 	)
@@ -254,38 +244,16 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 		}
 	}
 
-	updateCachedInformation := false
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
 	// -- second step: search instance in service cache
 	if subnetID != "" {
-		subnetCache, xerr := svc.GetCache(subnetKind)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		options := cache.MissEventOption(
-			func() (cache.Cacheable, fail.Error) { return onSubnetCacheMiss(ctx, svc, subnetID) },
-			timings.MetadataTimeout(),
-		)
-		cacheEntry, xerr := subnetCache.Get(ctx, subnetID, options...)
-		xerr = debug.InjectPlannedFail(xerr)
+		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSubnetCacheMiss(ctx, svc, subnetID) }
+		anon, xerr := cacheMissLoader()
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		var ok bool
-		subnetInstance, ok = cacheEntry.Content().(*Subnet)
+		subnetInstance, ok := anon.(*Subnet)
 		if !ok {
 			return nil, fail.InconsistentError("cache entry for %s is not a *Subnet", subnetID)
 		}
@@ -293,60 +261,32 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 			return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
 		}
 
-		_ = cacheEntry.LockContent()
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				_ = cacheEntry.UnlockContent()
-			}
-		}()
-
-		// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-		if updateCachedInformation {
-			if cacheEntry.LockCount() > 1 {
-				xerr = subnetInstance.Reload(ctx)
-				if xerr != nil {
-					return nil, xerr
-				}
-			}
-			xerr = subnetInstance.updateCachedInformation(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-		}
+		return subnetInstance, nil
 	} else {
 		return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 	}
-
-	// -- deal with instance not found and unable to create --
-	if subnetInstance == nil {
-		if networkRef != "" {
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
-		}
-
-		return nil, fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
-	}
-
-	return subnetInstance, nil
 }
 
 // onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'
-func onSubnetCacheMiss(ctx context.Context, svc iaas.Service, subnetID string) (cache.Cacheable, fail.Error) {
+func onSubnetCacheMiss(ctx context.Context, svc iaas.Service, subnetID string) (data.Identifiable, fail.Error) {
 	subnetInstance, innerXErr := NewSubnet(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if innerXErr = subnetInstance.ReadByID(subnetID); innerXErr != nil {
+	if innerXErr = subnetInstance.Read(subnetID); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	xerr := subnetInstance.updateCachedInformation(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return subnetInstance, nil
 }
 
-// updateCachedInformation updates the information cached in instance because will be frequently used and will not changed over time
+// updateCachedInformation updates the information cached in instance because will be frequently used and will not be changed over time
 func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error {
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
@@ -375,26 +315,38 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 		hostInstance, xerr := LoadHost(ctx, instance.Service(), primaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
-		}
-
-		var ok bool
-		instance.localCache.gateways[0], ok = hostInstance.(*Host)
-		if !ok {
-			return fail.NewError("hostInstance should be a *Host")
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
+				// Network metadata can be missing if it's the default Network, so continue
+			default:
+				return xerr
+			}
+		} else {
+			var ok bool
+			instance.localCache.gateways[0], ok = hostInstance.(*Host)
+			if !ok {
+				return fail.NewError("hostInstance should be a *Host")
+			}
 		}
 	}
 	if secondaryGatewayID != "" {
 		hostInstance, xerr := LoadHost(ctx, instance.Service(), secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
-		}
-
-		var ok bool
-		instance.localCache.gateways[1], ok = hostInstance.(*Host)
-		if !ok {
-			return fail.InconsistentError("hostInstance should be a *Host")
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
+				// Network metadata can be missing if it's the default Network, so continue
+			default:
+				return xerr
+			}
+		} else {
+			var ok bool
+			instance.localCache.gateways[1], ok = hostInstance.(*Host)
+			if !ok {
+				return fail.InconsistentError("hostInstance should be a *Host")
+			}
 		}
 	}
 
@@ -410,50 +362,12 @@ func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
 
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
-
-	xerr = instance.MetadataCore.Carry(clonable)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
@@ -555,12 +469,6 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
 		}
-		defer func() {
-			issue := sg.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		if innerXErr = sg.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, sg.GetName(), host.GetName())
@@ -598,10 +506,7 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
 			}
-			err := sg.Released()
-			if err != nil {
-				return fail.Wrap(err)
-			}
+
 			return nil
 		})
 	}
@@ -731,7 +636,7 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 
 // checkUnicity checks if the Subnet name is not already used
 func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetRequest) fail.Error {
-	resSubnet, xerr := LoadSubnet(ctx, instance.Service(), req.NetworkID, req.Name)
+	_, xerr := LoadSubnet(ctx, instance.Service(), req.NetworkID, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -740,11 +645,6 @@ func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetReq
 		default:
 			return xerr
 		}
-	}
-
-	err := resSubnet.Released()
-	if err != nil {
-		return fail.Wrap(err)
 	}
 
 	return fail.DuplicateError("Subnet '%s' already exists", req.Name)
@@ -1119,12 +1019,6 @@ func (instance *Subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_
 		if rgw, inErr = LoadHost(ctx, svc, id); inErr != nil {
 			return inErr
 		}
-		defer func() {
-			issue := rgw.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		if ip, inErr = rgw.GetPublicIP(ctx); inErr != nil {
 			return inErr
@@ -1166,14 +1060,6 @@ func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, fe
 			if inErr != nil {
 				return inErr
 			}
-
-			//goland:noinspection ALL
-			defer func(hostInstance resources.Host) {
-				issue := hostInstance.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(rgw)
 
 			ip, inErr := rgw.GetPublicIP(ctx)
 			if inErr != nil {
@@ -1289,13 +1175,9 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(lastCtx, svc, k, WithoutReloadOption); innerXErr != nil {
+					if _, innerXErr := LoadHost(lastCtx, svc, k, WithoutReloadOption); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
-						err := hostInstance.Released()
-						if err != nil {
-							return fail.Wrap(err)
-						}
 						hostList = append(hostList, k)
 					}
 				}
@@ -1595,14 +1477,6 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 				return xerr
 			}
 		} else {
-			//goland:noinspection ALL
-			defer func(sgInstance resources.SecurityGroup) {
-				issue := sgInstance.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(sgInstance)
-
 			xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)
 			if xerr != nil {
 				return xerr

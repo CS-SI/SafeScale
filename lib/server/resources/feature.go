@@ -47,10 +47,9 @@ type Feature interface {
 	data.Clonable
 	data.Identifiable
 
-	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)   // installs the feature on the target
-	Applicable(Targetable) (bool, fail.Error)                                                      // tells if the feature is installable on the target
-	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // check if feature is installed on target
-	// ControlledParameter(string, Host) (string, fail.Error)                                          // returns the controlled content of a FeatureParameter
+	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // installs the feature on the target
+	Applicable(Targetable) (bool, fail.Error)                                                       // tells if the feature is installable on the target
+	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // check if feature is installed on target
 	GetDisplayFilename() string                                                                     // displays the filename of display (optionally adding '[embedded]' for embedded features)
 	GetFilename() string                                                                            // returns the filename of the feature
 	Dependencies() (map[string]struct{}, fail.Error)                                                // returns the other features needed as requirements

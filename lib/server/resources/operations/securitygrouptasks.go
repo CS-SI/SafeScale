@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
@@ -139,14 +138,6 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 				}
 			}
 
-			//goland:noinspection GoDeferInLoop
-			defer func(ins resources.Host) {
-				issue := ins.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(hostInstance)
-
 			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", v)))
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
@@ -207,13 +198,6 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 			return nil, innerXErr
 		}
 	} else {
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
-
 		// Before enabling SG on Host, make sure the SG is bound to Host
 		xerr := hostInstance.BindSecurityGroup(task.Context(), instance, true)
 		if xerr != nil {

@@ -32,4 +32,4 @@ clean:
 	@(cd debug && make $@)
 	@(cd fail && make $@)
 	@(cd temporal && make $@)
-
+	@(cd retry && make $@)

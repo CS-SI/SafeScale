@@ -25,6 +25,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsecurity"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
@@ -91,9 +92,14 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 
 	// We specify a name and that it should forward packets
 	state := true
-	opts := networks.CreateOpts{
+	basic_opts := networks.CreateOpts{
 		Name:         req.Name,
 		AdminStateUp: &state,
+	}
+
+	opts := portsecurity.NetworkCreateOptsExt{
+		CreateOptsBuilder:   basic_opts,
+		PortSecurityEnabled: gophercloud.Enabled,
 	}
 
 	// Creates the network

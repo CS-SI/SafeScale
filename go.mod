@@ -6,9 +6,12 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go v1.43.33
+	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
+	github.com/dgraph-io/ristretto v0.1.0
+	github.com/eko/gocache/v2 v2.2.0
 	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
 	github.com/felixge/fgprof v0.9.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
@@ -29,8 +32,9 @@ require (
 	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v1.1.0
-	github.com/pelletier/go-toml/v2 v2.0.0-beta.7
+	github.com/pelletier/go-toml/v2 v2.0.0-beta.8
 	github.com/pkg/sftp v1.13.4
+	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/sanity-io/litter v1.5.4
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1

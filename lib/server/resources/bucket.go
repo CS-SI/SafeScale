@@ -21,6 +21,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
@@ -29,6 +31,8 @@ import (
 // Bucket GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {
 	Metadata
+	data.Identifiable
+	observer.Observable
 
 	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
 	Create(ctx context.Context, name string) fail.Error

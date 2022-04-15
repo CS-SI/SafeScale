@@ -522,13 +522,6 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 		}
 	}
 
-	defer func() {
-		issue := rs.Released() // mark the instance as unsafeReleased at the end of the function, for cache considerations
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	gw, xerr := rs.InspectGateway(ctx, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -689,17 +682,6 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		if len(hostsList) == 0 {
 			continue
 		}
-
-		// Marks hosts instances as unsafeReleased after use
-		//goland:noinspection GoDeferInLoop
-		defer func(hlist []resources.Host) {
-			for _, v := range hlist {
-				issue := v.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}
-		}(hostsList)
 
 		var problem error
 		subtask, xerr := concurrency.NewTaskWithParent(task)
@@ -1184,12 +1166,6 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer func() {
-		issue := subnetInstance.Released() // mark instance as unsafeReleased at the end of the function, for cache considerations
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	primaryKongController, xerr := NewKongController(ctx, w.service, subnetInstance, true)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1232,16 +1208,6 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply proxy rules: %s")
 		}
-
-		//goland:noinspection ALL
-		defer func(list []resources.Host) {
-			for _, v := range list {
-				issue := v.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}
-		}(hosts)
 
 		for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
 			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task.Context())
@@ -1616,13 +1582,6 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	defer func() {
-		issue := rs.Released() // mark instance as unsafeReleased at the end of the function, for cache considerations
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	forFeature := " for Feature '" + w.feature.GetName() + "'"
 
 	for k, rule := range rules {
@@ -1652,14 +1611,6 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 			if xerr != nil {
 				return xerr
 			}
-
-			//goland:noinspection ALL
-			defer func() {
-				issue := gwSG.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}()
 
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
@@ -1867,58 +1818,4 @@ func (w worker) interpretRuleTargets(rule map[interface{}]interface{}) stepTarge
 
 // Terminate cleans up resources
 func (w *worker) Terminate() {
-	for _, v := range w.allGateways {
-		issue := v.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	for _, v := range w.allMasters {
-		issue := v.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	for _, v := range w.allNodes {
-		issue := v.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	for _, v := range w.concernedGateways {
-		issue := v.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	for _, v := range w.concernedMasters {
-		issue := v.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	for _, v := range w.concernedNodes {
-		issue := v.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	if w.availableGateway != nil {
-		issue := w.availableGateway.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	if w.availableMaster != nil {
-		issue := w.availableMaster.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
-	if w.availableNode != nil {
-		issue := w.availableNode.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}
 }

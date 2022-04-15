@@ -1359,26 +1359,26 @@ EOF
     # Force update of systemd, pciutils and netplan
 
     if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-      sfApt install -y --no-install-recommends  pciutils || {
+      sfApt install -y --no-install-recommends pciutils || {
         echo "problem installing pciutils"
         return 210
       }
       if [[ ! -z ${FEN} && ${FEN} -eq 0 ]]; then
         which netplan || {
-          sfApt install -y --no-install-recommends  netplan.io || {
+          sfApt install -y --no-install-recommends netplan.io || {
             echo "problem installing netplan.io"
             return 210
           }
         }
       else
-        sfApt install -y --no-install-recommends  netplan.io || {
+        sfApt install -y --no-install-recommends netplan.io || {
           echo "problem installing netplan.io"
           return 210
         }
       fi
       # netplan.io may break networking... So ensure networking is working as expected
       ensure_network_connectivity
-      sfApt install -y --no-install-recommends  sudo || {
+      sfApt install -y --no-install-recommends sudo || {
         echo "problem installing sudo"
         return 210
       }
@@ -1393,13 +1393,13 @@ EOF
       if [ "{{.ProviderName}}" == "aws" ]; then
         : # do nothing
       else
-        sfApt install -y --no-install-recommends  systemd || {
+        sfApt install -y --no-install-recommends systemd || {
           echo "problem installing systemd"
           return 210
         }
       fi
     else
-      sfApt install -y --no-install-recommends  systemd || {
+      sfApt install -y --no-install-recommends systemd || {
         echo "problem installing systemd"
         return 210
       }

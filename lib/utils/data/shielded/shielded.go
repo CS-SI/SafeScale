@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/sanity-io/litter"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -56,6 +57,16 @@ func (instance *Shielded) Clone() (*Shielded, error) {
 		return nil, err
 	}
 	return NewShielded(cloned)
+}
+
+func (instance *Shielded) Sdump() (string, error) {
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	sq := litter.Options{
+		HidePrivateFields: false,
+	}
+	return sq.Sdump(instance.witness), nil
 }
 
 // Inspect is used to lock a clonable for read

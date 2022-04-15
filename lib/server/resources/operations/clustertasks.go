@@ -62,7 +62,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Check if Cluster exists in metadata; if yes, error
-	existing, xerr := LoadCluster(task.Context(), instance.Service(), req.Name)
+	_, xerr := LoadCluster(task.Context(), instance.Service(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -72,10 +72,6 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			return nil, xerr
 		}
 	} else {
-		issue := existing.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return nil, fail.DuplicateError("a Cluster named '%s' already exist", req.Name)
 	}
 
@@ -625,8 +621,6 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task) // nolint
-
 	// Determine if getGateway Failover must be set
 	svc := instance.Service()
 	caps, xerr := svc.GetCapabilities()
@@ -824,24 +818,24 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			}
 			networkV3.SubnetID = subnetInstance.GetID()
 			networkV3.GatewayID = primaryGateway.GetID()
-			if networkV3.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(ctx); innerXErr != nil {
+			if networkV3.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(task.Context()); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV3.DefaultRouteIP, innerXErr = subnetInstance.GetDefaultRouteIP(ctx); innerXErr != nil {
+			if networkV3.DefaultRouteIP, innerXErr = subnetInstance.GetDefaultRouteIP(task.Context()); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV3.EndpointIP, innerXErr = subnetInstance.GetEndpointIP(ctx); innerXErr != nil {
+			if networkV3.EndpointIP, innerXErr = subnetInstance.GetEndpointIP(task.Context()); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV3.PrimaryPublicIP, innerXErr = primaryGateway.GetPublicIP(ctx); innerXErr != nil {
+			if networkV3.PrimaryPublicIP, innerXErr = primaryGateway.GetPublicIP(task.Context()); innerXErr != nil {
 				return innerXErr
 			}
 			if !gwFailoverDisabled {
 				networkV3.SecondaryGatewayID = secondaryGateway.GetID()
-				if networkV3.SecondaryGatewayIP, innerXErr = secondaryGateway.GetPrivateIP(ctx); innerXErr != nil {
+				if networkV3.SecondaryGatewayIP, innerXErr = secondaryGateway.GetPrivateIP(task.Context()); innerXErr != nil {
 					return innerXErr
 				}
-				if networkV3.SecondaryPublicIP, innerXErr = secondaryGateway.GetPublicIP(ctx); innerXErr != nil {
+				if networkV3.SecondaryPublicIP, innerXErr = secondaryGateway.GetPublicIP(task.Context()); innerXErr != nil {
 					return innerXErr
 				}
 			}
@@ -2094,14 +2088,6 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 			break
 		}
 
-		//goland:noinspection ALL
-		defer func(hostInstance resources.Host) {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}(host)
-
 		_, xerr = tg.Start(
 			instance.taskConfigureMaster, taskConfigureMasterParameters{
 				Index:     captured + 1,
@@ -2789,14 +2775,6 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)
 	}
-
-	//goland:noinspection ALL
-	defer func(item resources.Host) {
-		issue := item.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}(hostInstance)
 
 	// Docker and docker-compose installation is mandatory on all nodes
 	xerr = instance.installDocker(task.Context(), hostInstance, hostLabel, variables)

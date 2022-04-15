@@ -25,6 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
@@ -33,6 +35,8 @@ import (
 // Subnet links Object Storage folder and Network
 type Subnet interface {
 	Metadata
+	data.Identifiable
+	observer.Observable
 
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                    // unlinks host ID from subnet
 	AttachHost(ctx context.Context, _ Host) fail.Error                                                                           // links Host to the Subnet

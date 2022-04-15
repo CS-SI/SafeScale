@@ -38,14 +38,12 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
@@ -78,41 +76,8 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 	return instance, nil
 }
 
-// lookupSecurityGroup returns true if security group exists, false otherwise
-func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
-	if svc == nil {
-		return false, fail.InvalidParameterError("svc", "cannot be nil")
-	}
-	if ref == "" {
-		return false, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	sgInstance, xerr := NewSecurityGroup(svc)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
-
-	xerr = sgInstance.Read(ref)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound, *retry.ErrTimeout:
-			return false, nil
-		default:
-			return false, xerr
-		}
-	}
-	err := sgInstance.Released()
-	if err != nil {
-		return false, fail.Wrap(err)
-	}
-
-	return true, nil
-}
-
 // LoadSecurityGroup ...
-func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (sgInstance *SecurityGroup, ferr fail.Error) {
+func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ *SecurityGroup, ferr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&ferr)
 
@@ -123,83 +88,42 @@ func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, option
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	updateCachedInformation := false
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case optionWithoutReloadKeyword:
-				updateCachedInformation = !v.Value().(bool)
-			default:
-				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-
-	timings, xerr := svc.Timings()
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgCache, xerr := svc.GetCache(securityGroupKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to get cache for Security Groups")
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := sgCache.Get(ctx, ref, cacheOptions...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Security Group '%s'", ref)
-		default:
-			return nil, xerr
-		}
-	}
-
 	var ok bool
-	sgInstance, ok = cacheEntry.Content().(*SecurityGroup)
+	sgInstance, ok := anon.(*SecurityGroup)
 	if !ok {
 		return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
 	}
 	if sgInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
 	}
-	_ = cacheEntry.LockContent()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
-
-	// If entry use is greater than 1, the metadata may have been updated, so Reload() the instance
-	if updateCachedInformation && cacheEntry.LockCount() > 1 {
-		xerr = sgInstance.Reload(ctx)
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
 
 	return sgInstance, nil
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
-func onSGCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onSGCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	sgInstance, innerXErr := NewSecurityGroup(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	blank, innerXerr := NewSecurityGroup(svc)
+	if innerXErr != nil {
+		return nil, innerXerr
+	}
+
 	if innerXErr = sgInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(sgInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("security group with ref '%s' does NOT exist", ref)
 	}
 
 	return sgInstance, nil
@@ -225,46 +149,13 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), temporal.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
@@ -360,13 +251,17 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 
 	// Check if SecurityGroup exists and is managed by SafeScale
 	svc := instance.Service()
-	var found bool
-	found, xerr = lookupSecurityGroup(svc, name)
+	_, xerr = LoadSecurityGroup(ctx, svc, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
-	}
-	if found {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+		}
+	} else {
 		return fail.DuplicateError("a Security Group named '%s' already exists", name)
 	}
 
@@ -463,13 +358,6 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		if xerr != nil {
 			return xerr
 		}
-
-		defer func() {
-			issue := networkInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
@@ -600,14 +488,6 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 				}
 			}
 
-			//goland:noinspection ALL
-			defer func(h resources.Host) {
-				issue := h.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(hostInstance)
-
 			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", hostInstance.GetName())))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -712,14 +592,6 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 						return xerr
 					}
 				}
-
-				//goland:noinspection GoDeferInLoop
-				defer func(in resources.Subnet) {
-					issue := in.Released()
-					if issue != nil {
-						logrus.Warn(issue)
-					}
-				}(subnetInstance)
 
 				xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return inspectFunc(props)

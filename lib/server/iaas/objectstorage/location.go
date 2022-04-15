@@ -38,7 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o mocks/mock_location.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Location
+//go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
 // FIXME: Make this easy to validate, what is optional ?, what is mandatory ?
@@ -85,8 +85,14 @@ type Location interface {
 
 	// ListObjects lists the objects in a GetBucket
 	ListObjects(string, string, string) ([]string, fail.Error)
+
+	// InvalidateObject ...
+	InvalidateObject(string, string) fail.Error
+
 	// InspectObject ...
 	InspectObject(string, string) (abstract.ObjectStorageItem, fail.Error)
+	// HasObject ...
+	HasObject(string, string) (bool, fail.Error)
 	// ReadObject ...
 	ReadObject(string, string, io.Writer, int64, int64) fail.Error
 	// WriteMultiPartObject ...
@@ -99,8 +105,8 @@ type Location interface {
 
 	// // ItemSize ?
 	// ItemSize(ContainerName string, item string) (int64, fail.Error)
-	// // ItemEtag returns the Etag of an item
-	// ItemEtag(ContainerName string, item string) (string, fail.Error)
+	// ItemEtag returns the Etag of an item
+	ItemEtag(string, string) (string, fail.Error)
 	// // ItemLastMod returns the dagte of last update
 	// ItemLastMod(ContainerName string, item string) (time.Time, fail.Error)
 	// // ItemID returns the ID of the item
@@ -120,10 +126,13 @@ type location struct {
 	Password         string
 	Username         string
 	Region           string
+
+	currentBucketName string
+	currentBucket     bucket
 }
 
 // NewLocation creates an Object Storage location based on config
-func NewLocation(conf Config) (_ *location, ferr fail.Error) { // nolint
+func NewLocation(conf Config) (_ *locationcache, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 	l := &location{
 		config: conf,
@@ -132,7 +141,12 @@ func NewLocation(conf Config) (_ *location, ferr fail.Error) { // nolint
 	if err != nil {
 		return nil, err
 	}
-	return l, nil
+	nl, serr := newLocationcache(l)
+	if serr != nil {
+		return nil, fail.ConvertError(serr)
+	}
+
+	return nl, nil
 }
 
 // IsNull tells if the instance should be considered as a null value
@@ -319,7 +333,7 @@ func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStor
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return abstract.ObjectStorageBucket{}, err
 	}
@@ -330,13 +344,19 @@ func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStor
 	return aosb, nil
 }
 
-// inspectBucket ...
-func (instance location) inspectBucket(bucketName string) (bucket, fail.Error) {
+// GetBucket ...
+func (instance *location) GetBucket(bucketName string) (_ bucket, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(instance) {
 		return bucket{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
 		return bucket{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+	}
+
+	if instance.currentBucketName == bucketName {
+		return instance.currentBucket, nil
 	}
 
 	b, xerr := newBucket(instance.stowLocation)
@@ -351,6 +371,9 @@ func (instance location) inspectBucket(bucketName string) (bucket, fail.Error) {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
 		return bucket{}, fail.ConvertError(err)
 	}
+
+	instance.currentBucket = b
+	instance.currentBucketName = bucketName
 
 	return b, nil
 }
@@ -399,6 +422,10 @@ func (instance location) DeleteBucket(bucketName string) (ferr fail.Error) {
 	return nil
 }
 
+func (instance location) InvalidateObject(bucketName string, objectName string) fail.Error {
+	return nil
+}
+
 // InspectObject ...
 func (instance location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -415,7 +442,7 @@ func (instance location) InspectObject(bucketName string, objectName string) (ao
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return aosi, err
 	}
@@ -453,7 +480,7 @@ func (instance location) DeleteObject(bucketName, objectName string) (ferr fail.
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -472,7 +499,7 @@ func (instance location) ListObjects(bucketName string, path, prefix string) (_ 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +518,7 @@ func (instance location) BrowseBucket(bucketName string, path, prefix string, ca
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -510,11 +537,72 @@ func (instance location) ClearBucket(bucketName string, path, prefix string) (fe
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
 	return b.Clear(path, prefix)
+}
+
+func (instance location) ItemEtag(bucketName, objectName string) (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+	if bucketName == "" {
+		return "", fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+	}
+	if objectName == "" {
+		return "", fail.InvalidParameterCannotBeEmptyStringError("objectName")
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+
+	b, err := instance.GetBucket(bucketName)
+	if err != nil {
+		return "", err
+	}
+
+	objectName = strings.Trim(objectName, "/")
+	o, err := newObject(&b, objectName)
+	if err != nil {
+		return "", err
+	}
+
+	return o.GetETag()
+}
+
+func (instance location) HasObject(bucketName, objectName string) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+	if bucketName == "" {
+		return false, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+	}
+	if objectName == "" {
+		return false, fail.InvalidParameterCannotBeEmptyStringError("objectName")
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+
+	b, xerr := instance.GetBucket(bucketName)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	objectName = strings.Trim(objectName, "/")
+	item, err := b.stowContainer.Item(objectName)
+	if err != nil {
+		switch err.Error() {
+		case NotFound: // this is an implementation detail of stow
+			return false, nil // nolint, we get an empty object
+		default:
+			return false, fail.ConvertError(err)
+		}
+	}
+
+	return item != nil, nil
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
@@ -532,7 +620,16 @@ func (instance location) ReadObject(bucketName, objectName string, writer io.Wri
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	has, err := instance.HasObject(bucketName, objectName)
+	if err != nil {
+		return err
+	}
+
+	if !has {
+		return fail.NotFoundError("object '%s' not found in bucket '%s'", objectName, bucketName)
+	}
+
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -573,7 +670,7 @@ func (instance location) WriteObject(
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		if err.Error() == NotFound {
 			return aosi, fail.NotFoundError("failed to find bucket '%s'", bucketName)
@@ -618,7 +715,7 @@ func (instance location) WriteMultiPartObject(
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering()
 	defer tracer.Exiting()
 
-	b, err := instance.inspectBucket(bucketName)
+	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return aosi, err
 	}

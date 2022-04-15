@@ -33,13 +33,11 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/system/bucketfs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -82,36 +80,14 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	bucketCache, xerr := svc.GetCache(bucketKind)
-	xerr = debug.InjectPlannedFail(xerr)
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(svc, name) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	cacheOptions := cache.MissEventOption(
-		func() (cache.Cacheable, fail.Error) { return onBucketCacheMiss(svc, name) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := bucketCache.Get(ctx, name, cacheOptions...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Bucket '%s'", name)
-		default:
-			return nil, xerr
-		}
 	}
 
 	var ok bool
-	b, ok = cacheEntry.Content().(resources.Bucket)
+	b, ok = anon.(resources.Bucket)
 	if !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
 	}
@@ -120,13 +96,16 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 		return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
 	}
 
-	_ = cacheEntry.LockContent()
-
 	return b, nil
 }
 
-func onBucketCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	bucketInstance, innerXErr := NewBucket(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	blank, innerXErr := NewBucket(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -134,6 +113,10 @@ func onBucketCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Erro
 	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 	if innerXErr = bucketInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("bucket with ref '%s' does NOT exist", ref)
 	}
 
 	return bucketInstance, nil
@@ -157,51 +140,13 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(ctx, identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derived, _ := cleanerCtx(ctx)
-			if derr := kindCache.FreeEntry(derived, identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(ctx, identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
@@ -385,11 +330,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 		}
 	}
 	if bucketInstance != nil {
-		issue := bucketInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
@@ -430,7 +370,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -520,12 +460,6 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -777,14 +711,6 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 				if xerr != nil {
 					return xerr
 				}
-
-				//goland:noinspection GoDeferInLoop
-				defer func(i resources.Host) { // nolint
-					issue := i.Released()
-					if issue != nil {
-						logrus.Warn(issue)
-					}
-				}(hostInstance)
 
 				out.Mounts = append(out.Mounts, &protocol.BucketMount{
 					Host: &protocol.Reference{

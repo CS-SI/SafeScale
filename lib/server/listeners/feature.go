@@ -22,13 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
 	featurefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/feature"
 	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
@@ -36,7 +31,10 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // FeatureListener feature service server grpc
@@ -90,13 +88,6 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
-
 		var list []resources.Feature
 		if in.GetInstalledOnly() {
 			list, xerr = hostInstance.ListInstalledFeatures(job.Context())
@@ -114,13 +105,6 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		if xerr != nil {
 			return empty, xerr
 		}
-
-		defer func() {
-			issue := clusterInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		var list []resources.Feature
 		if in.GetInstalledOnly() {
@@ -191,32 +175,18 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), targetRef)
+		_, xerr := hostfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		return nil, fail.NotImplementedError()
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
+		_, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		defer func() {
-			issue := clusterInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		return nil, fail.NotImplementedError()
 	}
@@ -282,32 +252,18 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), targetRef)
+		_, xerr := hostfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		return nil, fail.NotImplementedError()
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
+		_, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		defer func() {
-			issue := clusterInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		return nil, fail.NotImplementedError()
 	}
@@ -376,13 +332,6 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 			return empty, xerr
 		}
 
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
-
 		results, xerr := feat.Check(job.Context(), hostInstance, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot check feature")
@@ -397,13 +346,6 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		if xerr != nil {
 			return empty, xerr
 		}
-
-		defer func() {
-			issue := clusterInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		results, xerr := feat.Check(job.Context(), clusterInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -480,13 +422,6 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 			return empty, xerr
 		}
 
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
-
 		results, xerr := feat.Add(job.Context(), hostInstance, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, xerr
@@ -501,13 +436,6 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		if xerr != nil {
 			return empty, xerr
 		}
-
-		defer func() {
-			issue := clusterInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		results, xerr := feat.Add(job.Context(), clusterInstance, featureVariables, featureSettings)
 		if xerr != nil {
@@ -569,13 +497,6 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 			return empty, xerr
 		}
 
-		defer func() {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
-
 		results, xerr := feat.Remove(job.Context(), hostInstance, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot remove feature")
@@ -590,13 +511,6 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		if xerr != nil {
 			return empty, xerr
 		}
-
-		defer func() {
-			issue := clusterInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		results, xerr := feat.Remove(job.Context(), clusterInstance, featureVariables, featureSettings)
 		if xerr != nil {

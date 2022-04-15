@@ -165,18 +165,22 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 		}
 		if remotedesktopInstalled {
 			nodes, ok := config["nodes"].(map[string][]*protocol.Host)
-			if ok { // FIXME: What if it fails ?, we should return an error too
+			if ok {
 				masters := nodes["masters"]
 				if len(masters) > 0 {
 					urls := make(map[string]string, len(masters))
 					endpointIP, ok := config["endpoint_ip"].(string)
-					if ok { // FIXME: What if it fails ?, we should return an error too
+					if ok {
 						for _, v := range masters {
 							urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
 						}
 						config["remote_desktop"] = urls
+					} else {
+						return nil, fail.InconsistentError("'endpoint_ip' should be a string")
 					}
 				}
+			} else {
+				return nil, fail.InconsistentError("'nodes' should be a map[string][]*protocol.Host")
 			}
 		} else {
 			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
