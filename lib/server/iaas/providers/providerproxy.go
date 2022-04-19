@@ -113,17 +113,17 @@ func (s ProviderProxy) GetTenantParameters() (_ map[string]interface{}, ferr fai
 	return tenantParameters, xerr
 }
 
-func (s ProviderProxy) ListImages(p bool) (_ []abstract.Image, ferr fail.Error) {
+func (s ProviderProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	images, xerr := s.Provider.ListImages(p)
+	images, xerr := s.Provider.ListImages(all)
 	return images, xerr
 }
 
-func (s ProviderProxy) ListTemplates(p bool) (_ []abstract.HostTemplate, ferr fail.Error) {
+func (s ProviderProxy) ListTemplates(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	templates, xerr := s.Provider.ListTemplates(p)
+	templates, xerr := s.Provider.ListTemplates(all)
 	return templates, xerr
 }
 
@@ -148,14 +148,14 @@ func (s ProviderProxy) ListRegions() (_ []string, ferr fail.Error) {
 	return regions, xerr
 }
 
-func (s ProviderProxy) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
+func (s ProviderProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	image, xerr := s.Provider.InspectImage(id)
 	return image, xerr
 }
 
-func (s ProviderProxy) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
+func (s ProviderProxy) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	template, xerr := s.Provider.InspectTemplate(id)
@@ -176,7 +176,7 @@ func (s ProviderProxy) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail
 	return pair, xerr
 }
 
-func (s ProviderProxy) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
+func (s ProviderProxy) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.Provider.ListKeyPairs()
@@ -498,7 +498,7 @@ func (s ProviderProxy) InspectVolume(id string) (_ *abstract.Volume, ferr fail.E
 	return volume, xerr
 }
 
-func (s ProviderProxy) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
+func (s ProviderProxy) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.ListVolumes()
@@ -526,7 +526,7 @@ func (s ProviderProxy) InspectVolumeAttachment(serverID, id string) (_ *abstract
 	return volume, xerr
 }
 
-func (s ProviderProxy) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
+func (s ProviderProxy) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.ListVolumeAttachments(serverID)

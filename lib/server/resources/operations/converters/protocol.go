@@ -116,9 +116,7 @@ func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string 
 }
 
 // ClusterRequestFromProtocolToAbstract ...
-func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, ferr fail.Error) {
-	nullCR := abstract.ClusterRequest{}
-
+func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ *abstract.ClusterRequest, ferr fail.Error) {
 	var (
 		gatewaySizing *abstract.HostSizingRequirements
 		masterSizing  *abstract.HostSizingRequirements
@@ -129,7 +127,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if in.GatewaySizing != "" {
 		gatewaySizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.GatewaySizing)
 		if xerr != nil {
-			return nullCR, xerr
+			return nil, xerr
 		}
 	}
 	if gatewaySizing == nil {
@@ -139,7 +137,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if in.MasterSizing != "" {
 		masterSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.MasterSizing)
 		if xerr != nil {
-			return nullCR, xerr
+			return nil, xerr
 		}
 	}
 	if masterSizing == nil {
@@ -149,7 +147,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if in.NodeSizing != "" {
 		nodeSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.NodeSizing)
 		if xerr != nil {
-			return nullCR, xerr
+			return nil, xerr
 		}
 	}
 	if nodeSizing == nil {
@@ -157,7 +155,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	}
 	nodeCount, xerr := NodeCountFromStringToInteger(in.NodeSizing)
 	if xerr != nil {
-		return nullCR, xerr
+		return nil, xerr
 	}
 
 	disabled := map[string]struct{}{}
@@ -183,7 +181,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		FeatureParameters:       in.GetParameters(),
 		DefaultSshPort:          uint(in.DefaultSshPort),
 	}
-	return out, nil
+	return &out, nil
 }
 
 // SecurityGroupRuleFromProtocolToAbstract does what the name says

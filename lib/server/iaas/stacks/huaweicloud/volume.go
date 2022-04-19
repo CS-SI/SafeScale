@@ -81,14 +81,13 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 
 // CreateVolume creates a block volume
 func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	volume, xerr := s.InspectVolume(request.Name)
 	if xerr == nil && volume != nil {
-		return nullAV, fail.DuplicateError("volume '%s' already exists", request.Name)
+		return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
 	}
 
 	az, xerr := s.SelectedAvailabilityZone()
@@ -110,7 +109,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return nullAV, commRetryErr
+		return nil, commRetryErr
 	}
 
 	v := abstract.Volume{
@@ -125,12 +124,11 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	var vol *volumes.Volume
@@ -144,9 +142,9 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	if commRetryErr != nil {
 		switch commRetryErr.(type) {
 		case *fail.ErrNotFound:
-			return nullAV, abstract.ResourceNotFoundError("volume", id)
+			return nil, abstract.ResourceNotFoundError("volume", id)
 		default:
-			return nullAV, commRetryErr
+			return nil, commRetryErr
 		}
 	}
 
@@ -161,13 +159,12 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes lists volumes
-func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	var emptySlice []abstract.Volume
+func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
-	var vs []abstract.Volume
+	var vs []*abstract.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := volumes.List(s.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -177,7 +174,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 					return false, err
 				}
 				for _, vol := range list {
-					av := abstract.Volume{
+					av := &abstract.Volume{
 						ID:    vol.ID,
 						Name:  vol.Name,
 						Size:  vol.Size,
@@ -193,7 +190,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return emptySlice, commRetryErr
+		return nil, commRetryErr
 	}
 
 	return vs, nil

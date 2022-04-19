@@ -70,9 +70,8 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 // CreateNetwork creates a network named name
 func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
@@ -82,7 +81,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 	if req.CIDR != "" {
 		_, _, err := net.ParseCIDR(req.CIDR)
 		if err != nil {
-			return nullAN, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
+			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 		}
 	} else { // CIDR is empty, choose the first Class C one possible
 		tracer.Trace("CIDR is empty, choosing one...")
@@ -112,7 +111,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAN, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
+		return nil, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
 	}
 
 	// Starting from here, delete network if exit with error
@@ -140,12 +139,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 
 // InspectNetworkByName ...
 func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAN, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
@@ -164,9 +162,9 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrForbidden:
-			return nullAN, abstract.ResourceForbiddenError("network", name)
+			return nil, abstract.ResourceForbiddenError("network", name)
 		default:
-			return nullAN, fail.NewError("query for network '%s' failed: %v", name, r.Err)
+			return nil, fail.NewError("query for network '%s' failed: %v", name, r.Err)
 		}
 	}
 
@@ -174,25 +172,24 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 	if found && len(nets) > 0 {
 		entry, ok := nets[0].(map[string]interface{})
 		if !ok {
-			return nullAN, fail.InvalidParameterError("Body['networks']", "is not a map[string]")
+			return nil, fail.InvalidParameterError("Body['networks']", "is not a map[string]")
 		}
 		id, ok := entry["id"].(string)
 		if !ok {
-			return nullAN, fail.InvalidParameterError("entry['id']", "is not a string")
+			return nil, fail.InvalidParameterError("entry['id']", "is not a string")
 		}
 		return s.InspectNetwork(id)
 	}
-	return nullAN, abstract.ResourceNotFoundError("network", name)
+	return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 // InspectNetwork returns the network identified by id
 func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAN, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -213,7 +210,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 			// continue
 			debug.IgnoreError(xerr)
 		default:
-			return nullAN, xerr
+			return nil, xerr
 		}
 	}
 	if network != nil && network.ID != "" {
@@ -226,7 +223,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	// At this point, no network has been found with given reference
 	errNotFound := abstract.ResourceNotFoundError("network", id)
 	// logrus.Debug(errNotFound)
-	return nullAN, errNotFound
+	return nil, errNotFound
 }
 
 // ListNetworks lists available networks
@@ -351,9 +348,8 @@ func ToAbstractIPVersion(v int) ipversion.Enum {
 
 // CreateSubnet creates a subnet
 func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
@@ -361,7 +357,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 	// Checks if CIDR is valid...
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
-		return nullAS, fail.ConvertError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	// If req.IPVersion contains invalid value, force to IPv4
@@ -404,7 +400,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	// Starting from here, delete subnet if exit with error
@@ -425,7 +421,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 			NetworkID: s.ProviderNetworkID,
 		})
 		if xerr != nil {
-			return nullAS, fail.Wrap(xerr, "failed to create router '%s'", subnet.ID)
+			return nil, fail.Wrap(xerr, "failed to create router '%s'", subnet.ID)
 		}
 
 		// Starting from here, delete router if exit with error
@@ -442,7 +438,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 		xerr = s.addSubnetToRouter(router.ID, subnet.ID)
 		if xerr != nil {
-			return nullAS, fail.Wrap(xerr, "failed to add subnet '%s' to router '%s'", subnet.Name, router.Name)
+			return nil, fail.Wrap(xerr, "failed to add subnet '%s' to router '%s'", subnet.Name, router.Name)
 		}
 	}
 
@@ -467,12 +463,11 @@ func (s stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Networ
 
 // InspectSubnet returns the subnet identified by id
 func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -487,7 +482,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	as.ID = sn.ID
@@ -502,12 +497,11 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 
 // InspectSubnetByName ...
 func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAS, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
@@ -524,10 +518,10 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
 				if xerr != nil {
-					return nullAS, xerr
+					return nil, xerr
 				}
 			default:
-				return nullAS, xerr
+				return nil, xerr
 			}
 		}
 
@@ -551,7 +545,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	switch len(resp) {
@@ -559,9 +553,9 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 		msg := "failed to find a Subnet named '%s'"
 		if an != nil {
 			msg += " in Network '%s'"
-			return nullAS, fail.NotFoundError(msg, name, an.Name)
+			return nil, fail.NotFoundError(msg, name, an.Name)
 		}
-		return nullAS, fail.NotFoundError(msg, name)
+		return nil, fail.NotFoundError(msg, name)
 	case 1:
 		item := resp[0]
 		subnet = abstract.NewSubnet()
@@ -576,9 +570,9 @@ func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 		msg := "more than one Subnet named '%s' found"
 		if an != nil {
 			msg += " in Network '%s'"
-			return nullAS, fail.DuplicateError(msg, name, an.Name)
+			return nil, fail.DuplicateError(msg, name, an.Name)
 		}
-		return nullAS, fail.DuplicateError(msg, name)
+		return nil, fail.DuplicateError(msg, name)
 	}
 }
 
@@ -838,18 +832,17 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
-	nullAVIP := abstract.NewVirtualIP()
 	if valid.IsNil(s) {
-		return nullAVIP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if networkID = strings.TrimSpace(networkID); networkID == "" {
-		return nullAVIP, fail.InvalidParameterError("networkID", "cannot be empty string")
+		return nil, fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
 	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
-		return nullAVIP, fail.InvalidParameterError("subnetID", "cannot be empty string")
+		return nil, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 	if name = strings.TrimSpace(name); name == "" {
-		return nullAVIP, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var port *ports.Port
@@ -869,7 +862,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAVIP, xerr
+		return nil, xerr
 	}
 	vip := abstract.NewVirtualIP()
 	vip.ID = port.ID

@@ -334,17 +334,17 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.Image{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }

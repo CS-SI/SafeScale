@@ -475,30 +475,28 @@ func (instance *Cluster) GetAdminPassword() (adminPassword string, ferr fail.Err
 }
 
 // GetKeyPair returns the key pair used in the Cluster
-func (instance *Cluster) GetKeyPair() (keyPair abstract.KeyPair, ferr fail.Error) {
+func (instance *Cluster) GetKeyPair() (keyPair *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAKP := abstract.KeyPair{}
 	if instance == nil || valid.IsNil(instance) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	aci, xerr := instance.GetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 
-	return *(aci.Keypair), nil
+	return aci.Keypair, nil
 }
 
 // GetNetworkConfig returns subnet configuration of the Cluster
 func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullConfig := &propertiesv3.ClusterNetwork{}
 	if instance == nil || valid.IsNil(instance) {
-		return nullConfig, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -523,7 +521,7 @@ func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullConfig, xerr
+		return nil, xerr
 	}
 
 	return config, nil

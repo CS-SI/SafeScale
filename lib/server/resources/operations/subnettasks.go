@@ -256,6 +256,8 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 			return nil, xerr
 		}
 
+		time.Sleep(45 * time.Second)
+
 		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

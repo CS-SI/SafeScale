@@ -30,7 +30,7 @@ import (
 
 // ImageHandler defines API to manipulate images
 type ImageHandler interface {
-	List(all bool) ([]abstract.Image, fail.Error)
+	List(all bool) ([]*abstract.Image, fail.Error)
 	Select(osfilter string) (*abstract.Image, fail.Error)
 	Filter(osfilter string) ([]abstract.Image, fail.Error)
 }
@@ -48,7 +48,7 @@ func NewImageHandler(job server.Job) ImageHandler {
 }
 
 // List returns the image list
-func (handler *imageHandler) List(all bool) (images []abstract.Image, ferr fail.Error) {
+func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {

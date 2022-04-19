@@ -28,12 +28,11 @@ import (
 
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Error) {
-	nullAKP := &abstract.KeyPair{}
 	if valid.IsNil(s) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAKP, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
@@ -42,7 +41,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Erro
 	var xerr fail.Error
 	akp, xerr = abstract.NewKeyPair(name)
 	if xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 	return akp, s.ImportKeyPair(akp)
 }
@@ -64,12 +63,11 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 
 // InspectKeyPair returns the key pair identified by id
 func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error) {
-	nullAKP := &abstract.KeyPair{}
 	if valid.IsNil(s) {
-		return nullAKP, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
@@ -77,7 +75,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 
 	resp, xerr := s.rpcReadKeypairByName(id)
 	if xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 
 	kp := abstract.KeyPair{
@@ -88,10 +86,9 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
-	var emptySlice []abstract.KeyPair
+func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
@@ -99,12 +96,12 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadKeypairs(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	var kps []abstract.KeyPair
+	var kps []*abstract.KeyPair
 	for _, kp := range resp {
-		kps = append(kps, abstract.KeyPair{
+		kps = append(kps, &abstract.KeyPair{
 			ID:   kp.KeypairName,
 			Name: kp.KeypairName,
 		})

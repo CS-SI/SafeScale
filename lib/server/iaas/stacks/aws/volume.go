@@ -37,9 +37,8 @@ import (
 
 // CreateVolume ...
 func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
@@ -76,12 +75,11 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 
 // InspectVolume ...
 func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ref == "" {
-		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("ref")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
@@ -97,18 +95,18 @@ func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-					return nullAV, fail.NotFoundError("failed to find Volume %s", ref)
+					return nil, fail.NotFoundError("failed to find Volume %s", ref)
 				default:
-					return nullAV, xerr
+					return nil, xerr
 				}
 			}
 			if resp == nil {
-				return nullAV, fail.NotFoundError("failed to find Volume %s", ref)
+				return nil, fail.NotFoundError("failed to find Volume %s", ref)
 			}
 
 			name = ref
 		default:
-			return nullAV, xerr
+			return nil, xerr
 		}
 	} else {
 		for _, v := range resp.Tags {
@@ -187,10 +185,9 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
-	var emptySlice []abstract.Volume
+func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
@@ -205,10 +202,10 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	var volumes []abstract.Volume
+	var volumes []*abstract.Volume
 	for _, v := range resp.Volumes {
 		volumeName := aws.StringValue(v.VolumeId)
 		if len(v.Tags) > 0 {
@@ -228,7 +225,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 			Speed: toAbstractVolumeSpeed(v.VolumeType),
 			State: toAbstractVolumeState(v.State),
 		}
-		volumes = append(volumes, volume)
+		volumes = append(volumes, &volume)
 	}
 
 	return volumes, nil
@@ -357,15 +354,15 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 
 // InspectVolumeAttachment returns information about a volume attachment
 func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
-	nullAVA := abstract.NewVolumeAttachment()
+	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
-		return nullAVA, fail.InvalidInstanceError()
+		return nilA, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nullAVA, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return nilA, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 	if id == "" {
-		return nullAVA, fail.InvalidParameterError("id", "cannot be empty string")
+		return nilA, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -401,13 +398,12 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 }
 
 // ListVolumeAttachments ...
-func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
-	var emptySlice []abstract.VolumeAttachment
+func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return emptySlice, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
@@ -432,10 +428,10 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 		return nil, xerr
 	}
 
-	var vas []abstract.VolumeAttachment
+	var vas []*abstract.VolumeAttachment
 	for _, v := range resp.Volumes {
 		for _, va := range v.Attachments {
-			vas = append(vas, abstract.VolumeAttachment{
+			vas = append(vas, &abstract.VolumeAttachment{
 				Device:   aws.StringValue(va.Device),
 				ServerID: aws.StringValue(va.InstanceId),
 				VolumeID: aws.StringValue(va.VolumeId),
