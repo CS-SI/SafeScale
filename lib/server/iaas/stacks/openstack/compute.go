@@ -53,9 +53,8 @@ import (
 
 // ListRegions ...
 func (s stack) ListRegions() (list []string, ferr fail.Error) {
-	var emptySlice []string
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
@@ -72,12 +71,12 @@ func (s stack) ListRegions() (list []string, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	allRegions, err := regions.ExtractRegions(allPages)
 	if err != nil {
-		return emptySlice, fail.ConvertError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	var results []string
@@ -136,9 +135,8 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []abstract.Image
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
@@ -169,7 +167,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 		},
 	)
 	if err != nil {
-		return emptySlice, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return imgList, nil
 }
@@ -245,9 +243,8 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
-	var emptySlice []abstract.HostTemplate
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
@@ -285,11 +282,11 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *fail.ErrTimeout:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
-			return emptySlice, xerr
+			return nil, xerr
 		}
 	}
 	if len(flvList) == 0 {
@@ -341,15 +338,14 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	var emptySlice []abstract.KeyPair
+func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	var kpList []abstract.KeyPair
+	var kpList []*abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return keypairs.List(s.ComputeClient, nil).EachPage(
@@ -361,7 +357,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 
 					for _, v := range list {
 						kpList = append(
-							kpList, abstract.KeyPair{
+							kpList, &abstract.KeyPair{
 								ID:         v.Name,
 								Name:       v.Name,
 								PublicKey:  v.PublicKey,
@@ -376,7 +372,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	// Note: empty list is not an error, so do not raise one
 	return kpList, nil

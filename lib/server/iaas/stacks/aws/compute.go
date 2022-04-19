@@ -102,11 +102,11 @@ func (s stack) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) 
 	}
 
 	out := toAbstractKeyPair(*resp)
-	return &out, nil
+	return out, nil
 }
 
-func toAbstractKeyPair(in ec2.KeyPairInfo) abstract.KeyPair {
-	out := abstract.KeyPair{}
+func toAbstractKeyPair(in ec2.KeyPairInfo) *abstract.KeyPair {
+	out := &abstract.KeyPair{}
 	out.ID = aws.StringValue(in.KeyPairId)
 	out.Name = aws.StringValue(in.KeyName)
 	out.PublicKey = aws.StringValue(in.KeyFingerprint)
@@ -114,10 +114,9 @@ func toAbstractKeyPair(in ec2.KeyPairInfo) abstract.KeyPair {
 }
 
 // ListKeyPairs lists keypairs stored in AWS
-func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
-	var emptySlice []abstract.KeyPair
+func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).
@@ -128,9 +127,9 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
 
 	resp, xerr := s.rpcDescribeKeyPairs(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
-	var keys []abstract.KeyPair
+	var keys []*abstract.KeyPair
 	for _, kp := range resp {
 		keys = append(keys, toAbstractKeyPair(*kp))
 	}
@@ -179,9 +178,8 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
 
 // ListRegions lists regions available in AWS
 func (s stack) ListRegions() (_ []string, ferr fail.Error) {
-	var emptySlice []string
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -189,7 +187,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 
 	resp, xerr := s.rpcDescribeRegions(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if len(resp) > 0 {
 		regions := make([]string, 0, len(resp))
@@ -199,7 +197,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 		return regions, nil
 	}
 
-	return emptySlice, nil
+	return nil, nil
 }
 
 // InspectImage loads information about an image stored in AWS
@@ -321,9 +319,8 @@ func filterOwners(s stack) []*ec2.Filter {
 
 // ListImages lists available image
 func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
-	var emptySlice []abstract.Image
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -331,7 +328,7 @@ func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 
 	resp, xerr := s.rpcDescribeImages(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if len(resp) > 0 {
 		images := make([]abstract.Image, 0, len(resp))
@@ -348,7 +345,7 @@ func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 		return images, nil
 	}
 
-	return emptySlice, nil
+	return nil, nil
 }
 
 func toAbstractImage(in ec2.Image) abstract.Image {
@@ -362,9 +359,8 @@ func toAbstractImage(in ec2.Image) abstract.Image {
 
 // ListTemplates lists templates stored in AWS
 func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fail.Error) {
-	var emptySlice []abstract.HostTemplate
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -373,13 +369,13 @@ func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fa
 	var resp []*ec2.InstanceTypeInfo
 	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	// list only the resources actually available in our AZ
 	under, xerr := s.rpcDescribeInstanceTypeOfferings(aws.String(s.AwsConfig.Zone))
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	// put those into a set

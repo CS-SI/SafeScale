@@ -50,7 +50,7 @@ type Stack interface {
 	// InspectKeyPair returns the key pair identified by id
 	InspectKeyPair(id string) (*abstract.KeyPair, fail.Error)
 	// ListKeyPairs lists available key pairs
-	ListKeyPairs() ([]abstract.KeyPair, fail.Error)
+	ListKeyPairs() ([]*abstract.KeyPair, fail.Error)
 	// DeleteKeyPair deletes the key pair identified by id
 	DeleteKeyPair(id string) fail.Error
 

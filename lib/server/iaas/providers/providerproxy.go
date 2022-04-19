@@ -176,7 +176,7 @@ func (s ProviderProxy) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail
 	return pair, xerr
 }
 
-func (s ProviderProxy) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
+func (s ProviderProxy) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.Provider.ListKeyPairs()

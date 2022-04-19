@@ -173,7 +173,7 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 

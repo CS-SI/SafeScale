@@ -414,14 +414,14 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	var kpList []abstract.KeyPair
+	var kpList []*abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return keypairs.List(s.ComputeClient, nil).EachPage(
@@ -433,7 +433,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 
 					for _, v := range list {
 						kpList = append(
-							kpList, abstract.KeyPair{
+							kpList, &abstract.KeyPair{
 								ID:         v.Name,
 								Name:       v.Name,
 								PublicKey:  v.PublicKey,

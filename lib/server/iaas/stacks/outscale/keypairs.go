@@ -86,10 +86,9 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
-	var emptySlice []abstract.KeyPair
+func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
@@ -97,12 +96,12 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadKeypairs(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	var kps []abstract.KeyPair
+	var kps []*abstract.KeyPair
 	for _, kp := range resp {
-		kps = append(kps, abstract.KeyPair{
+		kps = append(kps, &abstract.KeyPair{
 			ID:   kp.KeypairName,
 			Name: kp.KeypairName,
 		})

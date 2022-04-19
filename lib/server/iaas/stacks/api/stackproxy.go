@@ -109,7 +109,7 @@ func (s StackProxy) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Er
 	return pair, xerr
 }
 
-func (s StackProxy) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
+func (s StackProxy) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.FullStack.ListKeyPairs()
