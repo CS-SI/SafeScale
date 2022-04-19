@@ -64,10 +64,9 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (_ []abstract.Image, ferr fail.Error) {
-	var emptySlice []abstract.Image
+func (s stack) ListImages(bool) (_ []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -75,13 +74,13 @@ func (s stack) ListImages(bool) (_ []abstract.Image, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadImages(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	var images []abstract.Image
+	var images []*abstract.Image
 	for _, omi := range resp {
 		images = append(
-			images, abstract.Image{
+			images, &abstract.Image{
 				Description: omi.Description,
 				ID:          omi.ImageId,
 				Name:        normalizeImageName(omi.ImageName),
@@ -201,9 +200,8 @@ func (s stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, ferr fail.Error) {
-	var emptySlice []abstract.HostTemplate
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()

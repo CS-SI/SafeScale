@@ -334,9 +334,9 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.Image{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }

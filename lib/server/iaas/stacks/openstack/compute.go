@@ -132,7 +132,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -152,7 +152,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 	pager := images.List(s.ComputeClient, opts)
 
 	// Define an anonymous function to be executed on each page's iteration
-	imgList = []abstract.Image{}
+	imgList = []*abstract.Image{}
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
 			imageList, err := images.ExtractImages(page)
@@ -161,7 +161,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 			}
 
 			for _, img := range imageList {
-				imgList = append(imgList, abstract.Image{ID: img.ID, Name: img.Name})
+				imgList = append(imgList, &abstract.Image{ID: img.ID, Name: img.Name})
 			}
 			return true, nil
 		},

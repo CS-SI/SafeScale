@@ -32,10 +32,10 @@ type StackProxy struct {
 	Name string
 }
 
-func (s StackProxy) ListImages(p bool) (_ []abstract.Image, ferr fail.Error) {
+func (s StackProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	images, xerr := s.FullStack.ListImages(p)
+	images, xerr := s.FullStack.ListImages(all)
 	return images, xerr
 }
 

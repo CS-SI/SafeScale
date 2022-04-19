@@ -636,7 +636,7 @@ func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
 	}
 
 	type ImageList struct {
-		Images []abstract.Image `json:"images,omitempty"`
+		Images []*abstract.Image `json:"images,omitempty"`
 	}
 
 	svc := handler.job.Service()

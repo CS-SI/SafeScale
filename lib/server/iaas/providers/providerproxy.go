@@ -113,10 +113,10 @@ func (s ProviderProxy) GetTenantParameters() (_ map[string]interface{}, ferr fai
 	return tenantParameters, xerr
 }
 
-func (s ProviderProxy) ListImages(p bool) (_ []abstract.Image, ferr fail.Error) {
+func (s ProviderProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	images, xerr := s.Provider.ListImages(p)
+	images, xerr := s.Provider.ListImages(all)
 	return images, xerr
 }
 

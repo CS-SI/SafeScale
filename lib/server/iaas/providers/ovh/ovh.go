@@ -340,7 +340,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}

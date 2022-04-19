@@ -316,7 +316,7 @@ func filterOwners(s stack) []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -329,7 +329,7 @@ func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 		return nil, xerr
 	}
 	if len(resp) > 0 {
-		images := make([]abstract.Image, 0, len(resp))
+		images := make([]*abstract.Image, 0, len(resp))
 		for _, image := range resp {
 			if image != nil {
 				if !aws.BoolValue(image.EnaSupport) {
@@ -337,7 +337,7 @@ func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 					continue
 				}
 
-				images = append(images, *toAbstractImage(*image))
+				images = append(images, toAbstractImage(*image))
 			}
 		}
 		return images, nil

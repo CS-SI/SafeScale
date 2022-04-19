@@ -284,7 +284,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 }
 
 // ListImages ...
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 

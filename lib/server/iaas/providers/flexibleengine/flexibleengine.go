@@ -281,17 +281,17 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 	return tpls, nil
 }
 
-func isWindowsImage(image abstract.Image) bool {
+func isWindowsImage(image *abstract.Image) bool {
 	return strings.Contains(strings.ToLower(image.Name), "windows")
 }
 
-func isBMSImage(image abstract.Image) bool {
+func isBMSImage(image *abstract.Image) bool {
 	return strings.HasPrefix(strings.ToUpper(image.Name), "OBS-BMS") ||
 		strings.HasPrefix(strings.ToUpper(image.Name), "OBS_BMS")
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p *provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	images, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)
 	if xerr != nil {
 		return nil, xerr

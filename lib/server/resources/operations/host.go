@@ -1150,7 +1150,7 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 			for _, v := range imgs {
 				if strings.Compare(v.ID, imageRef) == 0 {
 					logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-					img = &v
+					img = v
 					break
 				}
 			}

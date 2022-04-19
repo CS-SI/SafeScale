@@ -43,10 +43,9 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (out []abstract.Image, ferr fail.Error) {
-	var emptySlice []abstract.Image
+func (s stack) ListImages(bool) (out []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -54,11 +53,11 @@ func (s stack) ListImages(bool) (out []abstract.Image, ferr fail.Error) {
 
 	resp, xerr := s.rpcListImages()
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
-	out = make([]abstract.Image, 0, len(resp))
+	out = make([]*abstract.Image, 0, len(resp))
 	for _, v := range resp {
-		out = append(out, *toAbstractImage(*v))
+		out = append(out, toAbstractImage(*v))
 	}
 	return out, nil
 }
