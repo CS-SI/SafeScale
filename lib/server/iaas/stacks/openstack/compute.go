@@ -173,13 +173,12 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
-	nullAI := abstract.Image{}
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAI, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -194,10 +193,10 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAI, xerr
+		return nil, xerr
 	}
 
-	out := abstract.Image{
+	out := &abstract.Image{
 		ID:       img.ID,
 		Name:     img.Name,
 		DiskSize: int64(img.MinDiskGigabytes),

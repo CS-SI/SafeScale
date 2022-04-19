@@ -58,13 +58,13 @@ func (s stack) ListImages(bool) (out []abstract.Image, ferr fail.Error) {
 	}
 	out = make([]abstract.Image, 0, len(resp))
 	for _, v := range resp {
-		out = append(out, toAbstractImage(*v))
+		out = append(out, *toAbstractImage(*v))
 	}
 	return out, nil
 }
 
-func toAbstractImage(in compute.Image) abstract.Image {
-	return abstract.Image{
+func toAbstractImage(in compute.Image) *abstract.Image {
+	return &abstract.Image{
 		Name:        in.Name,
 		URL:         in.SelfLink,
 		ID:          strconv.FormatUint(in.Id, 10),
@@ -74,13 +74,12 @@ func toAbstractImage(in compute.Image) abstract.Image {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
-	nullAI := abstract.Image{}
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAI, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -88,7 +87,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 
 	resp, xerr := s.rpcGetImageByID(id)
 	if xerr != nil {
-		return nullAI, xerr
+		return nil, xerr
 	}
 	return toAbstractImage(*resp), nil
 }

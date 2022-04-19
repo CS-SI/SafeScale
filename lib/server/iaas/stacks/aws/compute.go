@@ -201,13 +201,12 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 }
 
 // InspectImage loads information about an image stored in AWS
-func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
-	nullAI := abstract.Image{}
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAI, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -215,7 +214,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 
 	resp, xerr := s.rpcDescribeImageByID(aws.String(id))
 	if xerr != nil {
-		return nullAI, xerr
+		return nil, xerr
 	}
 
 	return toAbstractImage(*resp), nil
@@ -339,7 +338,7 @@ func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 					continue
 				}
 
-				images = append(images, toAbstractImage(*image))
+				images = append(images, *toAbstractImage(*image))
 			}
 		}
 		return images, nil
@@ -348,8 +347,8 @@ func (s stack) ListImages(_ bool) (_ []abstract.Image, ferr fail.Error) {
 	return nil, nil
 }
 
-func toAbstractImage(in ec2.Image) abstract.Image {
-	return abstract.Image{
+func toAbstractImage(in ec2.Image) *abstract.Image {
+	return &abstract.Image{
 		ID:          aws.StringValue(in.ImageId),
 		Name:        aws.StringValue(in.Name),
 		Description: aws.StringValue(in.Description),

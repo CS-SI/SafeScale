@@ -81,7 +81,7 @@ func (s StackProxy) ListRegions() (_ []string, ferr fail.Error) {
 	return regions, xerr
 }
 
-func (s StackProxy) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
+func (s StackProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	image, xerr := s.FullStack.InspectImage(id)

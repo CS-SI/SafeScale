@@ -329,13 +329,12 @@ func (s *stack) buildTemplateList() {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
-	nullImage := abstract.Image{}
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullImage, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullImage, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -349,14 +348,14 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadImageByID(id)
 	if xerr != nil {
-		return nullImage, xerr
+		return nil, xerr
 	}
 
 	return toAbstractImage(resp), nil
 }
 
-func toAbstractImage(in osc.Image) abstract.Image {
-	return abstract.Image{
+func toAbstractImage(in osc.Image) *abstract.Image {
+	return &abstract.Image{
 		Description: in.Description,
 		ID:          in.ImageId,
 		Name:        in.ImageName,

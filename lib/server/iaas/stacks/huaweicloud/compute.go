@@ -825,10 +825,10 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 	// so we can write something like searchInStruct(in.Properties, ".Properties.image.minDisk")
 
 	properties := in.Properties
-	image := properties["image"].(map[string]interface{}) //nolint
-	d := image["minDisk"].(float64)                       //nolint
-	id := image["id"].(string)                            //nolint
-	name := image["name"].(string)                        //nolint
+	image := properties["image"].(map[string]interface{}) // nolint
+	d := image["minDisk"].(float64)                       // nolint
+	id := image["id"].(string)                            // nolint
+	name := image["name"].(string)                        // nolint
 
 	out := abstract.Image{
 		ID:       id,
@@ -840,13 +840,12 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
-	nullAI := abstract.Image{}
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAI, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -865,15 +864,15 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAI, xerr
+		return nil, xerr
 	}
 
 	if img == nil {
-		return nullAI, fail.UnknownError("get image information didn't fail, but it was nil")
+		return nil, fail.UnknownError("get image information didn't fail, but it was nil")
 	}
 
 	if img.ID == id {
-		out := abstract.Image{
+		out := &abstract.Image{
 			ID:       img.ID,
 			Name:     img.Name,
 			DiskSize: int64(img.MinDiskGigabytes),
@@ -886,10 +885,10 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	if err != nil {
 		// probably image internals has changed, dump image description
 		logrus.Warnf("this image description is invalid: %s", spew.Sdump(img))
-		return nullAI, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
+		return nil, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
 	}
 
-	return out, nil
+	return &out, nil
 }
 
 // InspectHost updates the data inside host with the data from provider

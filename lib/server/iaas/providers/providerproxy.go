@@ -148,7 +148,7 @@ func (s ProviderProxy) ListRegions() (_ []string, ferr fail.Error) {
 	return regions, xerr
 }
 
-func (s ProviderProxy) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
+func (s ProviderProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	image, xerr := s.Provider.InspectImage(id)

@@ -40,7 +40,7 @@ type Stack interface {
 	ListRegions() ([]string, fail.Error)
 
 	// InspectImage returns the Image referenced by id
-	InspectImage(id string) (abstract.Image, fail.Error)
+	InspectImage(id string) (*abstract.Image, fail.Error)
 
 	// InspectTemplate returns the Template referenced by id
 	InspectTemplate(id string) (abstract.HostTemplate, fail.Error)
