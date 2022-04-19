@@ -733,6 +733,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 
 	// Start masters
 	for _, n := range masters {
+		n := n
 		_, xerr = taskGroup.Start(instance.taskStartHost, n)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -747,6 +748,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 
 	// Start nodes
 	for _, n := range nodes {
+		n := n
 		_, xerr = taskGroup.Start(instance.taskStartHost, n)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -965,6 +967,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 		var problems []error
 
 		for _, n := range nodes {
+			n := n
 			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
 				problems = append(problems, innerXErr)
 				abErr := taskGroup.AbortWithCause(innerXErr)
@@ -976,6 +979,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 		}
 		// Stop masters
 		for _, n := range masters {
+			n := n
 			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
 				problems = append(problems, innerXErr)
 				abErr := taskGroup.AbortWithCause(innerXErr)
@@ -1157,14 +1161,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, xerr
 	}
 
-	params := taskCreateNodeParameters{
-		nodeDef:       nodeDef,
-		timeout:       timeout,
-		keepOnFailure: keepOnFailure,
-	}
 	for i := uint(1); i <= count; i++ {
-		params.index = i
-		_, xerr := tg.Start(instance.taskCreateNode, params, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
+		params := taskCreateNodeParameters{
+			nodeDef:       nodeDef,
+			timeout:       timeout,
+			keepOnFailure: keepOnFailure,
+			index:         i,
+		}
+		_, xerr := tg.Start(instance.taskCreateNode, params, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", params.index)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			abErr := tg.AbortWithCause(xerr)
@@ -1208,7 +1212,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		}
 	}()
 
-	res, xerr := tg.WaitGroup()
+	_, res, xerr := tg.WaitGroupFor(3 * timings.HostCreationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if len(res) > 0 {
 		for _, v := range res {
@@ -2969,13 +2973,14 @@ func (instance *Cluster) configureNodesFromList(task concurrency.Task, nodes []*
 		}
 
 		for i := 0; i < length; i++ {
+			captured := i
 			_, ierr := tg.Start(
 				instance.taskConfigureNode, taskConfigureNodeParameters{
-					index:     uint(i + 1),
-					node:      nodes[i],
+					index:     uint(captured + 1),
+					node:      nodes[captured],
 					variables: parameters,
 				}, concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/host/%s/configure", nodes[i].Name)),
+				concurrency.AmendID(fmt.Sprintf("/host/%s/configure", nodes[captured].Name)),
 			)
 			ierr = debug.InjectPlannedFail(ierr)
 			if ierr != nil {
