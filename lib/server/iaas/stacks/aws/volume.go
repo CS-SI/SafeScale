@@ -431,6 +431,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttac
 	var vas []*abstract.VolumeAttachment
 	for _, v := range resp.Volumes {
 		for _, va := range v.Attachments {
+			va := va
 			vas = append(vas, &abstract.VolumeAttachment{
 				Device:   aws.StringValue(va.Device),
 				ServerID: aws.StringValue(va.InstanceId),

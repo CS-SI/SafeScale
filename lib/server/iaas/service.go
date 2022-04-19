@@ -726,6 +726,7 @@ func (instance service) FilterImages(filter string) ([]*abstract.Image, fail.Err
 	var fimgs []*abstract.Image
 	sort.Sort(scoredImages(simgs))
 	for _, simg := range simgs {
+		simg := simg
 		fimgs = append(fimgs, &simg.Image)
 	}
 
