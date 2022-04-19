@@ -348,7 +348,7 @@ func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -372,7 +372,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	service := authOpts.GetString("TenantID")
 	region := authOpts.GetString("Region")
 
-	var listAvailableTemplates []abstract.HostTemplate
+	var listAvailableTemplates []*abstract.HostTemplate
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, xerr := p.requestOVHAPI(restURL, "GET")
 	if xerr != nil {
@@ -431,11 +431,11 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	return listAvailableTemplates, nil
 }
 
-func isWindowsTemplate(t abstract.HostTemplate) bool {
+func isWindowsTemplate(t *abstract.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
 
-func isFlexTemplate(t abstract.HostTemplate) bool {
+func isFlexTemplate(t *abstract.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 

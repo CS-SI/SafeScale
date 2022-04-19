@@ -356,7 +356,7 @@ func toAbstractImage(in ec2.Image) *abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fail.Error) {
+func (s stack) ListTemplates(all bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -397,9 +397,9 @@ func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fa
 	)
 
 	// converts response from AWS to abstract
-	list := make([]abstract.HostTemplate, 0, len(resp))
+	list := make([]*abstract.HostTemplate, 0, len(resp))
 	for _, v := range resp {
-		list = append(list, *toAbstractHostTemplate(*v))
+		list = append(list, toAbstractHostTemplate(*v))
 	}
 
 	return list, nil

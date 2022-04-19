@@ -95,7 +95,7 @@ type stack struct {
 	VolumeSpeedsMap      map[string]volumespeed.Enum
 	configurationOptions *stacks.ConfigurationOptions
 	deviceNames          []string
-	templates            []abstract.HostTemplate
+	templates            []*abstract.HostTemplate
 	vpc                  *abstract.Network
 
 	*temporal.MutableTimings

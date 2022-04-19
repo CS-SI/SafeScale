@@ -985,10 +985,9 @@ func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
-	var emptySlice []abstract.HostTemplate
+func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
@@ -996,7 +995,7 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 
 	opts := flavors.ListOpts{}
 
-	var flvList []abstract.HostTemplate
+	var flvList []*abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
@@ -1005,10 +1004,10 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 					if err != nil {
 						return false, err
 					}
-					flvList = make([]abstract.HostTemplate, 0, len(list))
+					flvList = make([]*abstract.HostTemplate, 0, len(list))
 					for _, v := range list {
 						flvList = append(
-							flvList, abstract.HostTemplate{
+							flvList, &abstract.HostTemplate{
 								Cores:    v.VCPUs,
 								RAMSize:  float32(v.RAM) / 1000.0,
 								DiskSize: v.Disk,
@@ -1026,11 +1025,11 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *fail.ErrTimeout:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
-			return emptySlice, xerr
+			return nil, xerr
 		}
 	}
 	if len(flvList) == 0 {

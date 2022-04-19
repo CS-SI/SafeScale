@@ -333,7 +333,7 @@ func pollVolume(
 
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (instance service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (instance service) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -363,7 +363,7 @@ func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate,
 	for _, i := range allTemplates {
 		i := i
 		if i.Name == name {
-			return &i, nil
+			return i, nil
 		}
 	}
 	return nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
@@ -382,7 +382,7 @@ func (instance service) FindTemplateByID(id string) (*abstract.HostTemplate, fai
 	for _, i := range allTemplates {
 		i := i
 		if i.ID == id {
-			return &i, nil
+			return i, nil
 		}
 	}
 	return nil, fail.NotFoundError(fmt.Sprintf("template with id '%s' not found", id))
@@ -441,8 +441,8 @@ func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequireme
 
 // reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
 func (instance service) reduceTemplates(
-	tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
-) []abstract.HostTemplate {
+	tpls []*abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
+) []*abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
 		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
@@ -464,7 +464,7 @@ func (instance service) reduceTemplates(
 }
 
 func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate {
-	return func(tpl abstract.HostTemplate) bool {
+	return func(tpl *abstract.HostTemplate) bool {
 		for _, re := range res {
 			if re.Match([]byte(tpl.Name)) {
 				return true
@@ -672,7 +672,7 @@ func (instance service) ListTemplatesBySizing(
 
 		if _, ok := scannerTpls[t.ID]; (ok || !askedForSpecificScannerInfo) && t.ID != "" {
 			newT := t
-			selectedTpls = append(selectedTpls, &newT)
+			selectedTpls = append(selectedTpls, newT)
 		}
 	}
 

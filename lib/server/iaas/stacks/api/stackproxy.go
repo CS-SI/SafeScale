@@ -39,10 +39,10 @@ func (s StackProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) 
 	return images, xerr
 }
 
-func (s StackProxy) ListTemplates(p bool) (_ []abstract.HostTemplate, ferr fail.Error) {
+func (s StackProxy) ListTemplates(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	templates, xerr := s.FullStack.ListTemplates(p)
+	templates, xerr := s.FullStack.ListTemplates(all)
 	return templates, xerr
 }
 

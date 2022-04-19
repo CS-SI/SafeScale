@@ -38,7 +38,7 @@ type Provider interface {
 	ListImages(all bool) ([]*abstract.Image, fail.Error)
 
 	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
+	ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
 	GetAuthenticationOptions() (Config, fail.Error)

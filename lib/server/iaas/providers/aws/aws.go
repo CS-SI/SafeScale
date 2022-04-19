@@ -342,9 +342,9 @@ func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 }
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }

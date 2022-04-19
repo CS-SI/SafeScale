@@ -199,7 +199,7 @@ func (s stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, ferr fail.Error) {
+func (s stack) ListTemplates(bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -207,7 +207,7 @@ func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, ferr fail.Error) 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	templates := make([]abstract.HostTemplate, len(s.templates))
+	templates := make([]*abstract.HostTemplate, len(s.templates))
 	_ = copy(templates, s.templates)
 	return templates, nil
 }
@@ -228,7 +228,7 @@ func (s *stack) buildTemplateList() {
 				}
 
 				name := gpuTemplateName(0, cpu, ram, perf, 0, "")
-				s.templates = append(s.templates, abstract.HostTemplate{
+				s.templates = append(s.templates, &abstract.HostTemplate{
 					DiskSize:  0,
 					Name:      name,
 					Cores:     cpu,
@@ -255,7 +255,7 @@ func (s *stack) buildTemplateList() {
 					}
 
 					name := gpuTemplateName(3, cpu, ram, perf, gpu, "nvidia-k2")
-					s.templates = append(s.templates, abstract.HostTemplate{
+					s.templates = append(s.templates, &abstract.HostTemplate{
 						DiskSize:  0,
 						Name:      name,
 						Cores:     cpu,
@@ -282,7 +282,7 @@ func (s *stack) buildTemplateList() {
 					}
 
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p6")
-					s.templates = append(s.templates, abstract.HostTemplate{
+					s.templates = append(s.templates, &abstract.HostTemplate{
 						DiskSize:  0,
 						Name:      name,
 						Cores:     cpu,
@@ -309,7 +309,7 @@ func (s *stack) buildTemplateList() {
 					}
 
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p100")
-					s.templates = append(s.templates, abstract.HostTemplate{
+					s.templates = append(s.templates, &abstract.HostTemplate{
 						DiskSize:  0,
 						Name:      name,
 						Cores:     cpu,

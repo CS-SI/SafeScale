@@ -289,7 +289,7 @@ func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 }
 
 // ListTemplates ...
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }
 

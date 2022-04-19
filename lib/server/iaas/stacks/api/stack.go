@@ -171,7 +171,7 @@ type Stack interface {
 // ReservedForProviderUse is an interface about the methods only available to providers internally
 type ReservedForProviderUse interface {
 	ListImages(all bool) ([]*abstract.Image, fail.Error)                     // lists available OS images
-	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)            // lists available host templates
+	ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error)           // lists available host templates
 	GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error)   // Returns a read-only struct containing configuration options
 	GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) // Returns a read-only struct containing authentication options
 }

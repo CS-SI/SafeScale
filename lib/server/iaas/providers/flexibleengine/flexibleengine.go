@@ -257,13 +257,13 @@ func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Erro
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p *provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var tpls []abstract.HostTemplate
+	var tpls []*abstract.HostTemplate
 	for _, tpl := range allTemplates {
 		// Ignore templates containing ".mcs."
 		if strings.Contains(tpl.Name, ".mcs.") {
@@ -274,7 +274,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 			continue
 		}
 
-		addGPUCfg(&tpl)
+		addGPUCfg(tpl)
 		tpls = append(tpls, tpl)
 	}
 

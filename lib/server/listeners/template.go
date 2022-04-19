@@ -93,7 +93,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 
 	var finalList []*protocol.HostTemplate
 	for _, item := range originalList {
-		entry := converters.HostTemplateFromAbstractToProtocol(item)
+		entry := converters.HostTemplateFromAbstractToProtocol(*item)
 		acpu := StoredCPUInfo{}
 		if err := db.Read(folder, item.Name, &acpu); err != nil {
 			if scannedOnly {

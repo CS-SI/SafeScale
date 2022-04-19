@@ -240,7 +240,7 @@ func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -250,7 +250,7 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 
 	opts := flavors.ListOpts{}
 
-	var flvList []abstract.HostTemplate
+	var flvList []*abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
@@ -259,10 +259,10 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 					if err != nil {
 						return false, err
 					}
-					flvList = make([]abstract.HostTemplate, 0, len(list))
+					flvList = make([]*abstract.HostTemplate, 0, len(list))
 					for _, v := range list {
 						flvList = append(
-							flvList, abstract.HostTemplate{
+							flvList, &abstract.HostTemplate{
 								Cores:    v.VCPUs,
 								RAMSize:  float32(v.RAM) / 1000.0,
 								DiskSize: v.Disk,

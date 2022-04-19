@@ -94,10 +94,9 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, ferr fail.Error) {
-	var emptySlice []abstract.HostTemplate
+func (s stack) ListTemplates(bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -105,12 +104,12 @@ func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, ferr fail
 
 	resp, xerr := s.rpcListMachineTypes()
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	templates = make([]abstract.HostTemplate, 0, len(resp))
+	templates = make([]*abstract.HostTemplate, 0, len(resp))
 	for _, v := range resp {
-		templates = append(templates, *toAbstractHostTemplate(*v))
+		templates = append(templates, toAbstractHostTemplate(*v))
 	}
 	return templates, nil
 }

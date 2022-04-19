@@ -120,10 +120,10 @@ func (s ProviderProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Erro
 	return images, xerr
 }
 
-func (s ProviderProxy) ListTemplates(p bool) (_ []abstract.HostTemplate, ferr fail.Error) {
+func (s ProviderProxy) ListTemplates(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	templates, xerr := s.Provider.ListTemplates(p)
+	templates, xerr := s.Provider.ListTemplates(all)
 	return templates, xerr
 }
 
