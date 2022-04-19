@@ -256,10 +256,10 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ref, refLabel := srvutils.GetReference(in.Network)
