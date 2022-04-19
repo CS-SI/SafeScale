@@ -305,9 +305,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 
 // ListRegions ...
 func (s stack) ListRegions() (list []string, ferr fail.Error) {
-	var emptySlice []string
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
@@ -324,12 +323,12 @@ func (s stack) ListRegions() (list []string, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	allRegions, err := regions.ExtractRegions(allPages)
 	if err != nil {
-		return emptySlice, fail.ConvertError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	var results []string
@@ -416,9 +415,8 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	var emptySlice []abstract.KeyPair
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
@@ -450,7 +448,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	// Note: empty list is not an error, so do not raise one
 	return kpList, nil
@@ -1064,28 +1062,27 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-	var emptySlice []abstract.VolumeAttachment
+func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return emptySlice, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
-	var vs []abstract.VolumeAttachment
+	var vs []*abstract.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			vs = []abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
+			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
 			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumeattach.ExtractVolumeAttachments(page)
 				if err != nil {
 					return false, err
 				}
 				for _, va := range list {
-					ava := abstract.VolumeAttachment{
+					ava := &abstract.VolumeAttachment{
 						ID:       va.ID,
 						ServerID: va.ServerID,
 						VolumeID: va.VolumeID,
@@ -1099,7 +1096,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	return vs, nil
 }

@@ -186,9 +186,8 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 
 // ListVolumes ...
 func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
-	var emptySlice []abstract.Volume
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
@@ -203,7 +202,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var volumes []abstract.Volume
@@ -399,13 +398,12 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 }
 
 // ListVolumeAttachments ...
-func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
-	var emptySlice []abstract.VolumeAttachment
+func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return emptySlice, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
@@ -430,10 +428,10 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 		return nil, xerr
 	}
 
-	var vas []abstract.VolumeAttachment
+	var vas []*abstract.VolumeAttachment
 	for _, v := range resp.Volumes {
 		for _, va := range v.Attachments {
-			vas = append(vas, abstract.VolumeAttachment{
+			vas = append(vas, &abstract.VolumeAttachment{
 				Device:   aws.StringValue(va.Device),
 				ServerID: aws.StringValue(va.InstanceId),
 				VolumeID: aws.StringValue(va.VolumeId),

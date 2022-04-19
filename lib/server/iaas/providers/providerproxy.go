@@ -526,7 +526,7 @@ func (s ProviderProxy) InspectVolumeAttachment(serverID, id string) (_ *abstract
 	return volume, xerr
 }
 
-func (s ProviderProxy) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
+func (s ProviderProxy) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.ListVolumeAttachments(serverID)

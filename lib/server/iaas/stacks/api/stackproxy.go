@@ -459,7 +459,7 @@ func (s StackProxy) InspectVolumeAttachment(serverID, id string) (_ *abstract.Vo
 	return volume, xerr
 }
 
-func (s StackProxy) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
+func (s StackProxy) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.ListVolumeAttachments(serverID)

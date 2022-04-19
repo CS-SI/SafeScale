@@ -157,7 +157,7 @@ type Stack interface {
 	// InspectVolumeAttachment returns the volume attachment identified by id
 	InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error)
 	// ListVolumeAttachments lists available volume attachment
-	ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error)
+	ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) fail.Error
 

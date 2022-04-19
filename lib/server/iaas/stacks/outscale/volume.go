@@ -205,9 +205,8 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.
 
 // ListVolumes list available volumes
 func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
-	var emptySlice []abstract.Volume
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume")).WithStopwatch().Entering()
@@ -215,7 +214,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadVolumes(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	volumes := make([]abstract.Volume, 0, len(resp))
@@ -343,13 +342,12 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
-	emptySlice := make([]abstract.VolumeAttachment, 0)
+func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return emptySlice, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", serverID).WithStopwatch().Entering()
@@ -359,11 +357,11 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	if err != nil {
 		return nil, err
 	}
-	atts := make([]abstract.VolumeAttachment, 0, len(volumes))
+	atts := make([]*abstract.VolumeAttachment, 0, len(volumes))
 	for _, v := range volumes {
 		att, _ := s.InspectVolumeAttachment(serverID, v.ID)
 		if att != nil {
-			atts = append(atts, *att)
+			atts = append(atts, att)
 		}
 	}
 	return atts, nil

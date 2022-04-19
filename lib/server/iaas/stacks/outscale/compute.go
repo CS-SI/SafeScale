@@ -1129,7 +1129,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	// list attached volumes
 	volumes, xerr := s.ListVolumeAttachments(ahf.Core.ID)
 	if xerr != nil {
-		volumes = []abstract.VolumeAttachment{}
+		volumes = []*abstract.VolumeAttachment{}
 	}
 
 	// delete host
