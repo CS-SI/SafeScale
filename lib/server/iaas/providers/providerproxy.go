@@ -498,7 +498,7 @@ func (s ProviderProxy) InspectVolume(id string) (_ *abstract.Volume, ferr fail.E
 	return volume, xerr
 }
 
-func (s ProviderProxy) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
+func (s ProviderProxy) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.ListVolumes()

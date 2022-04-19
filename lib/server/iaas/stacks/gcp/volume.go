@@ -135,7 +135,7 @@ func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -143,7 +143,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	var out []abstract.Volume
+	var out []*abstract.Volume
 	resp, xerr := s.rpcListDisks()
 	if xerr != nil {
 		return nil, xerr
@@ -153,7 +153,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		if xerr != nil {
 			return nil, xerr
 		}
-		out = append(out, *item)
+		out = append(out, item)
 	}
 	return out, nil
 }

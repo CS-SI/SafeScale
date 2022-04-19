@@ -431,7 +431,7 @@ func (s StackProxy) InspectVolume(id string) (_ *abstract.Volume, ferr fail.Erro
 	return volume, xerr
 }
 
-func (s StackProxy) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
+func (s StackProxy) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.ListVolumes()

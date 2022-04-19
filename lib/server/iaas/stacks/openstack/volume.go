@@ -212,17 +212,17 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
 
-	var vs []abstract.Volume
+	var vs []*abstract.Volume
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			vs = []abstract.Volume{} // If call fails, need to restart list from 0...
+			vs = []*abstract.Volume{} // If call fails, need to restart list from 0...
 			innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumesv2.ExtractVolumes(page)
 				if err != nil {
@@ -230,7 +230,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 					return false, err
 				}
 				for _, vol := range list {
-					av := abstract.Volume{
+					av := &abstract.Volume{
 						ID:    vol.ID,
 						Name:  vol.Name,
 						Size:  vol.Size,

@@ -148,7 +148,7 @@ type Stack interface {
 	// InspectVolume returns the volume identified by id
 	InspectVolume(id string) (*abstract.Volume, fail.Error)
 	// ListVolumes list available volumes
-	ListVolumes() ([]abstract.Volume, fail.Error)
+	ListVolumes() ([]*abstract.Volume, fail.Error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) fail.Error
 

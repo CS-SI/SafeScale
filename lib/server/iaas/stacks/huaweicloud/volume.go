@@ -159,13 +159,12 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes lists volumes
-func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	var emptySlice []abstract.Volume
+func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
-	var vs []abstract.Volume
+	var vs []*abstract.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := volumes.List(s.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -175,7 +174,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 					return false, err
 				}
 				for _, vol := range list {
-					av := abstract.Volume{
+					av := &abstract.Volume{
 						ID:    vol.ID,
 						Name:  vol.Name,
 						Size:  vol.Size,
@@ -191,7 +190,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return emptySlice, commRetryErr
+		return nil, commRetryErr
 	}
 
 	return vs, nil

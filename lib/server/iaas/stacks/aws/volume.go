@@ -185,7 +185,7 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
+func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -205,7 +205,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 		return nil, xerr
 	}
 
-	var volumes []abstract.Volume
+	var volumes []*abstract.Volume
 	for _, v := range resp.Volumes {
 		volumeName := aws.StringValue(v.VolumeId)
 		if len(v.Tags) > 0 {
@@ -225,7 +225,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 			Speed: toAbstractVolumeSpeed(v.VolumeType),
 			State: toAbstractVolumeState(v.State),
 		}
-		volumes = append(volumes, volume)
+		volumes = append(volumes, &volume)
 	}
 
 	return volumes, nil

@@ -204,7 +204,7 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.
 }
 
 // ListVolumes list available volumes
-func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
+func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -217,7 +217,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 		return nil, xerr
 	}
 
-	volumes := make([]abstract.Volume, 0, len(resp))
+	volumes := make([]*abstract.Volume, 0, len(resp))
 	for _, ov := range resp {
 		volume := abstract.NewVolume()
 		volume.ID = ov.VolumeId
@@ -228,7 +228,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 		volume.Tags["CreationDate"] = getResourceTag(ov.Tags, "CreationDate", "")
 		volume.Tags["ManagedBy"] = getResourceTag(ov.Tags, "ManagedBy", "")
 		volume.Tags["DeclaredInBucket"] = getResourceTag(ov.Tags, "DeclaredInBucket", "")
-		volumes = append(volumes, *volume)
+		volumes = append(volumes, volume)
 	}
 	return volumes, nil
 }
