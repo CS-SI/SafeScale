@@ -2487,6 +2487,8 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
+	logrus.Debugf(tracer.TraceMessage("[%s] Host updating cluster metadata...", hostLabel))
+
 	// -- update cluster metadata --
 	var node *propertiesv3.ClusterNode
 	xerr = instance.Alter(
@@ -2576,13 +2578,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
-	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, hostInstance.GetName())
-
-	// xerr = instance.installProxyCacheClient(task.Context(), hostInstance, hostLabel)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
+	logrus.Debugf(tracer.TraceMessage("[%s] Host installing node requirements...", hostLabel))
 
 	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Node, hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
