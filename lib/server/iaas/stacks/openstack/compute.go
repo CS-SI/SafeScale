@@ -205,13 +205,12 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAHT, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -227,9 +226,9 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr 
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
-	template = abstract.HostTemplate{
+	template = &abstract.HostTemplate{
 		Cores:    flv.VCPUs,
 		RAMSize:  float32(flv.RAM) / 1000.0,
 		DiskSize: flv.Disk,
@@ -920,7 +919,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// newHost.Networking.DefaultGatewayID = defaultGatewayID
 	// newHost.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	newHost.Networking.IsGateway = request.IsGateway
-	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	// if Floating IP are used and public address is requested
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {

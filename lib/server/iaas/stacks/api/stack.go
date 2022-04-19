@@ -43,7 +43,7 @@ type Stack interface {
 	InspectImage(id string) (*abstract.Image, fail.Error)
 
 	// InspectTemplate returns the Template referenced by id
-	InspectTemplate(id string) (abstract.HostTemplate, fail.Error)
+	InspectTemplate(id string) (*abstract.HostTemplate, fail.Error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*abstract.KeyPair, fail.Error)

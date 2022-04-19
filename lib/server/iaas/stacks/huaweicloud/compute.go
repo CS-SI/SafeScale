@@ -711,7 +711,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 	host.Networking.IsGateway = isGateway
 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	if request.PublicIP {
 		var fip *FloatingIP

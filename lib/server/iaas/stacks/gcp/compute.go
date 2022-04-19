@@ -111,13 +111,13 @@ func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, ferr fail
 
 	templates = make([]abstract.HostTemplate, 0, len(resp))
 	for _, v := range resp {
-		templates = append(templates, toAbstractHostTemplate(*v))
+		templates = append(templates, *toAbstractHostTemplate(*v))
 	}
 	return templates, nil
 }
 
-func toAbstractHostTemplate(in compute.MachineType) abstract.HostTemplate {
-	return abstract.HostTemplate{
+func toAbstractHostTemplate(in compute.MachineType) *abstract.HostTemplate {
+	return &abstract.HostTemplate{
 		Cores:   int(in.GuestCpus),
 		RAMSize: float32(in.MemoryMb / 1024),
 		// GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
@@ -129,13 +129,12 @@ func toAbstractHostTemplate(in compute.MachineType) abstract.HostTemplate {
 }
 
 // InspectTemplate ...
-func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAHT, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -143,7 +142,7 @@ func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Er
 
 	resp, xerr := s.rpcGetMachineType(id)
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
 	return toAbstractHostTemplate(*resp), nil
 }
@@ -311,7 +310,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
+			ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
@@ -369,7 +368,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.Password = request.Password           // and OperatorUsername's password
 	ahf.Networking.IsGateway = request.IsGateway
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
-	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	return ahf, userData, nil
 }

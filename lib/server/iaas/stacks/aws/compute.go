@@ -221,13 +221,12 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 }
 
 // InspectTemplate loads information about a template stored in AWS
-func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAHT, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -235,7 +234,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, ferr 
 
 	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(id))
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
 
 	return toAbstractHostTemplate(*resp), nil
@@ -400,14 +399,14 @@ func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fa
 	// converts response from AWS to abstract
 	list := make([]abstract.HostTemplate, 0, len(resp))
 	for _, v := range resp {
-		list = append(list, toAbstractHostTemplate(*v))
+		list = append(list, *toAbstractHostTemplate(*v))
 	}
 
 	return list, nil
 }
 
-func toAbstractHostTemplate(in ec2.InstanceTypeInfo) abstract.HostTemplate {
-	out := abstract.HostTemplate{
+func toAbstractHostTemplate(in ec2.InstanceTypeInfo) *abstract.HostTemplate {
+	out := &abstract.HostTemplate{
 		ID:   aws.StringValue(in.InstanceType),
 		Name: aws.StringValue(in.InstanceType),
 	}
@@ -620,7 +619,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Networking.IsGateway = request.IsGateway
 
 	// Adds Host property SizingV1
-	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	// Sets provider parameters to create ahf
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
@@ -652,12 +651,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			if request.Preemptible {
 				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
 					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, template,
+					string(userDataPhase1), publicIP, *template,
 				)
 			} else {
 				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
 					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, template,
+					string(userDataPhase1), publicIP, *template,
 				)
 			}
 			if innerXErr != nil {
@@ -935,7 +934,7 @@ func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstrac
 		return nullSizing, xerr
 	}
 
-	hs := converters.HostTemplateToHostEffectiveSizing(toAbstractHostTemplate(*resp))
+	hs := converters.HostTemplateToHostEffectiveSizing(*toAbstractHostTemplate(*resp))
 	return *hs, nil
 }
 

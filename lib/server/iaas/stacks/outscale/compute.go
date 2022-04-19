@@ -168,26 +168,25 @@ func parseGPU(s string) (gpus int, gpuType string, ferr fail.Error) {
 	return
 }
 
-func (s stack) parseTemplateID(id string) (abstract.HostTemplate, fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (s stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 || !strings.HasPrefix(id, "tina") {
-		return nullAHT, fail.InvalidParameterError("id", "invalid template id")
+		return nil, fail.InvalidParameterError("id", "invalid template id")
 	}
 
 	cpus, ram, perf, err := parseSizing(tokens[1])
 	if err != nil {
-		return nullAHT, fail.InvalidParameterError("id", "invalid template id")
+		return nil, fail.InvalidParameterError("id", "invalid template id")
 	}
 	gpus := 0
 	gpuType := ""
 	if len(tokens) > 2 {
 		gpus, gpuType, err = parseGPU(tokens[2])
 		if err != nil {
-			return nullAHT, fail.InvalidParameterError("id", "invalid template id")
+			return nil, fail.InvalidParameterError("id", "invalid template id")
 		}
 	}
-	return abstract.HostTemplate{
+	return &abstract.HostTemplate{
 		Cores:     cpus,
 		CPUFreq:   s.cpuFreq(perf),
 		GPUNumber: gpus,
@@ -365,13 +364,12 @@ func toAbstractImage(in osc.Image) *abstract.Image {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAHT, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
@@ -1035,7 +1033,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	// -- add GPU if asked for --
-	if xerr = s.addGPUs(&request, template, vm.VmId); xerr != nil {
+	if xerr = s.addGPUs(&request, *template, vm.VmId); xerr != nil {
 		return nil, nil, xerr
 	}
 	_, xerr = s.rpcCreateTags(

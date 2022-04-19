@@ -245,14 +245,13 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // InspectTemplate returns the Template referenced by id; overloads stack.InspectTemplate to inject templates with GPU
-func (p *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	tpl, xerr := p.Stack.InspectTemplate(id)
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
 
-	addGPUCfg(&tpl)
+	addGPUCfg(tpl)
 	return tpl, nil
 }
 

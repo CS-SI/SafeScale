@@ -155,7 +155,7 @@ func (s ProviderProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Err
 	return image, xerr
 }
 
-func (s ProviderProxy) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
+func (s ProviderProxy) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	template, xerr := s.Provider.InspectTemplate(id)

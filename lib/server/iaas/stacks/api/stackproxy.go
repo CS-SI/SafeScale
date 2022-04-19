@@ -88,7 +88,7 @@ func (s StackProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error)
 	return image, xerr
 }
 
-func (s StackProxy) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
+func (s StackProxy) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	template, xerr := s.FullStack.InspectTemplate(id)
