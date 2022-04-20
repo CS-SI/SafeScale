@@ -1160,13 +1160,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	for i := uint(1); i <= count; i++ {
+		captured := i
 		params := taskCreateNodeParameters{
 			nodeDef:       nodeDef,
 			timeout:       timeout,
 			keepOnFailure: keepOnFailure,
-			index:         i,
+			index:         captured,
 		}
-		_, xerr := tg.Start(instance.taskCreateNode, params, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", params.index)))
+		_, xerr := tg.Start(instance.taskCreateNode, params, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", captured)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			abErr := tg.AbortWithCause(xerr)
@@ -1191,6 +1192,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 
 			for _, v := range nodes {
+				v := v
 				_, derr = dtg.Start(
 					instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: WithoutReloadOption},
 				)
