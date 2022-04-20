@@ -523,7 +523,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ref, _ := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -534,6 +534,10 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	}
 	defer job.Close()
 	jobCtx := job.Context()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(jobCtx, job.Service(), ref)
 	if xerr != nil {
