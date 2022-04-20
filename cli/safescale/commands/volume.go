@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
@@ -58,17 +57,13 @@ var volumeList = cli.Command{
 		cli.BoolFlag{
 			Name:  "all, a",
 			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
-		}},
+		},
+	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		volumes, err := clientSession.Volume.List(c.Bool("all"), 0)
+		volumes, err := ClientSession.Volume.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of volumes", false).Error())))
@@ -90,12 +85,7 @@ var volumeInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		volumeInfo, err := clientSession.Volume.Inspect(c.Args().First(), 0)
+		volumeInfo, err := ClientSession.Volume.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of volume", false).Error())))
@@ -117,16 +107,11 @@ var volumeDelete = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		var volumeList []string
 		volumeList = append(volumeList, c.Args().First())
 		volumeList = append(volumeList, c.Args().Tail()...)
 
-		err := clientSession.Volume.Delete(volumeList, 0)
+		err := ClientSession.Volume.Delete(volumeList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of volume", false).Error())))
@@ -160,27 +145,23 @@ var volumeCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name>. "))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		speed := c.String("speed")
 		volSpeed, ok := protocol.VolumeSpeed_value["VS_"+speed]
 		if !ok {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
 		}
+
 		volSize := int32(c.Int("size"))
 		if volSize <= 0 {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
 		}
+
 		def := protocol.VolumeCreateRequest{
 			Name:  c.Args().First(),
 			Size:  volSize,
 			Speed: protocol.VolumeSpeed(volSpeed),
 		}
-
-		volume, err := clientSession.Volume.Create(&def, 0)
+		volume, err := ClientSession.Volume.Create(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of volume", true).Error())))
@@ -222,11 +203,6 @@ var volumeAttach = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		def := protocol.VolumeAttachmentRequest{
 			Format:      c.String("format"),
 			DoNotFormat: c.Bool("do-not-format"),
@@ -235,7 +211,7 @@ var volumeAttach = cli.Command{
 			Host:        &protocol.Reference{Name: c.Args().Get(1)},
 			Volume:      &protocol.Reference{Name: c.Args().Get(0)},
 		}
-		err := clientSession.Volume.Attach(&def, 0)
+		err := ClientSession.Volume.Attach(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "attach of volume", true).Error())))
@@ -257,12 +233,7 @@ var volumeDetach = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Volume.Detach(c.Args().Get(0), c.Args().Get(1), 0)
+		err := ClientSession.Volume.Detach(c.Args().Get(0), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unattach of volume", true).Error())))

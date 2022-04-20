@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -76,10 +78,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	var (
-		onAbort       uint32
-		clientSession *client.Session
-	)
+	var onAbort uint32
 
 	// mainCtx, cancelfunc := context.WithCancel(context.Background())
 
@@ -176,9 +175,9 @@ func main() {
 			appwide.Debug = true
 		}
 
-		clientSession, err = client.New(c.String("server"))
+		commands.ClientSession, err = client.New(c.String("server"))
 		if err != nil {
-			return err
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		// Starts ctrl+c handler before app.RunContext()
@@ -190,7 +189,7 @@ func main() {
 			for {
 				<-signalCh
 				atomic.StoreUint32(&onAbort, 1)
-				cleanup(clientSession, &onAbort)
+				cleanup(commands.ClientSession, &onAbort)
 				// cancelfunc()
 			}
 		}()
@@ -199,7 +198,7 @@ func main() {
 
 	app.After = func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		cleanup(clientSession, &onAbort)
+		cleanup(commands.ClientSession, &onAbort)
 		return nil
 	}
 

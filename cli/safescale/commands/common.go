@@ -32,6 +32,9 @@ const (
 	DoInstanciate    = true
 )
 
+// ClientSession contains the session allowing to communicate with safescaled
+var ClientSession *client.Session
+
 // extractFeatureArgument returns the name of the feature from the command arguments
 func extractFeatureArgument(c *cli.Context) (string, error) {
 	if c.NArg() < 2 {
@@ -56,13 +59,13 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 
 	var hostInstance *protocol.Host
 	if instanciate {
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		var err error
-		hostInstance, err = clientSession.Host.Inspect(hostName, 0)
+		hostInstance, err = Session.Host.Inspect(hostName, 0)
 		if err != nil {
 			return "", nil, clitools.ExitOnRPC(err.Error())
 		}
