@@ -316,7 +316,6 @@ func sprinterr(m dsl.Matcher) {
 	).
 		Where(m["err"].Type.Is("error")).
 		Report("maybe call $err.Error() instead of fmt.Sprint()?")
-
 }
 
 func largeloopcopy(m dsl.Matcher) {

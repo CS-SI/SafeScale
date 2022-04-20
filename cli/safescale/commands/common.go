@@ -19,29 +19,17 @@ package commands
 import (
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const (
 	DoNotInstanciate = false
 	DoInstanciate    = true
-)
-
-var (
-	// Verbose tells if user asks more verbosity
-	Verbose bool
-	// Debug tells if user asks debug information
-	Debug bool
-
-	// hostName     string
-	// hostInstance *protocol.Host
-	// featureName  string
 )
 
 // extractFeatureArgument returns the name of the feature from the command arguments
@@ -66,15 +54,15 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 		return "", nil, clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	var hostInstance *protocol.Host
 	if instanciate {
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
 		var err error
-		hostInstance, err = clientSession.Host.Inspect(hostName, temporal.ExecutionTimeout())
+		hostInstance, err = clientSession.Host.Inspect(hostName, 0)
 		if err != nil {
 			return "", nil, clitools.ExitOnRPC(err.Error())
 		}
@@ -82,10 +70,6 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 		if hostInstance == nil {
 			return "", nil, clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 		}
-	}
-
-	if hostInstance == nil {
-		return "", nil, clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 	}
 
 	return hostName, hostInstance, nil

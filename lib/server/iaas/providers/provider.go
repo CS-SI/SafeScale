@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_providerapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers.Provider
+//go:generate minimock -o mocks/mock_provider.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers.Provider
 
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack
@@ -35,10 +35,10 @@ type Provider interface {
 	Build(map[string]interface{}) (Provider, fail.Error)
 
 	// ListImages lists available OS images, all bool is unused here but used at upper levels to filter using whitelists and blacklists
-	ListImages(all bool) ([]abstract.Image, fail.Error)
+	ListImages(all bool) ([]*abstract.Image, fail.Error)
 
 	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
+	ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
 	GetAuthenticationOptions() (Config, fail.Error)

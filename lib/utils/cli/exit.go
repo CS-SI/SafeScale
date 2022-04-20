@@ -17,14 +17,14 @@
 package cli
 
 import (
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 )
 
 // ExitOnErrorWithMessage informs cli to exit with message and error code
 func ExitOnErrorWithMessage(exitcode exitcode.Enum, msg string) error {
-	return cli.Exit(msg, int(exitcode))
+	return cli.NewExitError(msg, int(exitcode))
 }
 
 // ExitOnInvalidArgument ...

@@ -537,6 +537,7 @@ func TestNestedLocks(t *testing.T) {
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(500 * time.Millisecond)
+
 			return clusters.Inspect("second", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
@@ -555,6 +556,7 @@ func TestNestedLocks(t *testing.T) {
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(500 * time.Millisecond)
+
 			return clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
@@ -565,7 +567,7 @@ func TestNestedLocks(t *testing.T) {
 		assert.Nil(t, oerr)
 	}()
 
-	failed := waitTimeout(&wg, 5*time.Second)
+	failed := waitTimeout(&wg, 500*time.Second)
 	if failed { // It ended with a deadlock
 		t.Fail()
 	}

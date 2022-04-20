@@ -98,7 +98,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
-	rb, xerr := bucketfactory.Load(svc, name)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), svc, name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -130,7 +130,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	rb, xerr := bucketfactory.Load(handler.job.Service(), name)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -153,7 +153,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var xerr fail.Error
-	rb, xerr = bucketfactory.Load(handler.job.Service(), name)
+	rb, xerr = bucketfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -185,7 +185,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Service(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
@@ -218,7 +218,7 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Service(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), bucketName)
 	if xerr != nil {
 		return xerr
 	}

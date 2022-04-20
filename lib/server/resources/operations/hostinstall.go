@@ -22,14 +22,13 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
@@ -39,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
@@ -58,15 +58,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -88,7 +80,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -96,7 +88,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var innerXErr fail.Error
-		outcomes, innerXErr = feat.Add(ctx, instance, vars, settings)
+		outcomes, innerXErr = feat.Add(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -108,7 +100,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
 			}
 
-			requires, innerXErr := feat.GetRequirements()
+			requires, innerXErr := feat.Dependencies()
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -147,15 +139,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -165,13 +149,13 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Check(ctx, instance, vars, settings)
+	return feat.Check(task.Context(), instance, vars, settings)
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
@@ -188,18 +172,10 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -221,14 +197,14 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		outcomes, innerXErr := feat.Remove(ctx, instance, vars, settings)
+		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}
@@ -271,7 +247,9 @@ func (instance *Host) InstallMethods() (map[uint8]installmethod.Enum, fail.Error
 	}
 
 	out := make(map[uint8]installmethod.Enum)
-	instance.installMethods.Range(func(k, v interface{}) bool {
+	instance.localCache.RLock()
+	defer instance.localCache.RUnlock()
+	instance.localCache.installMethods.Range(func(k, v interface{}) bool {
 		var ok bool
 		out[k.(uint8)], ok = v.(installmethod.Enum)
 		return ok
@@ -299,7 +277,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 
 			var item *propertiesv1.HostInstalledFeature
 			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.GetRequirements()
+				requirements, innerXErr := feat.Dependencies()
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -364,10 +342,11 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
-	return nil, fail.NotImplementedError()
+	// FIXME: 'allWithEmbedded' should be passed as parameter...
+	return filterEligibleFeatures(ctx, instance, allWithEmbedded)
 }
 
 // ListInstalledFeatures returns a slice of installed features
@@ -379,14 +358,13 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	list := instance.InstalledFeatures()
-
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
-		item, xerr := NewFeature(instance.Service(), v)
+		item, xerr := NewFeature(ctx, instance.Service(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr
@@ -427,10 +405,10 @@ func (instance *Host) InstalledFeatures() []string {
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
 // satisfies interface install.Targetable
-func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map) (ferr fail.Error) {
+func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if v == nil {
@@ -460,8 +438,21 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	}
 
 	v["Hostname"] = instance.GetName() + domain
-	v["HostIP"] = instance.privateIP
-	v["PublicIP"] = instance.publicIP
+	v["HostIP"], xerr = instance.GetPrivateIP(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	v["PublicIP"], xerr = instance.GetPublicIP(ctx)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// Host may not have Public IP, ignore this error
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	}
 
 	if _, ok := v["Username"]; !ok {
 		config, xerr := instance.Service().GetConfigurationOptions()
@@ -473,7 +464,7 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 		}
 	}
 
-	rs, xerr := instance.unsafeGetDefaultSubnet()
+	subnetInstance, xerr := instance.unsafeGetDefaultSubnet(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -493,30 +484,24 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 
 		v["DefaultRouteIP"] = ""
 	} else {
-		rgw, xerr := rs.InspectGateway(true)
+		gwInstance, xerr := subnetInstance.InspectGateway(ctx, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
-		defer func() {
-			issue := rgw.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
-		v["PrimaryGatewayIP"], xerr = rgw.GetPrivateIP()
+		v["PrimaryGatewayIP"], xerr = gwInstance.GetPrivateIP(ctx)
 		if xerr != nil {
 			return xerr
 		}
 
 		v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-		v["PrimaryPublicIP"], xerr = rgw.GetPublicIP()
+		v["PrimaryPublicIP"], xerr = gwInstance.GetPublicIP(ctx)
 		if xerr != nil {
 			return xerr
 		}
 
-		rgw, xerr = rs.InspectGateway(false)
+		gwInstance, xerr = subnetInstance.InspectGateway(ctx, false)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -528,25 +513,18 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 				return xerr
 			}
 		} else {
-			defer func() {
-				issue := rgw.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}()
-
-			v["SecondaryGatewayIP"], xerr = rgw.GetPrivateIP()
+			v["SecondaryGatewayIP"], xerr = gwInstance.GetPrivateIP(ctx)
 			if xerr != nil {
 				return xerr
 			}
 
-			v["SecondaryPublicIP"], xerr = rgw.GetPublicIP()
+			v["SecondaryPublicIP"], xerr = gwInstance.GetPublicIP(ctx)
 			if xerr != nil {
 				return xerr
 			}
 		}
 
-		v["EndpointIP"], xerr = rs.GetEndpointIP()
+		v["EndpointIP"], xerr = subnetInstance.GetEndpointIP(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

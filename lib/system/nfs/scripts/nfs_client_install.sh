@@ -52,8 +52,8 @@ debian | ubuntu)
   sfWaitForApt
   finishPreviousInstall
 
-  sfRetryEx 3m 5 "sfWaitForApt && apt -y update"
-  sfRetryEx 5m 5 "sfWaitForApt && apt-get install -qqy --force-yes nfs-common"
+  sfRetry4 "sfWaitForApt && apt -y update"
+  sfRetry4 "apt-get install -qqy nfs-common"
   ;;
 
 rhel | centos)

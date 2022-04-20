@@ -245,26 +245,25 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // InspectTemplate returns the Template referenced by id; overloads stack.InspectTemplate to inject templates with GPU
-func (p *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	tpl, xerr := p.Stack.InspectTemplate(id)
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
 
-	addGPUCfg(&tpl)
+	addGPUCfg(tpl)
 	return tpl, nil
 }
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p *provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var tpls []abstract.HostTemplate
+	var tpls []*abstract.HostTemplate
 	for _, tpl := range allTemplates {
 		// Ignore templates containing ".mcs."
 		if strings.Contains(tpl.Name, ".mcs.") {
@@ -275,24 +274,24 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 			continue
 		}
 
-		addGPUCfg(&tpl)
+		addGPUCfg(tpl)
 		tpls = append(tpls, tpl)
 	}
 
 	return tpls, nil
 }
 
-func isWindowsImage(image abstract.Image) bool {
+func isWindowsImage(image *abstract.Image) bool {
 	return strings.Contains(strings.ToLower(image.Name), "windows")
 }
 
-func isBMSImage(image abstract.Image) bool {
+func isBMSImage(image *abstract.Image) bool {
 	return strings.HasPrefix(strings.ToUpper(image.Name), "OBS-BMS") ||
 		strings.HasPrefix(strings.ToUpper(image.Name), "OBS_BMS")
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p *provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	images, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)
 	if xerr != nil {
 		return nil, xerr

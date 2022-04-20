@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
@@ -41,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
@@ -58,8 +56,6 @@ const (
 // Volume links Object Storage MetadataFolder and unsafeGetVolumes
 type volume struct {
 	*MetadataCore
-
-	lock sync.RWMutex
 }
 
 // NewVolume creates an instance of Volume
@@ -81,7 +77,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Error) {
+func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -91,73 +87,42 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	timings, xerr := svc.Timings()
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	volumeCache, xerr := svc.GetCache(volumeKind)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	options := iaas.CacheMissOption(
-		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
-		timings.MetadataTimeout(),
-	)
-	cacheEntry, xerr := volumeCache.Get(ref, options...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Volume '%s'", ref)
-		default:
-			return nil, xerr
-		}
 	}
 
 	var ok bool
-	rv, ok = cacheEntry.Content().(resources.Volume)
+	volumeInstance, ok := anon.(resources.Volume)
 	if !ok {
 		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
 	}
-	if rv == nil {
+	if volumeInstance == nil {
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
 
-	_ = cacheEntry.LockContent()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
-
-	// FIXME: The reload problem
-	// VPL: what state of Volume would you like to be updated by Reload?
-	/*
-		xerr = rv.Reload()
-		if xerr != nil {
-			return nil, xerr
-		}
-	*/
-
-	return rv, nil
+	return volumeInstance, nil
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
-func onVolumeCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	volumeInstance, innerXErr := NewVolume(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	blank, innerXErr := NewVolume(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	if innerXErr = volumeInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(volumeInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("volume with ref '%s' does NOT exist", ref)
 	}
 
 	return volumeInstance, nil
@@ -169,7 +134,7 @@ func (instance *volume) IsNull() bool {
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
+func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -181,50 +146,14 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), timings.MetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 	return nil
 }
 
@@ -232,12 +161,12 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	return instance.unsafeGetSpeed()
 }
@@ -246,12 +175,12 @@ func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
 func (instance *volume) GetSize() (_ int, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	return instance.unsafeGetSize()
 }
@@ -261,12 +190,12 @@ func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, fer
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	var vaV1 *propertiesv1.VolumeAttachments
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -305,15 +234,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -324,8 +245,8 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
 		if task.Aborted() {
@@ -351,25 +272,17 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -379,8 +292,8 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
@@ -417,12 +330,12 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			xerr = fail.ConvertError(fail.Cause(xerr))
-		default:
-		}
-	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
+			default:
+				return xerr
+			}
 		case *fail.ErrNotFound:
 			logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
 		default:
@@ -460,15 +373,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -478,12 +383,12 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.Service()
-	existing, xerr := LoadVolume(svc, req.Name)
+	_, xerr = LoadVolume(ctx, svc, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -493,10 +398,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
 	} else {
-		issue := existing.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
@@ -539,13 +440,11 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	}
 
 	// Sets err to possibly trigger defer calls
-	return instance.carry(av)
+	return instance.carry(ctx, av)
 }
 
 // Attach a volume to a host
-func (instance *volume) Attach(
-	ctx context.Context, host resources.Host, path, format string, doNotFormat, doNotMount bool,
-) (ferr fail.Error) {
+func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat, doNotMount bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -572,15 +471,7 @@ func (instance *volume) Attach(
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -590,8 +481,8 @@ func (instance *volume) Attach(
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
@@ -814,7 +705,7 @@ func (instance *volume) Attach(
 			deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
 
 			// Create mount point
-			sshConfig, deeperXErr := host.GetSSHConfig()
+			sshConfig, deeperXErr := host.GetSSHConfig(task.Context())
 			if deeperXErr != nil {
 				return deeperXErr
 			}
@@ -843,7 +734,7 @@ func (instance *volume) Attach(
 						// Disable abort signal during the cleanup
 						defer task.DisarmAbortSignal()()
 
-						if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+						if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
 						}
 					}
@@ -978,18 +869,10 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 		stdout, stderr string
 	)
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	svc := host.Service()
@@ -1060,18 +943,10 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -1082,8 +957,8 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	var (
 		volumeID, volumeName string
@@ -1227,7 +1102,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 			}
 
 			// -- Unmount the Block Device ...
-			sshConfig, innerXErr := host.GetSSHConfig()
+			sshConfig, innerXErr := host.GetSSHConfig(task.Context())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1310,13 +1185,13 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 }
 
 // ToProtocol converts the volume to protocol message VolumeInspectResponse
-func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspectResponse, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	volumeID := instance.GetID()
 	volumeName := instance.GetName()
@@ -1336,19 +1211,11 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 
 	svc := instance.Service()
 	for k := range attachments.Hosts {
-		hostInstance, xerr := LoadHost(svc, k)
+		hostInstance, xerr := LoadHost(ctx, svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		//goland:noinspection ALL
-		defer func(item resources.Host) {
-			issue := item.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}(hostInstance)
 
 		vols, _ := hostInstance.(*Host).unsafeGetVolumes()
 		device, ok := vols.DevicesByID[volumeID]

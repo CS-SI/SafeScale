@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -43,8 +44,16 @@ func (v volume) List(all bool, timeout time.Duration) (*protocol.VolumeListRespo
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	return service.List(ctx, &protocol.VolumeListRequest{All: all})
+	return service.List(newCtx, &protocol.VolumeListRequest{All: all})
 }
 
 // Inspect ...
@@ -57,8 +66,16 @@ func (v volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeIns
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	return service.Inspect(ctx, &protocol.Reference{Name: name})
+	return service.Inspect(newCtx, &protocol.Reference{Name: name})
 }
 
 // Delete ...
@@ -69,6 +86,14 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	var (
@@ -84,7 +109,7 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 		defer fail.OnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
 
 		if err != nil {
 			mutex.Lock()
@@ -116,8 +141,16 @@ func (v volume) Create(def *protocol.VolumeCreateRequest, timeout time.Duration)
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	return service.Create(ctx, def)
+	return service.Create(newCtx, def)
 }
 
 // Attach ...
@@ -130,8 +163,16 @@ func (v volume) Attach(def *protocol.VolumeAttachmentRequest, timeout time.Durat
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	_, err := service.Attach(ctx, def)
+	_, err := service.Attach(newCtx, def)
 	return err
 
 }
@@ -146,8 +187,16 @@ func (v volume) Detach(volumeName string, hostName string, timeout time.Duration
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	_, err := service.Detach(ctx, &protocol.VolumeDetachmentRequest{
+	_, err := service.Detach(newCtx, &protocol.VolumeDetachmentRequest{
 		Volume: &protocol.Reference{Name: volumeName},
 		Host:   &protocol.Reference{Name: hostName},
 	})

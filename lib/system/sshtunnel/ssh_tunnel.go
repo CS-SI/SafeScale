@@ -234,8 +234,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		tunnel.logf("ssh tunnel lifetime (%s): %s", tunnel.command, tunnel.timeTunnelRunning)
 	}(time.Now())
 
-	var quittingErr error
-
 	for {
 		if !tunnel.isOpen {
 			break
@@ -283,6 +281,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				defer OnPanic(&crash)
 
 				var fwErr error
+				var quittingErr error
 				for {
 					fwErr = tunnel.forward(conn)
 					if fwErr == nil {
@@ -336,14 +335,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		return fmt.Errorf("error closing the listener: %w", err)
 	}
 
-	if quittingErr != nil {
-		litter.Config.HidePrivateFields = false
-		tunnel.errorf("tunnel closed due to error: %s", litter.Sdump(quittingErr))
-	} else {
-		tunnel.logf("tunnel closed")
-	}
-
-	return quittingErr
+	return nil
 }
 
 func TunnelOptionWithDialTimeout(timeout time.Duration) Option {

@@ -58,16 +58,6 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 		return "", fail.OverflowError(nil, maxBucketNameLength, "name '%s' is too long, max allowed: %d characters", name, maxBucketNameLength-1)
 	}
 
-	// FIXME: GCP, Remove specific driver code
-	if driver == "gcp" {
-		name = strings.ReplaceAll(name, ".", "-")
-	}
-
-	// FIXME: AWS, Remove specific driver code
-	if driver == "aws" {
-		name = strings.ReplaceAll(name, ".", "-")
-	}
-
 	name = strings.ToLower(name)
 
 	return name, nil

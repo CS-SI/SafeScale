@@ -53,18 +53,10 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return invalid, "", "", xerr
-			}
-		default:
-			return invalid, "", "", xerr
-		}
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -85,7 +77,12 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	)
 
 	hostName := instance.GetName()
-	retCode, stdOut, stdErr, xerr = run(ctx, instance.sshProfile, cmd, outs, connTimeout+execTimeout)
+	sshProfile, xerr := instance.GetSSHConfig(task.Context())
+	if xerr != nil {
+		return retCode, stdOut, stdErr, xerr
+	}
+
+	retCode, stdOut, stdErr, xerr = run(task.Context(), sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -198,18 +195,10 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return invalid, "", "", xerr
-			}
-		default:
-			return invalid, "", "", xerr
-		}
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -236,12 +225,17 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		stdout, stderr string
 	)
 	retcode := -1
+	sshProfile, xerr := instance.GetSSHConfig(task.Context())
+	if xerr != nil {
+		return retcode, stdout, stderr, xerr
+	}
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			copyCtx, cancel := context.WithTimeout(ctx, timeout)
+			copyCtx, cancel := context.WithTimeout(task.Context(), timeout)
 			defer cancel()
 
-			iretcode, istdout, istderr, innerXErr := instance.sshProfile.CopyWithTimeout(copyCtx, target, source, true, timeout)
+			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, timeout)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -254,10 +248,10 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			}
 
 			crcCheck := func() fail.Error {
-				crcCtx, cancelCrc := context.WithTimeout(ctx, timeout)
+				crcCtx, cancelCrc := context.WithTimeout(task.Context(), timeout)
 				defer cancelCrc()
 
-				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, instance.sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
+				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -326,7 +320,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(ctx, instance.sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(task.Context(), sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -412,8 +406,11 @@ func (instance *Host) unsafePushStringToFile(ctx context.Context, content string
 func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance.sshProfile == nil {
-		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
+	instance.localCache.RLock()
+	notok := instance.localCache.sshProfile == nil
+	instance.localCache.RUnlock() // nolint
+	if notok {
+		return fail.InvalidInstanceContentError("instance.localCache.sshProfile", "cannot be nil")
 	}
 	if content == "" {
 		return fail.InvalidParameterError("content", "cannot be empty string")
@@ -422,18 +419,10 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -491,7 +480,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 }
 
 // unsafeGetDefaultSubnet returns the Networking instance corresponding to host default subnet
-func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, ferr fail.Error) {
+func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstance resources.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	svc := instance.Service()
@@ -503,7 +492,7 @@ func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, ferr fail.E
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				var inErr fail.Error
-				rs, inErr = LoadSubnet(svc, "", networkV2.DefaultSubnetID)
+				subnetInstance, inErr = LoadSubnet(ctx, svc, "", networkV2.DefaultSubnetID)
 				if inErr != nil {
 					return inErr
 				}
@@ -516,7 +505,7 @@ func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, ferr fail.E
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			var inErr fail.Error
-			rs, inErr = LoadSubnet(svc, "", hostNetworkV2.DefaultSubnetID)
+			subnetInstance, inErr = LoadSubnet(ctx, svc, "", hostNetworkV2.DefaultSubnetID)
 			if inErr != nil {
 				return inErr
 			}
@@ -525,8 +514,8 @@ func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, ferr fail.E
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullSubnet(), xerr
+		return nil, xerr
 	}
 
-	return rs, nil
+	return subnetInstance, nil
 }

@@ -262,23 +262,23 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 	if xerr != nil {
-		return []abstract.HostTemplate{}, xerr
+		return nil, xerr
 	}
 	return allTemplates, nil
 }
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.Image{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)

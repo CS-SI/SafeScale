@@ -154,7 +154,11 @@ func Profile(what string) func() {
 
 func constructProfileFilename(path, complement string) string {
 	if path == "" {
-		path = "./" + os.Args[0] + complement
+		if strings.HasPrefix(os.Args[0], "/") {
+			path = os.Args[0] + complement
+		} else {
+			path = "./" + os.Args[0] + complement
+		}
 	}
 	path = strings.TrimSpace(path)
 	st, err := os.Stat(path)

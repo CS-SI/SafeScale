@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -46,8 +47,16 @@ func (h host) List(all bool, timeout time.Duration) (*protocol.HostList, error) 
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.List(ctx, &protocol.HostListRequest{All: all})
+	return service.List(newCtx, &protocol.HostListRequest{All: all})
 }
 
 // Inspect ...
@@ -60,8 +69,16 @@ func (h host) Inspect(name string, timeout time.Duration) (*protocol.Host, error
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Inspect(ctx, &protocol.Reference{Name: name})
+	return service.Inspect(newCtx, &protocol.Reference{Name: name})
 }
 
 // GetStatus gets host status
@@ -74,8 +91,16 @@ func (h host) GetStatus(name string, timeout time.Duration) (*protocol.HostStatu
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Status(ctx, &protocol.Reference{Name: name})
+	return service.Status(newCtx, &protocol.Reference{Name: name})
 }
 
 // Reboot host
@@ -88,8 +113,16 @@ func (h host) Reboot(name string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.Reboot(ctx, &protocol.Reference{Name: name})
+	_, err := service.Reboot(newCtx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -103,8 +136,16 @@ func (h host) Start(name string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.Start(ctx, &protocol.Reference{Name: name})
+	_, err := service.Start(newCtx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -118,7 +159,15 @@ func (h host) Stop(name string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Stop(ctx, &protocol.Reference{Name: name})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Stop(newCtx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -132,8 +181,16 @@ func (h host) Create(req *protocol.HostDefinition, timeout time.Duration) (*prot
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Create(ctx, req)
+	return service.Create(newCtx, req)
 }
 
 // Delete deletes several hosts at the same time in goroutines
@@ -144,6 +201,14 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	var (
@@ -159,7 +224,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {
+		if _, xerr := service.Delete(newCtx, &protocol.Reference{Name: aname}); xerr != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
 			errs = append(errs, xerr.Error())
@@ -200,7 +265,7 @@ func (h host) SSHConfig(name string) (*system.SSHConfig, error) {
 }
 
 // Resize ...
-func (h host) Resize(def *protocol.HostDefinition, duration time.Duration) (*protocol.Host, error) {
+func (h host) Resize(def *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -209,18 +274,34 @@ func (h host) Resize(def *protocol.HostDefinition, duration time.Duration) (*pro
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Resize(ctx, def)
+	return service.Resize(newCtx, def)
 }
 
 // ListFeatures ...
-func (h host) ListFeatures(hostRef string, all bool, duration time.Duration) (*protocol.FeatureListResponse, error) {
+func (h host) ListFeatures(hostRef string, all bool, timeout time.Duration) (*protocol.FeatureListResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	req := protocol.FeatureListRequest{
@@ -229,7 +310,7 @@ func (h host) ListFeatures(hostRef string, all bool, duration time.Duration) (*p
 		InstalledOnly: !all,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	result, err := service.List(ctx, &req)
+	result, err := service.List(newCtx, &req)
 	if err != nil {
 		return nil, err
 	}
@@ -237,13 +318,21 @@ func (h host) ListFeatures(hostRef string, all bool, duration time.Duration) (*p
 }
 
 // InspectFeature ...
-func (h host) InspectFeature(hostRef, featureName string, embedded bool, duration time.Duration) (*protocol.FeatureDetailResponse, error) {
+func (h host) InspectFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureDetailResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	req := &protocol.FeatureDetailRequest{
@@ -253,17 +342,25 @@ func (h host) InspectFeature(hostRef, featureName string, embedded bool, duratio
 		Embedded:   embedded,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	return service.Inspect(ctx, req)
+	return service.Inspect(newCtx, req)
 }
 
 // ExportFeature ...
-func (h host) ExportFeature(hostRef, featureName string, embedded bool, duration time.Duration) (*protocol.FeatureExportResponse, error) {
+func (h host) ExportFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	req := &protocol.FeatureDetailRequest{
@@ -273,17 +370,25 @@ func (h host) ExportFeature(hostRef, featureName string, embedded bool, duration
 		Embedded:   embedded,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	return service.Export(ctx, req)
+	return service.Export(newCtx, req)
 }
 
 // CheckFeature ...
-func (h host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+func (h host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	req := &protocol.FeatureActionRequest{
@@ -294,18 +399,26 @@ func (h host) CheckFeature(hostRef, featureName string, params map[string]string
 		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	_, err := service.Check(ctx, req)
+	_, err := service.Check(newCtx, req)
 	return err
 }
 
 // AddFeature ...
-func (h host) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+func (h host) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	req := &protocol.FeatureActionRequest{
@@ -316,18 +429,26 @@ func (h host) AddFeature(hostRef, featureName string, params map[string]string, 
 		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	_, err := service.Add(ctx, req)
+	_, err := service.Add(newCtx, req)
 	return err
 }
 
 // RemoveFeature ...
-func (h host) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+func (h host) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	req := &protocol.FeatureActionRequest{
@@ -338,18 +459,26 @@ func (h host) RemoveFeature(hostRef, featureName string, params map[string]strin
 		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	_, err := service.Remove(ctx, req)
+	_, err := service.Remove(newCtx, req)
 	return err
 }
 
 // BindSecurityGroup calls the gRPC server to bind a security group to a host
-func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, duration time.Duration) error {
+func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	var state protocol.SecurityGroupState
@@ -365,12 +494,12 @@ func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, duration tim
 		State: state,
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.BindSecurityGroup(ctx, req)
+	_, err := service.BindSecurityGroup(newCtx, req)
 	return err
 }
 
 // UnbindSecurityGroup calls the gRPC server to unbind a security group from a host
-func (h host) UnbindSecurityGroup(hostRef, sgRef string, duration time.Duration) error {
+func (h host) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -379,17 +508,25 @@ func (h host) UnbindSecurityGroup(hostRef, sgRef string, duration time.Duration)
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	req := &protocol.SecurityGroupHostBindRequest{
 		Group: &protocol.Reference{Name: sgRef},
 		Host:  &protocol.Reference{Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.UnbindSecurityGroup(ctx, req)
+	_, err := service.UnbindSecurityGroup(newCtx, req)
 	return err
 }
 
 // EnableSecurityGroup calls the gRPC server to enable a bound security group on host
-func (h host) EnableSecurityGroup(hostRef, sgRef string, duration time.Duration) error {
+func (h host) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -398,17 +535,25 @@ func (h host) EnableSecurityGroup(hostRef, sgRef string, duration time.Duration)
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	req := &protocol.SecurityGroupHostBindRequest{
 		Group: &protocol.Reference{Name: sgRef},
 		Host:  &protocol.Reference{Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.EnableSecurityGroup(ctx, req)
+	_, err := service.EnableSecurityGroup(newCtx, req)
 	return err
 }
 
 // DisableSecurityGroup calls the gRPC server to disable a bound security group on host
-func (h host) DisableSecurityGroup(hostRef, sgRef string, duration time.Duration) error {
+func (h host) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -417,23 +562,39 @@ func (h host) DisableSecurityGroup(hostRef, sgRef string, duration time.Duration
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	req := &protocol.SecurityGroupHostBindRequest{
 		Group: &protocol.Reference{Name: sgRef},
 		Host:  &protocol.Reference{Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.DisableSecurityGroup(ctx, req)
+	_, err := service.DisableSecurityGroup(newCtx, req)
 	return err
 }
 
 // ListSecurityGroups calls the gRPC server to list bound security groups of a host
-func (h host) ListSecurityGroups(hostRef, state string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+func (h host) ListSecurityGroups(hostRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
@@ -451,5 +612,5 @@ func (h host) ListSecurityGroups(hostRef, state string, duration time.Duration) 
 	default:
 		return nil, fail.SyntaxError("invalid value '%s' for 'state' field", state)
 	}
-	return service.ListSecurityGroups(ctx, req)
+	return service.ListSecurityGroups(newCtx, req)
 }

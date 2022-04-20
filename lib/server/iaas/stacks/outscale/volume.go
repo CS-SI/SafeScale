@@ -29,9 +29,8 @@ import (
 
 // CreateVolume creates a block volume
 func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("volume name")
@@ -47,10 +46,10 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 			debug.IgnoreError(xerr)
 			break // nolint
 		default:
-			return nullAV, xerr
+			return nil, xerr
 		}
 	} else if v != nil {
-		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
+		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
 	IOPS := 0
@@ -62,7 +61,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	}
 	resp, xerr := s.rpcCreateVolume(request.Name, int32(request.Size), int32(IOPS), s.fromAbstractVolumeSpeed(request.Speed))
 	if xerr != nil {
-		return nullAV, xerr
+		return nil, xerr
 	}
 
 	defer func() {
@@ -75,7 +74,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 
 	xerr = s.WaitForVolumeState(resp.VolumeId, volumestate.Available)
 	if xerr != nil {
-		return nullAV, xerr
+		return nil, xerr
 	}
 
 	volume := abstract.NewVolume()
@@ -154,12 +153,11 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (ferr
 
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (av *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering()
@@ -167,7 +165,7 @@ func (s stack) InspectVolume(id string) (av *abstract.Volume, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadVolumeByID(id)
 	if xerr != nil {
-		return nullAV, xerr
+		return nil, xerr
 	}
 
 	av = abstract.NewVolume()
@@ -181,12 +179,11 @@ func (s stack) InspectVolume(id string) (av *abstract.Volume, ferr fail.Error) {
 
 // InspectVolumeByName returns the volume with name name
 func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "('%s')", name).WithStopwatch().Entering()
@@ -194,7 +191,7 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.
 
 	resp, xerr := s.rpcReadVolumeByName(name)
 	if xerr != nil {
-		return nullAV, xerr
+		return nil, xerr
 	}
 
 	av = abstract.NewVolume()
@@ -207,10 +204,9 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.
 }
 
 // ListVolumes list available volumes
-func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
-	var emptySlice []abstract.Volume
+func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume")).WithStopwatch().Entering()
@@ -218,10 +214,10 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 
 	resp, xerr := s.rpcReadVolumes(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	volumes := make([]abstract.Volume, 0, len(resp))
+	volumes := make([]*abstract.Volume, 0, len(resp))
 	for _, ov := range resp {
 		volume := abstract.NewVolume()
 		volume.ID = ov.VolumeId
@@ -232,7 +228,7 @@ func (s stack) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
 		volume.Tags["CreationDate"] = getResourceTag(ov.Tags, "CreationDate", "")
 		volume.Tags["ManagedBy"] = getResourceTag(ov.Tags, "ManagedBy", "")
 		volume.Tags["DeclaredInBucket"] = getResourceTag(ov.Tags, "DeclaredInBucket", "")
-		volumes = append(volumes, *volume)
+		volumes = append(volumes, volume)
 	}
 	return volumes, nil
 }
@@ -310,15 +306,14 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
 func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
-	nullVA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
-		return nullVA, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nullVA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 	if volumeID == "" {
-		return nullVA, fail.InvalidParameterCannotBeEmptyStringError("volumeID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("volumeID")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
@@ -326,7 +321,7 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 
 	resp, xerr := s.rpcReadVolumeByID(volumeID)
 	if xerr != nil {
-		return nullVA, xerr
+		return nil, xerr
 	}
 
 	for _, lv := range resp.LinkedVolumes {
@@ -347,13 +342,12 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
-	emptySlice := make([]abstract.VolumeAttachment, 0)
+func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return emptySlice, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", serverID).WithStopwatch().Entering()
@@ -363,11 +357,11 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	if err != nil {
 		return nil, err
 	}
-	atts := make([]abstract.VolumeAttachment, 0, len(volumes))
+	atts := make([]*abstract.VolumeAttachment, 0, len(volumes))
 	for _, v := range volumes {
 		att, _ := s.InspectVolumeAttachment(serverID, v.ID)
 		if att != nil {
-			atts = append(atts, *att)
+			atts = append(atts, att)
 		}
 	}
 	return atts, nil

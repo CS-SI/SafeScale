@@ -170,6 +170,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, err
 	}
 
+	metadataBucketName = strings.ReplaceAll(metadataBucketName, ".", "-")
+
 	var timings *temporal.MutableTimings
 	if tc, ok := params["timings"]; ok {
 		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
@@ -279,17 +281,17 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 // ListImages ...
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.Image{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates ...
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
-		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }

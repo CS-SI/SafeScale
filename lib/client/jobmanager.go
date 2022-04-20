@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -42,7 +43,15 @@ func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 		return nil, xerr
 	}
 
-	return service.List(ctx, &googleprotobuf.Empty{})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	return service.List(newCtx, &googleprotobuf.Empty{})
 }
 
 // Stop sends a signal to the server to stop a running job
@@ -56,6 +65,14 @@ func (c jobManager) Stop(uuid string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Stop(ctx, &protocol.JobDefinition{Uuid: uuid})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Stop(newCtx, &protocol.JobDefinition{Uuid: uuid})
 	return err
 }

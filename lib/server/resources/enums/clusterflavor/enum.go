@@ -46,19 +46,13 @@ const (
 
 var (
 	stringMap = map[string]Enum{
-		// "dcos":  DCOS,
 		"k8s": K8S,
-		// "swarm": SWARM,
 		"boh": BOH,
-		// "ohpc":  OHPC,
 	}
 
 	enumMap = map[Enum]string{
-		// DCOS:  "DCOS",
 		K8S: "K8S",
-		// SWARM: "SWARM",
 		BOH: "BOH",
-		// OHPC:  "OHPC",
 	}
 )
 

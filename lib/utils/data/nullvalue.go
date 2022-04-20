@@ -16,7 +16,7 @@
 
 package data
 
-//go:generate minimock -o ./mocks/mock_nullvalue.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.NullValue
+//go:generate minimock -o mocks/mock_nullvalue.go -i  github.com/CS-SI/SafeScale/v21/lib/utils/data.NullValue
 
 // NullValue ...
 type NullValue interface {

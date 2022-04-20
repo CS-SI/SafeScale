@@ -18,33 +18,32 @@ package commands
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var imageCmdName = "image"
 
 // ImageCommand command
-var ImageCommand = &cli.Command{
+var ImageCommand = cli.Command{
 	Name:  "image",
 	Usage: "image COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		imageList,
 	},
 }
 
-var imageList = &cli.Command{
+var imageList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available images",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all available images in tenant (without any filter)",
 		}},
@@ -57,7 +56,7 @@ var imageList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		images, err := clientSession.Image.List(c.Bool("all"), temporal.ExecutionTimeout())
+		images, err := clientSession.Image.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))

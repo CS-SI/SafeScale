@@ -51,6 +51,9 @@ func expose() {
 	// Track using expvar
 	expvar.NewInt("tenant.setted")
 	expvar.NewInt("maybes")
+	expvar.NewInt("metadata.reads")
+	expvar.NewInt("metadata.writes")
+	expvar.NewInt("metadata.cache.hits")
 
 	exportstats.NewStatCount("stats")
 	http.Handle("/debug/metrics", metric.Handler(metric.Exposed))

@@ -53,5 +53,6 @@ jobs:
           vet_results.log
           test_results.log
           style_results.log
+          semgrep_results.log
           go.mod
           go.sum

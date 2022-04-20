@@ -16,7 +16,7 @@
 
 package data
 
-//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Clonable
+//go:generate minimock -o mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Clonable
 
 // Clonable is the interface a struct must satisfy to be able to be cloned
 type Clonable interface {

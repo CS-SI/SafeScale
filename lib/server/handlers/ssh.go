@@ -86,6 +86,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 
 	task := handler.job.Task()
 	svc := handler.job.Service()
+	ctx := handler.job.Context()
 
 	_, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
@@ -96,7 +97,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	host, xerr := hostfactory.Load(svc, hostRef)
+	host, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -118,7 +119,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		user = abstract.DefaultUser
 	}
 
-	ip, xerr := host.GetAccessIP()
+	ip, xerr := host.GetAccessIP(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -184,7 +185,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				}
 
 				var innerXErr fail.Error
-				subnetInstance, innerXErr = subnetfactory.Load(svc, "", subnetID)
+				subnetInstance, innerXErr = subnetfactory.Load(handler.job.Context(), svc, "", subnetID)
 				return innerXErr
 			})
 		})
@@ -210,11 +211,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		)
 
 		// gets primary gateway information
-		gw, xerr := subnetInstance.InspectGateway(true)
+		gw, xerr := subnetInstance.InspectGateway(handler.job.Context(), true)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Primary gateway not found ? let's try with the secondary one later...
+				debug.IgnoreError(xerr)
 			default:
 				return nil, xerr
 			}
@@ -230,12 +232,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(); xerr != nil {
+			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
 			var gwcfg *system.SSHConfig
-			if gwcfg, xerr = gw.GetSSHConfig(); xerr != nil {
+			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
@@ -250,7 +252,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		}
 
 		// gets secondary gateway information
-		gw, xerr = subnetInstance.InspectGateway(false)
+		gw = nil
+		gw, xerr = subnetInstance.InspectGateway(handler.job.Context(), false)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -273,12 +276,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(); xerr != nil {
+			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
 			var gwcfg *system.SSHConfig
-			if gwcfg, xerr = gw.GetSSHConfig(); xerr != nil {
+			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
@@ -348,13 +351,13 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(handler.job.Service(), hostRef)
+	host, xerr := hostfactory.Load(task.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, xerr := host.GetSSHConfig()
+	ssh, xerr := host.GetSSHConfig(task.Context())
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -381,7 +384,11 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		timings.HostOperationTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
+				if t.Err != nil {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", host.GetName(), t.Err.Error())
+				} else {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
+				}
 			}
 		},
 	)
@@ -522,7 +529,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		upload = true
 	}
 
-	host, xerr := hostfactory.Load(handler.job.Service(), hostName)
+	host, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

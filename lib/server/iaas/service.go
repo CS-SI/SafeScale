@@ -23,7 +23,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	uuid "github.com/gofrs/uuid"
@@ -47,13 +46,13 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
-//go:generate minimock -o mocks/mock_serviceapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
+//go:generate minimock -o mocks/mock_service.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
 
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
-	FilterImages(string) ([]abstract.Image, fail.Error)
+	FilterImages(string) ([]*abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByID(string) (*abstract.HostTemplate, fail.Error)
@@ -69,8 +68,6 @@ type Service interface {
 	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
-
-	GetCache(string) (*ResourceCache, fail.Error)
 
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
@@ -96,9 +93,6 @@ type service struct {
 	blacklistTemplateREs []*regexp.Regexp
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
-
-	cache     serviceCache
-	cacheLock *sync.Mutex
 }
 
 const (
@@ -171,30 +165,6 @@ func (instance service) GetName() (string, fail.Error) {
 	}
 
 	return instance.tenantName, nil
-}
-
-// GetCache returns the data.Cache instance corresponding to the name passed as parameter
-// If the cache does not exist, create it
-func (instance *service) GetCache(name string) (_ *ResourceCache, ferr fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
-	}
-
-	instance.cacheLock.Lock()
-	defer instance.cacheLock.Unlock()
-
-	if _, ok := instance.cache.resources[name]; !ok {
-		rc, xerr := NewResourceCache(name)
-		if xerr != nil {
-			return rc, xerr
-		}
-
-		instance.cache.resources[name] = rc
-	}
-	return instance.cache.resources[name], nil
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
@@ -363,7 +333,7 @@ func pollVolume(
 
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (instance service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (instance service) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -393,7 +363,7 @@ func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate,
 	for _, i := range allTemplates {
 		i := i
 		if i.Name == name {
-			return &i, nil
+			return i, nil
 		}
 	}
 	return nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
@@ -412,7 +382,7 @@ func (instance service) FindTemplateByID(id string) (*abstract.HostTemplate, fai
 	for _, i := range allTemplates {
 		i := i
 		if i.ID == id {
-			return &i, nil
+			return i, nil
 		}
 	}
 	return nil, fail.NotFoundError(fmt.Sprintf("template with id '%s' not found", id))
@@ -471,8 +441,8 @@ func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequireme
 
 // reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
 func (instance service) reduceTemplates(
-	tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
-) []abstract.HostTemplate {
+	tpls []*abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
+) []*abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
 		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
@@ -494,7 +464,7 @@ func (instance service) reduceTemplates(
 }
 
 func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate {
-	return func(tpl abstract.HostTemplate) bool {
+	return func(tpl *abstract.HostTemplate) bool {
 		for _, re := range res {
 			if re.Match([]byte(tpl.Name)) {
 				return true
@@ -702,7 +672,7 @@ func (instance service) ListTemplatesBySizing(
 
 		if _, ok := scannerTpls[t.ID]; (ok || !askedForSpecificScannerInfo) && t.ID != "" {
 			newT := t
-			selectedTpls = append(selectedTpls, &newT)
+			selectedTpls = append(selectedTpls, newT)
 		}
 	}
 
@@ -722,7 +692,7 @@ func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
-func (instance service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
+func (instance service) FilterImages(filter string) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -746,24 +716,24 @@ func (instance service) FilterImages(filter string) ([]abstract.Image, fail.Erro
 		if score > 0.5 {
 			simgs = append(
 				simgs, scoredImage{
-					Image: img,
+					Image: *img,
 					score: score,
 				},
 			)
 		}
 
 	}
-	var fimgs []abstract.Image
+	var fimgs []*abstract.Image
 	sort.Sort(scoredImages(simgs))
 	for _, simg := range simgs {
-		fimgs = append(fimgs, simg.Image)
+		simg := simg
+		fimgs = append(fimgs, &simg.Image)
 	}
 
 	return fimgs, nil
-
 }
 
-func (instance service) reduceImages(imgs []abstract.Image) []abstract.Image {
+func (instance service) reduceImages(imgs []*abstract.Image) []*abstract.Image {
 	var finalFilter *imagefilters.Filter
 	if len(instance.whitelistImageREs) > 0 {
 		finalFilter = imagefilters.NewFilter(filterImagesByRegexSlice(instance.whitelistImageREs))
@@ -784,7 +754,7 @@ func (instance service) reduceImages(imgs []abstract.Image) []abstract.Image {
 }
 
 func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
-	return func(img abstract.Image) bool {
+	return func(img *abstract.Image) bool {
 		for _, re := range res {
 			if re.Match([]byte(img.Name)) {
 				return true
@@ -796,7 +766,7 @@ func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 }
 
 // ListImages reduces the list of needed, if all bool is true, all images are returned, if not, images are filtered using blacklists and whitelists
-func (instance service) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (instance service) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -859,7 +829,7 @@ func (instance service) SearchImage(osname string) (*abstract.Image, fail.Error)
 	}
 
 	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
-	return &imgs[wfSelect], nil
+	return imgs[wfSelect], nil
 }
 
 func normalizeString(in string, reg *regexp.Regexp) string {

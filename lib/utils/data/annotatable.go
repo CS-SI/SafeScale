@@ -16,7 +16,7 @@
 
 package data
 
-//go:generate minimock -o ../mocks/mock_annotatable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Annotatable
+//go:generate minimock -o mocks/mock_annotatable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Annotatable
 
 // Annotation ...
 type Annotation interface{}

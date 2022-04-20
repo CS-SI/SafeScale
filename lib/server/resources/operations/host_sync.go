@@ -25,3 +25,7 @@ func getPhase4Timeout(timings temporal.Timings) time.Duration {
 	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
 	return waitingTime
 }
+
+func inBackground() bool {
+	return false
+}

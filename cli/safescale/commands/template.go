@@ -20,42 +20,40 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 var templateCmdName = "template"
 
 // TemplateCommand command
-var TemplateCommand = &cli.Command{
+var TemplateCommand = cli.Command{
 	Name:  "template",
 	Usage: "template COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		templateList,
 		templateMatch,
 		templateInspect,
 	},
 }
 
-var templateList = &cli.Command{
+var templateList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available templates",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "all",
 			Usage: "Lists all available templates (ignoring any filter set in tenant file)",
 		},
-		&cli.BoolFlag{
-			Name:    "scanned-only",
-			Aliases: []string{"S"},
-			Usage:   "Display only templates with scanned information",
+		cli.BoolFlag{
+			Name:  "scanned-only, S",
+			Usage: "Display only templates with scanned information",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -67,7 +65,7 @@ var templateList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), temporal.ExecutionTimeout())
+		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -76,7 +74,7 @@ var templateList = &cli.Command{
 	},
 }
 
-var templateMatch = &cli.Command{
+var templateMatch = cli.Command{
 	Name:      "match",
 	Usage:     "List templates that match the SIZING",
 	ArgsUsage: "SIZING",
@@ -92,7 +90,7 @@ var templateMatch = &cli.Command{
 		sizing = append(sizing, c.Args().First())
 		sizing = append(sizing, c.Args().Tail()...)
 		sizingAsString := strings.Join(sizing, ",")
-		templates, err := clientSession.Template.Match(sizingAsString, temporal.ExecutionTimeout())
+		templates, err := clientSession.Template.Match(sizingAsString, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -101,7 +99,7 @@ var templateMatch = &cli.Command{
 	},
 }
 
-var templateInspect = &cli.Command{
+var templateInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Display available template information",
@@ -115,7 +113,7 @@ var templateInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		template, err := clientSession.Template.Inspect(c.Args().First(), temporal.ExecutionTimeout())
+		template, err := clientSession.Template.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))

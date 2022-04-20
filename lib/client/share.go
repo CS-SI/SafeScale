@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -42,7 +43,15 @@ func (n share) Create(def *protocol.ShareDefinition, timeout time.Duration) erro
 		return xerr
 	}
 
-	_, err := service.Create(ctx, def)
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Create(newCtx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "creation of share", true)
 	}
@@ -60,6 +69,14 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
@@ -72,7 +89,7 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {
+		if _, xerr := service.Delete(newCtx, &protocol.Reference{Name: aname}); xerr != nil {
 			mutex.Lock()
 			errs = append(errs, xerr.Error())
 			mutex.Unlock() // nolint
@@ -102,7 +119,15 @@ func (n share) List(timeout time.Duration) (*protocol.ShareList, error) {
 		return nil, xerr
 	}
 
-	list, err := service.List(ctx, &protocol.Reference{})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	list, err := service.List(newCtx, &protocol.Reference{})
 	if err != nil {
 		return nil, DecorateTimeoutError(err, "list of shares", true)
 	}
@@ -119,7 +144,15 @@ func (n share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) 
 		return xerr
 	}
 
-	_, err := service.Mount(ctx, def)
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Mount(newCtx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "mount of share", true)
 	}
@@ -136,7 +169,15 @@ func (n share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration
 		return xerr
 	}
 
-	_, err := service.Unmount(ctx, def)
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Unmount(newCtx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "unmount of share", true)
 	}
@@ -153,7 +194,15 @@ func (n share) Inspect(name string, timeout time.Duration) (*protocol.ShareMount
 		return nil, xerr
 	}
 
-	list, err := service.Inspect(ctx, &protocol.Reference{Name: name})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	list, err := service.Inspect(newCtx, &protocol.Reference{Name: name})
 	if err != nil {
 		return nil, DecorateTimeoutError(err, "inspection of share", true)
 	}

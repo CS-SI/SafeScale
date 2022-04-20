@@ -320,7 +320,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
-	task := handler.job.Task()
 
 	isScannable, err := handler.checkScannable()
 	if err != nil {
@@ -378,7 +377,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := network.Delete(task.Context())
+		derr := network.Delete(context.Background())
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
 			_ = ferr.AddConsequence(derr)
@@ -601,7 +600,7 @@ func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
 	}
 
 	type TemplateList struct {
-		Templates []abstract.HostTemplate `json:"templates,omitempty"`
+		Templates []*abstract.HostTemplate `json:"templates,omitempty"`
 	}
 
 	svc := handler.job.Service()
@@ -637,7 +636,7 @@ func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
 	}
 
 	type ImageList struct {
-		Images []abstract.Image `json:"images,omitempty"`
+		Images []*abstract.Image `json:"images,omitempty"`
 	}
 
 	svc := handler.job.Service()
@@ -673,7 +672,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 	svc := handler.job.Service()
 
 	var xerr fail.Error
-	network, xerr = networkfactory.Load(svc, scanNetworkName)
+	network, xerr = networkfactory.Load(handler.job.Context(), svc, scanNetworkName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
@@ -700,7 +699,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 	svc := handler.job.Service()
 
 	var xerr fail.Error
-	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
+	subnet, xerr = subnetfactory.Load(handler.job.Context(), svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr

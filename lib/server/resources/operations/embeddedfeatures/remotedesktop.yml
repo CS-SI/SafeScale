@@ -19,14 +19,22 @@ feature:
             - docker
 
     suitableFor:
-        host: no
+        host: yes
         cluster: all
 
     parameters:
-        - Username
-        - Password
-        - GuacamolePort=63011
-        - TomcatPort=9009
+        - name: Username
+          description: |-
+              Username to use to authenticate Remote Desktop (default: none)
+        - name: Password
+          description: |-
+              Password to use to authenticate Remote Desktop (default: none)
+        - name: GuacamolePort
+          value: 63011
+          description: Port guacamole must use
+        - name: TomcatPort
+          value: 9009
+          description: Port tomcat must use
 
     install:
         bash:
@@ -44,6 +52,7 @@ feature:
                             sfExit
 
             add:
+                #pace: desktop+deps,tigervnc+guacamole,start
                 pace: user,desktop,tigervnc,deps,guacamole,start
                 steps:
                     user:
@@ -376,9 +385,13 @@ feature:
                             cat >${SF_ETCDIR}/remotedesktop/build/user-mapping.xml <<'EOF'
                             <user-mapping>
                                 <authorize
+                            {{ if not .ClusterFlavor }}
+                                    username="{{ .Username }}"
+                                    password="{{ .Password }}">
+                            {{ else }}
                                     username="{{ .ClusterAdminUsername }}"
                                     password="{{ .ClusterAdminPassword }}">
-
+                            {{ end }}
                                     <!-- First authorized connection -->
                                     <connection name="{{ .Hostname }}">
                                         <protocol>vnc</protocol>
@@ -506,7 +519,6 @@ feature:
                             masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
-                            # DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet)
                             cat >>/etc/ssh/sshd_config <<-EOF
                             # Allow Password Authentication from user {{.Username}} for guacd to work
                             Match User {{.Username}} Address $(sfSubnetOfDockerBridge)

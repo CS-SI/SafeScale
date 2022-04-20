@@ -21,29 +21,28 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v21/lib/system"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 const hostCmdLabel = "host"
 
 // HostCommand command
-var HostCommand = &cli.Command{
+var HostCommand = cli.Command{
 	Name:  hostCmdLabel,
 	Usage: "host COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		hostList,
 		hostCreate,
 		//		hostResize,
@@ -63,7 +62,7 @@ var HostCommand = &cli.Command{
 	},
 }
 
-var hostStart = &cli.Command{
+var hostStart = cli.Command{
 	Name:      "start",
 	Usage:     "start Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -81,7 +80,7 @@ var hostStart = &cli.Command{
 		}
 
 		hostRef := c.Args().First()
-		err := clientSession.Host.Start(hostRef, temporal.ExecutionTimeout())
+		err := clientSession.Host.Start(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of host", false).Error())))
@@ -90,7 +89,7 @@ var hostStart = &cli.Command{
 	},
 }
 
-var hostStop = &cli.Command{
+var hostStop = cli.Command{
 	Name:      "stop",
 	Usage:     "stop Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -108,7 +107,7 @@ var hostStop = &cli.Command{
 		}
 
 		hostRef := c.Args().First()
-		err := clientSession.Host.Stop(hostRef, temporal.ExecutionTimeout())
+		err := clientSession.Host.Stop(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "stop of host", false).Error())))
@@ -117,7 +116,7 @@ var hostStop = &cli.Command{
 	},
 }
 
-var hostReboot = &cli.Command{
+var hostReboot = cli.Command{
 	Name:      "reboot",
 	Usage:     "reboot Host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -135,7 +134,7 @@ var hostReboot = &cli.Command{
 		}
 
 		hostRef := c.Args().First()
-		err := clientSession.Host.Reboot(hostRef, temporal.ExecutionTimeout())
+		err := clientSession.Host.Reboot(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reboot of host", false).Error())))
@@ -144,15 +143,14 @@ var hostReboot = &cli.Command{
 	},
 }
 
-var hostList = &cli.Command{
+var hostList = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Usage:   "List all hosts on tenant (not only those created by SafeScale)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
@@ -164,7 +162,7 @@ var hostList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		hosts, err := clientSession.Host.List(c.Bool("all"), temporal.ExecutionTimeout())
+		hosts, err := clientSession.Host.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
@@ -190,7 +188,7 @@ var hostList = &cli.Command{
 	},
 }
 
-var hostInspect = &cli.Command{
+var hostInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "inspect Host",
@@ -208,7 +206,7 @@ var hostInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Host.Inspect(c.Args().First(), temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -218,7 +216,7 @@ var hostInspect = &cli.Command{
 	},
 }
 
-var hostStatus = &cli.Command{
+var hostStatus = cli.Command{
 	Name:      "state",
 	Aliases:   []string{"status"},
 	Usage:     "status Host",
@@ -236,7 +234,7 @@ var hostStatus = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Host.GetStatus(c.Args().First(), temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.GetStatus(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
@@ -250,53 +248,46 @@ var hostStatus = &cli.Command{
 	},
 }
 
-var hostCreate = &cli.Command{
+var hostCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a new host",
 	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:    "network",
-			Aliases: []string{"net"},
-			Value:   "",
-			Usage:   "network name or network id",
+		cli.StringFlag{
+			Name:  "network, net",
+			Value: "",
+			Usage: "network name or network id",
 		},
-		&cli.StringSliceFlag{
-			Name:  "subnet",
-			Value: &cli.StringSlice{},
+		cli.StringSliceFlag{
+			Name: "subnet",
 			Usage: `subnet name or id.
 If subnet id is provided, '--network' is superfluous.
 May be used multiple times, the first occurrence becoming the default subnet by design`,
 		},
-		&cli.StringFlag{
-			Name: "os",
-			// Value: "Ubuntu 20.04",
+		cli.StringFlag{
+			Name:  "os",
 			Usage: "Image name for the host",
 		},
-		&cli.BoolFlag{
-			Name:    "single",
-			Aliases: []string{"public"},
-			Usage:   "Create single Host without network but with public IP",
+		cli.BoolFlag{
+			Name:  "single, public",
+			Usage: "Create single Host without network but with public IP",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "domain",
 			Value: "",
 			Usage: "domain name of the host (default: empty)",
 		},
-		&cli.BoolFlag{
-			Name:    "force",
-			Aliases: []string{"f"},
-			Usage:   "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
-		&cli.BoolFlag{
-			Name:    "keep-on-failure",
-			Aliases: []string{"k"},
-			Usage:   "If used, the resource is not deleted on failure (default: not set)",
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If used, the resource is not deleted on failure (default: not set)",
 		},
-		&cli.StringFlag{
-			Name:    "sizing",
-			Aliases: []string{"S"},
+		cli.StringFlag{
+			Name: "sizing, S",
 			Usage: `Describe sizing of host in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk, template (the latter takes precedence over the formers, but corrupting the cloud-agnostic principle)
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
@@ -346,7 +337,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			SizingAsString: sizing,
 			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
-		resp, err := clientSession.Host.Create(&req, temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.Create(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -355,33 +346,33 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 	},
 }
 
-var hostResize = &cli.Command{ // nolint
+var hostResize = cli.Command{ // nolint
 	Name:      "resize",
 	Aliases:   []string{"upgrade"},
 	Usage:     "resizes a host",
 	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "cpu",
 			Value: 1,
 			Usage: "Number of return CPU for the host",
 		},
-		&cli.Float64Flag{
+		cli.Float64Flag{
 			Name:  "ram",
 			Value: 1,
 			Usage: "RAM for the host (GB)",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "disk",
 			Value: 16,
 			Usage: "Disk space for the host (GB)",
 		},
-		&cli.IntFlag{
+		cli.IntFlag{
 			Name:  "gpu",
 			Value: 0,
 			Usage: "Number of GPU for the host",
 		},
-		&cli.Float64Flag{
+		cli.Float64Flag{
 			Name:  "cpu-freq, cpufreq",
 			Value: 0,
 			Usage: "Minimum cpu frequency required for the host (GHz)",
@@ -413,7 +404,7 @@ var hostResize = &cli.Command{ // nolint
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
-		resp, err := clientSession.Host.Resize(&def, temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.Resize(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -422,7 +413,7 @@ var hostResize = &cli.Command{ // nolint
 	},
 }
 
-var hostDelete = &cli.Command{
+var hostDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove host",
@@ -443,7 +434,7 @@ var hostDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		if err := clientSession.Host.Delete(hostList, temporal.ExecutionTimeout()); err != nil {
+		if err := clientSession.Host.Delete(hostList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
 		}
@@ -451,7 +442,7 @@ var hostDelete = &cli.Command{
 	},
 }
 
-var hostSSH = &cli.Command{
+var hostSSH = cli.Command{
 	Name:      "ssh",
 	Usage:     "Get ssh config to connect to host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -505,14 +496,14 @@ func formatSSHConfig(in system.SSHConfig) (map[string]interface{}, fail.Error) {
 }
 
 // hostListFeaturesCommand handles 'safescale host list-features'
-var hostListFeaturesCommand = &cli.Command{
+var hostListFeaturesCommand = cli.Command{
 	Name:      "list-features",
 	Aliases:   []string{"list-available-features"},
 	Usage:     "list-features",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
+		cli.BoolFlag{
 			Name:  "all, a",
 			Usage: "Lists all features available",
 		},
@@ -522,19 +513,18 @@ var hostListFeaturesCommand = &cli.Command{
 }
 
 // hostAddFeatureCommand handles 'safescale host add-feature <host name or id> <pkgname>'
-var hostAddFeatureCommand = &cli.Command{
+var hostAddFeatureCommand = cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
 	Usage:     "!DEPRECATED!See safescale host feature add instead! Add a feature to a host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "skip-proxy",
 			Usage: "Disable reverse proxy rules",
 		},
@@ -544,17 +534,16 @@ var hostAddFeatureCommand = &cli.Command{
 }
 
 // hostCheckFeatureCommand handles 'safescale host check-feature <host name or id> <pkgname>'
-var hostCheckFeatureCommand = &cli.Command{
+var hostCheckFeatureCommand = cli.Command{
 	Name:      "check-feature",
 	Aliases:   []string{"verify-feature"},
 	Usage:     "!DEPRECATED!See safescale host feature check instead! Check if a feature is installed",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -562,17 +551,16 @@ var hostCheckFeatureCommand = &cli.Command{
 }
 
 // hostRemoveFeatureCommand handles 'safescale host delete-feature <host name> <feature name>'
-var hostRemoveFeatureCommand = &cli.Command{
+var hostRemoveFeatureCommand = cli.Command{
 	Name:      "remove-feature",
 	Aliases:   []string{"rm-feature", "delete-feature", "uninstall-feature"},
 	Usage:     "!DEPRECATED!See safescale host feature delete instead! Remove a feature from host.",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -580,19 +568,19 @@ var hostRemoveFeatureCommand = &cli.Command{
 }
 
 // hostSecurityCommands commands
-var hostSecurityCommands = &cli.Command{
+var hostSecurityCommands = cli.Command{
 	Name:  securityCmdLabel,
 	Usage: "Manages host security",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		hostSecurityGroupCommands,
 	},
 }
 
 // networkSecurityGroupCommands commands
-var hostSecurityGroupCommands = &cli.Command{
+var hostSecurityGroupCommands = cli.Command{
 	Name:  groupCmdLabel,
 	Usage: "Manages host Security Groups",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		hostSecurityGroupAddCommand,
 		hostSecurityGroupRemoveCommand,
 		hostSecurityGroupEnableCommand,
@@ -601,15 +589,14 @@ var hostSecurityGroupCommands = &cli.Command{
 	},
 }
 
-var hostSecurityGroupAddCommand = &cli.Command{
+var hostSecurityGroupAddCommand = cli.Command{
 	Name:      "add",
 	Aliases:   []string{"attach", "bind"},
 	Usage:     "add HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "disabled",
-			Value: false,
 			Usage: "adds the security group to the host but does not activate it",
 		},
 	},
@@ -626,7 +613,7 @@ var hostSecurityGroupAddCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), temporal.ExecutionTimeout())
+		err := clientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -635,7 +622,7 @@ var hostSecurityGroupAddCommand = &cli.Command{
 	},
 }
 
-var hostSecurityGroupRemoveCommand = &cli.Command{
+var hostSecurityGroupRemoveCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm", "detach", "unbind"},
 	Usage:     "remove HOSTNAME GROUPNAME",
@@ -653,7 +640,7 @@ var hostSecurityGroupRemoveCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.ExecutionTimeout())
+		err := clientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -662,19 +649,17 @@ var hostSecurityGroupRemoveCommand = &cli.Command{
 	},
 }
 
-var hostSecurityGroupListCommand = &cli.Command{
+var hostSecurityGroupListCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"show", "ls"},
 	Usage:     "list HOSTNAME",
 	ArgsUsage: "HOSTNAME",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Value:   true,
-			Usage:   "List all security groups no matter what is the status (enabled or disabled)",
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "List all security groups no matter what is the status (enabled or disabled)",
 		},
-		&cli.StringFlag{
+		cli.StringFlag{
 			Name:  "state",
 			Value: "all",
 			Usage: "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')",
@@ -698,7 +683,7 @@ var hostSecurityGroupListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Host.ListSecurityGroups(c.Args().First(), state, temporal.ExecutionTimeout())
+		resp, err := clientSession.Host.ListSecurityGroups(c.Args().First(), state, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -727,7 +712,7 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 	return out, nil
 }
 
-var hostSecurityGroupEnableCommand = &cli.Command{
+var hostSecurityGroupEnableCommand = cli.Command{
 	Name:      "enable",
 	Aliases:   []string{"activate"},
 	Usage:     "enable NETWORKNAME GROUPNAME",
@@ -745,7 +730,7 @@ var hostSecurityGroupEnableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.ExecutionTimeout())
+		err := clientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enable security group of host", false).Error())))
@@ -754,7 +739,7 @@ var hostSecurityGroupEnableCommand = &cli.Command{
 	},
 }
 
-var hostSecurityGroupDisableCommand = &cli.Command{
+var hostSecurityGroupDisableCommand = cli.Command{
 	Name:      "disable",
 	Aliases:   []string{"deactivate"},
 	Usage:     "disable HOSTNAME GROUPNAME",
@@ -772,7 +757,7 @@ var hostSecurityGroupDisableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.ExecutionTimeout())
+		err := clientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disable security group of host", false).Error())))
@@ -784,10 +769,10 @@ var hostSecurityGroupDisableCommand = &cli.Command{
 const hostFeatureCmdLabel = "feature"
 
 // HostFeatureCommands command
-var hostFeatureCommands = &cli.Command{
+var hostFeatureCommands = cli.Command{
 	Name:  hostFeatureCmdLabel,
 	Usage: hostFeatureCmdLabel + " COMMAND",
-	Subcommands: []*cli.Command{
+	Subcommands: cli.Commands{
 		hostFeatureCheckCommand,
 		hostFeatureInspectCommand,
 		hostFeatureExportCommand,
@@ -798,15 +783,15 @@ var hostFeatureCommands = &cli.Command{
 }
 
 // hostFeatureListCommand handles 'safescale host feature list'
-var hostFeatureListCommand = &cli.Command{
+var hostFeatureListCommand = cli.Command{
 	Name:      "list",
-	Aliases:   []string{"ls", "list-availables"},
+	Aliases:   []string{"ls"},
 	Usage:     "List the available features for the host",
 	ArgsUsage: "HOSTNAME",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "all",
-			Value: false,
+		cli.BoolFlag{
+			Name: "all",
+			// Value: false,
 			Usage: "If used, will list all features that are eligible to be installed on the host",
 		},
 	},
@@ -818,31 +803,35 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
+	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	clientSession, xerr := client.New(c.String("server"))
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	features, err := clientSession.Host.ListFeatures(c.Args().First(), c.Bool("all"), 0)
+	list, err := clientSession.Host.ListFeatures(hostName, c.Bool("all"), 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 	}
-	return clitools.SuccessResponse(features)
+	return clitools.SuccessResponse(list)
 }
 
 // hostFeatureInspectCommand handles 'safescale host feature inspect <cluster name or id> <feature name>'
 // Displays information about the feature (parameters, if eligible on host, if installed, ...)
-var hostFeatureInspectCommand = &cli.Command{
+var hostFeatureInspectCommand = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspects the feature",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "embedded",
-			Value: false,
 			Usage: "if used, tells to show details of embedded feature (if it exists)",
 		},
 	},
@@ -854,11 +843,6 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
@@ -867,6 +851,11 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
+	}
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
 	details, err := clientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
@@ -879,21 +868,19 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 }
 
 // hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
-var hostFeatureExportCommand = &cli.Command{
-	Name:      "list",
-	Aliases:   []string{"ls"},
+var hostFeatureExportCommand = cli.Command{
+	Name:      "export",
+	Aliases:   []string{"dump"},
 	Usage:     "Export feature file content",
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "embedded",
-			Value: false,
 			Usage: "if used, tells to export embedded feature (if it exists)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "raw",
-			Value: false,
 			Usage: "outputs only the feature content, without json",
 		},
 	},
@@ -905,11 +892,6 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
@@ -918,6 +900,11 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
+	}
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
 	export, err := clientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
@@ -934,19 +921,18 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 }
 
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
-var hostFeatureAddCommand = &cli.Command{
+var hostFeatureAddCommand = cli.Command{
 	Name:      "add",
 	Aliases:   []string{"install"},
 	Usage:     "Installs a feature to a host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
-		&cli.BoolFlag{
+		cli.BoolFlag{
 			Name:  "skip-proxy",
 			Usage: "Disable reverse proxy rules",
 		},
@@ -989,17 +975,16 @@ func hostFeatureAddAction(c *cli.Context) (ferr error) {
 }
 
 // hostFeatureCheckCommand handles 'host feature check <host name or id> <pkgname>'
-var hostFeatureCheckCommand = &cli.Command{
+var hostFeatureCheckCommand = cli.Command{
 	Name:      "check",
 	Aliases:   []string{"verify"},
 	Usage:     "checks if a feature is installed on Host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -1009,6 +994,7 @@ var hostFeatureCheckCommand = &cli.Command{
 func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
+
 	_, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
@@ -1040,17 +1026,16 @@ func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 }
 
 // hostRemoveFeatureCommand handles 'deploy host delete-feature <host name> <feature name>'
-var hostFeatureRemoveCommand = &cli.Command{
+var hostFeatureRemoveCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm", "delete", "uninstall", "remove"},
 	Usage:     "Remove a feature from host.",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -1060,6 +1045,7 @@ var hostFeatureRemoveCommand = &cli.Command{
 func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
+
 	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)

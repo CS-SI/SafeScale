@@ -157,16 +157,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
-
-		err := subnetInstance.Released()
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-	}
-
-	err = networkInstance.Released()
-	if err != nil {
-		return nil, fail.Wrap(err)
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
@@ -248,17 +238,10 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.Service(), ref)
+	networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := networkInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return networkInstance.ToProtocol()
 }
@@ -273,10 +256,10 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ref, refLabel := srvutils.GetReference(in.Network)
@@ -301,7 +284,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(svc, ref)
+	networkInstance, xerr := networkfactory.Load(job.Context(), svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: no
+        host: yes
         cluster: all
 
     requirements:
@@ -53,45 +53,47 @@ feature:
                                 docker swarm init || sfFail 192
                             }
 
-                            # generate token to join managers to swarm
+                            {{ if .ClusterFlavor }}
+                            # generate token to join managers to Swarm
                             MANAGER_TOKEN=$(docker swarm join-token manager --quiet)
                             [ $? -ne 0 ] && sfFail 193 "failed to generate token to add manager to swarm"
-
-                            # generate token to join workers to swarm
+                            
+                            # generate token to join workers to Swarm
                             WORKER_TOKEN=$(docker swarm join-token worker --quiet)
                             [ $? -ne 0 ] && sfFail 194 "failed to generate token to add worker to swarm"
-
+                            
                             # create share data for managers to join
                             echo "$MANAGER_TOKEN" >${SF_TMPDIR}/docker-swarm.manager.token
                             sfDropzonePush ${SF_TMPDIR}/docker-swarm.manager.token || sfFail 195
                             rm -f ${SF_TMPDIR}/docker-swarm.manager.token
-
+                            
                             # create shared data for workers to join
                             echo "$WORKER_TOKEN" >${SF_TMPDIR}/docker-swarm.worker.token
                             sfDropzonePush ${SF_TMPDIR}/docker-swarm.worker.token || sfFail 196
                             rm -f ${SF_TMPDIR}/docker-swarm.worker.token
-
+                            
                             # create shared data for managers and workers to join
                             echo "{{ .HostIP }}" >${SF_TMPDIR}/docker-swarm.manager.first
                             sfDropzonePush ${SF_TMPDIR}/docker-swarm.manager.first || sfFail 197
                             rm -f ${SF_TMPDIR}/docker-swarm.manager.first
-
+                            
                             for ip in {{ range .ClusterMasterIPs }}{{.}} {{end}} {{ range .ClusterNodeIPs }}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
                                 sfDropzoneSync $ip || sfFail 198
                             done
                             sfDropzoneSync {{ .PrimaryGatewayIP }} || sfFail 198
-                            {{ if .SecondaryGatewayIP }}
+                                {{ if .SecondaryGatewayIP }}
                             sfDropzoneSync {{ .SecondaryGatewayIP }} || sfFail 198
-                            {{end}}
-
+                                {{end}}
+                            
                             rm ${SF_TMPDIR}/docker-swarm.worker.token
-                            sfDropzoneClean
+                            sfDropzoneClean 
+                            {{ end }}
                             sfExit
 
                     join-managers:
                         targets:
-                            hosts: yes
+                            hosts: no
                             gateways: no
                             masters: all
                             nodes: no
@@ -121,7 +123,7 @@ feature:
 
                     join-workers:
                         targets:
-                            hosts: yes
+                            hosts: no
                             gateways: all
                             masters: no
                             nodes: all

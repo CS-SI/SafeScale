@@ -69,12 +69,16 @@ type TaskResult interface{}
 // }, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, fail.Error)
 
+//go:generate minimock -o mocks/mock_taskguard.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskGuard
+
 // TaskGuard ...
 type TaskGuard interface {
 	TryWait() (bool, TaskResult, fail.Error)
 	Wait() (TaskResult, fail.Error)
 	WaitFor(time.Duration) (bool, TaskResult, fail.Error)
 }
+
+//go:generate minimock -o mocks/mock_taskcore.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskCore
 
 // TaskCore is the interface of core methods to control Task and TaskGroup
 type TaskCore interface {
@@ -95,6 +99,8 @@ type TaskCore interface {
 	Start(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
 	StartWithTimeout(fn TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error)
 }
+
+//go:generate minimock -o mocks/mock_task.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.Task
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
 type Task interface {
@@ -187,7 +193,11 @@ const (
 )
 
 // TaskFromContext extracts the task instance from context
-// If there is no task in the context, returns a VoidTask()
+// returns:
+//    - Task, nil: Task found in 'ctx'
+//    - nil, *fail.ErrNotAvailable: there is no Task value in 'ctx'
+//    - nil, *fail.ErrInconsistent: value stored as Task in "ctx' is not of type Task
+//    - nil, *ErrInvalidParameter: 'ctx' is nil
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
 		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
@@ -196,10 +206,23 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 			}
 			return nil, fail.InconsistentError("context value for '%s' is not a 'concurrency.Task'", KeyForTaskInContext)
 		}
-		return nil, fail.NotAvailableError("cannot find a value for '%s' in context", KeyForTaskInContext)
+		return nil, fail.InconsistentError("cannot find a value for '%s' in context", KeyForTaskInContext)
 	}
 
 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
+}
+
+// TaskFromContextOrVoid extracts the task instance from context.
+// If there is no task in the context, returns a VoidTask()
+// returns:
+//    - Task, nil: Task found in 'ctx' or VoidTask() is returned
+func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
+	nctx, err := TaskFromContext(ctx)
+	if err != nil {
+		return VoidTask()
+	}
+
+	return nctx, nil
 }
 
 // NewTask creates a new instance of Task

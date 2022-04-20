@@ -20,23 +20,22 @@ import (
 	"context"
 	"fmt"
 
-	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
-	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
 	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
+	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 )
 
 // safescale network subnet create --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" net1 subnet-1 (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
@@ -101,17 +100,10 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
-	networkInstance, xerr := networkfactory.Load(job.Service(), networkRef)
+	networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := networkInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	subnetInstance, xerr := subnetfactory.New(job.Service())
 	if xerr != nil {
@@ -138,18 +130,10 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		DefaultSSHPort: in.GetGateway().GetSshPort(),
 		KeepOnFailure:  in.GetKeepOnFailure(),
 	}
-
 	xerr = subnetInstance.Create(job.Context(), req, gwName, sizing)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = networkInstance.AdoptSubnet(job.Context(), subnetInstance)
 	if xerr != nil {
@@ -157,7 +141,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 
 	tracer.Trace("Subnet '%s' successfully created.", req.Name)
-	return subnetInstance.ToProtocol()
+	return subnetInstance.ToProtocol(job.Context())
 }
 
 // List existing networks
@@ -201,16 +185,12 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 			networkID = an.ID
 		}
 	} else {
-		networkInstance, xerr := networkfactory.Load(job.Service(), networkRef)
+		networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		networkID = networkInstance.GetID()
-		err := networkInstance.Released()
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
 	}
 	list, xerr := subnetfactory.List(job.Context(), job.Service(), networkID, in.GetAll())
 	if xerr != nil {
@@ -259,19 +239,12 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	return subnetInstance.ToProtocol()
+	return subnetInstance.ToProtocol(job.Context())
 }
 
 // Delete a/many subnet/s
@@ -317,7 +290,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 		subnetInstance  resources.Subnet
 		subnetID        string
 	)
-	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr = subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -330,7 +303,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 	}
 	clean := true
 	subnetID = subnetInstance.GetID()
-	networkInstance, xerr = subnetInstance.InspectNetwork()
+	networkInstance, xerr = subnetInstance.InspectNetwork(job.Context())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -355,13 +328,6 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 	}
 
 	if networkInstance != nil {
-		defer func() {
-			issue := networkInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
-
 		xerr = networkInstance.AbandonSubnet(newCtx, subnetID)
 		if xerr != nil {
 			return empty, xerr
@@ -411,29 +377,15 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -494,20 +446,13 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var sgInstance resources.SecurityGroup
-	sgInstance, xerr = securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr = securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	var subnetInstance resources.Subnet
-	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr = subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -520,13 +465,6 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 			return empty, xerr
 		}
 	}
-
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = subnetInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 	if xerr != nil {
@@ -575,29 +513,15 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = subnetInstance.EnableSecurityGroup(job.Context(), sgInstance)
 	if xerr != nil {
@@ -646,29 +570,15 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = subnetInstance.DisableSecurityGroup(job.Context(), sgInstance)
 	if xerr != nil {
@@ -713,17 +623,10 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 
 	state := securitygroupstate.Enum(in.GetState())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := subnetInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	bonds, xerr := subnetInstance.ListSecurityGroups(job.Context(), state)
 	if xerr != nil {

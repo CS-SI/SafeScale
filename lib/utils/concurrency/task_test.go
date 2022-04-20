@@ -75,7 +75,15 @@ func TestInjectAndExtractFromContext(t *testing.T) {
 	ctx := context.Background()
 	ctxv := context.WithValue(ctx, KeyForTaskInContext, ta) // nolint
 
-	nt, err := TaskFromContext(ctxv)
+	nt, err := TaskFromContext(ctx)
+	require.NotNil(t, err)
+	require.Nil(t, nt)
+
+	nt, err = TaskFromContextOrVoid(ctx)
+	require.Nil(t, err)
+	require.NotNil(t, nt)
+
+	nt, err = TaskFromContext(ctxv)
 	require.Nil(t, err)
 	rid, err := nt.ID()
 	require.Nil(t, err)
@@ -1332,13 +1340,13 @@ func TestStartWithTimeoutAbortedWithCauseTask(t *testing.T) {
 }
 
 func TestLikeBeforeWithoutAbort(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 80; i++ {
 		single, xerr := NewTask()
 		require.NotNil(t, single)
 		require.Nil(t, xerr)
 
 		single, xerr = single.StartWithTimeout(
-			taskgen(100, 200, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond,
+			taskgen(200, 300, 10, 0, 0, 0, false), nil, time.Duration(50)*time.Millisecond,
 		)
 		require.Nil(t, xerr)
 
@@ -1364,9 +1372,9 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			// expected
-			require.True(t, rv) // rv must be true
+			require.True(t, rv) // rv must be true // FIXME: Here fails too
 		default:
-			t.Errorf("Unexpected error, with rv: %v, %v", xerr, rv)
+			t.Errorf("Unexpected error, with rv: %v, %v", xerr, rv) // FIXME: Failure here
 			t.FailNow()
 		}
 

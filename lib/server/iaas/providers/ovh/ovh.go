@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -37,6 +36,7 @@ import (
 	filters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
@@ -72,13 +72,6 @@ var (
 	identityEndpoint = "https://auth.cloud.ovh.net/v3"
 	externalNetwork  = "Ext-Net"
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
-)
-
-// OVH api credentials
-var (
-	alternateAPIApplicationKey    string
-	alternateAPIApplicationSecret string
-	alternateAPIConsumerKey       string
 )
 
 // provider is the provider implementation of the OVH provider
@@ -141,6 +134,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.NewError("Invalid input for 'ProjectName'")
 	}
 
+	var alternateAPIApplicationKey string
+	var alternateAPIApplicationSecret string
+	var alternateAPIConsumerKey string
 	val1, ok1 := identityParams["AlternateApiApplicationKey"]
 	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
 	val3, ok3 := identityParams["AlternateApiConsumerKey"]
@@ -190,6 +186,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
+		AK:               alternateAPIApplicationKey,
+		AS:               alternateAPIApplicationSecret,
+		CK:               alternateAPIConsumerKey,
 	}
 
 	err := validation.ValidateStruct(&authOptions,
@@ -283,9 +282,9 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
-	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
-	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
-	cfg.Set("AlternateApiConsumerKey", alternateAPIConsumerKey)
+	cfg.Set("AlternateApiApplicationKey", opts.AK)
+	cfg.Set("AlternateApiApplicationSecret", opts.AS)
+	cfg.Set("AlternateApiConsumerKey", opts.CK)
 	return cfg, nil
 }
 
@@ -320,17 +319,16 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // InspectTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
-	nullAHT := abstract.HostTemplate{}
+func (p provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
-		return nullAHT, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tpl, xerr := p.Stack.InspectTemplate(id)
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
-	addGPUCfg(&tpl)
+	addGPUCfg(tpl)
 	return tpl, nil
 }
 
@@ -342,7 +340,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -350,7 +348,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -374,7 +372,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	service := authOpts.GetString("TenantID")
 	region := authOpts.GetString("Region")
 
-	var listAvailableTemplates []abstract.HostTemplate
+	var listAvailableTemplates []*abstract.HostTemplate
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, xerr := p.requestOVHAPI(restURL, "GET")
 	if xerr != nil {
@@ -433,11 +431,11 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	return listAvailableTemplates, nil
 }
 
-func isWindowsTemplate(t abstract.HostTemplate) bool {
+func isWindowsTemplate(t *abstract.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
 
-func isFlexTemplate(t abstract.HostTemplate) bool {
+func isFlexTemplate(t *abstract.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 

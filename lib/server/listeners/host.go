@@ -103,17 +103,10 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	xerr = hostInstance.Start(job.Context())
 	if xerr != nil {
@@ -154,17 +147,10 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.Stop(job.Context()); xerr != nil {
 		return empty, xerr
@@ -202,17 +188,10 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.Reboot(job.Context(), false); xerr != nil { // FIXME: We should run a sync first
 		return empty, xerr
@@ -315,18 +294,10 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	if len(in.GetSubnets()) > 0 {
 		for _, v := range in.GetSubnets() {
-			subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, v)
+			subnetInstance, xerr = subnetfactory.Load(job.Context(), job.Service(), networkRef, v)
 			if xerr != nil {
 				return nil, xerr
 			}
-
-			//goland:noinspection GoDeferInLoop
-			defer func(instance resources.Subnet) { // nolint
-				issue := instance.Released()
-				if issue != nil {
-					logrus.Warn(issue)
-				}
-			}(subnetInstance)
 
 			xerr = subnetInstance.Review(
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -347,17 +318,10 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		}
 	}
 	if len(subnets) == 0 && networkRef != "" {
-		subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, networkRef)
+		subnetInstance, xerr = subnetfactory.Load(job.Context(), job.Service(), networkRef, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		defer func() {
-			issue := subnetInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}()
 
 		xerr = subnetInstance.Review(
 			func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -406,15 +370,8 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	// logrus.Infof("Host '%s' created", name)
-	return hostInstance.ToProtocol()
+	return hostInstance.ToProtocol(job.Context())
 }
 
 // Resize a host
@@ -452,17 +409,10 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		MinCPUFreq:  in.GetCpuFreq(),
 	}
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), name)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	reduce := false
 	xerr = hostInstance.Inspect(
@@ -498,7 +448,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	tracer.Trace("Host '%s' successfully resized", name)
-	return hostInstance.ToProtocol()
+	return hostInstance.ToProtocol(job.Context())
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -532,7 +482,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -542,13 +492,6 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		}
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
 	// Data sync
 	xerr = hostInstance.Reload()
 	if xerr != nil {
@@ -556,7 +499,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 
 	// Gather host state from Cloud Provider
-	state, xerr := hostInstance.ForceGetState(ctx)
+	state, xerr := hostInstance.ForceGetState(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -580,7 +523,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ref, _ := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -590,8 +533,13 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, xerr
 	}
 	defer job.Close()
+	jobCtx := job.Context()
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(jobCtx, job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -601,20 +549,13 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		}
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	_, xerr = hostInstance.ForceGetState(job.Context())
+	_, xerr = hostInstance.ForceGetState(jobCtx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	var ph *protocol.Host
-	ph, xerr = hostInstance.ToProtocol()
+	ph, xerr = hostInstance.ToProtocol(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -654,17 +595,13 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
 	xerr = hostInstance.Delete(job.Context())
 	if xerr != nil {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
 		return empty, xerr
 	}
 
@@ -752,29 +689,15 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -829,29 +752,15 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return empty, hostInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 }
@@ -895,29 +804,15 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.EnableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		return empty, xerr
@@ -965,7 +860,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -977,14 +872,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		}
 	}
 
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -995,13 +883,6 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 			return empty, xerr
 		}
 	}
-
-	defer func() {
-		issue := sgInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = hostInstance.DisableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		switch xerr.(type) {
@@ -1048,17 +929,10 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	bonds, xerr := hostInstance.ListSecurityGroups(securitygroupstate.All)
 	if xerr != nil {
