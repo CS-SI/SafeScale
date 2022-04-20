@@ -40,17 +40,17 @@ type Stack interface {
 	ListRegions() ([]string, fail.Error)
 
 	// InspectImage returns the Image referenced by id
-	InspectImage(id string) (abstract.Image, fail.Error)
+	InspectImage(id string) (*abstract.Image, fail.Error)
 
 	// InspectTemplate returns the Template referenced by id
-	InspectTemplate(id string) (abstract.HostTemplate, fail.Error)
+	InspectTemplate(id string) (*abstract.HostTemplate, fail.Error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*abstract.KeyPair, fail.Error)
 	// InspectKeyPair returns the key pair identified by id
 	InspectKeyPair(id string) (*abstract.KeyPair, fail.Error)
 	// ListKeyPairs lists available key pairs
-	ListKeyPairs() ([]abstract.KeyPair, fail.Error)
+	ListKeyPairs() ([]*abstract.KeyPair, fail.Error)
 	// DeleteKeyPair deletes the key pair identified by id
 	DeleteKeyPair(id string) fail.Error
 
@@ -148,7 +148,7 @@ type Stack interface {
 	// InspectVolume returns the volume identified by id
 	InspectVolume(id string) (*abstract.Volume, fail.Error)
 	// ListVolumes list available volumes
-	ListVolumes() ([]abstract.Volume, fail.Error)
+	ListVolumes() ([]*abstract.Volume, fail.Error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) fail.Error
 
@@ -157,7 +157,7 @@ type Stack interface {
 	// InspectVolumeAttachment returns the volume attachment identified by id
 	InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error)
 	// ListVolumeAttachments lists available volume attachment
-	ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error)
+	ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) fail.Error
 
@@ -170,8 +170,8 @@ type Stack interface {
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally
 type ReservedForProviderUse interface {
-	ListImages(all bool) ([]abstract.Image, fail.Error)                      // lists available OS images
-	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)            // lists available host templates
+	ListImages(all bool) ([]*abstract.Image, fail.Error)                     // lists available OS images
+	ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error)           // lists available host templates
 	GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error)   // Returns a read-only struct containing configuration options
 	GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) // Returns a read-only struct containing authentication options
 }

@@ -34,9 +34,8 @@ import (
 )
 
 func (s stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
-	nullServer := &servers.Server{}
 	if id == "" {
-		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	var server *servers.Server
@@ -48,15 +47,14 @@ func (s stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullServer, xerr
+		return nil, xerr
 	}
 	return server, nil
 }
 
 func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
-	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
-		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -73,21 +71,21 @@ func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullServer, xerr
+		return nil, xerr
 	}
 
 	jsoned, err := json.Marshal(r.Body.(map[string]interface{})["servers"])
 	if err != nil {
-		return nullServer, fail.SyntaxError(err.Error())
+		return nil, fail.SyntaxError(err.Error())
 	}
 	var resp []*servers.Server
 	if err = json.Unmarshal(jsoned, &resp); err != nil {
-		return nullServer, fail.SyntaxError(err.Error())
+		return nil, fail.SyntaxError(err.Error())
 	}
 
 	switch len(resp) {
 	case 0:
-		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
+		return nil, fail.NotFoundError("failed to find a Host named '%s'", name)
 	default:
 	}
 
@@ -103,11 +101,11 @@ func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	}
 	switch found {
 	case 0:
-		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
+		return nil, fail.NotFoundError("failed to find a Host named '%s'", name)
 	case 1:
 		return instance, nil
 	}
-	return nullServer, fail.InconsistentError("found more than one Host named '%s'", name)
+	return nil, fail.InconsistentError("found more than one Host named '%s'", name)
 }
 
 // rpcGetMetadataOfInstance returns the metadata associated with the instance
@@ -165,18 +163,17 @@ func (s stack) rpcListServers() ([]*servers.Server, fail.Error) {
 
 // rpcCreateServer calls openstack to create a server
 func (s stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, diskSize int, userdata []byte, az string) (*servers.Server, fail.Error) {
-	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
-		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 	if templateID = strings.TrimSpace(templateID); templateID == "" {
-		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("templateID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("templateID")
 	}
 	if imageID = strings.TrimSpace(imageID); imageID == "" {
-		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("imageID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("imageID")
 	}
 	if az == "" {
-		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("az")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("az")
 	}
 
 	metadata := make(map[string]string)
@@ -307,10 +304,8 @@ func (s stack) rpcUpdatePort(id string, options ports.UpdateOpts) fail.Error {
 
 // rpcGetPort returns port information from its ID
 func (s stack) rpcGetPort(id string) (port *ports.Port, ferr fail.Error) {
-	nullPort := &ports.Port{}
-
 	if id == "" {
-		return nullPort, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	xerr := stacks.RetryableRemoteCall(
@@ -321,7 +316,7 @@ func (s stack) rpcGetPort(id string) (port *ports.Port, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullPort, xerr
+		return nil, xerr
 	}
 
 	return port, nil

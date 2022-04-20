@@ -32,17 +32,17 @@ type StackProxy struct {
 	Name string
 }
 
-func (s StackProxy) ListImages(p bool) (_ []abstract.Image, ferr fail.Error) {
+func (s StackProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	images, xerr := s.FullStack.ListImages(p)
+	images, xerr := s.FullStack.ListImages(all)
 	return images, xerr
 }
 
-func (s StackProxy) ListTemplates(p bool) (_ []abstract.HostTemplate, ferr fail.Error) {
+func (s StackProxy) ListTemplates(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	templates, xerr := s.FullStack.ListTemplates(p)
+	templates, xerr := s.FullStack.ListTemplates(all)
 	return templates, xerr
 }
 
@@ -81,14 +81,14 @@ func (s StackProxy) ListRegions() (_ []string, ferr fail.Error) {
 	return regions, xerr
 }
 
-func (s StackProxy) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
+func (s StackProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	image, xerr := s.FullStack.InspectImage(id)
 	return image, xerr
 }
 
-func (s StackProxy) InspectTemplate(id string) (_ abstract.HostTemplate, ferr fail.Error) {
+func (s StackProxy) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	template, xerr := s.FullStack.InspectTemplate(id)
@@ -109,7 +109,7 @@ func (s StackProxy) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Er
 	return pair, xerr
 }
 
-func (s StackProxy) ListKeyPairs() (_ []abstract.KeyPair, ferr fail.Error) {
+func (s StackProxy) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.FullStack.ListKeyPairs()
@@ -431,7 +431,7 @@ func (s StackProxy) InspectVolume(id string) (_ *abstract.Volume, ferr fail.Erro
 	return volume, xerr
 }
 
-func (s StackProxy) ListVolumes() (_ []abstract.Volume, ferr fail.Error) {
+func (s StackProxy) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.ListVolumes()
@@ -459,7 +459,7 @@ func (s StackProxy) InspectVolumeAttachment(serverID, id string) (_ *abstract.Vo
 	return volume, xerr
 }
 
-func (s StackProxy) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, ferr fail.Error) {
+func (s StackProxy) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.ListVolumeAttachments(serverID)

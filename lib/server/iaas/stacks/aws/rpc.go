@@ -1561,18 +1561,17 @@ func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.Spo
 }
 
 func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
-	nullInstance := &ec2.SpotInstanceRequest{}
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(imageID, "imageID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(keypairName, "keypairName", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if publicIP == nil {
 		publicIP = aws.Bool(false)
@@ -1609,33 +1608,32 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 		normalizeError,
 	)
 	if xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if len(resp.SpotInstanceRequests) == 0 {
-		return nullInstance, nil
+		return nil, nil
 	}
 	return resp.SpotInstanceRequests[0], nil
 }
 
 func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
-	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(subnetID, "subnetID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(imageID, "imageID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(keypairName, "keypairName", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if publicIP == nil {
 		publicIP = aws.Bool(false)
@@ -1771,10 +1769,10 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID *string,
 		normalizeError,
 	)
 	if xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if len(resp.Instances) == 0 {
-		return nullInstance, fail.InconsistentError("invalid empty response from Cloud Provider")
+		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
 	}
 
 	defer func() {
@@ -1793,7 +1791,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID *string,
 	}()
 
 	if len(resp.Instances) > 1 {
-		return nullInstance, fail.InconsistentError("more than one instance has been created by Cloud Provider")
+		return nil, fail.InconsistentError("more than one instance has been created by Cloud Provider")
 	}
 
 	instance := resp.Instances[0]

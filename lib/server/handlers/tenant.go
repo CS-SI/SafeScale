@@ -600,7 +600,7 @@ func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
 	}
 
 	type TemplateList struct {
-		Templates []abstract.HostTemplate `json:"templates,omitempty"`
+		Templates []*abstract.HostTemplate `json:"templates,omitempty"`
 	}
 
 	svc := handler.job.Service()
@@ -636,7 +636,7 @@ func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
 	}
 
 	type ImageList struct {
-		Images []abstract.Image `json:"images,omitempty"`
+		Images []*abstract.Image `json:"images,omitempty"`
 	}
 
 	svc := handler.job.Service()

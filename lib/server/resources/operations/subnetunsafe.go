@@ -790,7 +790,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				for _, aimg := range imgs {
 					if strings.Compare(aimg.ID, imageQuery) == 0 {
 						logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-						img = &aimg
+						img = aimg
 						break
 					}
 				}

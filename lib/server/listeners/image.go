@@ -67,7 +67,7 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	// Build response mapping abstract.Image to protocol.Image
 	pbImages := make([]*protocol.Image, len(images))
 	for k, image := range images {
-		pbImages[k] = converters.ImageFromAbstractToProtocol(&image)
+		pbImages[k] = converters.ImageFromAbstractToProtocol(image)
 	}
 	out := &protocol.ImageList{Images: pbImages}
 	return out, nil

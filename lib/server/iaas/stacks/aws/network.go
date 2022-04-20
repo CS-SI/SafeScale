@@ -60,16 +60,15 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 
 // CreateNetwork creates a Network, ie a VPC in AWS terminology
 func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, ferr fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	// Check if network already there
@@ -79,16 +78,16 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 			debug.IgnoreError(xerr)
 			// continue
 		default:
-			return nullAN, xerr
+			return nil, xerr
 		}
 	} else {
-		return nullAN, fail.DuplicateError("a Network/VPC named '%s' already exists")
+		return nil, fail.DuplicateError("a Network/VPC named '%s' already exists")
 	}
 
 	// if not, create the network/VPC
 	theVpc, xerr := s.rpcCreateVpc(aws.String(req.Name), aws.String(req.CIDR))
 	if xerr != nil {
-		return nullAN, fail.Wrap(xerr, "failed to create VPC")
+		return nil, fail.Wrap(xerr, "failed to create VPC")
 	}
 
 	// wait until available status
@@ -110,11 +109,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 		if retryErr != nil {
 			switch retryErr.(type) {
 			case *retry.ErrStopRetry:
-				return nullAN, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+				return nil, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 			case *fail.ErrTimeout:
-				return nullAN, fail.Wrap(fail.Cause(retryErr), "timeout")
+				return nil, fail.Wrap(fail.Cause(retryErr), "timeout")
 			default:
-				return nullAN, retryErr
+				return nil, retryErr
 			}
 		}
 	}
@@ -132,11 +131,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 
 	gw, xerr := s.rpcCreateInternetGateway()
 	if xerr != nil {
-		return nullAN, fail.Wrap(xerr, "failed to create internet gateway")
+		return nil, fail.Wrap(xerr, "failed to create internet gateway")
 	}
 
 	if xerr = s.rpcAttachInternetGateway(theVpc.VpcId, gw.InternetGatewayId); xerr != nil {
-		return nullAN, fail.Wrap(xerr, "failed to attach internet gateway to Network")
+		return nil, fail.Wrap(xerr, "failed to attach internet gateway to Network")
 	}
 
 	defer func() {
@@ -149,14 +148,14 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 
 	tables, xerr := s.rpcDescribeRouteTables(aws.String("vpc-id"), []*string{theVpc.VpcId})
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 	if len(tables) < 1 {
-		return nullAN, fail.InconsistentError("no Route Tables")
+		return nil, fail.InconsistentError("no Route Tables")
 	}
 
 	if xerr = s.rpcCreateRoute(gw.InternetGatewayId, tables[0].RouteTableId, aws.String("0.0.0.0/0")); xerr != nil {
-		return nullAN, fail.Wrap(xerr, "failed to create route")
+		return nil, fail.Wrap(xerr, "failed to create route")
 	}
 
 	defer func() {
@@ -181,24 +180,23 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 
 // InspectNetwork returns information about Network/VPC from AWS
 func (s stack) InspectNetwork(id string) (_ *abstract.Network, ferr fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAN, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	resp, xerr := s.rpcDescribeVpcByID(aws.String(id))
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	anet, xerr := toAbstractNetwork(resp)
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	return anet, nil
@@ -225,24 +223,23 @@ func toAbstractNetwork(in *ec2.Vpc) (*abstract.Network, fail.Error) {
 
 // InspectNetworkByName does the same as InspectNetwork but on its name
 func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, ferr fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAN, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s')", name).WithStopwatch().Entering().Exiting()
 
 	resp, xerr := s.rpcDescribeVpcByName(aws.String(name))
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	anet, xerr := toAbstractNetwork(resp)
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	return anet, nil
@@ -388,9 +385,8 @@ func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
 
 // CreateSubnet ...
 func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
@@ -401,12 +397,12 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 	}
 
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
-		return nullAS, fail.Wrap(err, "error parsing requested CIDR")
+		return nil, fail.Wrap(err, "error parsing requested CIDR")
 	}
 
 	resp, xerr := s.rpcCreateSubnet(aws.String(req.Name), aws.String(req.NetworkID), aws.String(s.AwsConfig.Zone), aws.String(req.CIDR))
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	defer func() {
@@ -435,17 +431,17 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 		if retryErr != nil {
 			switch retryErr.(type) {
 			case *retry.ErrStopRetry:
-				return nullAS, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+				return nil, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 			case *fail.ErrTimeout:
-				return nullAS, fail.Wrap(fail.Cause(retryErr), "timeout")
+				return nil, fail.Wrap(fail.Cause(retryErr), "timeout")
 			default:
-				return nullAS, retryErr
+				return nil, retryErr
 			}
 		}
 	}
 	tables, xerr := s.rpcDescribeRouteTables(aws.String("vpc-id"), []*string{aws.String(req.NetworkID)})
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 	if len(tables) < 1 {
 		return nil, fail.InconsistentError("No Route Tables")
@@ -472,19 +468,18 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 
 // InspectSubnet returns information about the Subnet from AWS
 func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	resp, xerr := s.rpcDescribeSubnetByID(aws.String(id))
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	return toAbstractSubnet(resp)
@@ -510,19 +505,18 @@ func toAbstractSubnet(in *ec2.Subnet) (*abstract.Subnet, fail.Error) {
 
 // InspectSubnetByName ...
 func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if subnetName == "" {
-		return nullAS, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s', '%s')", networkRef, subnetName).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	req, xerr := s.initEC2DescribeSubnetsInput(networkRef)

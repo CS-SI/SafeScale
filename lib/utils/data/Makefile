@@ -9,6 +9,7 @@ generate:
 	@$(GO) generate -run minimock . >/dev/null 2>&1 || true
 	@(cd observer && $(MAKE) $@)
 	@(cd serialize && $(MAKE) $@)
+	@(cd cache && $(MAKE) $@)
 
 vet:
 	@$(GO) vet ./...

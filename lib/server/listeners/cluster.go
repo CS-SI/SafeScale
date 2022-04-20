@@ -112,7 +112,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		req.Tenant = job.Tenant()
 	}
 
-	xerr = instance.Create(job.Context(), req)
+	xerr = instance.Create(job.Context(), *req)
 	if xerr != nil {
 		return nil, xerr
 	}

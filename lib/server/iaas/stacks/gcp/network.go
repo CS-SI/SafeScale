@@ -54,9 +54,8 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 
 // CreateNetwork creates a new network
 func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", req.Name).WithStopwatch().Entering()
@@ -68,7 +67,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 			// continue
 			debug.IgnoreError(xerr)
 		default:
-			return nullAN, xerr
+			return nil, xerr
 		}
 	}
 
@@ -81,7 +80,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 
 	resp, xerr := s.rpcCreateNetwork(req.Name)
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	anet := abstract.NewNetwork()
@@ -96,12 +95,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 
 // InspectNetwork returns the network identified by id (actually for gcp, id here is name)
 func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAN, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", id).WithStopwatch().Entering()
@@ -109,7 +107,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 
 	resp, xerr := s.rpcGetNetworkByID(id)
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	return toAbstractNetwork(*resp), nil
@@ -117,12 +115,11 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 
 // InspectNetworkByName returns the network identified by ref (id or name)
 func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
-	nullAN := abstract.NewNetwork()
 	if valid.IsNil(s) {
-		return nullAN, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
-		return nullAN, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
@@ -130,7 +127,7 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 
 	resp, xerr := s.rpcGetNetworkByName(name)
 	if xerr != nil {
-		return nullAN, xerr
+		return nil, xerr
 	}
 
 	anet := toAbstractNetwork(*resp)
@@ -193,7 +190,7 @@ func (s stack) DeleteNetwork(ref string) (ferr fail.Error) {
 	}
 
 	if metadata {
-		if theNetwork != nil { // maybe nullAn
+		if theNetwork != nil { // maybe nil
 			if theNetwork.ID != "" {
 				return s.rpcDeleteNetworkByID(theNetwork.ID)
 			}
@@ -325,9 +322,8 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 
 // CreateSubnet creates a new subnet
 func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", req.Name).WithStopwatch().Entering()
@@ -335,7 +331,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, fer
 
 	an, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
-		return nullAS, fail.Wrap(xerr, "failed to find Network identified by %s", req.NetworkID)
+		return nil, fail.Wrap(xerr, "failed to find Network identified by %s", req.NetworkID)
 	}
 
 	if xerr = s.validateCIDR(req, an); xerr != nil {
@@ -344,7 +340,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, fer
 
 	resp, xerr := s.rpcCreateSubnet(req.Name, an.Name, req.CIDR)
 	if xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	defer func() {
@@ -406,9 +402,8 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 
 // InspectSubnetByName returns the subnet identified by name
 func (s stack) InspectSubnetByName(networkRef, name string) (_ *abstract.Subnet, ferr fail.Error) {
-	nullAS := abstract.NewSubnet()
 	if valid.IsNil(s) {
-		return nullAS, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
@@ -421,7 +416,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (_ *abstract.Subnet,
 
 	var region string
 	if region, xerr = getRegionFromSelfLink(genURL(resp.SelfLink)); xerr != nil {
-		return nullAS, xerr
+		return nil, xerr
 	}
 
 	if region != s.GcpConfig.Region {

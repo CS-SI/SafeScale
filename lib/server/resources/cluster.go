@@ -55,7 +55,7 @@ type Cluster interface {
 	GetFlavor() (clusterflavor.Enum, fail.Error)                                                                                                 // returns the flavor of the cluster
 	GetComplexity() (clustercomplexity.Enum, fail.Error)                                                                                         // returns the complexity of the cluster
 	GetAdminPassword() (string, fail.Error)                                                                                                      // returns the password of the cluster admin account
-	GetKeyPair() (abstract.KeyPair, fail.Error)                                                                                                  // returns the key pair used in the cluster
+	GetKeyPair() (*abstract.KeyPair, fail.Error)                                                                                                 // returns the key pair used in the cluster
 	GetNetworkConfig() (*propertiesv3.ClusterNetwork, fail.Error)                                                                                // returns network configuration of the cluster
 	GetState() (clusterstate.Enum, fail.Error)                                                                                                   // returns the current state of the cluster
 	IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error)                                                           // tells if a feature is installed in Cluster using only metadata

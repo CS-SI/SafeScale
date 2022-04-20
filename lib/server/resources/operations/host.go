@@ -1150,7 +1150,7 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 			for _, v := range imgs {
 				if strings.Compare(v.ID, imageRef) == 0 {
 					logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-					img = &v
+					img = v
 					break
 				}
 			}
@@ -1921,12 +1921,12 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
-	// maybe there is a reboot here...
-
-	_, xerr = instance.waitInstallPhase(task.Context(), userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+	if inBackground() {
+		_, xerr = instance.waitInstallPhase(task.Context(), userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout())
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
@@ -1940,6 +1940,8 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		if xerr != nil {
 			return xerr
 		}
+
+		time.Sleep(45 * time.Second)
 	}
 
 	_, xerr = instance.waitInstallPhase(task.Context(), userdata.PHASE2_NETWORK_AND_SECURITY, 90*time.Second) // FIXME: It should be 1:30 min tops, 2*reboot time
@@ -1972,6 +1974,8 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			if xerr != nil {
 				return xerr
 			}
+
+			time.Sleep(45 * time.Second)
 
 			_, xerr = instance.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, waitingTime)
 			xerr = debug.InjectPlannedFail(xerr)
