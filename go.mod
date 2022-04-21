@@ -24,7 +24,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
 	github.com/makholm/covertool v0.0.0-20210624102319-bb1c7c716204
-	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
 	github.com/oscarpicas/go-dsp v0.1.0
@@ -34,7 +34,6 @@ require (
 	github.com/ovh/go-ovh v1.1.0
 	github.com/pelletier/go-toml/v2 v2.0.0-beta.8
 	github.com/pkg/sftp v1.13.4
-	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/sanity-io/litter v1.5.4
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
