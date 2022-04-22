@@ -231,6 +231,7 @@ func (instance *Feature) Applicable(t resources.Targetable) (bool, fail.Error) {
 	switch t.TargetType() {
 	case featuretargettype.Cluster:
 		// FIXME: implement this
+	default:
 	}
 
 	// 2nd check there is an install method the target can use

@@ -33,6 +33,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
@@ -43,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
@@ -117,6 +119,19 @@ type SSHConfig struct {
 // IsNull tells if the instance is a null value
 func (sconf *SSHConfig) IsNull() bool {
 	return sconf == nil || sconf.IPAddress == ""
+}
+
+// Clone clones the SSHConfig
+func (sconf *SSHConfig) Clone() *SSHConfig {
+	out := &SSHConfig{}
+	*out = *sconf
+	if out.GatewayConfig != nil {
+		out.GatewayConfig = sconf.GatewayConfig.Clone()
+	}
+	if out.SecondaryGatewayConfig != nil {
+		out.SecondaryGatewayConfig = sconf.SecondaryGatewayConfig.Clone()
+	}
+	return out
 }
 
 // SSHTunnel a SSH tunnel
@@ -337,9 +352,10 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	if scfg.GatewayConfig.Port == 0 {
 		scfg.GatewayConfig.Port = 22
 	}
-	if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
-		scfg.SecondaryGatewayConfig.Port = 22
-	}
+	// VPL: never used
+	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
+	// 	scfg.SecondaryGatewayConfig.Port = 22
+	// }
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
@@ -796,19 +812,45 @@ func (scmd *SSHCommand) Close() fail.Error {
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
 func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, fail.Error) {
 	if sc != nil {
-		tunnel, xerr := createConsecutiveTunnels(sc.GatewayConfig, tunnels)
-		if xerr != nil {
-			return nil, xerr
+		// determine what gateway to use
+		var gwConf *SSHConfig
+		if sc.GatewayConfig != nil {
+			gwConf = sc.GatewayConfig
+			if !netutils.CheckRemoteTCP(gwConf.IPAddress, gwConf.Port) {
+				if !valid.IsNil(sc.SecondaryGatewayConfig) {
+					gwConf = sc.SecondaryGatewayConfig
+					if !netutils.CheckRemoteTCP(gwConf.IPAddress, gwConf.Port) {
+						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
+					}
+				} else {
+					return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
+				}
+			}
 		}
 
-		cfg := sc
-		if tunnel != nil {
-			gateway := *sc.GatewayConfig
-			gateway.Port = tunnel.port
-			gateway.IPAddress = "127.0.0.1"
-			cfg.GatewayConfig = &gateway
+		tunnel, xerr := createConsecutiveTunnels(gwConf, tunnels)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotAvailable:
+				gwConf = sc.SecondaryGatewayConfig
+				tunnel, xerr = createConsecutiveTunnels(gwConf, tunnels)
+				if xerr != nil {
+					return nil, xerr
+				}
+			default:
+				return nil, xerr
+			}
 		}
-		if cfg.GatewayConfig != nil {
+
+		if gwConf != nil {
+			cfg := sc.Clone()
+			cfg.GatewayConfig = gwConf
+			if tunnel != nil {
+				gateway := *gwConf
+				gateway.Port = tunnel.port
+				gateway.IPAddress = "127.0.0.1"
+				cfg.GatewayConfig = &gateway
+			}
 			failures := 0
 			xerr = retry.WhileUnsuccessful(
 				func() error {
@@ -864,7 +906,7 @@ func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail
 
 	tunnel, xerr := createConsecutiveTunnels(sconf, &tunnels)
 	if xerr != nil {
-		return nil, nil, fail.Wrap(xerr, "failed to create SSH Tunnels")
+		return nil, nil, xerr
 	}
 
 	sshConfig := *sconf
