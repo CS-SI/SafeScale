@@ -70,7 +70,6 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-// if 'options' contains WithReloadOption, the instance is refreshed from metadata
 func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (networkInstance resources.Network, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be null value")

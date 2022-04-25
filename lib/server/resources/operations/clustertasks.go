@@ -2845,9 +2845,8 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 }
 
 type taskDeleteNodeParameters struct {
-	node           *propertiesv3.ClusterNode
-	nodeLoadMethod data.ImmutableKeyValue
-	master         *Host
+	node   *propertiesv3.ClusterNode
+	master *Host
 }
 
 // taskDeleteNode deletes one node
@@ -2876,9 +2875,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	if p.node.ID == "" && p.node.Name == "" {
 		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
 	}
-	if p.nodeLoadMethod != WithoutReloadOption && p.nodeLoadMethod != WithReloadOption {
-		return nil, fail.InvalidParameterError("params.nodeLoadMethod", "must be 'WithoutReloadOption' or 'WithReloadOption'")
-	}
+
 	nodeName := p.node.Name
 	if nodeName == "" {
 		nodeName = p.node.ID
@@ -2900,7 +2897,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}()
 
 	logrus.Debugf("Deleting Node '%s'", nodeName)
-	xerr = instance.deleteNode(task.Context(), p.node, p.master, p.nodeLoadMethod)
+	xerr = instance.deleteNode(task.Context(), p.node, p.master)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2952,7 +2949,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	host, xerr := LoadHost(task.Context(), instance.Service(), nodeName, WithoutReloadOption)
+	host, xerr := LoadHost(task.Context(), instance.Service(), nodeName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {

@@ -39,5 +39,5 @@ func New(svc iaas.Service) (resources.Subnet, fail.Error) {
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
 func Load(ctx context.Context, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef, operations.WithReloadOption)
+	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef)
 }

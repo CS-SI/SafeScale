@@ -140,7 +140,6 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-// if 'options' contains WithReloadOption, the instance is refreshed from metadata. Otherwise, metadata is not read (except if Share is not in cache)
 func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Share, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

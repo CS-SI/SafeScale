@@ -1173,7 +1173,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hess, innerXErr := LoadHost(lastCtx, svc, k, WithReloadOption); innerXErr != nil {
+					if hess, innerXErr := LoadHost(lastCtx, svc, k); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
 						if _, innerXErr := hess.ForceGetState(lastCtx); innerXErr != nil {

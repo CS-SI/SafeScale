@@ -2315,7 +2315,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				if count > 0 {
 					// clients found, checks if these clients already exists...
 					for _, hostID := range hostShare.ClientsByID {
-						instance, inErr := LoadHost(task.Context(), svc, hostID, WithoutReloadOption)
+						instance, inErr := LoadHost(task.Context(), svc, hostID)
 						if inErr != nil {
 							debug.IgnoreError(inErr)
 							continue

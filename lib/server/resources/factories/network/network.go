@@ -78,5 +78,5 @@ func New(svc iaas.Service) (resources.Network, fail.Error) {
 
 // Load loads the metadata of a network and returns an instance of resources.Network
 func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-	return operations.LoadNetwork(ctx, svc, ref, operations.WithReloadOption)
+	return operations.LoadNetwork(ctx, svc, ref)
 }

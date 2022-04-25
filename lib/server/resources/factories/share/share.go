@@ -35,5 +35,5 @@ func New(svc iaas.Service) (resources.Share, fail.Error) {
 
 // Load loads the metadata of a share and returns an instance of resources.Share
 func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Share, fail.Error) {
-	return operations.LoadShare(ctx, svc, ref, operations.WithReloadOption)
+	return operations.LoadShare(ctx, svc, ref)
 }
