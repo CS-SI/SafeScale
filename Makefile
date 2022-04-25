@@ -135,10 +135,10 @@ mod:
 		sleep 4 ; \
 	done
 	@($(GO) mod tidy || true)
-	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 || true)
-	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.28.0 || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.28.0 || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.28.0 || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.28.0 || true)
 	@sleep 4
 	@while [ $(ps -ef | grep "mod download") ] ; do \
 		sleep 4 ; \

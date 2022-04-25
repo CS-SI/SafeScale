@@ -11,7 +11,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/dgraph-io/ristretto v0.1.0
-	github.com/eko/gocache/v2 v2.2.0
+	github.com/eko/gocache/v2 v2.3.0
 	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
 	github.com/felixge/fgprof v0.9.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
@@ -39,7 +39,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.7.1
-	github.com/urfave/cli v1.22.5
+	github.com/urfave/cli v1.22.7
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
@@ -47,8 +47,8 @@ require (
 	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.74.0
-	google.golang.org/grpc v1.45.0
+	google.golang.org/api v0.75.0
+	google.golang.org/grpc v1.46.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/fsnotify.v1 v1.4.7
 )
