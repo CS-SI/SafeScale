@@ -1103,6 +1103,13 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
 			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
 			secondaryUserdata.IsPrimaryGateway = false
+			if as.VIP != nil {
+				secondaryUserdata.DefaultRouteIP = primaryUserdata.DefaultRouteIP
+				secondaryUserdata.EndpointIP = primaryUserdata.EndpointIP
+			} else {
+				secondaryUserdata.DefaultRouteIP = secondaryUserdata.SecondaryGatewayPrivateIP
+				secondaryUserdata.EndpointIP = secondaryUserdata.SecondaryGatewayPublicIP
+			}
 		}
 		return nil
 	})

@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
@@ -60,12 +59,7 @@ var templateList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), 0)
+		templates, err := ClientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -82,15 +76,11 @@ var templateMatch = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
 		var sizing []string
 		sizing = append(sizing, c.Args().First())
 		sizing = append(sizing, c.Args().Tail()...)
 		sizingAsString := strings.Join(sizing, ",")
-		templates, err := clientSession.Template.Match(sizingAsString, 0)
+		templates, err := ClientSession.Template.Match(sizingAsString, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -108,12 +98,7 @@ var templateInspect = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		template, err := clientSession.Template.Inspect(c.Args().First(), 0)
+		template, err := ClientSession.Template.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))

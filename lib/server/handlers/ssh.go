@@ -327,7 +327,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
@@ -343,6 +343,10 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	if cmd == "" {
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("cmd")
 	}
+
+	retCode := invalid
+	stdOut := ""
+	stdErr := ""
 
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
@@ -377,8 +381,13 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
-			return xerr
+			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
+			if xerr != nil {
+				return xerr
+			}
+
+			retCode, stdOut, stdErr = aretCode, astdOut, astdErr
+			return nil
 		},
 		timings.SmallDelay(),
 		timings.HostOperationTimeout(),
@@ -392,7 +401,11 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 			}
 		},
 	)
-	return retCode, stdOut, stdErr, retryErr
+	if retryErr != nil {
+		return invalid, "", "", retryErr
+	}
+
+	return retCode, stdOut, stdErr, nil
 }
 
 // run executes command on the host

@@ -57,6 +57,8 @@ func (n network) List(all bool, timeout time.Duration) (*protocol.NetworkList, e
 	})
 }
 
+var forceCtxKey = "force"
+
 // Delete deletes several networks at the same time in goroutines
 func (n network) Delete(names []string, timeout time.Duration, force bool) error { // TODO: concurrent access if deleting multiple networks
 	n.session.Connect()
@@ -68,7 +70,7 @@ func (n network) Delete(names []string, timeout time.Duration, force bool) error
 	}
 
 	// finally, using context
-	newCtx := context.WithValue(ctx, "force", force)
+	newCtx := context.WithValue(ctx, &forceCtxKey, force)
 	if timeout != 0 {
 		aCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()

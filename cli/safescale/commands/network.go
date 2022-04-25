@@ -67,23 +67,10 @@ var networkList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		networks, err := clientSession.Network.List(c.Bool("all"), 0)
+		networks, err := ClientSession.Network.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "list of networks", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of networks", false).Error())))
 		}
 		return clitools.SuccessResponse(networks.GetNetworks())
 	},
@@ -114,12 +101,7 @@ var networkDelete = cli.Command{
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Network.Delete(networkList, 0, c.Bool("force"))
+		err := ClientSession.Network.Delete(networkList, 0, c.Bool("force"))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network", false).Error())))
@@ -141,12 +123,7 @@ var networkInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		network, err := clientSession.Network.Inspect(c.Args().First(), 0)
+		network, err := ClientSession.Network.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
@@ -165,7 +142,7 @@ var networkInspect = cli.Command{
 
 		if len(network.Subnets) == 1 {
 			if network.Subnets[0] == network.Name {
-				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, 0)
+				subnet, err := ClientSession.Subnet.Inspect(network.Id, network.Name, 0)
 				if err != nil {
 					err = fail.FromGRPCStatus(err)
 					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
@@ -206,7 +183,7 @@ var networkInspect = cli.Command{
 					mapped["subnet_state_label"] = subnetstate.Enum(int32(staltnum)).String()
 				}
 
-				if err = queryGatewaysInformation(clientSession, subnet, mapped, false); err != nil {
+				if err = queryGatewaysInformation(ClientSession, subnet, mapped, false); err != nil {
 					return err
 				}
 
@@ -347,13 +324,9 @@ var networkCreate = cli.Command{
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 		}
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
 
 		gatewaySSHPort := uint32(c.Int("gwport"))
-		network, err := clientSession.Network.Create(
+		network, err := ClientSession.Network.Create(
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
 			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),

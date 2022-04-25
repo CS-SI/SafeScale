@@ -106,8 +106,7 @@ function install_keepalived() {
 		    advert_int 2
 		    authentication {
 		        auth_type PASS
-		        auth_pass {{ .GatewayHAKeepalivedPassword }}
-		
+		        auth_pass "{{ .GatewayHAKeepalivedPassword }}"
 		    }
 		{{ if eq .IsPrimaryGateway true }}
 		    # Unicast specific option, this is the IP of the interface keepalived listens on

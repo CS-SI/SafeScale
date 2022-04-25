@@ -57,12 +57,7 @@ var bucketList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(xerr)
-		}
-
-		resp, err := clientSession.Bucket.List(c.Bool("all"), 0)
+		resp, err := ClientSession.Bucket.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
@@ -84,12 +79,7 @@ var bucketCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(xerr)
-		}
-
-		err := clientSession.Bucket.Create(c.Args().Get(0), 0)
+		err := ClientSession.Bucket.Create(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of bucket", true).Error())))
@@ -115,12 +105,7 @@ var bucketDelete = cli.Command{
 		bucketList = append(bucketList, c.Args().First())
 		bucketList = append(bucketList, c.Args().Tail()...)
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(xerr)
-		}
-
-		err := clientSession.Bucket.Delete(bucketList, 0)
+		err := ClientSession.Bucket.Delete(bucketList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
@@ -142,12 +127,7 @@ var bucketInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(xerr)
-		}
-
-		resp, err := clientSession.Bucket.Inspect(c.Args().Get(0), 0)
+		resp, err := ClientSession.Bucket.Inspect(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
@@ -180,12 +160,7 @@ var bucketMount = cli.Command{
 		default:
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(xerr)
-		}
-
-		err := clientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
+		err := ClientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "mount of bucket", true).Error())))
@@ -212,12 +187,7 @@ var bucketUnmount = cli.Command{
 		default:
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(xerr)
-		}
-
-		err := clientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
+		err := ClientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unmount of bucket", true).Error())))

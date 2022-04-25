@@ -74,18 +74,13 @@ var sshRun = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		var timeout time.Duration
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
 			timeout = 0
 		}
-		retcode, _, _, err := clientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
+		retcode, _, _, err := ClientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
@@ -123,18 +118,13 @@ var sshCopy = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		var timeout time.Duration
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		} else {
 			timeout = 0
 		}
-		retcode, _, _, err := clientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
+		retcode, _, _, err := ClientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
@@ -170,17 +160,13 @@ var sshConnect = cli.Command{
 			return fmt.Errorf("missing mandatory argument <Host_name>")
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		// Check host status 1st
-		resp, err := clientSession.Host.GetStatus(c.Args().Get(0), 0)
+		resp, err := ClientSession.Host.GetStatus(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
 		}
+
 		converted := converters.HostStateFromProtocolToEnum(resp.Status)
 		if converted != hoststate.Started {
 			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("Host %s is not in 'Started' state, it's '%s'", c.Args().Get(0), converted.String())))
@@ -195,7 +181,7 @@ var sshConnect = cli.Command{
 		if c.IsSet("shell") {
 			shell = c.String("shell")
 		}
-		err = clientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
+		err = ClientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))
@@ -233,11 +219,6 @@ var sshTunnel = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		localPort := c.Int("local")
 		if 0 > localPort || localPort > 65535 {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port", localPort)))
@@ -251,7 +232,7 @@ var sshTunnel = cli.Command{
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 
 		// c.GlobalInt("port") is the grpc port aka. 50051
-		err := clientSession.SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
+		err := ClientSession.SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh tunnel", false).Error())))
@@ -289,11 +270,6 @@ var sshClose = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		strLocalPort := c.String("local")
 		if c.IsSet("local") {
 			localPort, err := strconv.Atoi(strLocalPort)
@@ -310,7 +286,7 @@ var sshClose = cli.Command{
 		}
 
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
-		err := clientSession.SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
+		err := ClientSession.SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh close", false).Error())))

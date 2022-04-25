@@ -74,13 +74,13 @@ var hostStart = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		hostRef := c.Args().First()
-		err := clientSession.Host.Start(hostRef, 0)
+		err := Session.Host.Start(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of host", false).Error())))
@@ -101,13 +101,13 @@ var hostStop = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		hostRef := c.Args().First()
-		err := clientSession.Host.Stop(hostRef, 0)
+		err := Session.Host.Stop(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "stop of host", false).Error())))
@@ -128,13 +128,13 @@ var hostReboot = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		hostRef := c.Args().First()
-		err := clientSession.Host.Reboot(hostRef, 0)
+		err := Session.Host.Reboot(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reboot of host", false).Error())))
@@ -157,12 +157,12 @@ var hostList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		hosts, err := clientSession.Host.List(c.Bool("all"), 0)
+		hosts, err := Session.Host.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
@@ -201,12 +201,12 @@ var hostInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Host.Inspect(c.Args().First(), 0)
+		resp, err := Session.Host.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -229,12 +229,12 @@ var hostStatus = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Host.GetStatus(c.Args().First(), 0)
+		resp, err := Session.Host.GetStatus(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
@@ -322,11 +322,6 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			return err
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		req := protocol.HostDefinition{
 			Name:           c.Args().First(),
 			ImageId:        c.String("os"),
@@ -337,7 +332,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			SizingAsString: sizing,
 			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
-		resp, err := clientSession.Host.Create(&req, 0)
+		resp, err := ClientSession.Host.Create(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -390,11 +385,6 @@ var hostResize = cli.Command{ // nolint
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		def := protocol.HostDefinition{
 			Name:     c.Args().First(),
 			CpuCount: int32(c.Int("cpu")),
@@ -404,7 +394,7 @@ var hostResize = cli.Command{ // nolint
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
-		resp, err := clientSession.Host.Resize(&def, 0)
+		resp, err := ClientSession.Host.Resize(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -429,12 +419,7 @@ var hostDelete = cli.Command{
 		hostList = append(hostList, c.Args().First())
 		hostList = append(hostList, c.Args().Tail()...)
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		if err := clientSession.Host.Delete(hostList, 0); err != nil {
+		if err := ClientSession.Host.Delete(hostList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
 		}
@@ -454,12 +439,7 @@ var hostSSH = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		resp, err := clientSession.Host.SSHConfig(c.Args().First())
+		resp, err := ClientSession.Host.SSHConfig(c.Args().First())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -608,12 +588,7 @@ var hostSecurityGroupAddCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), 0)
+		err := ClientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -635,12 +610,7 @@ var hostSecurityGroupRemoveCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
+		err := ClientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -678,12 +648,7 @@ var hostSecurityGroupListCommand = cli.Command{
 			state = "all"
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		resp, err := clientSession.Host.ListSecurityGroups(c.Args().First(), state, 0)
+		resp, err := ClientSession.Host.ListSecurityGroups(c.Args().First(), state, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -725,12 +690,7 @@ var hostSecurityGroupEnableCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
+		err := ClientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enable security group of host", false).Error())))
@@ -752,12 +712,7 @@ var hostSecurityGroupDisableCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
+		err := ClientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disable security group of host", false).Error())))
@@ -808,12 +763,7 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	list, err := clientSession.Host.ListFeatures(hostName, c.Bool("all"), 0)
+	list, err := ClientSession.Host.ListFeatures(hostName, c.Bool("all"), 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
@@ -853,12 +803,7 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	details, err := clientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	details, err := ClientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -902,12 +847,7 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	export, err := clientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	export, err := ClientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -959,12 +899,7 @@ func hostFeatureAddAction(c *cli.Context) (ferr error) {
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
+	err = ClientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
@@ -1008,12 +943,7 @@ func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	if err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
+	if err = ClientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
 		switch grpcstatus.Code(err) {
 		case codes.NotFound:
 			return clitools.FailureResponse(clitools.ExitOnNotFound(fail.FromGRPCStatus(err).Error()))
@@ -1059,12 +989,7 @@ func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	err = clientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)
+	err = ClientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to remove Feature '%s' on Host '%s': %s", featureName, hostName, err.Error())

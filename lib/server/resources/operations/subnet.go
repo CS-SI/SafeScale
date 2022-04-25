@@ -46,7 +46,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -1097,7 +1096,6 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 	var force bool
 	var ok bool
 	if cv := ctx.Value("force"); cv != nil {
-		logrus.Warningf("value: %s", spew.Sdump(cv))
 		force, ok = cv.(bool)
 		if !ok {
 			return fail.InvalidRequestError("force flag must be a bool")
@@ -1175,10 +1173,14 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if _, innerXErr := LoadHost(lastCtx, svc, k, WithoutReloadOption); innerXErr != nil {
+					if hess, innerXErr := LoadHost(lastCtx, svc, k, WithReloadOption); innerXErr != nil {
 						debug.IgnoreError(innerXErr)
 					} else {
-						hostList = append(hostList, k)
+						if _, innerXErr := hess.ForceGetState(lastCtx); innerXErr != nil {
+							debug.IgnoreError(innerXErr)
+						} else {
+							hostList = append(hostList, k)
+						}
 					}
 				}
 			}

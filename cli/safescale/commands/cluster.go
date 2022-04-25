@@ -92,12 +92,7 @@ var clusterListCommand = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		list, err := clientSession.Cluster.List(0)
+		list, err := ClientSession.Cluster.List(0)
 		if err != nil {
 			err := fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
@@ -204,12 +199,7 @@ var clusterInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		cluster, err := clientSession.Cluster.Inspect(clusterName, 0)
+		cluster, err := ClientSession.Cluster.Inspect(clusterName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
@@ -489,11 +479,6 @@ var clusterCreateCommand = cli.Command{
 			}
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		req := protocol.ClusterCreateRequest{
 			Name:           clusterName,
 			Complexity:     protocol.ClusterComplexity(comp),
@@ -510,7 +495,7 @@ var clusterCreateCommand = cli.Command{
 			Parameters:     c.StringSlice("param"),
 			DefaultSshPort: gatewaySSHPort,
 		}
-		res, err := clientSession.Cluster.Create(&req, 0)
+		res, err := ClientSession.Cluster.Create(&req, 0)
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -567,12 +552,7 @@ var clusterDeleteCommand = cli.Command{
 			return clitools.SuccessResponse("Aborted")
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = clientSession.Cluster.Delete(clusterName, force, 0)
+		err = ClientSession.Cluster.Delete(clusterName, force, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -596,12 +576,7 @@ var clusterStopCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = clientSession.Cluster.Stop(clusterName, 0)
+		err = ClientSession.Cluster.Stop(clusterName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -625,12 +600,7 @@ var clusterStartCommand = cli.Command{
 		}
 		clusterRef := c.Args().First()
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		if err = clientSession.Cluster.Start(clusterRef, 0); err != nil {
+		if err = ClientSession.Cluster.Start(clusterRef, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of cluster", false).Error())))
 		}
@@ -652,12 +622,7 @@ var clusterStateCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		state, err := clientSession.Cluster.GetState(clusterName, 0)
+		state, err := ClientSession.Cluster.GetState(clusterName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
@@ -739,12 +704,7 @@ var clusterExpandCommand = cli.Command{
 			Parameters:    c.StringSlice("param"),
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		hosts, err := clientSession.Cluster.Expand(&req, 0)
+		hosts, err := ClientSession.Cluster.Expand(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -799,12 +759,7 @@ var clusterShrinkCommand = cli.Command{
 			Count: int32(count),
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		if _, err = clientSession.Cluster.Shrink(&req, 0); err != nil {
+		if _, err = ClientSession.Cluster.Shrink(&req, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
@@ -1028,7 +983,7 @@ var clusterRunCommand = cli.Command{
 
 func executeCommand(clientSession *client.Session, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
-	master, err := clientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
+	master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 	if err != nil {
 		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1163,12 +1118,7 @@ var clusterNodeListCommand = cli.Command{
 
 		var formatted []map[string]interface{}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		list, err := clientSession.Cluster.ListNodes(clusterName, 0)
+		list, err := ClientSession.Cluster.ListNodes(clusterName, 0)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -1202,12 +1152,7 @@ var clusterNodeInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, 0)
+		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1244,12 +1189,7 @@ var clusterNodeDeleteCommand = cli.Command{
 		yes := c.Bool("yes")
 		force := c.Bool("force")
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		_, err = clientSession.Cluster.Inspect(clusterName, 0)
+		_, err = ClientSession.Cluster.Inspect(clusterName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
@@ -1266,7 +1206,7 @@ var clusterNodeDeleteCommand = cli.Command{
 			logrus.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
+		err = ClientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1294,12 +1234,7 @@ var clusterNodeStopCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = clientSession.Cluster.StopNode(clusterName, hostName, 0)
+		err = ClientSession.Cluster.StopNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1327,12 +1262,7 @@ var clusterNodeStartCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = clientSession.Cluster.StartNode(clusterName, hostName, 0)
+		err = ClientSession.Cluster.StartNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1359,12 +1289,7 @@ var clusterNodeStateCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		resp, err := clientSession.Cluster.StateNode(clusterName, hostName, 0)
+		resp, err := ClientSession.Cluster.StateNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1413,12 +1338,7 @@ var clusterMasterListCommand = cli.Command{
 
 		var formatted []map[string]interface{}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		list, err := clientSession.Cluster.ListMasters(clusterName, 0)
+		list, err := ClientSession.Cluster.ListMasters(clusterName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1453,12 +1373,7 @@ var clusterMasterInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, 0)
+		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1486,12 +1401,7 @@ var clusterMasterStopCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = clientSession.Cluster.StopMaster(clusterName, hostName, 0)
+		err = ClientSession.Cluster.StopMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1519,12 +1429,7 @@ var clusterMasterStartCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = clientSession.Cluster.StartMaster(clusterName, hostName, 0)
+		err = ClientSession.Cluster.StartMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1551,12 +1456,7 @@ var clusterMasterStateCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		resp, err := clientSession.Cluster.StateMaster(clusterName, hostName, 0)
+		resp, err := ClientSession.Cluster.StateMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1610,16 +1510,11 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	if err := extractClusterName(c); err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	features, err := clientSession.Cluster.ListFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
+	features, err := ClientSession.Cluster.ListFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1651,11 +1546,6 @@ func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	if err := extractClusterName(c); err != nil {
 		return clitools.FailureResponse(err)
 	}
@@ -1665,7 +1555,7 @@ func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	details, err := clientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	details, err := ClientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1701,11 +1591,6 @@ func clusterFeatureExportAction(c *cli.Context) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
 	if err := extractClusterName(c); err != nil {
 		return clitools.FailureResponse(err)
 	}
@@ -1716,7 +1601,7 @@ func clusterFeatureExportAction(c *cli.Context) (ferr error) {
 		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
 	}
 
-	export, err := clientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	export, err := ClientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1766,12 +1651,7 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	if err := clientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0); err != nil {
+	if err := ClientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -1822,12 +1702,7 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	if err := clientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0); err != nil { // FIXME: define duration
+	if err := ClientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0); err != nil { // FIXME: define duration
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error checking Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -1870,12 +1745,7 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 	settings.SkipProxy = true
 
-	clientSession, xerr := client.New(c.String("server"))
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
-
-	if err := clientSession.Cluster.RemoveFeature(clusterName, featureName, values, &settings, 0); err != nil {
+	if err := ClientSession.Cluster.RemoveFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to remove Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -1916,7 +1786,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 		}
 
 		// Get cluster master
-		master, err := clientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
+		master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 		if err != nil {
 			msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1925,7 +1795,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 		// Check for feature
 		values := map[string]string{}
 		settings := protocol.FeatureSettings{}
-		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+		if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -2006,7 +1876,7 @@ var clusterAnsibleRunCommands = cli.Command{
 		}
 
 		// Get cluster master
-		master, err := clientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
+		master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 		if err != nil {
 			msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -2015,7 +1885,7 @@ var clusterAnsibleRunCommands = cli.Command{
 		// Check for feature
 		values := map[string]string{}
 		settings := protocol.FeatureSettings{}
-		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+		if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -2102,7 +1972,7 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 		// Check for feature
 		values := map[string]string{}
 		settings := protocol.FeatureSettings{}
-		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+		if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))

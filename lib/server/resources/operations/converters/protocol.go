@@ -35,17 +35,21 @@ import (
 
 // SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
 func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
-	var gw *system.SSHConfig
+	var pgw, sgw *system.SSHConfig
 	if from.Gateway != nil {
-		gw = SSHConfigFromProtocolToSystem(from.Gateway)
+		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
+	}
+	if from.SecondaryGateway != nil {
+		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
 	return &system.SSHConfig{
-		User:          from.User,
-		Hostname:      from.HostName,
-		IPAddress:     from.Host,
-		PrivateKey:    from.PrivateKey,
-		Port:          int(from.Port),
-		GatewayConfig: gw,
+		User:                   from.User,
+		Hostname:               from.HostName,
+		IPAddress:              from.Host,
+		PrivateKey:             from.PrivateKey,
+		Port:                   int(from.Port),
+		GatewayConfig:          pgw,
+		SecondaryGatewayConfig: sgw,
 	}
 }
 

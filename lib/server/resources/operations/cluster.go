@@ -2943,7 +2943,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("%s Timeouts ansible update inventory", prerr)
+			logrus.Warnf("%s Timeouts ansible update inventory", prerr)
 		}
 	}
 	if len(errors) != 0 {

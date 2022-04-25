@@ -185,9 +185,7 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -206,7 +204,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 	}
 
 	objgw := castedParams.host
-	if objgw == nil || valid.IsNil(objgw) {
+	if valid.IsNil(objgw) {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
 

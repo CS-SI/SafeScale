@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v21/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
@@ -51,12 +50,7 @@ var imageList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		images, err := clientSession.Image.List(c.Bool("all"), 0)
+		images, err := ClientSession.Image.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))

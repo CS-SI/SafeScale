@@ -71,7 +71,7 @@ func (s subnet) Delete(networkRef string, names []string, timeout time.Duration,
 	}
 
 	// finally, using context
-	valCtx := context.WithValue(ctx, "force", force) // nolint
+	valCtx := context.WithValue(ctx, &forceCtxKey, force) // nolint
 	newCtx, cancel := context.WithTimeout(valCtx, timeout)
 	defer cancel()
 

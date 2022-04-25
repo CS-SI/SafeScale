@@ -1698,7 +1698,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts creating masters !!")
+			logrus.Warnf("Timeouts creating masters !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create master(s): %s", clusterName, xerr)
 		if len(collectedErs) != 0 {
@@ -2113,7 +2113,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts configuring masters !!")
+			logrus.Warnf("Timeouts configuring masters !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure master(s): %s", instance.GetName(), xerr)
 		if len(loadErrors) != 0 {
@@ -2295,7 +2295,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts creating nodes !!")
+			logrus.Warnf("Timeouts creating nodes !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
 		return nil, rerr
@@ -2698,7 +2698,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts configuring nodes !!")
+			logrus.Warnf("Timeouts configuring nodes !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), xerr)
 		if len(startErrs) > 0 {

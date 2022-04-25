@@ -366,7 +366,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(subtasks) != len(hosts) {
-			logrus.Warningf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
+			logrus.Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
 		}
 		logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
 		if taskErr != nil {

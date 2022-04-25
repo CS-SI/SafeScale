@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
 )
@@ -100,11 +99,6 @@ var shareCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		shareName := c.Args().Get(0)
 		def := protocol.ShareDefinition{
 			Name: shareName,
@@ -122,7 +116,7 @@ var shareCreate = cli.Command{
 			SecurityModes: c.StringSlice("securityModes"),
 		}
 
-		err := clientSession.Share.Create(&def, 0)
+		err := ClientSession.Share.Create(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "creation of share", true).Error()))
@@ -153,12 +147,7 @@ var shareDelete = cli.Command{
 		shareList = append(shareList, c.Args().First())
 		shareList = append(shareList, c.Args().Tail()...)
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		if err := clientSession.Share.Delete(shareList, 0); err != nil {
+		if err := ClientSession.Share.Delete(shareList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of share", false).Error())))
 		}
@@ -174,12 +163,7 @@ var shareList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		list, err := clientSession.Share.List(0)
+		list, err := ClientSession.Share.List(0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "list of shares", false).Error()))
@@ -211,11 +195,6 @@ var shareMount = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		shareName := c.Args().Get(0)
 		hostName := c.Args().Get(1)
 		path := c.String("path")
@@ -226,7 +205,7 @@ var shareMount = cli.Command{
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
 		}
-		err := clientSession.Share.Mount(&def, 0)
+		err := ClientSession.Share.Mount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "mount of nas", true).Error()))
@@ -248,18 +227,13 @@ var shareUnmount = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments SHARE_REF and/or HOST_REF."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		shareName := c.Args().Get(0)
 		hostName := c.Args().Get(1)
 		def := protocol.ShareMountDefinition{
 			Host:  &protocol.Reference{Name: hostName},
 			Share: &protocol.Reference{Name: shareName},
 		}
-		err := clientSession.Share.Unmount(&def, 0)
+		err := ClientSession.Share.Unmount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "unmount of share", true).Error()))
@@ -281,12 +255,7 @@ var shareInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SHARE_REF."))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		list, err := clientSession.Share.Inspect(c.Args().Get(0), 0)
+		list, err := ClientSession.Share.Inspect(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "inspection of share", false).Error()))

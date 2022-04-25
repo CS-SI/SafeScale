@@ -91,13 +91,13 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 
 	// We specify a name and that it should forward packets
 	state := true
-	basic_opts := networks.CreateOpts{
+	basicOpts := networks.CreateOpts{
 		Name:         req.Name,
 		AdminStateUp: &state,
 	}
 
 	opts := portsecurity.NetworkCreateOptsExt{
-		CreateOptsBuilder:   basic_opts,
+		CreateOptsBuilder:   basicOpts,
 		PortSecurityEnabled: gophercloud.Enabled,
 	}
 

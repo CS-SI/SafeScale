@@ -787,7 +787,7 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 	}
 
 	if missingSomething {
-		logrus.Warningf("Ignoring metadata upgrade of Cluster '%s' due to missing referenced resources", instance.GetName())
+		logrus.Warnf("Ignoring metadata upgrade of Cluster '%s' due to missing referenced resources", instance.GetName())
 	} else {
 		xerr = tv.upgradeClusterDefaultsPropertyIfNeeded(instance)
 		xerr = debug.InjectPlannedFail(xerr)
