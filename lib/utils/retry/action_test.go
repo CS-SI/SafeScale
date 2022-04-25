@@ -262,8 +262,8 @@ func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 			func() error {
 				return nil
 			},
-			100*time.Millisecond,
-			40*time.Millisecond,
+			600*time.Millisecond,
+			240*time.Millisecond,
 		)
 		require.EqualValues(t, err, nil)
 	})
@@ -274,7 +274,7 @@ func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 		func() error {
 			return nil
 		},
-		100*time.Millisecond,
+		600*time.Millisecond,
 		-1*time.Second,
 	)
 	require.EqualValues(t, err, nil)
