@@ -383,7 +383,6 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 
 			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
 			if xerr != nil {
-				logrus.Warningf("Good intentions: %s", xerr.Error())
 				return xerr
 			}
 

@@ -166,7 +166,7 @@ func (sc *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 
 		rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
 		if rv == -2 {
-			logrus.Warningf("tunnel problem")
+			// logrus.Warningf("tunnel problem")
 			return fmt.Errorf("tunnel problem")
 		}
 		rc = rv
@@ -290,18 +290,18 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				if strings.Contains(internalErr.Error(), "EOF") {
 					eofCount = eofCount + 1
 					if eofCount >= 14 {
-						logrus.Warningf("client seems dead")
+						// logrus.Warningf("client seems dead")
 						return retry.StopRetryError(internalErr, "client seems dead")
 					}
 				}
 				if strings.Contains(internalErr.Error(), "unexpected packet") {
-					logrus.Warningf("client seems dead")
+					// logrus.Warningf("client seems dead")
 					return retry.StopRetryError(internalErr, "client seems dead")
 				}
 				return internalErr
 			}
 			if session != nil { // race condition mitigation
-				logrus.Warningf("too late")
+				// logrus.Warningf("too late")
 				return fmt.Errorf("too late")
 			}
 			logrus.Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
@@ -616,7 +616,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 			// FIXME: Remove WaitServerReady logs and ensure minimum of iterations
 			if task != nil {
 				if task != nil && task.Aborted() {
-					logrus.Warningf("Someone aborted")
+					// logrus.Warningf("Someone aborted")
 					return fail.AbortedError(nil, "task already aborted by the parent")
 				}
 			}
@@ -626,7 +626,6 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 			var xerr fail.Error
 			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
-				logrus.Warningf("this happened: %s", xerr.Error())
 				return xerr
 			}
 
@@ -637,7 +636,6 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 				fe.Annotate("stderr", stderr)
 				fe.Annotate("operation", cmd.Display())
 				fe.Annotate("iterations", iterations)
-				logrus.Warningf("This is hard: %s", fe.Error())
 				return fe
 			}
 
