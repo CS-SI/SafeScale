@@ -572,7 +572,7 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", xerr
@@ -1133,6 +1133,11 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	originalPhase := phase
 	if phase == "ready" {
 		phase = "final"
+	}
+
+	// no timeout is unsafe, we set an upper limit
+	if timeout == 0 {
+		timeout = temporal.HostLongOperationTimeout()
 	}
 
 	var (
