@@ -35,7 +35,7 @@ jobs:
         brew update
         brew install protoc-gen-go
 
-    - run: make ${{ matrix.tags }} rawci with-coverage mintest
+    - run: make ${{ matrix.tags }} rawci with-coverage
     - uses: actions/upload-artifact@v2
       if: failure()
       with:
