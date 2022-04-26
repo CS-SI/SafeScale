@@ -72,6 +72,9 @@ func (l locationtransparent) ItemEtag(bucketName, objectName string) (_ string, 
 }
 
 func (l locationtransparent) ReadObject(s string, s2 string, writer io.Writer, i int64, i2 int64) fail.Error {
+	incrementExpVar("readobject")
+	incrementExpVar("metadata.reads")
+
 	xerr := l.inner.ReadObject(s, s2, writer, i, i2)
 	if xerr != nil {
 		return xerr
@@ -81,6 +84,9 @@ func (l locationtransparent) ReadObject(s string, s2 string, writer io.Writer, i
 }
 
 func (l locationtransparent) WriteMultiPartObject(s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
+	incrementExpVar("writeobject")
+	incrementExpVar("metadata.writes")
+
 	chunk, err := l.inner.WriteMultiPartObject(s, s2, reader, i, i2, metadata)
 	if err != nil {
 		return abstract.ObjectStorageItem{}, err
@@ -90,6 +96,9 @@ func (l locationtransparent) WriteMultiPartObject(s string, s2 string, reader io
 }
 
 func (l locationtransparent) WriteObject(s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
+	incrementExpVar("writeobject")
+	incrementExpVar("metadata.writes")
+
 	chunk, err := l.inner.WriteObject(s, s2, reader, i, metadata)
 	if err != nil {
 		return abstract.ObjectStorageItem{}, err
