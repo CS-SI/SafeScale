@@ -68,6 +68,7 @@ type Config struct {
 	Credentials      string
 	BucketName       string
 	DNS              string
+	Direct           bool // if true, no stow cache is used
 }
 
 // Location ...
@@ -140,7 +141,7 @@ type location struct {
 }
 
 // NewLocation creates an Object Storage location based on config
-func NewLocation(conf Config) (_ *locationcache, ferr fail.Error) { // nolint
+func NewLocation(conf Config) (_ Location, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 	l := &location{
 		config: conf,
@@ -149,6 +150,15 @@ func NewLocation(conf Config) (_ *locationcache, ferr fail.Error) { // nolint
 	if err != nil {
 		return nil, err
 	}
+
+	if conf.Direct {
+		nlt, serr := newlocationtransparent(l)
+		if serr != nil {
+			return nil, fail.ConvertError(serr)
+		}
+		return nlt, nil
+	}
+
 	nl, serr := newLocationcache(l)
 	if serr != nil {
 		return nil, fail.ConvertError(serr)
