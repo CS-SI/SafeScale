@@ -94,6 +94,14 @@ func (l locationcache) InvalidateObject(bucketName string, objectName string) fa
 	return nil
 }
 
+func (l locationcache) DownloadBucket(bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {
+	mu := l.getLock(bucketName, "download")
+	mu.RLock()
+	defer mu.RUnlock()
+
+	return l.inner.DownloadBucket(bucketName, decryptionKey)
+}
+
 func (l locationcache) InspectObject(s string, s2 string) (abstract.ObjectStorageItem, fail.Error) {
 	mu := l.getLock(s, s2)
 	mu.RLock()

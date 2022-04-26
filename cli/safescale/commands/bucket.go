@@ -17,6 +17,10 @@
 package commands
 
 import (
+	"io/ioutil"
+	"strings"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -40,6 +44,7 @@ var BucketCommand = cli.Command{
 		bucketInspect,
 		bucketMount,
 		bucketUnmount,
+		bucketDownload,
 	},
 }
 
@@ -63,6 +68,52 @@ var bucketList = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
+	},
+}
+
+var bucketDownload = cli.Command{
+	Name:    "download",
+	Aliases: []string{"download"},
+	Usage:   "Downloads a bucket",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "output",
+			Value:    "",
+			Required: true,
+			Usage:    "filename where the zipped bucket is stored",
+		},
+	},
+	ArgsUsage: "BUCKET_NAME",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+		}
+
+		filename := c.String("output")
+		if !strings.HasSuffix(strings.ToLower(filename), ".zip") {
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("output file should have .zip suffix"))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		dr, err := clientSession.Bucket.Download(c.Args().Get(0), 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bucket download", true).Error())))
+		}
+
+		err = ioutil.WriteFile(filename, dr.Content, 0644)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		return clitools.SuccessResponse(nil)
 	},
 }
 
