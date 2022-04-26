@@ -197,7 +197,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 		return regions, nil
 	}
 
-	return nil, nil
+	return []string{}, nil
 }
 
 // InspectImage loads information about an image stored in AWS
@@ -343,7 +343,7 @@ func (s stack) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
 		return images, nil
 	}
 
-	return nil, nil
+	return []*abstract.Image{}, nil
 }
 
 func toAbstractImage(in ec2.Image) *abstract.Image {

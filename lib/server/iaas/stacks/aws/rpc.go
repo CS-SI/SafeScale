@@ -1611,7 +1611,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 		return nil, xerr
 	}
 	if len(resp.SpotInstanceRequests) == 0 {
-		return nil, nil
+		return nil, fail.NotAvailableError("no spot instances available")
 	}
 	return resp.SpotInstanceRequests[0], nil
 }
