@@ -140,7 +140,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, ferr fail.Error) {
+func LoadShare(ctx context.Context, svc iaas.Service, ref string) (_ resources.Share, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -150,7 +150,7 @@ func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, fer
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -169,7 +169,7 @@ func LoadShare(svc iaas.Service, ref string) (shareInstance resources.Share, fer
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
-func onShareCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	shareInstance, innerXErr := NewShare(svc)
 	if innerXErr != nil {
 		return nil, innerXErr

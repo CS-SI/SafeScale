@@ -32,5 +32,5 @@ func New(svc iaas.Service) (resources.Volume, fail.Error) {
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
 func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
-	return operations.LoadVolume(ctx, svc, ref, operations.WithReloadOption)
+	return operations.LoadVolume(ctx, svc, ref)
 }

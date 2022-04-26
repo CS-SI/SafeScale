@@ -149,7 +149,7 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 }
 
 // LoadCluster loads cluster information from metadata
-func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
+func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -1194,7 +1194,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			for _, v := range nodes {
 				v := v
 				_, derr = dtg.Start(
-					instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: WithoutReloadOption},
+					instance.taskDeleteNode, taskDeleteNodeParameters{node: v},
 				)
 				if derr != nil {
 					abErr := dtg.AbortWithCause(derr)
@@ -1386,7 +1386,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
-	xerr = instance.deleteNode(task.Context(), node, selectedMaster.(*Host), WithReloadOption)
+	xerr = instance.deleteNode(task.Context(), node, selectedMaster.(*Host))
 	if xerr != nil {
 		return xerr
 	}
@@ -2037,7 +2037,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 }
 
 // deleteNode deletes a node
-func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host, loadHostMethod data.ImmutableKeyValue) (ferr fail.Error) {
+func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2114,7 +2114,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	}()
 
 	// Deletes node
-	hostInstance, xerr := LoadHost(task.Context(), instance.Service(), nodeRef, loadHostMethod)
+	hostInstance, xerr := LoadHost(task.Context(), instance.Service(), nodeRef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2312,7 +2312,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 				completedOptions = append(completedOptions, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
 				_, xerr = tg.Start(
-					instance.taskDeleteNode, taskDeleteNodeParameters{node: n, nodeLoadMethod: WithoutReloadOption},
+					instance.taskDeleteNode, taskDeleteNodeParameters{node: n},
 					completedOptions...,
 				)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2338,7 +2338,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 				completedOptions = append(completedOptions, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
 				_, xerr := tg.Start(
-					instance.taskDeleteMaster, taskDeleteNodeParameters{node: n, nodeLoadMethod: WithoutReloadOption},
+					instance.taskDeleteMaster, taskDeleteNodeParameters{node: n},
 					completedOptions...,
 				)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2396,7 +2396,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 		for _, v := range all {
 			_, xerr = tg.Start(
-				instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: WithoutReloadOption},
+				instance.taskDeleteNode, taskDeleteNodeParameters{node: v},
 				concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)),
 			)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -3407,7 +3407,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		for _, v := range removedNodes {
 			_, xerr = tg.Start(
 				instance.taskDeleteNode,
-				taskDeleteNodeParameters{node: v, nodeLoadMethod: WithReloadOption, master: selectedMaster.(*Host)},
+				taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host)},
 				concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)),
 			)
 			xerr = debug.InjectPlannedFail(xerr)

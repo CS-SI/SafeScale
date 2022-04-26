@@ -105,7 +105,7 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 }
 
 // LoadHost ...
-func LoadHost(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Host, ferr fail.Error) {
+func LoadHost(ctx context.Context, svc iaas.Service, ref string) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -2314,7 +2314,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				if count > 0 {
 					// clients found, checks if these clients already exists...
 					for _, hostID := range hostShare.ClientsByID {
-						instance, inErr := LoadHost(task.Context(), svc, hostID, WithoutReloadOption)
+						instance, inErr := LoadHost(task.Context(), svc, hostID)
 						if inErr != nil {
 							debug.IgnoreError(inErr)
 							continue

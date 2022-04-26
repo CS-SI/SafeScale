@@ -77,7 +77,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, ferr fail.Error) {
+func LoadVolume(ctx context.Context, svc iaas.Service, ref string) (_ resources.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -93,7 +93,6 @@ func LoadVolume(svc iaas.Service, ref string) (volumeInstance resources.Volume, 
 		return nil, xerr
 	}
 
-	var ok bool
 	volumeInstance, ok := anon.(resources.Volume)
 	if !ok {
 		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
 	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
 	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
@@ -196,12 +196,6 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		derr := instance.Released()
-		if derr != nil {
-			logrus.Warn(derr)
-		}
-	}()
 
 	return instance.ToProtocol()
 }
