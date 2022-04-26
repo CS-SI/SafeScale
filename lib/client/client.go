@@ -127,7 +127,7 @@ func New(server string) (_ *Session, ferr fail.Error) {
 
 func validateServerString(server string) (string, fail.Error) {
 	if server == "" {
-		return "", nil
+		return "", fail.InvalidParameterError("server", "is empty")
 	}
 
 	parts := strings.Split(server, ":")

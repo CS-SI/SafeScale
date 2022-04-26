@@ -131,15 +131,15 @@ type deleteResult struct {
 }
 
 // ListFloatingIPs lists all the floating IP currently requested for the VPC
-func (s stack) ListFloatingIPs() pagination.Pager {
+func (s stack) ListFloatingIPs() (pagination.Pager, fail.Error) {
 	if valid.IsNil(s) {
-		return pagination.Pager{}
+		return pagination.Pager{}, fail.InvalidInstanceError()
 	}
 
 	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
 	return pagination.NewPager(s.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
-	})
+	}), nil
 }
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
@@ -185,7 +185,11 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 	fip := FloatingIP{}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := s.ListFloatingIPs().EachPage(func(page pagination.Page) (bool, error) {
+			floats, innerErr := s.ListFloatingIPs()
+			if innerErr != nil {
+				return normalizeError(innerErr)
+			}
+			paginationErr := floats.EachPage(func(page pagination.Page) (bool, error) {
 				list, err := extractFloatingIPs(page)
 				if err != nil {
 					return false, err
@@ -199,7 +203,7 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 				}
 				return true, nil
 			})
-			return normalizeError(innerErr)
+			return normalizeError(paginationErr)
 		},
 		normalizeError,
 	)

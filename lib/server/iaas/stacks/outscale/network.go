@@ -36,7 +36,7 @@ const tagNameLabel = "name"
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	if valid.IsNil(s) {
-		return false, nil
+		return false, fail.InvalidInstanceError()
 	}
 	return s.vpc != nil, nil
 }

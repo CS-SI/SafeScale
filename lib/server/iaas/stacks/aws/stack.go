@@ -66,7 +66,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) {
-		return stacks.ConfigurationOptions{}, nil
+		return stacks.ConfigurationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.Config, nil
 }
@@ -74,7 +74,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	if valid.IsNil(s) {
-		return stacks.AuthenticationOptions{}, nil
+		return stacks.AuthenticationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.AuthOptions, nil
 }
