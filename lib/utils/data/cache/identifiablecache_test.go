@@ -180,7 +180,7 @@ func TestFreeEntry(t *testing.T) {
 	err = rc2.ReserveEntry(song, "days", 1*time.Second)
 	require.NoError(t, err)
 
-	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, song.Value(concurrency.KeyForTaskInContext))
+	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, song.Value(concurrency.KeyForTaskInContext)) // nolint
 
 	err = rc2.FreeEntry(derived, "days")
 	require.NoError(t, err)

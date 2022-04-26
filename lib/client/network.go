@@ -70,7 +70,7 @@ func (n network) Delete(names []string, timeout time.Duration, force bool) error
 	}
 
 	// finally, using context
-	newCtx := context.WithValue(ctx, &forceCtxKey, force)
+	newCtx := context.WithValue(ctx, &forceCtxKey, force) // nolint
 	if timeout != 0 {
 		aCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()

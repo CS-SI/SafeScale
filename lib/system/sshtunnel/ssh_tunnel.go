@@ -62,7 +62,7 @@ func SilentOnPanic(err *error) func() {
 	return func() {
 		if x := recover(); x != nil {
 			if anError, ok := x.(error); ok {
-				logrus.Errorf("runtime panic occurred: %w", anError)
+				logrus.Errorf("runtime panic occurred: %v", anError)
 			} else {
 				logrus.Errorf("runtime panic occurred: %v", x)
 			}
@@ -354,14 +354,14 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	return nil
 }
 
-func TunnelOptionWithDialTimeout(timeout time.Duration) Option {
+func TunnelOptionWithDialTimeout(timeout time.Duration) Option { // nolint
 	return func(tunnel *SSHTunnel) error {
 		tunnel.dialTimeout = timeout
 		return nil
 	}
 }
 
-func TunnelOptionWithKeepAlive(keepAlive time.Duration) Option {
+func TunnelOptionWithKeepAlive(keepAlive time.Duration) Option { // nolint
 	return func(tunnel *SSHTunnel) error {
 		tunnel.withKeepAlive = true
 		tunnel.timeKeepAliveRead = keepAlive
@@ -655,8 +655,8 @@ func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options 
 	return NewSSHTunnelWithLocalBinding(gw.String(), gwCfg.Auth[0], target.Address(), local.Address(), options...)
 }
 
-// NewSSHTunnel creates a ssh tunnel through localhost:0
-func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (_ *SSHTunnel, err error) {
+// NewSSHTunnel creates a SSH tunnel through localhost:0
+func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (_ *SSHTunnel, err error) { // nolint
 	return NewSSHTunnelWithLocalBinding(tunnel, auth, destination, "localhost:0", options...)
 }
 
