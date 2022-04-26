@@ -37,7 +37,7 @@ func RunCommandInSSHSessionWithTimeout(se *ssh.Session, cmd string, timeout time
 	resChan := make(chan result)
 	go func() {
 		var crash error
-		defer OnPanic(&crash)
+		defer SilentOnPanic(&crash)
 
 		theErr := se.Run(cmd)
 		defer close(resChan)
@@ -77,7 +77,7 @@ func DialSSHWithTimeout(network, addr string, config *ssh.ClientConfig, timeout 
 	resChan := make(chan result)
 	go func() {
 		var crash error
-		defer OnPanic(&crash)
+		defer SilentOnPanic(&crash)
 
 		theCli, theErr := sshDial(network, addr, config)
 		defer close(resChan)

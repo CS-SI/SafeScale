@@ -66,7 +66,7 @@ func work(c *cli.Context) {
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		<-signalCh
 		cleanup(true)

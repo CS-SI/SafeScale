@@ -106,7 +106,7 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 
 	volumeDeleter := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})

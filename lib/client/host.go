@@ -220,7 +220,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 	service := protocol.NewHostServiceClient(h.session.connection)
 	hostDeleter := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 

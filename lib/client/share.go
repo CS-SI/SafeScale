@@ -85,7 +85,7 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 
 	shareDeleter := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 

@@ -123,7 +123,7 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 		_, err := service.Delete(newCtx, &protocol.BucketRequest{Name: aname})

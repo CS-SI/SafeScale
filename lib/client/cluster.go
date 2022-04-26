@@ -621,7 +621,7 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, timeout time.Dur
 
 	nodeDeleter := func(ref string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 

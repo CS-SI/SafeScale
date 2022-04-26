@@ -62,7 +62,7 @@ func expose() {
 	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
 	go func() {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux)
 		if err != nil {
