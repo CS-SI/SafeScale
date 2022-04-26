@@ -148,7 +148,7 @@ func BackoffSelector() Backoff {
 
 // WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 	}
 
@@ -177,7 +177,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 
 // WhileUnsuccessfulWithLimitedRetries uses Unsuccessful and Max arbiters
 func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, timeout time.Duration, retries uint) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 	}
 
@@ -213,7 +213,7 @@ func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, 
 
 // WhileUnsuccessfulWithHardTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 	}
 
@@ -238,7 +238,7 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 
 // WhileUnsuccessfulWithHardTimeoutWithNotifier retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 	}
 
@@ -264,7 +264,7 @@ func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.D
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 'delay' after each try, expiring after 'timeout'
 func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}
@@ -297,7 +297,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 
 // WhileUnsuccessfulWithAggregator allows using another ArbiterAggregator instead of the default PrevailDone
 func WhileUnsuccessfulWithAggregator(run func() error, delay time.Duration, timeout time.Duration, arb ArbiterAggregator, notify Notify) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}
@@ -395,7 +395,7 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 
 	ctxID := ""
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -449,7 +449,7 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 // WhileSuccessful retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting a duration of 'delay' after each try, expiring after a duration of 'timeout'.
 func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}
@@ -481,7 +481,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 // waiting a duration of 'delay' after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
 func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
-	if delay > timeout {
+	if delay > timeout && timeout != 0 {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}

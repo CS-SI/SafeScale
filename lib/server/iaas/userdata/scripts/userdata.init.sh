@@ -62,6 +62,8 @@ LOGFILE=/opt/safescale/var/log/user_data.init.log
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
+date
+
 LINUX_KIND=
 VERSION_ID=
 FULL_HOSTNAME=
@@ -133,33 +135,6 @@ EOF
   chmod -R 0600 /home/{{.Username}}/.ssh/*
   cat /home/{{.Username}}/.ssh/id_rsa
 
-  cat >> /home/{{.Username}}/.bashrc <<- EOF
-		pathremove() {
-      local IFS=':'
-      local NEWPATH
-      local DIR
-      local PATHVARIABLE=${2:-PATH}
-      for DIR in ${!PATHVARIABLE} ; do
-              if [ "$DIR" != "$1" ] ; then
-                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-              fi
-      done
-      export $PATHVARIABLE="$NEWPATH"
-		}
-		pathprepend() {
-      pathremove $1 $2
-      local PATHVARIABLE=${2:-PATH}
-      export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-		}
-		pathappend() {
-      pathremove $1 $2
-      local PATHVARIABLE=${2:-PATH}
-      export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-		}
-		pathprepend $HOME/.local/bin
-		pathappend /opt/safescale/bin
-EOF
-
   chown -R {{.Username}}:{{.Username}} /opt/safescale
   chmod -R 0640 /opt/safescale
   find /opt/safescale -type d -exec chmod a+rx {} \;
@@ -180,6 +155,7 @@ EOF
 # - /etc/hostname contains short hostname
 function put_hostname_in_hosts() {
   echo "{{ .HostName }}" > /etc/hostname
+  echo "127.0.0.1 {{ .HostName }}" >> /etc/hosts
   hostname {{ .HostName }}
   SHORT_HOSTNAME=$(hostname -s)
   [[ "$SHORT_HOSTNAME" == "{{ .HostName }}" ]] && return
@@ -228,10 +204,27 @@ function disable_services() {
   esac
 }
 
+function sfFinishPreviousInstall() {
+  local unfinished
+  unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+  if [[ "$unfinished" == 0 ]]; then
+    echo "good"
+    return 0
+  else
+    echo "there are unconfigured packages !"
+    sudo dpkg --configure -a --force-all && {
+      return $?
+    }
+    return 0
+  fi
+}
+export -f sfFinishPreviousInstall
+
 function disable_upgrades() {
   case $LINUX_KIND in
   ubuntu)
-    sfApt remove -y unattended-upgrades || true
+    sfFinishPreviousInstall
+    dpkg --remove --force-remove-reinstreq unattended-upgrades || true
     ;;
   *) ;;
 

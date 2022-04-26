@@ -32,7 +32,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
@@ -47,8 +46,6 @@ const (
 	curlPut   = "curl -kSsl -X PUT --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 	curlPatch = "curl -kSsl -X PATCH --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
-
-var kongProxyCheckedCache cache.Cache // nolint
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
@@ -70,7 +67,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
+	addressedGateway, xerr := subnet.InspectGateway(ctx, addressPrimaryGateway)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -87,7 +84,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	if !present {
 		// try an active check and update InstalledFeatures if found
 		// Check if 'edgeproxy4subnet' feature is installed on host
-		featureInstance, xerr := NewFeature(svc, "edgeproxy4subnet")
+		featureInstance, xerr := NewFeature(ctx, svc, "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -101,7 +98,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 		if results.Successful() {
 			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -109,11 +106,12 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 					item := propertiesv1.NewHostInstalledFeature()
 					item.HostContext = true
-					var inErr fail.Error
-					item.Requires, inErr = featureInstance.GetRequirements()
-					if inErr != nil {
-						return inErr
+					var innerXErr fail.Error
+					item.Requires, innerXErr = featureInstance.Dependencies()
+					if innerXErr != nil {
+						return innerXErr
 					}
+
 					featuresV1.Installed[featureInstance.GetName()] = item
 					return nil
 				})
@@ -134,13 +132,13 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		subnet:  subnet,
 		gateway: addressedGateway,
 	}
-	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP()
+	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP()
+	ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -589,13 +587,5 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 			return response, httpcode, fail.NewError("post failed: HTTP error code=%s: %s", httpcode, msg.(string))
 		}
 		return response, httpcode, fail.NewError("post failed with HTTP error code '%s'", httpcode)
-	}
-}
-
-func init() {
-	var xerr fail.Error
-	kongProxyCheckedCache, xerr = cache.NewCache("proxychecks")
-	if xerr != nil {
-		panic(xerr)
 	}
 }

@@ -31,6 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
+//go:generate minimock -o mocks/mock_tracer.go -i github.com/CS-SI/SafeScale/v21/lib/utils/debug.Tracer
+
 // Tracer ...
 type Tracer interface {
 	WithStopwatch() Tracer

@@ -47,19 +47,44 @@ feature:
                     nodes:   "count >= 8, cpu >= 2"
 
     parameters:
-        - AllowPodsOnMasters=false      # define if pods can be run on master(s)
-        - AllowPodsOnGateways=false     # define if pods can be run on gateway(s)
-        - CNI=flannel                   # define the name of the CNI to use (can be flannel or calico)
+        - name: AllowPodsOnMasters
+          value: false
+          description: define if pods can be run on master(s)
+        - name: AllowPodsOnGateways
+          value: false
+          description: define if pods can be run on gateway(s)
+        - name: CNI
+          value: flannel
+          description: define the name of the CNI to use (can be flannel or calico)
         #- CNI=calico
-        - CalicoNetworking=vxlan        # define the Calico Networking tech
-        - ClusterControlplaneEndpointIP # define the IP address of the cluster ControlPlane
-        - Dashboard=true                # define if Kubernetes Dashboard have to be installed
-        - EnableAudit=false             # define if system audit have to be configured
-        - ExternalLoadBalancerHostname= # define the DNS/IP address of the external Load Balancer (none by default)
-        - Hardening=true                # tells if hardening is wanted
-        - KubeVersion=1.20.9            # defines the Kubernetes version to use
-        #- CalicoVersion=v3.19.1         # defines the Calico version to use
-        - FlannelVersion=v0.13.0        # defines the Flannel version to use
+        - name: CalicoNetworking
+          value: vxlan
+          description: define the Calico Networking tech
+        - name: ClusterControlplaneEndpointIP
+          value: ''
+          description: define the IP address of the cluster ControlPlane
+        - name: Dashboard
+          value: true
+          description: define if Kubernetes Dashboard have to be installed
+        - name: EnableAudit
+          value: false
+          description: define if system audit have to be configured
+        - name: ExternalLoadBalancerHostname
+          value: ""
+          description: define the DNS/IP address of the external Load Balancer (none by default)
+        - name: Hardening
+          value: true
+          description: |-
+              tells if hardening is wanted (default: true)
+        - name: KubeVersion
+          value: 1.20.9
+          description: defines the Kubernetes version to use
+        #- name: CalicoVersion
+        #  value: 3.19.1
+        #  description: defines the Calico version to use
+        - name: FlannelVersion
+          value: v0.13.0
+          description: defines the Flannel version to use
         - OIDCClientName=default
         - OIDCGroupName=user_groups
         - OIDCRealm=
@@ -949,7 +974,7 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
+                                    dpkg --purge --force-remove-reinstreq kubectl kubeadm kubelet || sfFail 192 "failure purging kubernetes"
                                     ;;
                                 redhat|rhel|fedora|centos)
                                     yum remove -y kubectl kubeadm kubelet || sfFail 193 "failure purging kubernetes"

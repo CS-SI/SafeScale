@@ -35,17 +35,21 @@ import (
 
 // SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
 func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
-	var gw *system.SSHConfig
+	var pgw, sgw *system.SSHConfig
 	if from.Gateway != nil {
-		gw = SSHConfigFromProtocolToSystem(from.Gateway)
+		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
+	}
+	if from.SecondaryGateway != nil {
+		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
 	return &system.SSHConfig{
-		User:          from.User,
-		Hostname:      from.HostName,
-		IPAddress:     from.Host,
-		PrivateKey:    from.PrivateKey,
-		Port:          int(from.Port),
-		GatewayConfig: gw,
+		User:                   from.User,
+		Hostname:               from.HostName,
+		IPAddress:              from.Host,
+		PrivateKey:             from.PrivateKey,
+		Port:                   int(from.Port),
+		GatewayConfig:          pgw,
+		SecondaryGatewayConfig: sgw,
 	}
 }
 
@@ -116,9 +120,7 @@ func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string 
 }
 
 // ClusterRequestFromProtocolToAbstract ...
-func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, ferr fail.Error) {
-	nullCR := abstract.ClusterRequest{}
-
+func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ *abstract.ClusterRequest, ferr fail.Error) {
 	var (
 		gatewaySizing *abstract.HostSizingRequirements
 		masterSizing  *abstract.HostSizingRequirements
@@ -129,7 +131,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if in.GatewaySizing != "" {
 		gatewaySizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.GatewaySizing)
 		if xerr != nil {
-			return nullCR, xerr
+			return nil, xerr
 		}
 	}
 	if gatewaySizing == nil {
@@ -139,7 +141,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if in.MasterSizing != "" {
 		masterSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.MasterSizing)
 		if xerr != nil {
-			return nullCR, xerr
+			return nil, xerr
 		}
 	}
 	if masterSizing == nil {
@@ -149,7 +151,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if in.NodeSizing != "" {
 		nodeSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.NodeSizing)
 		if xerr != nil {
-			return nullCR, xerr
+			return nil, xerr
 		}
 	}
 	if nodeSizing == nil {
@@ -157,7 +159,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	}
 	nodeCount, xerr := NodeCountFromStringToInteger(in.NodeSizing)
 	if xerr != nil {
-		return nullCR, xerr
+		return nil, xerr
 	}
 
 	disabled := map[string]struct{}{}
@@ -183,7 +185,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		FeatureParameters:       in.GetParameters(),
 		DefaultSshPort:          uint(in.DefaultSshPort),
 	}
-	return out, nil
+	return &out, nil
 }
 
 // SecurityGroupRuleFromProtocolToAbstract does what the name says

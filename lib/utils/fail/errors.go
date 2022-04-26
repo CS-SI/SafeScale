@@ -49,6 +49,8 @@ type causer interface {
 	RootCause() error // returns the root cause of an error
 }
 
+// DISABLED go:generate minimock -o mocks/mock_error.go -i github.com/CS-SI/SafeScale/v21/lib/utils/fail.Error
+
 // Error defines the interface of a SafeScale error
 type Error interface {
 	data.Annotatable
@@ -74,6 +76,14 @@ type errorCore struct {
 	consequences        []error
 	grpcCode            codes.Code
 	lock                *sync.RWMutex
+}
+
+func IgnoreError(in interface{}, _ Error) interface{} {
+	return in
+}
+
+func TakeError(_ interface{}, xerr Error) error { // nolint
+	return xerr
 }
 
 // Valid errorCore struct should be always created via newError constructor, if it doesn't we might miss e.lock initialization

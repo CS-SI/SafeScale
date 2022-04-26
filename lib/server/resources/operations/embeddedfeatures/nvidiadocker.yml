@@ -79,7 +79,7 @@ feature:
                                     sfWaitForApt && apt install -y gcc linux-headers-$(uname -r) || sfFail $?
                                     if dpkg --compare-versions $DOCKER_VERSION ge 19.03; then
                                         # first install cuda-drivers
-                                        apt-get install linux-headers-$(uname -r)
+                                        apt-get install -y --no-install-recommends linux-headers-$(uname -r)
                                         wget -O /etc/apt/preferences.d/cuda-repository-pin-600 ${NVIDIA_URL}/${DIST/.//}/x86_64/cuda-${DIST/.//}.pin
                                         apt-key adv --fetch-keys ${NVIDIA_DEV_URL}/${DIST/.//}/x86_64/7fa2af80.pub
                                         echo "deb ${NVIDIA_DEV_URL}/${DIST/.//}/x86_64/ /" >/etc/apt/sources.list.d/nvidia-cuda.list
@@ -160,10 +160,11 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfWaitForApt && apt remove -y nvidia-docker2
+                                    sfWaitForApt || sfFail $?
+                                    apt remove -y nvidia-docker2 || sfFail $?
                                     ;;
                                 centos|fedora|redhat|rhel)
-                                    yum remove -y nvidia-docker2
+                                    yum remove -y nvidia-docker2 || sfFail $?
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

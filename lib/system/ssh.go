@@ -33,6 +33,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
@@ -43,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
@@ -117,6 +119,19 @@ type SSHConfig struct {
 // IsNull tells if the instance is a null value
 func (sconf *SSHConfig) IsNull() bool {
 	return sconf == nil || sconf.IPAddress == ""
+}
+
+// Clone clones the SSHConfig
+func (sconf *SSHConfig) Clone() *SSHConfig {
+	out := &SSHConfig{}
+	*out = *sconf
+	if out.GatewayConfig != nil {
+		out.GatewayConfig = sconf.GatewayConfig.Clone()
+	}
+	if out.SecondaryGatewayConfig != nil {
+		out.SecondaryGatewayConfig = sconf.SecondaryGatewayConfig.Clone()
+	}
+	return out
 }
 
 // SSHTunnel a SSH tunnel
@@ -337,9 +352,10 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	if scfg.GatewayConfig.Port == 0 {
 		scfg.GatewayConfig.Port = 22
 	}
-	if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
-		scfg.SecondaryGatewayConfig.Port = 22
-	}
+	// VPL: never used
+	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
+	// 	scfg.SecondaryGatewayConfig.Port = 22
+	// }
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
@@ -547,9 +563,7 @@ func (scmd *SSHCommand) Start() fail.Error {
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
-func (scmd *SSHCommand) RunWithTimeout(
-	ctx context.Context, outs outputs.Enum, timeout time.Duration,
-) (int, string, string, fail.Error) {
+func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
 	if scmd == nil {
 		return invalid, "", "", fail.InvalidInstanceError()
@@ -558,18 +572,10 @@ func (scmd *SSHCommand) RunWithTimeout(
 		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return invalid, "", "", xerr
-			}
-		default:
-			return invalid, "", "", xerr
-		}
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -806,19 +812,45 @@ func (scmd *SSHCommand) Close() fail.Error {
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
 func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, fail.Error) {
 	if sc != nil {
-		tunnel, xerr := createConsecutiveTunnels(sc.GatewayConfig, tunnels)
-		if xerr != nil {
-			return nil, xerr
+		// determine what gateway to use
+		var gwConf *SSHConfig
+		if sc.GatewayConfig != nil {
+			gwConf = sc.GatewayConfig
+			if !netutils.CheckRemoteTCP(gwConf.IPAddress, gwConf.Port) {
+				if !valid.IsNil(sc.SecondaryGatewayConfig) {
+					gwConf = sc.SecondaryGatewayConfig
+					if !netutils.CheckRemoteTCP(gwConf.IPAddress, gwConf.Port) {
+						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
+					}
+				} else {
+					return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
+				}
+			}
 		}
 
-		cfg := sc
-		if tunnel != nil {
-			gateway := *sc.GatewayConfig
-			gateway.Port = tunnel.port
-			gateway.IPAddress = "127.0.0.1"
-			cfg.GatewayConfig = &gateway
+		tunnel, xerr := createConsecutiveTunnels(gwConf, tunnels)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotAvailable:
+				gwConf = sc.SecondaryGatewayConfig
+				tunnel, xerr = createConsecutiveTunnels(gwConf, tunnels)
+				if xerr != nil {
+					return nil, xerr
+				}
+			default:
+				return nil, xerr
+			}
 		}
-		if cfg.GatewayConfig != nil {
+
+		if gwConf != nil {
+			cfg := sc.Clone()
+			cfg.GatewayConfig = gwConf
+			if tunnel != nil {
+				gateway := *gwConf
+				gateway.Port = tunnel.port
+				gateway.IPAddress = "127.0.0.1"
+				cfg.GatewayConfig = &gateway
+			}
 			failures := 0
 			xerr = retry.WhileUnsuccessful(
 				func() error {
@@ -874,7 +906,7 @@ func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail
 
 	tunnel, xerr := createConsecutiveTunnels(sconf, &tunnels)
 	if xerr != nil {
-		return nil, nil, fail.Wrap(xerr, "failed to create SSH Tunnels")
+		return nil, nil, xerr
 	}
 
 	sshConfig := *sconf
@@ -963,18 +995,10 @@ func (sconf *SSHConfig) newCommand(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("runCmdString")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1021,18 +1045,10 @@ func (sconf *SSHConfig) newCopyCommand(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("localPath")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1082,9 +1098,7 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (sconf *SSHConfig) WaitServerReady(
-	ctx context.Context, phase string, timeout time.Duration,
-) (out string, ferr fail.Error) {
+func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if sconf == nil {
@@ -1100,18 +1114,10 @@ func (sconf *SSHConfig) WaitServerReady(
 		return "", fail.InvalidInstanceContentError("sconf.IPAddress", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return "", xerr
-			}
-		default:
-			return "", xerr
-		}
+		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -1127,6 +1133,11 @@ func (sconf *SSHConfig) WaitServerReady(
 	originalPhase := phase
 	if phase == "ready" {
 		phase = "final"
+	}
+
+	// no timeout is unsafe, we set an upper limit
+	if timeout == 0 {
+		timeout = temporal.HostLongOperationTimeout()
 	}
 
 	var (
@@ -1212,10 +1223,14 @@ func (sconf *SSHConfig) WaitServerReady(
 		}
 	}
 
+	if !strings.HasPrefix(stdout, "0,") {
+		return stdout, fail.NewError("PROVISIONING ERROR: host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.IPAddress, originalPhase,
+			temporal.FormatDuration(time.Since(begins)), stdout)
+	}
+
 	logrus.Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname, originalPhase,
-		temporal.FormatDuration(time.Since(begins)), stdout,
-	)
+		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
@@ -1236,18 +1251,10 @@ func (sconf *SSHConfig) copy(
 	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return invalid, "", "", xerr
-			}
-		default:
-			return invalid, "", "", xerr
-		}
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {

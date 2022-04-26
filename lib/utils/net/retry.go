@@ -263,7 +263,7 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 				return retry.StopRetryError(realErr)
 			}
 		default:
-			// doing something based on error's Error() method is always dangerous, so a litte log here might help finding problems later
+			// doing something based on error's Error() method is always dangerous, so a little log here might help to find problems later
 			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()

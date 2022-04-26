@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/denisbrodbeck/machineid"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
 )

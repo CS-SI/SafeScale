@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -42,8 +43,16 @@ func (t tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	return service.List(ctx, &googleprotobuf.Empty{})
+	return service.List(newCtx, &googleprotobuf.Empty{})
 
 }
 
@@ -57,8 +66,16 @@ func (t tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	return service.Get(ctx, &googleprotobuf.Empty{})
+	return service.Get(newCtx, &googleprotobuf.Empty{})
 }
 
 // Set ...
@@ -71,8 +88,16 @@ func (t tenant) Set(name string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	_, err := service.Set(ctx, &protocol.TenantName{Name: name})
+	_, err := service.Set(newCtx, &protocol.TenantName{Name: name})
 	return err
 }
 
@@ -86,8 +111,16 @@ func (t tenant) Inspect(name string, timeout time.Duration) (*protocol.TenantIns
 		return nil, fail.Wrap(xerr, "failure retrieving context")
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	return service.Inspect(ctx, &protocol.TenantName{Name: name})
+	return service.Inspect(newCtx, &protocol.TenantName{Name: name})
 }
 
 // Cleanup ...
@@ -100,8 +133,16 @@ func (t tenant) Cleanup(name string, timeout time.Duration) error {
 		return xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	_, err := service.Cleanup(ctx, &protocol.TenantCleanupRequest{Name: name, Force: false})
+	_, err := service.Cleanup(newCtx, &protocol.TenantCleanupRequest{Name: name, Force: false})
 	return err
 }
 
@@ -115,8 +156,16 @@ func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Scan(ctx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
+	results, err := service.Scan(newCtx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
 	return results, err
 }
 
@@ -130,8 +179,16 @@ func (t tenant) Upgrade(name string, dryRun bool, timeout time.Duration) ([]stri
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Upgrade(ctx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})
+	results, err := service.Upgrade(newCtx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})
 	if results != nil && len(results.Actions) > 0 {
 		return results.Actions, err
 	}

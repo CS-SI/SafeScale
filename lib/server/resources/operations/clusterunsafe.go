@@ -35,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/sirupsen/logrus"
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
@@ -85,9 +84,12 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 	defer fail.OnPanic(&ferr)
 
 	state = clusterstate.Unknown
-	if instance.makers.GetState != nil {
+	instance.localCache.RLock()
+	makers := instance.localCache.makers
+	instance.localCache.RUnlock() //nolint
+	if makers.GetState != nil {
 		var xerr fail.Error
-		state, xerr = instance.makers.GetState(instance)
+		state, xerr = makers.GetState(instance)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return clusterstate.Unknown, xerr
@@ -101,7 +103,9 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 				}
 
 				stateV1.State = state
-				instance.lastStateCollection = time.Now()
+				instance.localCache.Lock()
+				instance.localCache.lastStateCollection = time.Now()
+				instance.localCache.Unlock() //nolint
 				return nil
 			})
 		})
@@ -169,18 +173,10 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 		return emptyList, xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return emptyList, xerr
-			}
-		default:
-			return emptyList, xerr
-		}
+		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -303,7 +299,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			continue
 		}
 
-		master, xerr = LoadHost(instance.Service(), v.ID)
+		master, xerr = LoadHost(ctx, instance.Service(), v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -369,18 +365,10 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 		return emptyList, xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return emptyList, xerr
-			}
-		default:
-			return emptyList, xerr
-		}
+		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -418,18 +406,10 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 // unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
 // Note: must be used wisely
 func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node resources.Host, ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
+		return nil, xerr
 	}
 
 	timings, xerr := instance.Service().Timings()
@@ -461,19 +441,11 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 			return nil, fail.AbortedError(nil, "aborted")
 		}
 
-		node, xerr = LoadHost(svc, v.ID)
+		node, xerr = LoadHost(ctx, svc, v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		//goland:noinspection ALL
-		defer func(hostInstance resources.Host) {
-			issue := hostInstance.Released()
-			if issue != nil {
-				logrus.Warn(issue)
-			}
-		}(node)
 
 		_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)

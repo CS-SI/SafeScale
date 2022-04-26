@@ -57,5 +57,5 @@ func New(ctx context.Context, svc iaas.Service) (_ resources.Cluster, ferr fail.
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
 func Load(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, ferr fail.Error) {
-	return operations.LoadCluster(ctx, svc, name)
+	return operations.LoadCluster(ctx, svc, name, operations.WithReloadOption)
 }

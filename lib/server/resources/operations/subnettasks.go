@@ -40,9 +40,7 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -187,9 +185,7 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -208,7 +204,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 	}
 
 	objgw := castedParams.host
-	if objgw == nil || valid.IsNil(objgw) {
+	if valid.IsNil(objgw) {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
 
@@ -257,6 +253,8 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 		if xerr != nil {
 			return nil, xerr
 		}
+
+		time.Sleep(45 * time.Second)
 
 		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
 		xerr = debug.InjectPlannedFail(xerr)

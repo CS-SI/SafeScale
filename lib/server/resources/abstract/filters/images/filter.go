@@ -26,7 +26,7 @@ type Filter struct {
 }
 
 // Predicate ...
-type Predicate func(img abstract.Image) bool
+type Predicate func(img *abstract.Image) bool
 
 // NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
@@ -36,7 +36,7 @@ func NewFilter(predicate Predicate) *Filter {
 // Not ...
 func (f *Filter) Not() *Filter {
 	oldFilter := f.filter
-	f.filter = func(in abstract.Image) bool {
+	f.filter = func(in *abstract.Image) bool {
 		return !oldFilter(in)
 	}
 	return f
@@ -45,7 +45,7 @@ func (f *Filter) Not() *Filter {
 // And ...
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in abstract.Image) bool {
+	f.filter = func(in *abstract.Image) bool {
 		return oldFilter(in) && other.filter(in)
 	}
 	return f
@@ -54,7 +54,7 @@ func (f *Filter) And(other *Filter) *Filter {
 // Or ...
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in abstract.Image) bool {
+	f.filter = func(in *abstract.Image) bool {
 		return oldFilter(in) || other.filter(in)
 	}
 	return f
@@ -62,14 +62,14 @@ func (f *Filter) Or(other *Filter) *Filter {
 
 // Not ...
 func Not(f Predicate) Predicate {
-	return func(in abstract.Image) bool {
+	return func(in *abstract.Image) bool {
 		return !f(in)
 	}
 }
 
 // OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-	return func(in abstract.Image) bool {
+	return func(in *abstract.Image) bool {
 		for _, f := range filters {
 			if f(in) {
 				return true
@@ -81,7 +81,7 @@ func OrFilter(filters ...Predicate) Predicate {
 
 // AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-	return func(in abstract.Image) bool {
+	return func(in *abstract.Image) bool {
 		for _, f := range filters {
 			if !f(in) {
 				return false
@@ -92,8 +92,8 @@ func AndFilter(filters ...Predicate) Predicate {
 }
 
 // FilterImages ...
-func FilterImages(images []abstract.Image, f *Filter) []abstract.Image {
-	res := make([]abstract.Image, 0)
+func FilterImages(images []*abstract.Image, f *Filter) []*abstract.Image {
+	res := make([]*abstract.Image, 0)
 	for _, img := range images {
 
 		if f.filter(img) {

@@ -158,16 +158,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
-
-		err := subnetInstance.Released()
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-	}
-
-	err = networkInstance.Released()
-	if err != nil {
-		return nil, fail.Wrap(err)
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
@@ -249,23 +239,16 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.Service(), ref)
+	networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := networkInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	return networkInstance.ToProtocol()
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete network")
 
@@ -274,18 +257,24 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in.Network)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
+	force := in.GetForce()
+
+	if force {
+		logrus.Tracef("forcing network deletion")
+	}
+
+	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -296,7 +285,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(svc, ref)
+	networkInstance, xerr := networkfactory.Load(job.Context(), svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

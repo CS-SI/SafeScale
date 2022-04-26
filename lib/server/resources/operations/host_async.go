@@ -25,3 +25,7 @@ func getPhase2Timeout(timings temporal.Timings) time.Duration {
 func getPhase4Timeout(timings temporal.Timings) time.Duration {
 	return 30 * time.Second
 }
+
+func inBackground() bool {
+	return true
+}

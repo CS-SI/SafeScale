@@ -17,6 +17,7 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -28,9 +29,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_NewCache(t *testing.T) {
+func TestMapStore_New(t *testing.T) {
 
-	_, err := NewCache("")
+	_, err := NewMapStore("")
 	require.Error(t, err)
 
 }
@@ -52,7 +53,8 @@ func TestCache_IsNull(t *testing.T) {
 }
 */
 
-func TestCache_Reserve(t *testing.T) {
+// TestMapStore_ReserveUnknownRequestor validates the case where cache entry does not know its requestor (ie context does not contain Task instance)
+func TestMapStore_ReserveUnknownRequestor(t *testing.T) {
 
 	/*
 		var c *cache = nil
@@ -62,33 +64,69 @@ func TestCache_Reserve(t *testing.T) {
 			t.Fail()
 		}
 	*/
-	c2, err := NewCache("cache")
+	c2, err := NewMapStore("store")
 	if err != nil {
 		t.Fail()
 	}
-	err = c2.Reserve("", 1*time.Second)
+	err = c2.Reserve(context.Background(), "", 1*time.Second)
 	if err == nil {
 		t.Error("Expect empty key error")
 		t.Fail()
 	}
-	err = c2.Reserve("key", 0*time.Second)
+	err = c2.Reserve(context.Background(), "key", 0*time.Second)
 	if err == nil {
 		t.Error("Expect timeout=0 error")
 		t.Fail()
 	}
-	err = c2.Reserve("key", 1*time.Second)
+	err = c2.Reserve(context.Background(), "key", 5*time.Second)
 	require.NoError(t, err)
-	err = c2.Reserve("key", 1*time.Second)
-	if err == nil {
-		t.Error("Can't duplicate reservation")
-		t.Fail()
-	}
 
+	// Note: in same goroutine, the second reserve will return *fail.ErrDuplicate
+	err = c2.Reserve(context.Background(), "key", 1*time.Second)
+	require.NotNil(t, err)
 }
 
-func TestCache_Commit(t *testing.T) {
+func TestMapStore_ReserveSameTask(t *testing.T) {
 
-	content := newReservation("content" /*, time.Minute*/)
+	task, xerr := concurrency.NewTask()
+	require.Nil(t, xerr)
+
+	/*
+		var c *cache = nil
+		err := c.Reserve("", 1*time.Second)
+		if err == nil {
+			t.Error("Can't reserve on nil pointer cache")
+			t.Fail()
+		}
+	*/
+	c2, err := NewMapStore("store")
+	if err != nil {
+		t.Fail()
+	}
+	err = c2.Reserve(task.Context(), "", 1*time.Second)
+	if err == nil {
+		t.Error("Expect empty key error")
+		t.Fail()
+	}
+	err = c2.Reserve(task.Context(), "key", 0*time.Second)
+	if err == nil {
+		t.Error("Expect timeout=0 error")
+		t.Fail()
+	}
+	err = c2.Reserve(task.Context(), "key", 5*time.Second)
+	require.NoError(t, err)
+
+	// VPL: in same goroutine, the second reserve will report reservation already done
+	err = c2.Reserve(task.Context(), "key", 1*time.Second)
+	require.NotNil(t, err)
+}
+
+func TestMapStore_Commit(t *testing.T) {
+
+	task, xerr := concurrency.NewTask()
+	require.Nil(t, xerr)
+
+	content := newReservation(context.Background(), "store", "content" /*, time.Minute*/)
 
 	/*
 		var c *cache = nil
@@ -99,14 +137,14 @@ func TestCache_Commit(t *testing.T) {
 		}
 	*/
 
-	c2, err := NewCache("nuka")
+	c2, err := NewMapStore("nuka")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 		return
 	}
 
-	err = c2.Reserve(content.GetID(), 100*time.Millisecond)
+	err = c2.Reserve(task.Context(), content.GetID(), 100*time.Millisecond)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -115,7 +153,7 @@ func TestCache_Commit(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	_, err = c2.Commit("", content)
+	_, err = c2.Commit(task.Context(), "", content)
 	if err == nil {
 		t.Error("Expect empty key error")
 		t.Fail()
@@ -123,27 +161,30 @@ func TestCache_Commit(t *testing.T) {
 
 }
 
-func TestCache_Free(t *testing.T) {
+func TestMapStore_Free(t *testing.T) {
 
-	var rc *cache = nil
-	err := rc.Free("key")
+	task, xerr := concurrency.NewTask()
+	require.Nil(t, xerr)
+
+	var rc *mapStore = nil
+	err := rc.Free(task.Context(), "key")
 	if err == nil {
 		t.Error("Can't Free on nil pointer cache")
 		t.Fail()
 	}
 
-	content := newReservation("content" /*, time.Minute*/)
+	content := newReservation(task.Context(), "store", "content" /*, time.Minute*/)
 
-	rc2, err := NewCache("cache")
+	rc2, err := NewMapStore("cache")
 	require.NoError(t, err)
 
-	err = rc2.Reserve("key", 100*time.Millisecond)
+	err = rc2.Reserve(task.Context(), "key", 100*time.Millisecond)
 	require.NoError(t, err)
 
-	_, err = rc2.Commit("key", content)
+	_, err = rc2.Commit(task.Context(), "key", content)
 	require.NoError(t, err)
 
-	err = rc2.Free("")
+	err = rc2.Free(task.Context(), "")
 	if err == nil {
 		t.Error("Can't Free empty key")
 		t.Fail()
@@ -151,28 +192,30 @@ func TestCache_Free(t *testing.T) {
 
 }
 
-func TestCache_Add(t *testing.T) {
+func TestMapStore_Add(t *testing.T) {
+	task, xerr := concurrency.NewTask()
+	require.Nil(t, xerr)
 
-	content := newReservation("content" /*, time.Minute*/)
-	var rc *cache = nil
-	_, err := rc.Add(content)
+	content := newReservation(task.Context(), "store", "content")
+	var rc *mapStore = nil
+	_, err := rc.Add(task.Context(), content)
 	if err == nil {
 		t.Error("Can't Add on nil pointer cache")
 		t.Fail()
 	}
-	rc2, err := NewCache("cache")
+	rc2, err := NewMapStore("cache")
 	require.NoError(t, err)
-	_, err = rc2.Add(nil)
+	_, err = rc2.Add(task.Context(), nil)
 	if err == nil {
 		t.Error("Can't Add nil content")
 		t.Fail()
 	}
-	_, err = rc2.Add(content)
+	_, err = rc2.Add(task.Context(), content)
 	require.NoError(t, err)
 
 }
 
-func TestCache_SignalChange(t *testing.T) {
+func TestMapStore_SignalChange(t *testing.T) {
 
 	// Expect no panic
 	defer func() {
@@ -182,26 +225,27 @@ func TestCache_SignalChange(t *testing.T) {
 		}
 	}()
 
-	content := newReservation("content" /*, time.Minute*/)
+	task, xerr := concurrency.NewTask()
+	require.Nil(t, xerr)
 
-	var rc *cache = nil
+	content := newReservation(task.Context(), "store", "content" /*, time.Minute*/)
+
+	var rc *mapStore = nil
 	rc.SignalChange(content.GetName())
 
-	rc2, err := NewCache("nuka")
+	rc2, err := NewMapStore("nuka")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 		return
 	}
 
-	err = rc2.Reserve(content.GetName(), 100*time.Millisecond)
-	if err != nil {
-		t.Error(err)
-		t.Fail()
-		return
-	}
+	err = rc2.Reserve(task.Context(), content.GetName(), 100*time.Millisecond)
 
-	_, err = rc2.Commit(content.GetName(), content)
+	_, err = rc2.Commit(context.Background(), content.GetName(), content)
+	require.NotNil(t, err)
+
+	_, err = rc2.Commit(task.Context(), content.GetName(), content)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -213,7 +257,7 @@ func TestCache_SignalChange(t *testing.T) {
 
 }
 
-func TestCache_MarkAsFreed(t *testing.T) {
+func TestMapStore_MarkAsFreed(t *testing.T) {
 
 	// Expect no panic
 	defer func() {
@@ -223,26 +267,26 @@ func TestCache_MarkAsFreed(t *testing.T) {
 		}
 	}()
 
-	content := newReservation("content" /*, time.Minute*/)
+	content := newReservation(context.Background(), "store", "content")
 
-	var rc *cache = nil
+	var rc *mapStore = nil
 	rc.MarkAsFreed(content.GetName())
 
-	rc2, err := NewCache("nuka")
+	rc2, err := NewMapStore("nuka")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 		return
 	}
 
-	err = rc2.Reserve(content.GetName(), 100*time.Millisecond)
+	err = rc2.Reserve(context.Background(), content.GetName(), 100*time.Millisecond)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 		return
 	}
 
-	_, err = rc2.Commit(content.GetName(), content)
+	_, err = rc2.Commit(context.Background(), content.GetName(), content)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -254,7 +298,7 @@ func TestCache_MarkAsFreed(t *testing.T) {
 
 }
 
-func TestCache_MarkAsDeleted(t *testing.T) {
+func TestMapStore_MarkAsDeleted(t *testing.T) {
 
 	// Expect no panic
 	defer func() {
@@ -264,26 +308,26 @@ func TestCache_MarkAsDeleted(t *testing.T) {
 		}
 	}()
 
-	content := newReservation("content" /*, time.Minute*/)
+	content := newReservation(context.Background(), "store", "content" /*, time.Minute*/)
 
-	var rc *cache = nil
+	var rc *mapStore = nil
 	rc.MarkAsDeleted(content.GetName())
 
-	rc2, err := NewCache("nuka")
+	rc2, err := NewMapStore("nuka")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 		return
 	}
 
-	err = rc2.Reserve(content.GetName(), 100*time.Millisecond)
+	err = rc2.Reserve(context.Background(), content.GetName(), 100*time.Millisecond)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 		return
 	}
 
-	_, err = rc2.Commit(content.GetName(), content)
+	_, err = rc2.Commit(context.Background(), content.GetName(), content)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -295,8 +339,8 @@ func TestCache_MarkAsDeleted(t *testing.T) {
 
 }
 
-func TestLockContent(t *testing.T) {
-	content := newReservation("content" /*, time.Minute*/)
+func TestMapStore_LockContent(t *testing.T) {
+	content := newReservation(context.Background(), "store", "content")
 	cacheEntry := newEntry(content)
 
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
@@ -314,8 +358,8 @@ func TestLockContent(t *testing.T) {
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
 }
 
-func TestParallelLockContent(t *testing.T) {
-	content := newReservation("content" /*, time.Minute*/)
+func TestMapStore_ParallelLockContent(t *testing.T) {
+	content := newReservation(context.Background(), "store", "content")
 	cacheEntry := newEntry(content)
 
 	task1, _ := concurrency.NewUnbreakableTask()
@@ -355,9 +399,9 @@ func TestParallelLockContent(t *testing.T) {
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
 }
 
-func makeDeadlockHappy(mdh Cache) fail.Error {
+func makeDeadlockHappy(mdh Store) fail.Error {
 	// doing some stuff that ends up calling....
-	anotherRead, xerr := mdh.Entry("What")
+	anotherRead, xerr := mdh.Entry(context.Background(), "What")
 	if xerr != nil {
 		return xerr
 	}
@@ -383,16 +427,16 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
-func TestDeadlock(t *testing.T) {
+func TestMapStore_Deadlock(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		content := newReservation("content" /*, time.Minute*/)
+		content := newReservation(context.Background(), "store", "content")
 
-		nukaCola, _ := NewCache("nuka")
-		xerr := nukaCola.Reserve("What", 2*time.Second)
+		nukaCola, _ := NewMapStore("nuka")
+		xerr := nukaCola.Reserve(context.Background(), "What", 2*time.Second)
 		if xerr != nil {
 			t.Error(xerr)
 			t.Fail()
@@ -404,12 +448,12 @@ func TestDeadlock(t *testing.T) {
 		t.Log(xerr)
 
 		time.Sleep(1 * time.Second)
-		_, xerr = nukaCola.Commit("What", content)
+		_, xerr = nukaCola.Commit(context.Background(), "What", content)
 		if xerr != nil {
 			t.Log(xerr)
 		}
 
-		theX, xerr := nukaCola.Entry("What")
+		theX, xerr := nukaCola.Entry(context.Background(), "What")
 		if xerr == nil {
 			fmt.Println(theX)
 		} else {
@@ -424,21 +468,21 @@ func TestDeadlock(t *testing.T) {
 	}
 }
 
-func TestReserveCommitGet(t *testing.T) {
+func TestMapStore_ReserveCommitGet(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		content := newReservation("content" /*, time.Minute*/)
+		content := newReservation(context.Background(), "store", "content")
 
-		nukaCola, err := NewCache("nuka")
+		nukaCola, err := NewMapStore("nuka")
 		if err != nil {
 			t.Error(err)
 			t.Fail()
 			return
 		}
 
-		err = nukaCola.Reserve(content.GetID(), 100*time.Millisecond)
+		err = nukaCola.Reserve(context.Background(), content.GetID(), 100*time.Millisecond)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -447,7 +491,7 @@ func TestReserveCommitGet(t *testing.T) {
 
 		time.Sleep(100 * time.Millisecond)
 
-		compilerHappy, err := nukaCola.Commit(content.GetID(), content)
+		compilerHappy, err := nukaCola.Commit(context.Background(), content.GetID(), content)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -458,7 +502,7 @@ func TestReserveCommitGet(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		theX, err := nukaCola.Entry(content.GetID())
+		theX, err := nukaCola.Entry(context.Background(), content.GetID())
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -475,10 +519,10 @@ func TestReserveCommitGet(t *testing.T) {
 	}
 }
 
-func TestMultipleReserveCommitGet(t *testing.T) {
+func TestMapStore_MultipleReserveCommitGet(t *testing.T) {
 	wg := sync.WaitGroup{}
-	content := newReservation("content" /*, time.Minute*/)
-	nukaCola, err := NewCache("nuka")
+	content := newReservation(context.Background(), "store", "content")
+	nukaCola, err := NewMapStore("nuka")
 	require.Nil(t, err)
 
 	for i := 0; i < 10; i++ {
@@ -486,7 +530,7 @@ func TestMultipleReserveCommitGet(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
-			xerr := nukaCola.Reserve(content.GetID(), 200*time.Millisecond)
+			xerr := nukaCola.Reserve(context.Background(), content.GetID(), 200*time.Millisecond)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotAvailable, *fail.ErrDuplicate:
@@ -500,7 +544,7 @@ func TestMultipleReserveCommitGet(t *testing.T) {
 
 			time.Sleep(100 * time.Millisecond)
 
-			_, xerr = nukaCola.Commit(content.GetID(), content)
+			_, xerr = nukaCola.Commit(context.Background(), content.GetID(), content)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotAvailable, *fail.ErrDuplicate, *fail.ErrNotFound:
@@ -514,7 +558,7 @@ func TestMultipleReserveCommitGet(t *testing.T) {
 
 			time.Sleep(1 * time.Second)
 
-			_, xerr = nukaCola.Entry(content.GetID())
+			_, xerr = nukaCola.Entry(context.Background(), content.GetID())
 			if xerr != nil {
 				t.Errorf("Unexpected error: %v", xerr)
 				t.Fail()
@@ -530,21 +574,21 @@ func TestMultipleReserveCommitGet(t *testing.T) {
 	}
 }
 
-func TestSurprisingBehaviour(t *testing.T) {
+func TestMapStore_SurprisingBehaviour(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		content := newReservation("content" /*, time.Minute*/)
+		content := newReservation(context.Background(), "store", "content")
 
-		nukaCola, err := NewCache("nuka")
+		nukaCola, err := NewMapStore("nuka")
 		if err != nil {
 			t.Error(err)
 			t.Fail()
 			return
 		}
 
-		err = nukaCola.Reserve("What", 200*time.Millisecond)
+		err = nukaCola.Reserve(context.Background(), "What", 200*time.Millisecond)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -553,7 +597,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 
 		time.Sleep(100 * time.Millisecond)
 
-		compilerHappy, xerr := nukaCola.Commit("What", content) // problem here ?, a mismatch and no complaining ?
+		compilerHappy, xerr := nukaCola.Commit(context.Background(), "What", content) // problem here ?, a mismatch and no complaining ?
 		if xerr != nil {
 			t.Errorf("unexpected error: %v", xerr)
 			t.Fail()
@@ -564,17 +608,17 @@ func TestSurprisingBehaviour(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 
-		// This Entry should fail; "What" has been replacd by "content" during the commit (the key of cache entry follows content ID)
-		theX, xerr := nukaCola.Entry("What")
+		// This Entry should fail; "What" has been replacd by "content" during the commit (the key of cached entry follows content ID)
+		theX, xerr := nukaCola.Entry(context.Background(), "What")
 		if xerr == nil {
-			t.Error("there is no cache entry identified by 'What', how can we find it?")
+			t.Error("there is no cached entry identified by 'What', how can we find it?")
 			t.Fail()
 			return
 		}
 		require.Nil(t, theX)
 
 		// This Entry should succeed
-		theX, xerr = nukaCola.Entry("content")
+		theX, xerr = nukaCola.Entry(context.Background(), "content")
 		if xerr != nil {
 			t.Errorf("unexpected error: %v", xerr)
 			t.Fail()
@@ -591,22 +635,22 @@ func TestSurprisingBehaviour(t *testing.T) {
 	}
 }
 
-func TestDeadlockAddingEntry(t *testing.T) {
-	content := newReservation("content" /*, time.Minute*/)
+func TestMapStore_DeadlockAddingEntry(t *testing.T) {
+	content := newReservation(context.Background(), "store", "content")
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		nukaCola, err := NewCache("nuka")
+		nukaCola, err := NewMapStore("nuka")
 		if err != nil {
 			t.Error(err)
 			t.Fail()
 			return
 		}
 
-		_, err = nukaCola.Add(content)
+		_, err = nukaCola.Add(context.Background(), content)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -621,8 +665,8 @@ func TestDeadlockAddingEntry(t *testing.T) {
 	}
 }
 
-func TestSignalChangeEntry(t *testing.T) {
-	content := newReservation("content" /*, time.Minute*/)
+func TestMapStore_SignalChangeEntry(t *testing.T) {
+	content := newReservation(context.Background(), "store", "content")
 	_ = content
 
 	wg := sync.WaitGroup{}
@@ -630,21 +674,21 @@ func TestSignalChangeEntry(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		nukaCola, err := NewCache("nuka")
+		nukaCola, err := NewMapStore("nuka")
 		if err != nil {
 			t.Error(err)
 			t.Fail()
 			return
 		}
 
-		err = nukaCola.Reserve(content.GetName(), 100*time.Millisecond)
+		err = nukaCola.Reserve(context.Background(), content.GetName(), 100*time.Millisecond)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
 			return
 		}
 
-		_, err = nukaCola.Commit(content.GetName(), content)
+		_, err = nukaCola.Commit(context.Background(), content.GetName(), content)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -661,16 +705,16 @@ func TestSignalChangeEntry(t *testing.T) {
 	}
 }
 
-func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
-	rc, err := NewCache("nuka")
+func TestMapStore_FreeWhenConflictingReservationAlreadyThere(t *testing.T) {
+	rc, err := NewMapStore("nuka")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
 
-	previous := newReservation("previous" /*, time.Minute*/)
+	previous := newReservation(context.Background(), "store", "previous")
 	_ = previous
-	content := newReservation("cola" /*, time.Minute*/)
+	content := newReservation(context.Background(), "store", "cola")
 	_ = content
 
 	wg := sync.WaitGroup{}
@@ -679,19 +723,19 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		_ = rc.Reserve("previous", 100*time.Millisecond)
+		_ = rc.Reserve(context.Background(), "previous", 100*time.Millisecond)
 		// _ , _ = rc.Commit("previous", previous)
 
 		key := "cola"
-		if xerr := rc.Reserve(key, 100*time.Millisecond); xerr != nil {
+		if xerr := rc.Reserve(context.Background(), key, 100*time.Millisecond); xerr != nil {
 			t.Error(xerr)
 			t.Fail()
 			return
 		}
 
-		_, xerr := rc.Commit("previous", content)
+		_, xerr := rc.Commit(context.Background(), "previous", content)
 		if xerr != nil {
-			nerr := rc.Free("previous")
+			nerr := rc.Free(context.Background(), "previous")
 			if nerr != nil {
 				t.Error(nerr)
 				t.Fail()
@@ -707,6 +751,81 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 	failed := waitTimeout(&wg, 3*time.Second)
 	if failed {
 		t.Error("We have a deadlock in TestSignalChangeEntry")
+		t.FailNow()
+	}
+}
+
+func TestMapStore_Entry(t *testing.T) {
+
+	// Empty cache
+	/*
+		var nilCache *cache = nil
+		_, err := nilCache.Entry("What")
+		if err == nil {
+			t.Error("Should throw a fail.InvalidInstanceError")
+			t.FailNow()
+		}
+	*/
+
+	// Filled cache, empty key
+	nukaCola, err := NewMapStore("nuka")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Entry(context.Background(), "")
+	if err == nil {
+		t.Error("Should throw a fail.InvalidParameterCannotBeEmptyStringError")
+		t.FailNow()
+	}
+
+	// Filled cache, filled key
+	nukaCola, err = NewMapStore("nuka")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Entry(context.Background(), "key1")
+	if err == nil {
+		t.Error("Should throw a fail.NotFoundError")
+		t.FailNow()
+	}
+
+	err = nukaCola.Reserve(context.Background(), "key1", 1*time.Second)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	// Cache never created on commited
+	_, err = nukaCola.Entry(context.Background(), "key1")
+	if err == nil {
+		t.Error("Should throw a *expired cache* error")
+		t.FailNow()
+	}
+
+	// Special broken reservation
+	err = nukaCola.Reserve(context.Background(), "key1", 1*time.Second)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Commit(context.Background(), "key1", nil)
+	if err == nil {
+		t.Error("Should throw a fail.InvalidParameterCannotBeNilError(content)")
+		t.FailNow()
+	}
+	r := &reservation{
+		key:     "content",
+		timeout: 1000,
+	}
+	_, err = nukaCola.Commit(context.Background(), "key1", r)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Entry(context.Background(), "key1")
+	if err == nil {
+		t.Error("Should throw a fail.NotFoundError (fail to found entry...broken one)")
 		t.FailNow()
 	}
 }

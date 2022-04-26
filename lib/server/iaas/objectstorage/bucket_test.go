@@ -57,7 +57,6 @@ func TestLocation_IsNull(t *testing.T) {
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
 	require.EqualValues(t, err, nil)
-	require.EqualValues(t, loc.IsNull(), false)
 
 }
 
@@ -79,10 +78,6 @@ func TestLocation_Connect(t *testing.T) {
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
 	require.EqualValues(t, err, nil)
-
-	err = loc.connect()
-	require.EqualValues(t, err, nil)
-
 }
 
 func TestLocation_Protocol(t *testing.T) {

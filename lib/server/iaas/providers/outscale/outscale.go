@@ -284,12 +284,12 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 }
 
 // ListImages ...
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates ...
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }
 

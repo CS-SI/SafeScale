@@ -39,8 +39,8 @@ type SecurityGroupRule struct {
 	Protocol    string                          `json:"protocol,omitempty"`    // concerned protocol
 	PortFrom    int32                           `json:"port_from,omitempty"`   // first port of the rule
 	PortTo      int32                           `json:"port_to,omitempty"`     // last port of the rule
-	Sources     []string                        `json:"sources"`               // concerned sources (depending of Direction); can be array of IP ranges or array of Security Group IDs (no mix)
-	Targets     []string                        `json:"targets"`               // concerned source or target (depending of Direction); can be array of IP ranges or array of Security Group IDs (no mix)
+	Sources     []string                        `json:"sources"`               // concerned sources (depending on Direction); can be array of IP ranges or array of Security Group IDs (no mix)
+	Targets     []string                        `json:"targets"`               // concerned source or target (depending on Direction); can be array of IP ranges or array of Security Group IDs (no mix)
 }
 
 // IsNull tells if the Security Group Rule is a null value
@@ -78,7 +78,6 @@ func (instance *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 
 	found := false
 
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v1 := range instance.IDs {
 		found = false
 		for _, v2 := range in.IDs {
@@ -92,7 +91,6 @@ func (instance *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 		}
 	}
 
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v1 := range instance.Sources {
 		found = false
 		for _, v2 := range in.Sources {
@@ -105,7 +103,7 @@ func (instance *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 			return false
 		}
 	}
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+
 	for _, v1 := range instance.Targets {
 		found = false
 		for _, v2 := range in.Targets {
@@ -143,7 +141,6 @@ func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		return false
 	}
 
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range instance.Sources {
 		found := false
 		for _, w := range in.Sources {
@@ -157,7 +154,6 @@ func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		}
 	}
 
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range instance.Targets {
 		found := false
 		for _, w := range in.Targets {
@@ -180,6 +176,11 @@ func (instance *SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
 	if valid.IsNil(instance) {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
+
+	if len(instance.Sources) == 0 {
+		return false, nil
+	}
+
 	return concernsGroups(instance.Sources)
 }
 
@@ -189,12 +190,21 @@ func (instance *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
 	if valid.IsNil(instance) {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
+
+	if len(instance.Targets) == 0 {
+		return false, nil
+	}
+
 	return concernsGroups(instance.Targets)
 }
 
 func concernsGroups(in []string) (bool, fail.Error) {
 	// this assumes in is a list of identifiers + valid cidrs.
 	// but it can also be identifiers + valid cidrs + invalid cidrs.
+
+	if len(in) == 0 {
+		return false, fail.InconsistentError("empty input ??: %s", in)
+	}
 
 	// that matches for things like 333.825.7.320/53, clearly invalid CIDRs, but cidrs; sg ids don't follow this format
 	ipRegexp := regexp.MustCompile("^(([0-9]?[0-9][0-9]?)\\.){3}([0-9]?[0-9][0-9]?)/[0-9]{1,2}$") // nolint
@@ -212,13 +222,13 @@ func concernsGroups(in []string) (bool, fail.Error) {
 		}
 	}
 	if invalidCidrs > 0 {
-		return false, fail.InvalidRequestError("in should be either a list of VALID CIDRs or list of Security Group IDs, we found an INVALID CIDR")
+		return false, fail.InvalidRequestError("in should be either a list of VALID CIDRs or list of Security Group IDs, we found an INVALID CIDR: %s", in)
 	}
 	if cidrFound > 0 && idFound > 0 {
-		return false, fail.InvalidRequestError("cannot mix CIDRs and Security Group IDs in source/target of rule")
+		return false, fail.InvalidRequestError("cannot mix CIDRs and Security Group IDs in source/target of rule: %s", in)
 	}
 	if cidrFound == 0 && idFound == 0 {
-		return false, fail.InvalidRequestError("missing valid sources/targets in rule")
+		return false, fail.InvalidRequestError("missing valid sources/targets in rule: %s", in)
 	}
 	return idFound > 0, nil
 }

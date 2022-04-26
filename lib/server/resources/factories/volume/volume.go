@@ -17,6 +17,8 @@
 package volume
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
@@ -29,6 +31,6 @@ func New(svc iaas.Service) (resources.Volume, fail.Error) {
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(svc iaas.Service, ref string) (resources.Volume, fail.Error) {
-	return operations.LoadVolume(svc, ref)
+func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+	return operations.LoadVolume(ctx, svc, ref, operations.WithReloadOption)
 }

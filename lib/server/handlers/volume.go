@@ -86,7 +86,7 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 		return nil, xerr
 	}
 	xerr = objv.Browse(task.Context(), func(volume *abstract.Volume) fail.Error {
-		rv, innerXErr := volumefactory.Load(handler.job.Service(), volume.ID)
+		rv, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -118,7 +118,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Service(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -254,17 +254,18 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
-	volumeInstance, xerr := volumefactory.Load(svc, volumeRef)
+	ctx := handler.job.Context()
+	volumeInstance, xerr := volumefactory.Load(ctx, svc, volumeRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	return volumeInstance.Attach(handler.job.Context(), hostInstance, path, format, doNotFormat, doNotMount)
+	return volumeInstance.Attach(ctx, hostInstance, path, format, doNotFormat, doNotMount)
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
@@ -288,8 +289,10 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
+	svc := handler.job.Service()
+	ctx := handler.job.Context()
 	// Load volume data
-	rv, xerr := volumefactory.Load(handler.job.Service(), volumeRef)
+	rv, xerr := volumefactory.Load(ctx, svc, volumeRef)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -300,7 +303,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	// mountPath := ""
 
 	// Load rh data
-	rh, xerr := hostfactory.Load(handler.job.Service(), hostRef)
+	rh, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
 		return xerr
 	}

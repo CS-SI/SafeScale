@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package abstract
+package providers
 
 import (
 	"reflect"

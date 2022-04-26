@@ -36,17 +36,9 @@ func NewStatCount(statName string) {
 		return fmt.Sprintf("%d", runtime.NumGoroutine())
 	}))
 
-	// Init
-	expvar.Publish("waitinit", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("runinit", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("waitnetsec", metric.NewCounter("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("runnetsec", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("waitgwha", metric.NewHistogram("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("rungwha", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("waitsysfix", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("runsysfix", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("waitfinal", metric.NewGauge("5m1s", "15m30s", "1h1m"))
-	expvar.Publish("runfinal", metric.NewGauge("5m1s", "15m30s", "1h1m"))
+	// Monitoring stow cache
+	expvar.Publish("readobject", metric.NewCounter("5m15s", "15m1m", "1h5m"))
+	expvar.Publish("writeobject", metric.NewCounter("5m15s", "15m1m", "1h5m"))
 }
 
 // Increment a certain stat

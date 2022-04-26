@@ -125,7 +125,11 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		connectionTimeout,
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+				if t.Err != nil {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...\n", hostName, t.Err.Error())
+				} else {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostName)
+				}
 			}
 		},
 	)
@@ -455,7 +459,11 @@ func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) er
 		retry.OrArbiter, // if sshCfg.Ender succeeds, we don't care about the timeout
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
+				if t.Err != nil {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", hostname, t.Err.Error())
+				} else {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
+				}
 			}
 		},
 	)
@@ -490,7 +498,11 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 		temporal.SSHConnectionTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
-				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+				if t.Err != nil {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...\n", name, t.Err.Error())
+				} else {
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", name)
+				}
 			}
 		},
 	)
@@ -550,28 +562,4 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 	}
 
 	return nil
-}
-
-// WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
-func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.Duration) error {
-	task, xerr := s.session.GetTask()
-	if xerr != nil {
-		return xerr
-	}
-	ctx := task.Context()
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	if timeout < temporal.HostOperationTimeout() {
-		timeout = temporal.HostOperationTimeout()
-	}
-	sshCfg, err := s.getHostSSHConfig(hostName)
-	if err != nil {
-		return err
-	}
-
-	_, xerr = sshCfg.WaitServerReady(ctx, "ready", timeout)
-	return xerr
 }

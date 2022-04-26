@@ -2,9 +2,10 @@ GO?=go
 
 .PHONY: clean generate vet
 
-all:    generate
+all: generate
 
 generate:
+	@$(GO) generate ./...
 	@(cd enums && $(MAKE) $(@))
 
 vet:

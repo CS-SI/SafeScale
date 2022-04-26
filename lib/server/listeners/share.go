@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 )
 
 // safescale share create --path="/shared/data" share1 host1
@@ -81,7 +80,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
 	svc := job.Service()
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	rh, xerr := hostfactory.Load(job.Context(), svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -96,14 +95,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 
-	defer func() {
-		issue := shareInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	out, xerr := shareInstance.ToProtocol()
+	out, xerr := shareInstance.ToProtocol(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -139,17 +131,10 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	shareInstance, xerr := sharefactory.Load(job.Service(), shareName)
+	shareInstance, xerr := sharefactory.Load(job.Context(), job.Service(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer func() {
-		issue := shareInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if xerr = shareInstance.Delete(job.Context()); xerr != nil {
 		return empty, xerr
@@ -312,12 +297,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	defer func() {
-		issue := shareInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
-
-	return shareInstance.ToProtocol()
+	return shareInstance.ToProtocol(job.Context())
 }

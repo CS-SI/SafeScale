@@ -68,7 +68,6 @@ const (
 
 // New returns an instance of safescale Client
 func New(server string) (_ *Session, ferr fail.Error) {
-
 	var xerr fail.Error
 	// Validate server parameter (can be empty string...)
 	if server != "" {

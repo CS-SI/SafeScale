@@ -21,9 +21,7 @@ import (
 	"expvar"
 	"fmt"
 	"regexp"
-	"sync"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -31,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
@@ -147,8 +146,6 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 
 		newS := &service{
 			Provider:   providerInstance,
-			cache:      serviceCache{map[string]*ResourceCache{}},
-			cacheLock:  &sync.Mutex{},
 			tenantName: tenantName,
 		}
 

@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 // safescale ssh connect host2
@@ -80,17 +79,10 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	retcode, stdout, stderr, xerr := hostInstance.Run(
 		job.Context(), command, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout(),
@@ -172,17 +164,10 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer func() {
-		issue := hostInstance.Released()
-		if issue != nil {
-			logrus.Warn(issue)
-		}
-	}()
 
 	if pull {
 		retcode, stdout, stderr, xerr = hostInstance.Pull(

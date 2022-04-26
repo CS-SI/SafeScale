@@ -26,10 +26,11 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
+
+// DISABLED go:generate minimock -o mocks/mock_cluster.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Cluster
 
 // IndexedListOfClusterNodes ...
 type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
@@ -39,7 +40,6 @@ type Cluster interface {
 	Metadata
 	Targetable
 	observer.Observable
-	cache.Cacheable
 
 	AddFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) ([]Host, fail.Error) // adds several nodes
@@ -55,7 +55,7 @@ type Cluster interface {
 	GetFlavor() (clusterflavor.Enum, fail.Error)                                                                                                 // returns the flavor of the cluster
 	GetComplexity() (clustercomplexity.Enum, fail.Error)                                                                                         // returns the complexity of the cluster
 	GetAdminPassword() (string, fail.Error)                                                                                                      // returns the password of the cluster admin account
-	GetKeyPair() (abstract.KeyPair, fail.Error)                                                                                                  // returns the key pair used in the cluster
+	GetKeyPair() (*abstract.KeyPair, fail.Error)                                                                                                 // returns the key pair used in the cluster
 	GetNetworkConfig() (*propertiesv3.ClusterNetwork, fail.Error)                                                                                // returns network configuration of the cluster
 	GetState() (clusterstate.Enum, fail.Error)                                                                                                   // returns the current state of the cluster
 	IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error)                                                           // tells if a feature is installed in Cluster using only metadata

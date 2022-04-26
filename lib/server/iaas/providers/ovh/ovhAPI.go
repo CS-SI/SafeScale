@@ -30,7 +30,7 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail
 		return nil, xerr
 	}
 
-	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
+	alternateAPIApplicationKey := authOpts.GetString("AlternateApiApplicationKey")
 	if alternateAPIApplicationKey == "" {
 		return nil, fail.SyntaxError("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
 	}

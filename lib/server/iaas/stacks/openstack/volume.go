@@ -89,9 +89,8 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
@@ -101,7 +100,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 	az, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
+		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
 	var v abstract.Volume
@@ -168,7 +167,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if xerr != nil {
-		return nullAV, xerr
+		return nil, xerr
 	}
 
 	return &v, nil
@@ -176,12 +175,11 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 // InspectVolume returns the volume identified by id
 func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-	nullAV := abstract.NewVolume()
 	if valid.IsNil(s) {
-		return nullAV, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -197,9 +195,9 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nullAV, abstract.ResourceNotFoundError("volume", id)
+			return nil, abstract.ResourceNotFoundError("volume", id)
 		default:
-			return nullAV, xerr
+			return nil, xerr
 		}
 	}
 
@@ -214,18 +212,17 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	var emptySlice []abstract.Volume
+func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
 
-	var vs []abstract.Volume
+	var vs []*abstract.Volume
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			vs = []abstract.Volume{} // If call fails, need to restart list from 0...
+			vs = []*abstract.Volume{} // If call fails, need to restart list from 0...
 			innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumesv2.ExtractVolumes(page)
 				if err != nil {
@@ -233,7 +230,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 					return false, err
 				}
 				for _, vol := range list {
-					av := abstract.Volume{
+					av := &abstract.Volume{
 						ID:    vol.ID,
 						Name:  vol.Name,
 						Size:  vol.Size,
@@ -249,7 +246,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil || len(vs) == 0 {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return vs, nil
@@ -339,15 +336,15 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	nullAVA := abstract.NewVolumeAttachment()
+	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
-		return nullAVA, fail.InvalidInstanceError()
+		return nilA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nilA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("id")
+		return nilA, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
@@ -361,7 +358,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAVA, xerr
+		return nilA, xerr
 	}
 	return &abstract.VolumeAttachment{
 		ID:       va.ID,
@@ -372,28 +369,27 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-	var emptySlice []abstract.VolumeAttachment
+func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return emptySlice, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
-	var vs []abstract.VolumeAttachment
+	var vs []*abstract.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			vs = []abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
+			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
 			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumeattach.ExtractVolumeAttachments(page)
 				if err != nil {
 					return false, err
 				}
 				for _, va := range list {
-					ava := abstract.VolumeAttachment{
+					ava := &abstract.VolumeAttachment{
 						ID:       va.ID,
 						ServerID: va.ServerID,
 						VolumeID: va.VolumeID,
@@ -407,7 +403,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	return vs, nil
 }

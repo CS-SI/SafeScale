@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -264,6 +265,7 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
+	ctx := task.Context()
 	outcomes = &unitResults{}
 
 	var (
@@ -275,7 +277,7 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	for _, h := range hosts {
 		var xerr fail.Error
 		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
-		clonedV, xerr = is.initLoopTurnForHost(h, v)
+		clonedV, xerr = is.initLoopTurnForHost(ctx, h, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -323,6 +325,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	outcomes = &unitResults{}
+	ctx := task.Context()
 
 	var (
 		clonedV data.Map
@@ -337,7 +340,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	var taskErr fail.Error
 	subtasks := map[string]concurrency.Task{}
 	for _, h := range hosts {
-		clonedV, taskErr = is.initLoopTurnForHost(h, v)
+		clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v) // FIXME: Profile this
 		taskErr = debug.InjectPlannedFail(taskErr)
 		if taskErr != nil {
 			abErr := tg.AbortWithCause(taskErr)
@@ -363,7 +366,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(subtasks) != len(hosts) {
-			logrus.Warningf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
+			logrus.Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
 		}
 		logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
 		if taskErr != nil {
@@ -417,7 +420,7 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 }
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
-func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV data.Map, ferr fail.Error) {
+func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v data.Map) (clonedV data.Map, ferr fail.Error) {
 	is.Worker.startTime = time.Now()
 
 	var xerr fail.Error
@@ -427,7 +430,7 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 		return nil, fail.Wrap(cerr)
 	}
 
-	clonedV["HostIP"], xerr = host.GetPrivateIP()
+	clonedV["HostIP"], xerr = host.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Errorf("aborting because of %s", xerr.Error())
@@ -457,7 +460,7 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 	}
 
 	var sn resources.Subnet
-	sn, xerr = host.GetDefaultSubnet()
+	sn, xerr = host.GetDefaultSubnet(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

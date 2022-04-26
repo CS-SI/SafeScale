@@ -14,21 +14,19 @@
  * limitations under the License.
  */
 
-package objectstorage
+package operations
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
-func normalizeError(err error) fail.Error { // nolint
-	if err != nil {
-		switch realErr := err.(type) {
-		case fail.Error:
-			return realErr
-		default:
-			return fail.ConvertError(err)
-		}
-	}
+const (
+	optionWithoutReloadKeyword = "without_reload"
+)
 
-	return nil
-}
+var (
+	// WithoutReloadOption is used as option to LoadXXX() to disable reloading from metadata and/or local instance caching (that may lead to deadlock sometimes)
+	WithoutReloadOption = data.NewImmutableKeyValue(optionWithoutReloadKeyword, true)
+	// WithReloadOption is used as option to LoadXXX() to enable reloading from metadata
+	WithReloadOption = data.NewImmutableKeyValue(optionWithoutReloadKeyword, false)
+)

@@ -24,19 +24,18 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
+	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -50,6 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 type blockDevice struct {
@@ -416,10 +416,8 @@ func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 // CreateHost creates a new host
 func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
-	nullAhf := abstract.NewHostFull()
-	nullUdc := userdata.NewContent()
 	if valid.IsNil(s) {
-		return nullAhf, nullUdc, fail.InvalidInstanceError()
+		return nil, nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
@@ -429,7 +427,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError(
+		return nil, nil, abstract.ResourceInvalidRequestError(
 			"host creation", "cannot create a host without public IP or without attached network",
 		)
 	}
@@ -437,11 +435,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// Validating name of the host
 	if ok, xerr := validateHostname(request); !ok {
 		if xerr != nil {
-			return nullAhf, nullUdc, fail.InvalidRequestError(
+			return nil, nil, fail.InvalidRequestError(
 				"name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error(),
 			)
 		}
-		return nullAhf, nullUdc, fail.InvalidRequestError(
+		return nil, nil, fail.InvalidRequestError(
 			"name '%s' is invalid for a FlexibleEngine Host", request.ResourceName,
 		)
 	}
@@ -461,31 +459,31 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
+		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "bad timings")
+		return nil, nil, fail.Wrap(xerr, "bad timings")
 	}
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
+		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get template")
+		return nil, nil, fail.Wrap(xerr, "failed to get template")
 	}
 
 	rim, xerr := s.InspectImage(request.ImageID)
 	if xerr != nil {
-		return nullAhf, nullUdc, xerr
+		return nil, nil, xerr
 	}
 
 	diskSize := request.DiskSize
@@ -520,7 +518,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// Select usable availability zone
 	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select Availability Zone")
+		return nil, nil, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
 
 	// Defines boot disk
@@ -713,7 +711,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 	host.Networking.IsGateway = isGateway
 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	if request.PublicIP {
 		var fip *FloatingIP
@@ -842,13 +840,12 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
-	nullAI := abstract.Image{}
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
-		return nullAI, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -867,15 +864,15 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAI, xerr
+		return nil, xerr
 	}
 
 	if img == nil {
-		return nullAI, fail.UnknownError("get image information didn't fail, but it was nil")
+		return nil, fail.UnknownError("get image information didn't fail, but it was nil")
 	}
 
 	if img.ID == id {
-		out := abstract.Image{
+		out := &abstract.Image{
 			ID:       img.ID,
 			Name:     img.Name,
 			DiskSize: int64(img.MinDiskGigabytes),
@@ -888,10 +885,10 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	if err != nil {
 		// probably image internals has changed, dump image description
 		logrus.Warnf("this image description is invalid: %s", spew.Sdump(img))
-		return nullAI, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
+		return nil, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
 	}
 
-	return out, nil
+	return &out, nil
 }
 
 // InspectHost updates the data inside host with the data from provider
@@ -900,19 +897,18 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	nullAHF := abstract.NewHostFull()
 	if valid.IsNil(s) {
-		return nullAHF, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
@@ -925,14 +921,14 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 				ahf.Core.LastState = hoststate.Error
 				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
-			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 		default:
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	}
 
 	if server == nil {
-		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
+		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
 	host, xerr = s.complementHost(ahf.Core, server)
@@ -947,12 +943,11 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []abstract.Image
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
@@ -968,7 +963,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 	pager := images.List(s.ComputeClient, opts)
 
 	// Define an anonymous function to be executed on each page's iteration
-	imgList = []abstract.Image{}
+	imgList = []*abstract.Image{}
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
 			imageList, err := images.ExtractImages(page)
@@ -977,23 +972,22 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, ferr fail.Error) {
 			}
 
 			for _, img := range imageList {
-				imgList = append(imgList, abstract.Image{ID: img.ID, Name: img.Name})
+				imgList = append(imgList, &abstract.Image{ID: img.ID, Name: img.Name})
 			}
 			return true, nil
 		},
 	)
 	if err != nil {
-		return emptySlice, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return imgList, nil
 }
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
-	var emptySlice []abstract.HostTemplate
+func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
@@ -1001,7 +995,7 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 
 	opts := flavors.ListOpts{}
 
-	var flvList []abstract.HostTemplate
+	var flvList []*abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
@@ -1010,10 +1004,10 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 					if err != nil {
 						return false, err
 					}
-					flvList = make([]abstract.HostTemplate, 0, len(list))
+					flvList = make([]*abstract.HostTemplate, 0, len(list))
 					for _, v := range list {
 						flvList = append(
-							flvList, abstract.HostTemplate{
+							flvList, &abstract.HostTemplate{
 								Cores:    v.VCPUs,
 								RAMSize:  float32(v.RAM) / 1000.0,
 								DiskSize: v.Disk,
@@ -1031,11 +1025,11 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *fail.ErrTimeout:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
-			return emptySlice, xerr
+			return nil, xerr
 		}
 	}
 	if len(flvList) == 0 {
