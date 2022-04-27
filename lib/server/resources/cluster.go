@@ -19,18 +19,18 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -o mocks/mock_cluster.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Cluster
+// DISABLED go:generate minimock -o mocks/mock_cluster.go -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Cluster
 
 // IndexedListOfClusterNodes ...
 type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode

@@ -12,7 +12,7 @@
 ![Go Versions](https://img.shields.io/badge/go-1.16%2C1.17-brightgreen)
 ![CodeSizeInBytes](https://img.shields.io/github/languages/code-size/CS-SI/SafeScale)
 
-[![Packages Documentation](https://img.shields.io/badge/go-documentation-blue.svg?label=packages)](https://pkg.go.dev/github.com/CS-SI/SafeScale/v21/lib)
+[![Packages Documentation](https://img.shields.io/badge/go-documentation-blue.svg?label=packages)](https://pkg.go.dev/github.com/CS-SI/SafeScale/v22/lib)
 
 SafeScale is an Infrastructure and Platform as Code tool.
 

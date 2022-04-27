@@ -17,7 +17,7 @@
 package images
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 // Filter ...

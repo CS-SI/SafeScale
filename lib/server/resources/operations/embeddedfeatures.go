@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 const featureFileExt = ".yml"

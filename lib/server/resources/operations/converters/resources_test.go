@@ -19,8 +19,8 @@ package converters
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
 )
 
 func Test_IndexedListOfClusterNodesFromResourceToProtocol(t *testing.T) {

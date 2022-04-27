@@ -21,20 +21,20 @@ import (
 	"io"
 	"os"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o mocks/mock_printer.go -i github.com/CS-SI/SafeScale/v21/lib/utils/cli.Printer
+//go:generate minimock -o mocks/mock_printer.go -i github.com/CS-SI/SafeScale/v22/lib/utils/cli.Printer
 
 // Printer ...
 type Printer interface {
 	Print(interface{})
 }
 
-//go:generate minimock -o mocks/mock_pipebridge.go -i github.com/CS-SI/SafeScale/v21/lib/utils/cli.PipeBridge
+//go:generate minimock -o mocks/mock_pipebridge.go -i github.com/CS-SI/SafeScale/v22/lib/utils/cli.PipeBridge
 
 // PipeBridge ...
 type PipeBridge interface {

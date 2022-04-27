@@ -24,13 +24,13 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
 // Item is a helper struct to ease the copy of local files to remote

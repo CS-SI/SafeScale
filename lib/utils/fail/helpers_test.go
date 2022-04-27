@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 func TestIsNull(t *testing.T) {

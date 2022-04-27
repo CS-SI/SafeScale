@@ -19,14 +19,14 @@ package listeners
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 

@@ -19,12 +19,12 @@ package operations
 import (
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // unsafeGetSpeed ...

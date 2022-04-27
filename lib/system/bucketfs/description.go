@@ -20,11 +20,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Description contains the configuration for bucket mount

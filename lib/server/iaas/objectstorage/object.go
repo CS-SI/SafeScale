@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
@@ -32,13 +32,13 @@ import (
 	_ "gomodules.xyz/stow/s3"
 	_ "gomodules.xyz/stow/swift"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Object
+//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Object
 
 // Object interface
 type Object interface {

@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"

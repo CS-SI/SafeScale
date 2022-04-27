@@ -25,8 +25,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // normalizeError translates AWS error to SafeScale one

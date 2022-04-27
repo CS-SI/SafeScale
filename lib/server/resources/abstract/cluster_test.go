@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

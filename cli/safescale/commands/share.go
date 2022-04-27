@@ -22,12 +22,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v21/lib/client"
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 var shareCmdName = "share"

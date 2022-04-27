@@ -20,9 +20,9 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/system/nfs/enums/securityflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ExportOptions ...

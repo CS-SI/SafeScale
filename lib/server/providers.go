@@ -20,12 +20,12 @@ package server
 
 // This file is used to automatically register all providers
 import (
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/aws"            // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/gcp"            // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/openstack"      // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/outscale"       // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers/ovh"            // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/aws"            // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/gcp"            // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/openstack"      // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/outscale"       // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers/ovh"            // Imported to initialize tenants
 )

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/stretchr/testify/require"
 )
 

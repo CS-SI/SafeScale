@@ -19,9 +19,9 @@ package client
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // RemoteFileItem is a helper struct to ease the copy of local files to remote

@@ -21,11 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // IdentifiableCache contains the caches for objects that satisfy data.Identifiable interface

@@ -17,18 +17,18 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 const defaultSecurityGroupName = "default"

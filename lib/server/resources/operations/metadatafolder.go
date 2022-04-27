@@ -21,20 +21,20 @@ import (
 	"strings"
 	"time"
 
-	datadef "github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // MetadataFolder describes a metadata MetadataFolder

@@ -29,7 +29,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NOTICE The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go

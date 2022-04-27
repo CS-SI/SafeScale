@@ -19,13 +19,13 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // Server getServer structure

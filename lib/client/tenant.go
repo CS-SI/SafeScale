@@ -20,11 +20,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
 // tenant is the part of safescale client handling tenants

@@ -31,12 +31,12 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/fsnotify.v1"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 var (

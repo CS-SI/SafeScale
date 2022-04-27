@@ -20,10 +20,10 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)

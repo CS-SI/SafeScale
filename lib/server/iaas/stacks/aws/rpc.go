@@ -30,11 +30,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
 func validateAWSString(stringContent *string, stringLabel string, notEmpty bool) fail.Error {

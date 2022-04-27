@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NetworkRequest represents network requirements to create a network/VPC where CIDR contains a non-routable network

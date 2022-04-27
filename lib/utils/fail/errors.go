@@ -25,16 +25,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 // consequencer is the interface exposing the methods manipulating consequences
@@ -49,7 +49,7 @@ type causer interface {
 	RootCause() error // returns the root cause of an error
 }
 
-// DISABLED go:generate minimock -o mocks/mock_error.go -i github.com/CS-SI/SafeScale/v21/lib/utils/fail.Error
+// DISABLED go:generate minimock -o mocks/mock_error.go -i github.com/CS-SI/SafeScale/v22/lib/utils/fail.Error
 
 // Error defines the interface of a SafeScale error
 type Error interface {

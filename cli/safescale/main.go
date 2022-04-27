@@ -28,22 +28,22 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v21/cli/safescale/commands"
-	"github.com/CS-SI/SafeScale/v21/lib/client"
-	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/commands"
+	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
-	_ "github.com/CS-SI/SafeScale/v21/lib/server"
+	_ "github.com/CS-SI/SafeScale/v22/lib/server"
 )
 
 var profileCloseFunc = func() {}

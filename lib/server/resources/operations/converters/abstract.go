@@ -17,15 +17,15 @@
 package converters
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
 )
 
 // Contains the function used to convert from abstract structures

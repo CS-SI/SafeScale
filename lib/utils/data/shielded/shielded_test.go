@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/assert"
 
-	datatests "github.com/CS-SI/SafeScale/v21/lib/utils/data/tests"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	datatests "github.com/CS-SI/SafeScale/v22/lib/utils/data/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // taki taki, Ozuna

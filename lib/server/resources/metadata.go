@@ -17,18 +17,18 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Metadata -o mocks/mock_metadata.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Metadata -o mocks/mock_metadata.go
 
 // Callback describes the function prototype to use to inspect metadata
 type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 
-//go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v21/lib/server/resources -i Metadata -t ./microfallback.tmpl -o mfall.go -l ""
+//go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v22/lib/server/resources -i Metadata -t ./microfallback.tmpl -o mfall.go -l ""
 
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
@@ -46,7 +46,7 @@ type Metadata interface {
 }
 
 /*
-//go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v21/lib/server/resources -i RawMetadata -t ./microfallback.tmpl -o breakeven.go -l ""
+//go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v22/lib/server/resources -i RawMetadata -t ./microfallback.tmpl -o breakeven.go -l ""
 
 type RawMetadata interface {
 	IsNull() bool

@@ -20,19 +20,19 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // CreateVolume ...

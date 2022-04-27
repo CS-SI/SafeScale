@@ -19,7 +19,7 @@ package serialize
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 )
 
 // propertyTypeRegistry contains the registry to have mapping between key strings and real struct

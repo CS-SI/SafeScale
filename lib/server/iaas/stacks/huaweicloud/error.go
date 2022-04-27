@@ -24,14 +24,14 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/gophercloud/gophercloud"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NormalizeError translates gophercloud or openstack error to SafeScale error

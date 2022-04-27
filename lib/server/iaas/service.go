@@ -30,23 +30,23 @@ import (
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	imagefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	imagefilters "github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract/filters/templates"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -o mocks/mock_service.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
+//go:generate minimock -o mocks/mock_service.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas.Service
 
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods

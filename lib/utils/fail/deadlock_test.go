@@ -24,7 +24,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 )
 
 func waitTimeoutWithoutDeadlock(wg *sync.WaitGroup, timeout time.Duration) bool {

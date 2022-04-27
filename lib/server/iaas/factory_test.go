@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"

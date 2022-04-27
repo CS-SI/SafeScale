@@ -19,17 +19,17 @@ package huaweicloud
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum

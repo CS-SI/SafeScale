@@ -19,7 +19,7 @@ package operations
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 )
 
 // cleanerCtx copies the task id value into a new context derived from context.Background

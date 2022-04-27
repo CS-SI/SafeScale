@@ -21,10 +21,10 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v21/lib/client"
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 )
 
 const (

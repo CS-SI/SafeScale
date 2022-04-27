@@ -16,10 +16,10 @@
 
 package cache
 
-//go:generate minimock -o mocks/mock_cacheable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/cache.Cacheable
+//go:generate minimock -o mocks/mock_cacheable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/cache.Cacheable
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 )
 
 // Cacheable is the interface a struct must satisfy to be able to be cached

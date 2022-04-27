@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	urfcli "github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/cmdstatus"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/cmdstatus"
 )
 
 // response define a standard response for most safescale commands

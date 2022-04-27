@@ -19,14 +19,14 @@ package huaweicloud
 import (
 	"net/http"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ListOpts to define parameter of list

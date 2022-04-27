@@ -22,10 +22,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/commonlog"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/commonlog"
 )
 
-//go:generate minimock -o mocks/mock_stopwatch.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Stopwatch
+//go:generate minimock -o mocks/mock_stopwatch.go -i github.com/CS-SI/SafeScale/v22/lib/utils/temporal.Stopwatch
 
 // Stopwatch interface to expose methods available for a stopwatch
 type Stopwatch interface {

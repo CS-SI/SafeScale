@@ -25,32 +25,32 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 )
 
 const protocolSeparator = ":"
 
-//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.SSHHandler
+//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.SSHHandler
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 

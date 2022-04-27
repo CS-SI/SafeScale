@@ -19,9 +19,9 @@ package retry
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // Arbiter sleeps or selects any amount of time for each attempt.

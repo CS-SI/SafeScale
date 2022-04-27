@@ -24,10 +24,10 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 // tracer ...

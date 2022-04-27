@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/stretchr/testify/require"
 )
 

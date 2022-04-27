@@ -25,14 +25,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
-	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
+	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SecurityGroupListener security-group service server grpc

@@ -19,7 +19,7 @@ package temporal
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -70,7 +70,7 @@ const (
 	defaultBigDelay = 30 * time.Second
 )
 
-//go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Timings
+//go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v22/lib/utils/temporal.Timings
 
 type Timings interface {
 	// OperationTimeout ...

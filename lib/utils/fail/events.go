@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/commonlog"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/commonlog"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 const (

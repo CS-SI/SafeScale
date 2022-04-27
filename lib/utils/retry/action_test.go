@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )

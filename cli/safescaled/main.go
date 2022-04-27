@@ -33,16 +33,16 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	_ "github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/listeners"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	_ "github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/listeners"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/heartbeat"
 )
 
 var profileCloseFunc = func() {}

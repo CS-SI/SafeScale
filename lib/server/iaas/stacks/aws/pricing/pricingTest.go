@@ -19,7 +19,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -29,8 +29,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/pricing"
 
-	ouraws "github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/aws"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
+	ouraws "github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/aws"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TryConnection(bucketName, key string) fail.Error {

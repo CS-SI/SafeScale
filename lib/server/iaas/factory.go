@@ -25,14 +25,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 var (

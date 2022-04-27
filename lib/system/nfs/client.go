@@ -19,9 +19,9 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Client defines the structure of a Client object

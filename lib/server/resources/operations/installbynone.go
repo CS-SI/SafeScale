@@ -19,14 +19,14 @@ package operations
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installaction"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installaction"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // noneInstaller is an installer using script to add and remove a Feature

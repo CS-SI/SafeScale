@@ -20,21 +20,21 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
-	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/cluster"
+	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ClusterListener host service server grpc

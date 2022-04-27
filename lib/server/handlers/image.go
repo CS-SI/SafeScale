@@ -17,14 +17,14 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ImageHandler
+//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ImageHandler
 
 // TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 

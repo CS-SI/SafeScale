@@ -17,10 +17,10 @@
 package observer
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 )
 
-//go:generate minimock -o mocks/mock_observer.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observer
+//go:generate minimock -o mocks/mock_observer.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/observer.Observer
 
 // Observer is the interface a struct must satisfy to be observed by outside
 type Observer interface {
@@ -31,7 +31,7 @@ type Observer interface {
 	MarkAsDeleted(id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
 }
 
-//go:generate minimock -o mocks/mock_observable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observable
+//go:generate minimock -o mocks/mock_observable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/observer.Observable
 
 // Observable is the interface a struct must satisfy to signal internal change to observers
 type Observable interface {

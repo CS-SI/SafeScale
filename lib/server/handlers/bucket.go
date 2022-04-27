@@ -17,18 +17,18 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	bucketfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/bucket"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	bucketfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/bucket"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go
 
 // BucketHandler defines interface to manipulate buckets
 type BucketHandler interface {

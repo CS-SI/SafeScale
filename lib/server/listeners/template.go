@@ -20,16 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // safescale template list --all=false

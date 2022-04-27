@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

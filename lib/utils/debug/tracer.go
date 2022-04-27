@@ -22,16 +22,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-//go:generate minimock -o mocks/mock_tracer.go -i github.com/CS-SI/SafeScale/v21/lib/utils/debug.Tracer
+//go:generate minimock -o mocks/mock_tracer.go -i github.com/CS-SI/SafeScale/v22/lib/utils/debug.Tracer
 
 // Tracer ...
 type Tracer interface {

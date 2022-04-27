@@ -19,12 +19,12 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SecurityGroupActivation represents activation state of a Security Group
@@ -45,7 +45,7 @@ const (
 	KeepCurrentSecurityGroupMark    = false // Do not change current Security Group mark
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
+// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
 
 // SecurityGroup links Object Storage folder and SecurityGroup
 type SecurityGroup interface {

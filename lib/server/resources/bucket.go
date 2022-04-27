@@ -19,14 +19,14 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -o mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Bucket
+// DISABLED go:generate minimock -o mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Bucket
 
 // Bucket GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {

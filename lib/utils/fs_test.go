@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 )
 
 func Test_LazyRemove(t *testing.T) {

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // ClusterRequest defines what kind of Cluster is wanted

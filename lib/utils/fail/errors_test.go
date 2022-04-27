@@ -27,9 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 )

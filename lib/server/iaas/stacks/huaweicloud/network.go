@@ -23,10 +23,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
@@ -38,14 +38,14 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 )
 
 // VPCRequest defines a request to create a VPC

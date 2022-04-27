@@ -21,22 +21,22 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 const (

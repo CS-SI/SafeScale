@@ -21,7 +21,7 @@ import (
 
 	"github.com/ovh/go-ovh/ovh"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail.Error) {

@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 )
 
 // Entry is a struct containing information about a cache entry

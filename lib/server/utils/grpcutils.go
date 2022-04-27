@@ -19,7 +19,7 @@ package utils
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
 // GetReference return a reference from the name or id given in the protocol.Reference

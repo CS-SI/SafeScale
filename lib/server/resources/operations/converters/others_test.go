@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )

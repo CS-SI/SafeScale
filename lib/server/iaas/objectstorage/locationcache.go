@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"

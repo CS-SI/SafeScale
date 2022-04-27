@@ -19,7 +19,7 @@ package converters
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/stretchr/testify/require"
 )
 

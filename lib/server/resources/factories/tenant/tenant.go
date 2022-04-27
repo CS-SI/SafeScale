@@ -19,10 +19,10 @@ package tenant
 import (
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 )
 
 // Tenant structure to handle name and Service for a tenant

@@ -19,8 +19,8 @@ package converters
 // Contains functions that are used to convert from system
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/system"
 )
 
 // SSHConfigFromSystemToProtocol converts a system.SSHConfig into a SshConfig

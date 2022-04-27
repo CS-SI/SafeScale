@@ -20,17 +20,17 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Subnet -o mocks/mock_subnet.go
+// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Subnet -o mocks/mock_subnet.go
 
 // Subnet links Object Storage folder and Network
 type Subnet interface {

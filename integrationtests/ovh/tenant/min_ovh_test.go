@@ -22,8 +22,8 @@ package tenant
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/integrationtests"
-	"github.com/CS-SI/SafeScale/v21/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/v22/integrationtests"
+	"github.com/CS-SI/SafeScale/v22/integrationtests/enums/providers"
 )
 
 func Test_Env_Setup(t *testing.T) {

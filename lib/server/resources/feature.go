@@ -19,15 +19,15 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/featuretargettype"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Feature -o mocks/mock_feature.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Feature -o mocks/mock_feature.go
 
 // Targetable is an interface that target must satisfy to be able to install something on it
 type Targetable interface {
