@@ -20,7 +20,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 

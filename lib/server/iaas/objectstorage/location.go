@@ -26,8 +26,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
