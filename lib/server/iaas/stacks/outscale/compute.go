@@ -594,7 +594,7 @@ func (s stack) addNICs(request *abstract.HostRequest, vmID string) ([]osc.Nic, f
 		}
 		return nics, nil
 	}
-	return nil, nil
+	return []osc.Nic{}, nil
 }
 
 func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate, vmID string) (ferr fail.Error) {

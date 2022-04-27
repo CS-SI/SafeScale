@@ -155,7 +155,7 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	taskDeleteSecurityGroup := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 		req := &protocol.SecurityGroupDeleteRequest{

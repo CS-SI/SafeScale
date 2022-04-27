@@ -17,12 +17,17 @@
 package objectstorage
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
@@ -63,6 +68,7 @@ type Config struct {
 	Credentials      string
 	BucketName       string
 	DNS              string
+	Direct           bool // if true, no stow cache is used
 }
 
 // Location ...
@@ -80,6 +86,9 @@ type Location interface {
 	CreateBucket(string) (abstract.ObjectStorageBucket, fail.Error)
 	// DeleteBucket removes a bucket (need to be cleared before)
 	DeleteBucket(string) fail.Error
+	// DownloadBucket downloads a bucket
+	DownloadBucket(bucketName, decryptionKey string) ([]byte, fail.Error)
+
 	// ClearBucket empties a GetBucket
 	ClearBucket(string, string, string) fail.Error
 
@@ -132,7 +141,7 @@ type location struct {
 }
 
 // NewLocation creates an Object Storage location based on config
-func NewLocation(conf Config) (_ *locationcache, ferr fail.Error) { // nolint
+func NewLocation(conf Config) (_ Location, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 	l := &location{
 		config: conf,
@@ -141,6 +150,15 @@ func NewLocation(conf Config) (_ *locationcache, ferr fail.Error) { // nolint
 	if err != nil {
 		return nil, err
 	}
+
+	if conf.Direct {
+		nlt, serr := newlocationtransparent(l)
+		if serr != nil {
+			return nil, fail.ConvertError(serr)
+		}
+		return nlt, nil
+	}
+
 	nl, serr := newLocationcache(l)
 	if serr != nil {
 		return nil, fail.ConvertError(serr)
@@ -523,6 +541,91 @@ func (instance location) BrowseBucket(bucketName string, path, prefix string, ca
 		return err
 	}
 	return b.Browse(path, prefix, callback)
+}
+
+// DownloadBucket just downloads the bucket
+func (instance location) DownloadBucket(bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if bucketName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+	}
+
+	path := ""
+	prefix := ""
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
+
+	zippedBucket, err := os.CreateTemp("", "bucketcontent.*.zip")
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	defer func(closer *os.File) {
+		_ = closer.Close()
+		_ = os.Remove(zippedBucket.Name())
+	}(zippedBucket)
+
+	zipwriter := zip.NewWriter(zippedBucket)
+	defer func(closer *zip.Writer) {
+		_ = closer.Close()
+	}(zipwriter)
+
+	xerr := instance.BrowseBucket(bucketName, path, prefix, func(o Object) fail.Error {
+		name, xerr := o.GetName()
+		if xerr != nil {
+			return xerr
+		}
+		name = strings.TrimPrefix(name, path)
+
+		var buffer bytes.Buffer
+		ierr := instance.ReadObject(bucketName, path+name, &buffer, 0, 0)
+		if ierr != nil {
+			return ierr
+		}
+
+		var content []byte
+		if decryptionKey != "" {
+			ck, err := crypt.NewEncryptionKey([]byte(decryptionKey))
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+			clean, err := crypt.Decrypt(buffer.Bytes(), ck)
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+			content = clean
+		} else {
+			content = buffer.Bytes()
+		}
+
+		tw, err := zipwriter.Create(name)
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+		_, err = tw.Write(content)
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	_ = zipwriter.Close()
+	_ = zippedBucket.Close()
+
+	ct, err := ioutil.ReadFile(zippedBucket.Name())
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	return ct, nil
 }
 
 // ClearBucket ...

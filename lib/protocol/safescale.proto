@@ -638,6 +638,10 @@ message BucketListResponse {
 	repeated BucketResponse buckets = 1;
 }
 
+message BucketDownloadResponse {
+	bytes content = 1;
+}
+
 message BucketMountRequest {
 	string bucket = 1;
 	Reference host = 2;
@@ -651,6 +655,7 @@ service BucketService {
 	rpc Delete(BucketRequest) returns (google.protobuf.Empty){}
 	rpc List(BucketListRequest) returns (BucketListResponse){}
 	rpc Inspect(BucketRequest) returns (BucketResponse){}
+	rpc Download(BucketRequest) returns (BucketDownloadResponse){}
 }
 
 // SSH requests

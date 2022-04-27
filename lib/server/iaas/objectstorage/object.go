@@ -42,8 +42,6 @@ import (
 
 // Object interface
 type Object interface {
-	//	data.Identifiable
-
 	Stored() (bool, fail.Error)
 
 	Read(io.Writer, int64, int64) fail.Error
@@ -143,6 +141,7 @@ func (instance *object) Reload() fail.Error {
 			return fail.ConvertError(err)
 		}
 	}
+
 	return instance.reloadFromItem(item)
 }
 

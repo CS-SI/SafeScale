@@ -112,12 +112,7 @@ func Profile(what string) func() {
 			server := listen + ":" + port
 			go func() {
 				var crash error
-				defer func() {
-					if crash != nil {
-						logrus.Error(crash)
-					}
-				}()
-				defer fail.OnPanic(&crash)
+				defer fail.SilentOnPanic(&crash)
 
 				err := http.ListenAndServe(server, nil)
 				if err != nil {

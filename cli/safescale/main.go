@@ -50,7 +50,7 @@ var profileCloseFunc = func() {}
 
 func cleanup(clientSession *client.Session, onAbort *uint32) {
 	var crash error
-	defer fail.OnPanic(&crash) // nolint
+	defer fail.SilentOnPanic(&crash) // nolint
 
 	if atomic.CompareAndSwapUint32(onAbort, 0, 0) {
 		profileCloseFunc()
@@ -184,7 +184,7 @@ func main() {
 		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			var crash error
-			defer fail.OnPanic(&crash)
+			defer fail.SilentOnPanic(&crash)
 
 			for {
 				<-signalCh

@@ -203,6 +203,11 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		return nil, fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	objgw := castedParams.host
 	if valid.IsNil(objgw) {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
@@ -220,7 +225,6 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	var xerr fail.Error
 	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
 
 	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
@@ -254,7 +258,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 			return nil, xerr
 		}
 
-		time.Sleep(45 * time.Second)
+		time.Sleep(timings.RebootTimeout())
 
 		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
 		xerr = debug.InjectPlannedFail(xerr)

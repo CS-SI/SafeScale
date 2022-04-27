@@ -225,7 +225,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 				return
 			}
 		}()
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		for {
 			select {
@@ -311,7 +311,7 @@ func pollVolume(
 	svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
 ) {
 	var crash error
-	defer fail.OnPanic(&crash)
+	defer fail.SilentOnPanic(&crash)
 
 	for {
 		v, err := svc.InspectVolume(volumeID)

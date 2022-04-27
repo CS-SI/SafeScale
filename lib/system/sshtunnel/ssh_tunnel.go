@@ -28,6 +28,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/sanity-io/litter"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -51,6 +52,19 @@ func OnPanic(err *error) func() {
 				*err = fmt.Errorf("runtime panic occurred: %w", anError)
 			} else {
 				*err = fmt.Errorf("runtime panic occurred: %v", x)
+			}
+		}
+	}
+}
+
+// SilentOnPanic sometimes we cannot return errors, in that case, log the panic
+func SilentOnPanic(err *error) func() {
+	return func() {
+		if x := recover(); x != nil {
+			if anError, ok := x.(error); ok {
+				logrus.Errorf("runtime panic occurred: %v", anError)
+			} else {
+				logrus.Errorf("runtime panic occurred: %v", x)
 			}
 		}
 	}
@@ -159,7 +173,7 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 	resChan := make(chan result)
 	go func() {
 		var crash error
-		defer OnPanic(&crash)
+		defer SilentOnPanic(&crash)
 
 		theCli, theErr := net.Listen(network, address)
 		if theErr != nil {
@@ -243,7 +257,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		connCh := make(chan net.Conn)
 		go func() {
 			var crash error
-			defer OnPanic(&crash)
+			defer SilentOnPanic(&crash)
 
 			cwErr := tunnel.newConnectionWaiter(listener, connCh)
 			if cwErr != nil {
@@ -271,6 +285,8 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		case <-tunnel.closer:
 			tunnel.logf("close signal received through channel: closing tunnel...\n")
 			tunnel.isOpen = false
+			close(tunnel.closer)
+			tunnel.closer = nil
 		case conn := <-connCh:
 			tunnel.mu.Lock()
 			tunnel.conns = append(tunnel.conns, conn)
@@ -278,7 +294,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 			tunnel.logf("accepted connection")
 			go func() {
 				var crash error
-				defer OnPanic(&crash)
+				defer SilentOnPanic(&crash)
 
 				var fwErr error
 				var quittingErr error
@@ -338,14 +354,14 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	return nil
 }
 
-func TunnelOptionWithDialTimeout(timeout time.Duration) Option {
+func TunnelOptionWithDialTimeout(timeout time.Duration) Option { // nolint
 	return func(tunnel *SSHTunnel) error {
 		tunnel.dialTimeout = timeout
 		return nil
 	}
 }
 
-func TunnelOptionWithKeepAlive(keepAlive time.Duration) Option {
+func TunnelOptionWithKeepAlive(keepAlive time.Duration) Option { // nolint
 	return func(tunnel *SSHTunnel) error {
 		tunnel.withKeepAlive = true
 		tunnel.timeKeepAliveRead = keepAlive
@@ -385,7 +401,7 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 	resChan := make(chan result)
 	go func() {
 		var crash error
-		defer OnPanic(&crash)
+		defer SilentOnPanic(&crash)
 
 		theCli, theErr := sshDial(network, addr, config)
 		if theErr != nil {
@@ -432,7 +448,7 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 	resChan := make(chan result)
 	go func() {
 		var crash error
-		defer OnPanic(&crash)
+		defer SilentOnPanic(&crash)
 
 		theConn, theErr := cli.Dial(n, addr)
 		if theErr != nil {
@@ -512,7 +528,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 		endCopy := make(chan bool)
 		go func() {
 			var crash error
-			defer OnPanic(&crash)
+			defer SilentOnPanic(&crash)
 
 			defer close(endCopy)
 			_, err := io.CopyBuffer(writer, reader, *buff)
@@ -568,7 +584,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 	// Both goroutines should end almost in the same second one after another, if not we can consider the tunnel dead...
 	go func() {
 		var crash error
-		defer OnPanic(&crash)
+		defer SilentOnPanic(&crash)
 
 		defer func() {
 			close(stopUpdown)
@@ -616,9 +632,13 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 }
 
 func (tunnel *SSHTunnel) Close() {
+	var crash error
+	defer SilentOnPanic(&crash)
+
 	if tunnel.isOpen {
-		tunnel.closer <- struct{}{}
-		close(tunnel.closer)
+		if tunnel.closer != nil {
+			tunnel.closer <- struct{}{}
+		}
 	}
 	return // nolint
 }
@@ -635,8 +655,8 @@ func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options 
 	return NewSSHTunnelWithLocalBinding(gw.String(), gwCfg.Auth[0], target.Address(), local.Address(), options...)
 }
 
-// NewSSHTunnel creates a ssh tunnel through localhost:0
-func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (_ *SSHTunnel, err error) {
+// NewSSHTunnel creates a SSH tunnel through localhost:0
+func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (_ *SSHTunnel, err error) { // nolint
 	return NewSSHTunnelWithLocalBinding(tunnel, auth, destination, "localhost:0", options...)
 }
 

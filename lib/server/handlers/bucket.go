@@ -36,6 +36,7 @@ type BucketHandler interface {
 	Create(string) fail.Error
 	Delete(string) fail.Error
 	Inspect(string) (resources.Bucket, fail.Error)
+	Download(string) ([]byte, fail.Error)
 	Mount(string, string, string) fail.Error
 	Unmount(string, string) fail.Error
 }
@@ -135,6 +136,29 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 		return xerr
 	}
 	return rb.Delete(task.Context())
+}
+
+// Download a bucket
+func (handler *bucketHandler) Download(name string) (bytes []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if handler == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	task := handler.job.Task()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+
+	// -- download bucket
+	ct, xerr := handler.job.Service().DownloadBucket(name, "")
+	if xerr != nil {
+		return nil, xerr
+	}
+	return ct, nil
 }
 
 // Inspect a bucket

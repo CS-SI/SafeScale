@@ -82,6 +82,21 @@ func (c bucket) Create(name string, timeout time.Duration) error {
 	return err
 }
 
+// Create ...
+func (c bucket) Download(name string, timeout time.Duration) (*protocol.BucketDownloadResponse, error) {
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	service := protocol.NewBucketServiceClient(c.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	dr, err := service.Download(ctx, &protocol.BucketRequest{Name: name})
+	return dr, err
+}
+
 // Delete ...
 func (c bucket) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
@@ -108,7 +123,7 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 		_, err := service.Delete(newCtx, &protocol.BucketRequest{Name: aname})

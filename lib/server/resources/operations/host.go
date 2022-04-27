@@ -1941,7 +1941,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			return xerr
 		}
 
-		time.Sleep(45 * time.Second)
+		time.Sleep(timings.RebootTimeout())
 	}
 
 	_, xerr = instance.waitInstallPhase(task.Context(), userdata.PHASE2_NETWORK_AND_SECURITY, 90*time.Second) // FIXME: It should be 1:30 min tops, 2*reboot time
@@ -1975,7 +1975,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 				return xerr
 			}
 
-			time.Sleep(45 * time.Second)
+			time.Sleep(timings.RebootTimeout())
 
 			_, xerr = instance.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, waitingTime)
 			xerr = debug.InjectPlannedFail(xerr)

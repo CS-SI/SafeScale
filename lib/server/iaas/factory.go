@@ -200,7 +200,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
+			metadataLocationConfig, err := initObjectStorageLocationConfig(authOpts, tenant)
 			if err != nil {
 				return NullService(), err
 			}
@@ -423,6 +423,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	config.AuthURL, _ = ostorage["AuthURL"].(string)   // nolint
 	config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
+	if _, ok := ostorage["Direct"]; ok {
+		config.Direct, _ = ostorage["Direct"].(bool) // nolint
+	}
 
 	if config.User, ok = ostorage["AccessKey"].(string); !ok {
 		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
@@ -517,187 +520,6 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 		config.Credentials = string(d1)
 	}
-	return config, nil
-}
-
-// func validateOVHObjectStorageRegionNaming(context, region, authURL string) fail.Error {
-// 	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
-// 	// Object Storage regions don't contain anymore an index like compute regions
-// 	if strings.Contains(authURL, "ovh.") {
-// 		rLen := len(region)
-// 		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
-// 			region = region[:rLen-1]
-// 			return fail.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
-// 		}
-// 	}
-// 	return nil
-// }
-
-// initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
-	var (
-		config objectstorage.Config
-		ok     bool
-	)
-
-	// FIXME: This code is ancient and doesn't provide nor hints nor protection against formatting
-
-	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
-	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
-	metadata, _ := tenant["metadata"].(map[string]interface{})      // nolint
-
-	if config.Type, ok = metadata["Type"].(string); !ok {
-		if config.Type, ok = ostorage["Type"].(string); !ok {
-			return config, fail.SyntaxError("missing setting 'Type' in 'metadata' section")
-		}
-	}
-
-	if config.Domain, ok = metadata["Domain"].(string); !ok {
-		if config.Domain, ok = metadata["DomainName"].(string); !ok {
-			if config.Domain, ok = ostorage["Domain"].(string); !ok {
-				if config.Domain, ok = ostorage["DomainName"].(string); !ok {
-					if config.Domain, ok = compute["Domain"].(string); !ok {
-						if config.Domain, ok = compute["DomainName"].(string); !ok {
-							if config.Domain, ok = identity["Domain"].(string); !ok {
-								if config.Domain, ok = identity["DomainName"].(string); !ok {
-									config.Domain = authOpts.GetString("DomainName") // nolint
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	config.TenantDomain = config.Domain
-
-	if config.Tenant, ok = metadata["Tenant"].(string); !ok {
-		if config.Tenant, ok = metadata["ProjectName"].(string); !ok {
-			if config.Tenant, ok = metadata["ProjectID"].(string); !ok {
-				if config.Tenant, ok = ostorage["Tenant"].(string); !ok {
-					if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
-						if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
-							if config.Tenant, ok = compute["Tenant"].(string); !ok {
-								if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-									config.Tenant, _ = compute["ProjectID"].(string) // nolint
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if config.AuthURL, ok = metadata["AuthURL"].(string); !ok {
-		config.AuthURL, _ = ostorage["AuthURL"].(string) // nolint
-	}
-
-	if config.Endpoint, ok = metadata["Endpoint"].(string); !ok {
-		config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
-	}
-
-	if config.User, ok = metadata["AccessKey"].(string); !ok {
-		if config.User, ok = metadata["OpenstackID"].(string); !ok {
-			if config.User, ok = metadata["Username"].(string); !ok {
-				if config.User, ok = ostorage["AccessKey"].(string); !ok {
-					if config.User, ok = ostorage["OpenStackID"].(string); !ok {
-						if config.User, ok = ostorage["Username"].(string); !ok {
-							if config.User, ok = identity["Username"].(string); !ok {
-								config.User, _ = identity["OpenstackID"].(string) // nolint
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	config.DNS, _ = compute["DNS"].(string) // nolint
-
-	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
-		if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-			config.Key, _ = identity["ApplicationKey"].(string) // nolint
-		}
-	}
-
-	if config.SecretKey, ok = metadata["SecretKey"].(string); !ok {
-		if config.SecretKey, ok = metadata["AccessPassword"].(string); !ok {
-			if config.SecretKey, ok = metadata["OpenstackPassword"].(string); !ok {
-				if config.SecretKey, ok = metadata["Password"].(string); !ok {
-					if config.SecretKey, ok = ostorage["SecretKey"].(string); !ok {
-						if config.SecretKey, ok = ostorage["AccessPassword"].(string); !ok {
-							if config.SecretKey, ok = ostorage["OpenstackPassword"].(string); !ok {
-								if config.SecretKey, ok = ostorage["Password"].(string); !ok {
-									if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
-										if config.SecretKey, ok = identity["AccessPassword"].(string); !ok {
-											if config.SecretKey, ok = identity["Password"].(string); !ok {
-												config.SecretKey, _ = identity["OpenstackPassword"].(string) // nolint
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if config.Region, ok = metadata["Region"].(string); !ok {
-		if config.Region, ok = ostorage["Region"].(string); !ok {
-			config.Region, _ = compute["Region"].(string) // nolint
-		}
-		// FIXME: Wrong, this needs validation, but not ALL providers
-		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-		// 	return config, err
-		// }
-	}
-
-	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
-		if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
-		}
-	}
-
-	// FIXME: Remove google custom code, it's a problem, think about delegation to providers
-	if config.Type == "google" {
-		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
-		for _, key := range keys {
-			if _, ok = identity[key].(string); !ok {
-				return config, fail.SyntaxError("problem parsing %s", key)
-			}
-		}
-
-		config.ProjectID, ok = identity["project_id"].(string)
-		if !ok {
-			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
-		}
-
-		googleCfg := stacks.GCPConfiguration{
-			Type:         "service_account",
-			ProjectID:    identity["project_id"].(string),
-			PrivateKeyID: identity["private_key_id"].(string),
-			PrivateKey:   identity["private_key"].(string),
-			ClientEmail:  identity["client_email"].(string),
-			ClientID:     identity["client_id"].(string),
-			AuthURI:      identity["auth_uri"].(string),
-			TokenURI:     identity["token_uri"].(string),
-			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
-			ClientCert:   identity["client_x509_cert_url"].(string),
-		}
-
-		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
-		if jserr != nil {
-			return config, fail.ConvertError(jserr)
-		}
-
-		config.Credentials = string(d1)
-	}
-
-	config.BucketName, _ = metadata["MetadataBucketName"].(string) // nolint
 	return config, nil
 }
 

@@ -78,9 +78,11 @@ func New(server string) (_ *Session, ferr fail.Error) {
 	// if server is empty, try to see if env SAFESCALED_LISTEN is set...
 	if server == "" {
 		server = os.Getenv("SAFESCALED_LISTEN")
-		if server, xerr = validateServerString(server); xerr != nil {
-			logrus.Warnf("Content of environment variable SAFESCALED_LISTEN is invalid, ignoring.")
-			server = ""
+		if server != "" {
+			if server, xerr = validateServerString(server); xerr != nil {
+				logrus.Warnf("Content of environment variable SAFESCALED_LISTEN is invalid, ignoring.")
+				server = ""
+			}
 		}
 
 		// LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
@@ -127,7 +129,7 @@ func New(server string) (_ *Session, ferr fail.Error) {
 
 func validateServerString(server string) (string, fail.Error) {
 	if server == "" {
-		return "", nil
+		return "", fail.InvalidParameterError("server", "is empty")
 	}
 
 	parts := strings.Split(server, ":")

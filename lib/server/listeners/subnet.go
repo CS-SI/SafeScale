@@ -283,7 +283,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 
 	force := in.GetForce()
 	jobCtx := job.Context()
-	newCtx := context.WithValue(jobCtx, "force", force)
+	newCtx := context.WithValue(jobCtx, "force", force) // nolint
 
 	var (
 		networkInstance resources.Network

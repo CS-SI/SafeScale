@@ -48,6 +48,9 @@ const (
 	// defaultOperationTimeout default timeout to handle operations
 	defaultOperationTimeout = 150 * time.Second
 
+	// defaultWaitAfterReboot time we wait after a reboot before trying SSH connection
+	defaultWaitAfterReboot = 45 * time.Second
+
 	// defaultSSHConnectionTimeout is the default ssh timeout connection
 	defaultSSHConnectionTimeout = 3 * time.Minute
 
@@ -106,6 +109,9 @@ type Timings interface {
 	// MetadataTimeout ...
 	MetadataTimeout() time.Duration
 
+	// RebootTimeout
+	RebootTimeout() time.Duration
+
 	// MetadataReadAfterWriteTimeout ...
 	MetadataReadAfterWriteTimeout() time.Duration
 
@@ -129,6 +135,7 @@ type Timeouts struct {
 	SSHConnection          time.Duration `json:"timeout_ssh_connection,omitempty" mapstructure:"sshconnection"`
 	Metadata               time.Duration `json:"timeout_metadata,omitempty" mapstructure:"metadata"`
 	MetadataReadAfterWrite time.Duration `json:"timeout_metadata_raw,omitempty" mapstructure:"metadatareadafterwrite"`
+	RebootTimeout          time.Duration `json:"timeout_reboot,omitempty" mapstructure:"reboot"`
 }
 
 type Delays struct {
@@ -334,6 +341,15 @@ func (t *MutableTimings) MetadataReadAfterWriteTimeout() time.Duration {
 	return t.Timeouts.MetadataReadAfterWrite
 }
 
+// RebootTimeout returns the time we wait after a reboot before trying SSH connection
+func (t *MutableTimings) RebootTimeout() time.Duration {
+	if t == nil {
+		return RebootTimeout()
+	}
+
+	return t.Timeouts.RebootTimeout
+}
+
 // SmallDelay returns the duration of a small delay
 func (t *MutableTimings) SmallDelay() time.Duration {
 	if t == nil {
@@ -369,6 +385,10 @@ func CommunicationTimeout() time.Duration {
 // MetadataReadAfterWriteTimeout ...
 func MetadataReadAfterWriteTimeout() time.Duration {
 	return getFromEnv(defaultMetadataReadAfterWriteTimeout, "SAFESCALE_METADATA_READ_AFTER_WRITE_TIMEOUT")
+}
+
+func RebootTimeout() time.Duration {
+	return getFromEnv(defaultWaitAfterReboot, "SAFESCALE_REBOOT_TIMEOUT")
 }
 
 // HostLongOperationTimeout ...
