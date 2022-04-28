@@ -18,5 +18,8 @@ test:
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) 2>&1
 
 clean:
+	@(cd cache && $(MAKE) $@)
+	@(cd observer && $(MAKE) $@)
+	@(cd serialize && $(MAKE) $@)
 	@$(RM) ./mocks/mock_*.go || true
 

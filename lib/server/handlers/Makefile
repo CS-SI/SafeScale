@@ -9,4 +9,5 @@ generate:
 	@(mkdir -p ../mocks) || true
 	@$(GO) generate -run minimock . > /dev/null 2>&1 || true
 
-clean: ;
+clean:
+	@$(RM) ./mocks/mock_*.go || true
