@@ -196,6 +196,10 @@ func (instance *Share) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+func (instance *Share) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // carry creates metadata and add Volume to service cache
 func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {

@@ -127,6 +127,10 @@ func (instance *bucket) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+func (instance *bucket) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // carry ...
 func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {

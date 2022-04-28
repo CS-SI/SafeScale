@@ -114,6 +114,10 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 	return instance, nil
 }
 
+func (instance *Cluster) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // StartRandomDelayGenerator starts a Task to generate random delays, read from instance.randomDelayCh
 func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max int) fail.Error {
 	chint := make(chan int)

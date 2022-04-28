@@ -164,6 +164,10 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 	return hostInstance, nil
 }
 
+func (instance *Host) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation() fail.Error {
 	svc := instance.Service()

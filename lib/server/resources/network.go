@@ -34,6 +34,7 @@ type Network interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
+	Consistent
 
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network
 	AdoptSubnet(ctx context.Context, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network

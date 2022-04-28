@@ -40,6 +40,7 @@ type Cluster interface {
 	Metadata
 	Targetable
 	observer.Observable
+	Consistent
 
 	AddFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) ([]Host, fail.Error) // adds several nodes

@@ -45,6 +45,10 @@ type Metadata interface {
 	Service() iaas.Service // returns the iaas.Service used
 }
 
+type Consistent interface {
+	Exists() (bool, fail.Error)
+}
+
 /*
 //go:generate gowrap gen -g -p github.com/CS-SI/SafeScale/v22/lib/server/resources -i RawMetadata -t ./microfallback.tmpl -o breakeven.go -l ""
 

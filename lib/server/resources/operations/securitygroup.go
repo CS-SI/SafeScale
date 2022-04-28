@@ -138,6 +138,10 @@ func (instance *SecurityGroup) IsNull() bool {
 	return valid.IsNil(instance.MetadataCore)
 }
 
+func (instance *SecurityGroup) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // Carry overloads rv.core.Carry() to add Volume to service cache
 func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {

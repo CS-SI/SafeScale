@@ -52,6 +52,7 @@ type SecurityGroup interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
+	Consistent
 
 	AddRule(ctx context.Context, _ *abstract.SecurityGroupRule) fail.Error                                         // returns true if the host is member of a cluster
 	AddRules(ctx context.Context, _ abstract.SecurityGroupRules) fail.Error                                        // returns true if the host is member of a cluster

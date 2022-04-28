@@ -124,6 +124,10 @@ func (instance *Network) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+func (instance *Network) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // Create creates a Network
 // returns:
 //   - *fail.ErrInvalidParameter: one parameter is invalid

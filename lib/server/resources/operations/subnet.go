@@ -356,6 +356,10 @@ func (instance *Subnet) IsNull() bool {
 	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && valid.IsNil(instance.MetadataCore))))
 }
 
+func (instance *Subnet) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // Carry wraps rv.core.Carry() to add Volume to service cache
 func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if clonable == nil {

@@ -37,6 +37,7 @@ type Subnet interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
+	Consistent
 
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                    // unlinks host ID from subnet
 	AttachHost(ctx context.Context, _ Host) fail.Error                                                                           // links Host to the Subnet

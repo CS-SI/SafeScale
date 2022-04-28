@@ -133,6 +133,10 @@ func (instance *volume) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+func (instance *volume) Exists() (bool, fail.Error) {
+	return true, nil
+}
+
 // carry overloads rv.core.Carry() to add Volume to service cache
 func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {

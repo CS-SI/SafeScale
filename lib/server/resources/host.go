@@ -40,6 +40,7 @@ type Host interface {
 	Metadata
 	Targetable
 	observer.Observable
+	Consistent
 
 	BindSecurityGroup(ctx context.Context, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                // Binds a security group to host
 	Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) fail.Error                                               // ...
