@@ -614,3 +614,49 @@ func (h host) ListSecurityGroups(hostRef, state string, timeout time.Duration) (
 	}
 	return service.ListSecurityGroups(newCtx, req)
 }
+
+// Tag Host
+func (h host) Tag(hostName string, tagName string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := protocol.NewHostServiceClient(h.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req := &protocol.TagRequest{
+		Host: &protocol.Reference{Name: hostName},
+		Tag:  &protocol.Reference{Name: tagName},
+	}
+
+	_, err := service.Tag(newCtx, req)
+	return err
+}
+
+// Untag Host
+func (h host) Untag(hostName string, tagName string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := protocol.NewHostServiceClient(h.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req := &protocol.TagRequest{
+		Host: &protocol.Reference{Name: hostName},
+		Tag:  &protocol.Reference{Name: tagName},
+	}
+
+	_, err := service.Untag(newCtx, req)
+	return err
+}

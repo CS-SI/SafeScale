@@ -123,6 +123,7 @@ func New(server string) (_ *Session, ferr fail.Error) {
 	s.Template = template{session: s}
 	s.Tenant = tenant{session: s}
 	s.Volume = volume{session: s}
+	s.Tag = tag{session: s}
 
 	return s, nil
 }

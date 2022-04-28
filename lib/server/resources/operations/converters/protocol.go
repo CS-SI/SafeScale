@@ -241,6 +241,19 @@ func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (*a
 	return out, nil
 }
 
+// TagFromProtocolToAbstract ...
+func TagFromProtocolToAbstract(in *protocol.TagInspectResponse) (*abstract.Tag, fail.Error) {
+	if in == nil {
+		return &abstract.Tag{}, fail.InvalidParameterCannotBeNilError("in")
+	}
+
+	out := &abstract.Tag{
+		ID:   in.GetId(),
+		Name: in.GetName(),
+	}
+	return out, nil
+}
+
 // HostStateFromProtocolToEnum converts a protocol.HostState to hoststate.Enum
 func HostStateFromProtocolToEnum(in protocol.HostState) hoststate.Enum {
 	switch in {

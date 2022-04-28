@@ -76,4 +76,6 @@ type Host interface {
 	ToProtocol(ctx context.Context) (*protocol.Host, fail.Error)                                                                                 // converts a host to equivalent gRPC message
 	UnbindSecurityGroup(ctx context.Context, sg SecurityGroup) fail.Error                                                                        // Unbinds a security group from host
 	WaitSSHReady(ctx context.Context, timeout time.Duration) (status string, err fail.Error)                                                     // Wait for remote SSH to respond
+	Tag(ctx context.Context, tag Tag) fail.Error                                                                                                 // Tag a host
+	Untag(ctx context.Context, tag Tag) fail.Error                                                                                               // Untag a host
 }

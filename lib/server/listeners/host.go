@@ -37,6 +37,7 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
+	tagfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/tag"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
@@ -943,4 +944,110 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 
 	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "hosts")
 	return resp, nil
+}
+
+// Tag tags a host with a given tag
+func (s *HostListener) Tag(ctx context.Context, in *protocol.TagRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot tag host")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
+	}
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	tagRef, tagRefLabel := srvutils.GetReference(in.GetTag())
+	if tagRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Tag")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/tag/%s", hostRef, tagRef))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, tagRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	tagInstance, xerr := tagfactory.Load(job.Context(), job.Service(), tagRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	if xerr = hostInstance.Tag(job.Context(), tagInstance); xerr != nil {
+		return empty, xerr
+	}
+
+	tracer.Trace("Host %s tagged %s", hostRefLabel, tagRefLabel)
+	return empty, nil
+}
+
+// Untag remove a tag from a host $
+func (s *HostListener) Untag(ctx context.Context, in *protocol.TagRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot tag host")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
+	}
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	tagRef, tagRefLabel := srvutils.GetReference(in.GetTag())
+	if tagRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Tag")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/untag/%s", hostRef, tagRef))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, tagRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	tagInstance, xerr := tagfactory.Load(job.Context(), job.Service(), tagRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	if xerr = hostInstance.Untag(job.Context(), tagInstance); xerr != nil {
+		return empty, xerr
+	}
+
+	tracer.Trace("Host %s untagged %s", hostRefLabel, tagRefLabel)
+	return empty, nil
 }

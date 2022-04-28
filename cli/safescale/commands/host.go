@@ -62,6 +62,8 @@ var HostCommand = cli.Command{
 		hostListFeaturesCommand,  // Legacy, will be deprecated
 		hostSecurityCommands,
 		hostFeatureCommands,
+		hostTag,
+		hostUntag,
 	},
 }
 
@@ -1253,5 +1255,61 @@ func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 
+	return clitools.SuccessResponse(nil)
+}
+
+var hostTag = cli.Command{
+	Name:      "tag",
+	Usage:     "tag Host Tag",
+	ArgsUsage: "<Host_name|Host_ID> <Tag_name>",
+	Action:    hostTagAction,
+}
+
+func hostTagAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
+	if c.NArg() != 2 {
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments <Host_name> <Tag_name>."))
+	}
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	err := clientSession.Host.Tag(c.Args().First(), c.Args().Get(1), 0)
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "tag of host", false).Error())))
+	}
+	return clitools.SuccessResponse(nil)
+}
+
+var hostUntag = cli.Command{
+	Name:      "untag",
+	Usage:     "untag Host Tag",
+	ArgsUsage: "<Host_name|Host_ID> <Tag_name>",
+	Action:    hostUntagAction,
+}
+
+func hostUntagAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
+	if c.NArg() != 2 {
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments <Host_name> <Tag_name>."))
+	}
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	err := clientSession.Host.Untag(c.Args().First(), c.Args().Get(1), 0)
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "untag of host", false).Error())))
+	}
 	return clitools.SuccessResponse(nil)
 }

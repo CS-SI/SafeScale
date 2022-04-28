@@ -232,6 +232,9 @@ func main() {
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
+	app.Commands = append(app.Commands, commands.TagCommand)
+	sort.Sort(cli.CommandsByName(commands.TagCommand.Subcommands))
+
 	sort.Sort(cli.CommandsByName(app.Commands))
 
 	// if last argument has "--" or "-" and is NOT help we are probably writing a wrong command

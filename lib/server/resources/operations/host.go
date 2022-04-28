@@ -3436,6 +3436,8 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		hostSizingV2  *propertiesv2.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string
+		hostTagsV1    *propertiesv1.HostTags
+		tags          []string
 	)
 
 	publicIP, _ := instance.GetPublicIP(ctx)   // There may be no public ip, but the returned value is pertinent in this case, no need to handle error
@@ -3459,7 +3461,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 			return innerXErr
 		}
 
-		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String)
@@ -3471,6 +3473,26 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 			}
 			return nil
 		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = props.Inspect(hostproperty.TagsV1, func(clonable data.Clonable) fail.Error {
+			hostTagsV1, ok = clonable.(*propertiesv1.HostTags)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String)
+			}
+
+			tags = make([]string, 0, len(hostTagsV1.ByName))
+			for k := range hostTagsV1.ByName {
+				tags = append(tags, k)
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3492,6 +3514,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
 		Template:            hostSizingV2.Template,
+		TagNames:            tags,
 	}
 	return ph, nil
 }
@@ -3928,4 +3951,171 @@ func inBackground() bool {
 	default:
 		return true
 	}
+}
+
+// Tag tags a Host with a tag
+func (instance *Host) Tag(ctx context.Context, tagInstance resources.Tag) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if tagInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("tag")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	tagName := tagInstance.GetName()
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(tag='%s')", tagName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	// instance.Lock()
+	// defer instance.Unlock()
+
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.TagsV1, func(clonable data.Clonable) fail.Error {
+			htagV1, ok := clonable.(*propertiesv1.HostTags)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			tagID := tagInstance.GetID()
+			// If the host already has this tag, consider it a success
+			_, ok = htagV1.ByID[tagID]
+			if ok {
+				return nil
+			}
+
+			if !ok { // Not found, update tags of Host
+				htagV1.ByID[tagID] = tagName
+				htagV1.ByName[tagName] = tagID
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = tagInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		tagV1, ok := clonable.(*abstract.Tag)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Tag' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		hID := instance.GetID()
+		hName := instance.GetName()
+
+		// If the tag has this host, consider it a success
+		_, ok = tagV1.HostsByID[hID]
+		if ok {
+			return nil
+		} else { // Host not found, add host to tag
+			tagV1.HostsByID[hID] = hName
+			tagV1.HostsByName[hName] = hID
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// Untag removes a tag from a Host
+func (instance *Host) Untag(ctx context.Context, tagInstance resources.Tag) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if tagInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("tag")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	tagName := tagInstance.GetName()
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(tag='%s')", tagName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	// instance.Lock()
+	// defer instance.Unlock()
+
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.TagsV1, func(clonable data.Clonable) fail.Error {
+			htagV1, ok := clonable.(*propertiesv1.HostTags)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			tagID := tagInstance.GetID()
+			// If the host does not have this tag, consider it a success
+			_, ok = htagV1.ByID[tagID]
+			if !ok {
+				return nil
+			} else { // Tag found, remove tag from Host
+				delete(htagV1.ByID, tagID)
+				delete(htagV1.ByName, tagInstance.GetName())
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = tagInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		tagV1, ok := clonable.(*abstract.Tag)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Tag' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		hID := instance.GetID()
+		hName := instance.GetName()
+
+		// If the tag does not have this host, consider it a success
+		_, ok = tagV1.HostsByID[hID]
+		if !ok {
+			return nil
+		} else { // Host found, remove host from tag
+			delete(tagV1.HostsByID, hID)
+			delete(tagV1.HostsByName, hName)
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+	return nil
 }
