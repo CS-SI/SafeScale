@@ -112,6 +112,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 
 	// attach task instance to the context
 	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // nolint
+	ctx = context.WithValue(ctx, concurrency.KeyForID, id)              // nolint
 
 	nj := job{
 		description: description,

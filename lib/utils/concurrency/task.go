@@ -190,6 +190,7 @@ type taskContextKey = string
 
 const (
 	KeyForTaskInContext taskContextKey = "task"
+	KeyForID            taskContextKey = "ID"
 )
 
 // TaskFromContext extracts the task instance from context

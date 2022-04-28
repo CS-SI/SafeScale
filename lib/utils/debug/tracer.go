@@ -17,12 +17,14 @@
 package debug
 
 import (
+	"context"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -66,7 +68,56 @@ const (
 )
 
 // NewTracer creates a new Tracer instance
-func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
+func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
+	if thing == nil {
+		return NewTracerFromCtx(context.Background(), enable, msg...)
+	}
+	switch casted := thing.(type) {
+	case context.Context:
+		return NewTracerFromCtx(casted, enable, msg...)
+	case concurrency.Task:
+		return NewTracerFromTask(casted, enable, msg...)
+	default:
+		return nil
+	}
+}
+
+// NewTracer creates a new Tracer instance
+func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Tracer {
+	t := tracer{
+		enabled: enable,
+	}
+
+	if aId := ctx.Value(concurrency.KeyForID); aId != nil {
+		t.taskSig = ctx.Value(concurrency.KeyForID).(string)
+	} else {
+		aId, _ = uuid.NewV4()
+	}
+
+	message := strprocess.FormatStrings(msg...)
+	if message == "" {
+		message = "()"
+	}
+	t.callerParams = strings.TrimSpace(message)
+
+	if pc, file, _, ok := runtime.Caller(1); ok {
+		t.fileName = callstack.SourceFilePathUpdater()(file)
+		if f := runtime.FuncForPC(pc); f != nil {
+			t.funcName = filepath.Base(f.Name())
+		}
+	}
+	if t.funcName == "" {
+		t.funcName = unknownFunction
+	}
+	if t.fileName == "" {
+		t.funcName = unknownFile
+	}
+
+	return &t
+}
+
+// NewTracer creates a new Tracer instance
+func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
 	}
