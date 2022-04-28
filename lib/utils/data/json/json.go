@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,35 @@
 
 package json
 
-import jsoniter "github.com/json-iterator/go"
+import (
+	"fmt"
 
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
+	jsoniter "github.com/json-iterator/go"
+)
 
-// Marshal is a wrapper around jsoniter Marshal
+// Marshal is a wrapper around json Marshal
 func Marshal(in interface{}) ([]byte, error) {
-	return json.Marshal(in)
+	res, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling error: %w", err)
+	}
+	return res, nil
 }
 
-// Unmarshal is a wrapper around jsoniter Unmarshal
+// Unmarshal is a wrapper around json Unmarshal
 func Unmarshal(jsoned []byte, out interface{}) error {
-	return json.Unmarshal(jsoned, out)
+	err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(jsoned, out)
+	if err != nil {
+		return fmt.Errorf("unmarshaling error: %w", jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(jsoned, out))
+	}
+	return nil
 }
 
-// MarshalIndent is a wrapper around jsoniter MarshalIndent
+// MarshalIndent is a wrapper around json MarshalIndent
 func MarshalIndent(in interface{}, prefix, indent string) ([]byte, error) {
-	return json.MarshalIndent(in, prefix, indent)
+	res, err := jsoniter.ConfigCompatibleWithStandardLibrary.MarshalIndent(in, prefix, indent)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling with indentation error: %w", err)
+	}
+	return res, nil
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/CS-SI/SafeScale/v21/lib/utils"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Description contains the configuration for bucket mount
@@ -55,7 +54,12 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 		_ = os.Remove(f.Name())
 	}()
 
-	svc := host.GetService()
+	svc := host.Service()
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	svcConf, xerr := svc.GetConfigurationOptions()
 	if xerr != nil {
 		return xerr
@@ -71,7 +75,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 	owner := desc.OperatorUsername + ":" + desc.OperatorUsername
 	target := desc.FilePath()
-	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to upload rclone configuration file")
 	}

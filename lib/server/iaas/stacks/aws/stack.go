@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,20 +18,21 @@
 package aws
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/aws/aws-sdk-go/service/s3"
-
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 type stack struct {
@@ -43,6 +44,8 @@ type stack struct {
 	EC2Service     *ec2.EC2
 	SSMService     *ssm.SSM
 	PricingService *pricing.Pricing
+
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -62,7 +65,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return stacks.ConfigurationOptions{}, nil
 	}
 	return *s.Config, nil
@@ -70,7 +73,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return stacks.AuthenticationOptions{}, nil
 	}
 	return *s.AuthOptions, nil
@@ -126,5 +129,23 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
 
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+	if cfg.Timings != nil {
+		stack.MutableTimings = cfg.Timings
+	} else {
+		stack.MutableTimings = temporal.NewTimings()
+	}
+
 	return stack, nil
+}
+
+// Timings returns the instance containing current timeout/delay settings
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
+	if s == nil {
+		return temporal.NewTimings(), fail.InvalidInstanceError()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings, nil
 }

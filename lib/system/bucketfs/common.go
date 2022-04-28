@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,25 +47,22 @@ var bucketfsScripts embed.FS
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		return xerr
@@ -121,15 +118,15 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 	xerr = retry.Action(
 		func() (innerXErr error) {
-			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetBigDelay())
+			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetContextTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(timings.ContextTimeout(), timings.ConnectionTimeout()+timings.ExecutionTimeout()))),
+		retry.Constant(timings.NormalDelay()),
 		nil, nil, nil,
 	)
 	if xerr != nil {
@@ -177,7 +174,9 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	return content, nil
 }
 
-func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host resources.Host) (string, fail.Error) {
+func uploadContentToFile(
+	ctx context.Context, content, name, owner, rights string, host resources.Host,
+) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
 	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
@@ -191,10 +190,17 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	}()
 
 	// TODO: This is not Windows friendly
+	svc := host.Service()
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return "", xerr
+	}
+
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, temporal.GetOperationTimeout())
+			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")
 			}
@@ -206,8 +212,8 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostTimeout(),
+		timings.NormalDelay(),
+		timings.HostOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,6 @@ func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
-func Load(svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
-	return operations.LoadHost(svc, ref)
+func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
+	return operations.LoadHost(ctx, svc, ref)
 }

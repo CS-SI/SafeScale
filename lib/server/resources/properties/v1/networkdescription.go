@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -46,19 +48,23 @@ func (nd *NetworkDescription) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (nd NetworkDescription) Clone() data.Clonable {
+func (nd NetworkDescription) Clone() (data.Clonable, error) {
 	return NewNetworkDescription().Replace(&nd)
 }
 
 // Replace ... (data.Clonable interface)
-func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (nd *NetworkDescription) Replace(p data.Clonable) (data.Clonable, error) {
 	if nd == nil || p == nil {
-		return nd
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*nd = *p.(*NetworkDescription)
-	return nd
+	casted, ok := p.(*NetworkDescription)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *NetworkDescription")
+	}
+
+	*nd = *casted
+	return nd, nil
 }
 
 func init() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterState contains the bare minimum information about the state of a cluster
@@ -39,25 +41,29 @@ func newClusterState() *ClusterState {
 // IsNull ...
 // satisfies interface data.Clonable
 func (s *ClusterState) IsNull() bool {
-	return s == nil || s.StateCollectInterval == 0
+	return s == nil || (s.StateCollectInterval <= 0)
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s ClusterState) Clone() data.Clonable {
+func (s ClusterState) Clone() (data.Clonable, error) {
 	return newClusterState().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (s *ClusterState) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (s *ClusterState) Replace(p data.Clonable) (data.Clonable, error) {
 	if s == nil || p == nil {
-		return s
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*s = *p.(*ClusterState)
-	return s
+	casted, ok := p.(*ClusterState)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterState")
+	}
+
+	*s = *casted
+	return s, nil
 }
 
 func init() {

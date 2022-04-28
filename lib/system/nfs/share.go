@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
@@ -74,14 +75,19 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 }
 
 // Add configures and exports the share
-func (s *Share) Add(ctx context.Context) fail.Error {
+func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	data := map[string]interface{}{
 		"Path": s.Path,
 		// "AccessRights": strings.TrimSpace(acls),
 		"Options": s.Options,
 	}
 
-	if _, xerr := executeScript(ctx, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
+	if _, xerr := executeScript(ctx, timings, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
 		return fail.Wrap(xerr, "failed to export a shared directory")
 	}
 	return nil

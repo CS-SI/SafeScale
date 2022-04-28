@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
 )
 
 func validateAWSString(stringContent *string, stringLabel string, notEmpty bool) fail.Error {
@@ -108,14 +109,14 @@ func (s stack) rpcAttachInternetGateway(vpcID, internetGatewayID *string) fail.E
 }
 
 func (s stack) rpcDescribeVpcs(ids []*string) ([]*ec2.Vpc, fail.Error) {
-	var request ec2.DescribeVpcsInput
+	var req ec2.DescribeVpcsInput
 	if len(ids) > 0 {
-		request.VpcIds = ids
+		req.VpcIds = ids
 	}
 	var resp *ec2.DescribeVpcsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVpcs(&request)
+			resp, err = s.EC2Service.DescribeVpcs(&req)
 			return err
 		},
 		normalizeError,
@@ -149,7 +150,7 @@ func (s stack) rpcDescribeVpcByName(name *string) (*ec2.Vpc, fail.Error) {
 		return &ec2.Vpc{}, xerr
 	}
 
-	request := ec2.DescribeVpcsInput{
+	req := ec2.DescribeVpcsInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("tag:" + tagNameLabel),
@@ -160,7 +161,7 @@ func (s stack) rpcDescribeVpcByName(name *string) (*ec2.Vpc, fail.Error) {
 	var resp *ec2.DescribeVpcsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVpcs(&request)
+			resp, err = s.EC2Service.DescribeVpcs(&req)
 			return err
 		},
 		normalizeError,
@@ -186,13 +187,13 @@ func (s stack) rpcCreateVpc(name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 		return &ec2.Vpc{}, xerr
 	}
 
-	request := ec2.CreateVpcInput{
+	req := ec2.CreateVpcInput{
 		CidrBlock: cidr,
 	}
 	var resp *ec2.CreateVpcOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.CreateVpc(&request)
+			resp, err = s.EC2Service.CreateVpc(&req)
 			return err
 		},
 		normalizeError,
@@ -249,13 +250,13 @@ func (s stack) rpcCreateTags(resources []*string, tags []*ec2.Tag) fail.Error {
 		return nil
 	}
 
-	request := ec2.CreateTagsInput{
+	req := ec2.CreateTagsInput{
 		Resources: resources,
 		Tags:      tags,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.CreateTags(&request)
+			_, err := s.EC2Service.CreateTags(&req)
 			return err
 		},
 		normalizeError,
@@ -267,12 +268,12 @@ func (s stack) rpcDeleteVpc(id *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteVpcInput{
+	req := ec2.DeleteVpcInput{
 		VpcId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteVpc(&request)
+			_, err := s.EC2Service.DeleteVpc(&req)
 			return err
 		},
 		normalizeError,
@@ -287,13 +288,13 @@ func (s stack) rpcDetachInternetGateway(vpcID, internetGatewayID *string) fail.E
 		return xerr
 	}
 
-	request := ec2.DetachInternetGatewayInput{
+	req := ec2.DetachInternetGatewayInput{
 		InternetGatewayId: internetGatewayID,
 		VpcId:             vpcID,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DetachInternetGateway(&request)
+			_, err := s.EC2Service.DetachInternetGateway(&req)
 			return err
 		},
 		normalizeError,
@@ -308,13 +309,13 @@ func (s stack) rpcDeleteRoute(routeTableID, cidr *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteRouteInput{
+	req := ec2.DeleteRouteInput{
 		DestinationCidrBlock: cidr,
 		RouteTableId:         routeTableID,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteRoute(&request)
+			_, err := s.EC2Service.DeleteRoute(&req)
 			return err
 		},
 		normalizeError,
@@ -343,12 +344,12 @@ func (s stack) rpcDeleteInternetGateway(id *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteInternetGatewayInput{
+	req := ec2.DeleteInternetGatewayInput{
 		InternetGatewayId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteInternetGateway(&request)
+			_, err := s.EC2Service.DeleteInternetGateway(&req)
 			return err
 		},
 		normalizeError,
@@ -373,13 +374,13 @@ func (s stack) rpcDescribeInternetGateways(vpcID *string, ids []*string) ([]*ec2
 			},
 		)
 	}
-	request := ec2.DescribeInternetGatewaysInput{
+	req := ec2.DescribeInternetGatewaysInput{
 		Filters: filters,
 	}
 	var resp *ec2.DescribeInternetGatewaysOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeInternetGateways(&request)
+			resp, err = s.EC2Service.DescribeInternetGateways(&req)
 			return err
 		},
 		normalizeError,
@@ -423,7 +424,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (_ *ec2.Subnet, 
 		return &ec2.Subnet{}, xerr
 	}
 
-	request := ec2.CreateSubnetInput{
+	req := ec2.CreateSubnetInput{
 		CidrBlock:        cidr,
 		VpcId:            vpcID,
 		AvailabilityZone: azID,
@@ -431,7 +432,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (_ *ec2.Subnet, 
 	var resp *ec2.CreateSubnetOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.CreateSubnet(&request)
+			resp, err = s.EC2Service.CreateSubnet(&req)
 			return err
 		},
 		normalizeError,
@@ -481,13 +482,13 @@ func (s stack) rpcAssociateRouteTable(subnetID, routeID *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.AssociateRouteTableInput{
+	req := ec2.AssociateRouteTableInput{
 		RouteTableId: routeID,
 		SubnetId:     subnetID,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.AssociateRouteTable(&request)
+			_, err := s.EC2Service.AssociateRouteTable(&req)
 			return err
 		},
 		normalizeError,
@@ -503,7 +504,7 @@ func (s stack) rpcDescribeRouteTables(key *string, values []*string) ([]*ec2.Rou
 		return emptySlice, fail.InvalidParameterError("values", "cannot be empty slice")
 	}
 
-	request := ec2.DescribeRouteTablesInput{
+	req := ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   key,
@@ -514,7 +515,7 @@ func (s stack) rpcDescribeRouteTables(key *string, values []*string) ([]*ec2.Rou
 	var resp *ec2.DescribeRouteTablesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeRouteTables(&request)
+			resp, err = s.EC2Service.DescribeRouteTables(&req)
 			return err
 		},
 		normalizeError,
@@ -530,12 +531,12 @@ func (s stack) rpcDisassociateRouteTable(id *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DisassociateRouteTableInput{
+	req := ec2.DisassociateRouteTableInput{
 		AssociationId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DisassociateRouteTable(&request)
+			_, err := s.EC2Service.DisassociateRouteTable(&req)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -547,12 +548,12 @@ func (s stack) rpcDeleteSubnet(id *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteSubnetInput{
+	req := ec2.DeleteSubnetInput{
 		SubnetId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteSubnet(&request)
+			_, err := s.EC2Service.DeleteSubnet(&req)
 			return err
 		},
 		normalizeError,
@@ -564,12 +565,12 @@ func (s stack) rpcDeleteSecurityGroup(id *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteSecurityGroupInput{
+	req := ec2.DeleteSecurityGroupInput{
 		GroupId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteSecurityGroup(&request)
+			_, err := s.EC2Service.DeleteSecurityGroup(&req)
 			return err
 		},
 		normalizeError,
@@ -587,7 +588,7 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description *string) (*st
 		return aws.String(""), xerr
 	}
 
-	request := ec2.CreateSecurityGroupInput{
+	req := ec2.CreateSecurityGroupInput{
 		Description: description,
 		GroupName:   name,
 		VpcId:       networkID,
@@ -595,7 +596,7 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description *string) (*st
 	var resp *ec2.CreateSecurityGroupOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.CreateSecurityGroup(&request)
+			resp, err = s.EC2Service.CreateSecurityGroup(&req)
 			return err
 		},
 		normalizeError,
@@ -607,9 +608,9 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description *string) (*st
 }
 
 func (s stack) rpcDescribeSecurityGroups(networkID *string, ids []*string) ([]*ec2.SecurityGroup, fail.Error) {
-	var request ec2.DescribeSecurityGroupsInput
+	var req ec2.DescribeSecurityGroupsInput
 	if aws.StringValue(networkID) != "" {
-		request.Filters = []*ec2.Filter{
+		req.Filters = []*ec2.Filter{
 			{
 				Name:   aws.String("vpc-id"),
 				Values: []*string{networkID},
@@ -617,12 +618,12 @@ func (s stack) rpcDescribeSecurityGroups(networkID *string, ids []*string) ([]*e
 		}
 	}
 	if len(ids) > 0 {
-		request.GroupIds = ids
+		req.GroupIds = ids
 	}
 	var resp *ec2.DescribeSecurityGroupsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeSecurityGroups(&request)
+			resp, err = s.EC2Service.DescribeSecurityGroups(&req)
 			return err
 		},
 		normalizeError,
@@ -666,7 +667,7 @@ func (s stack) rpcDescribeSecurityGroupByName(networkID, name *string) (*ec2.Sec
 		return &ec2.SecurityGroup{}, xerr
 	}
 
-	request := ec2.DescribeSecurityGroupsInput{
+	req := ec2.DescribeSecurityGroupsInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("group-name"),
@@ -681,7 +682,7 @@ func (s stack) rpcDescribeSecurityGroupByName(networkID, name *string) (*ec2.Sec
 	var resp *ec2.DescribeSecurityGroupsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeSecurityGroups(&request)
+			resp, err = s.EC2Service.DescribeSecurityGroups(&req)
 			return err
 		},
 		normalizeError,
@@ -715,13 +716,13 @@ func (s stack) rpcRevokeSecurityGroupIngress(id *string, ingress []*ec2.IpPermis
 		return fail.InvalidParameterError("ingress", "cannot be empty slice")
 	}
 
-	request := ec2.RevokeSecurityGroupIngressInput{
+	req := ec2.RevokeSecurityGroupIngressInput{
 		GroupId:       id,
 		IpPermissions: ingress,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.RevokeSecurityGroupIngress(&request)
+			_, err := s.EC2Service.RevokeSecurityGroupIngress(&req)
 			return err
 		},
 		normalizeError,
@@ -736,13 +737,13 @@ func (s stack) rpcRevokeSecurityGroupEgress(id *string, egress []*ec2.IpPermissi
 		return fail.InvalidParameterError("egress", "cannot be empty slice")
 	}
 
-	request := ec2.RevokeSecurityGroupEgressInput{
+	req := ec2.RevokeSecurityGroupEgressInput{
 		GroupId:       id,
 		IpPermissions: egress,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.RevokeSecurityGroupEgress(&request)
+			_, err := s.EC2Service.RevokeSecurityGroupEgress(&req)
 			return err
 		},
 		normalizeError,
@@ -757,13 +758,13 @@ func (s stack) rpcAuthorizeSecurityGroupIngress(id *string, ingress []*ec2.IpPer
 		return fail.InvalidParameterError("ingress", "cannot be empty slice")
 	}
 
-	request := ec2.AuthorizeSecurityGroupIngressInput{
+	req := ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId:       id,
 		IpPermissions: ingress,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.AuthorizeSecurityGroupIngress(&request)
+			_, err := s.EC2Service.AuthorizeSecurityGroupIngress(&req)
 			return err
 		},
 		normalizeError,
@@ -778,13 +779,13 @@ func (s stack) rpcAuthorizeSecurityGroupEgress(id *string, egress []*ec2.IpPermi
 		return fail.InvalidParameterError("egress", "cannot be empty slice")
 	}
 
-	request := ec2.AuthorizeSecurityGroupEgressInput{
+	req := ec2.AuthorizeSecurityGroupEgressInput{
 		GroupId:       id,
 		IpPermissions: egress,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.AuthorizeSecurityGroupEgress(&request)
+			_, err := s.EC2Service.AuthorizeSecurityGroupEgress(&req)
 			return err
 		},
 		normalizeError,
@@ -792,11 +793,11 @@ func (s stack) rpcAuthorizeSecurityGroupEgress(id *string, egress []*ec2.IpPermi
 }
 
 func (s stack) rpcAllocateAddress(description string) (allocID *string, publicIP *string, ferr fail.Error) {
-	request := ec2.AllocateAddressInput{}
+	req := ec2.AllocateAddressInput{}
 	var resp *ec2.AllocateAddressOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.AllocateAddress(&request)
+			resp, innerErr = s.EC2Service.AllocateAddress(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -848,12 +849,12 @@ func (s stack) rpcReleaseAddress(id *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.ReleaseAddressInput{
+	req := ec2.ReleaseAddressInput{
 		AllocationId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.ReleaseAddress(&request)
+			_, err := s.EC2Service.ReleaseAddress(&req)
 			return err
 		},
 		normalizeError,
@@ -868,14 +869,14 @@ func (s stack) rpcAssociateAddress(nicID, addressID *string) (*string, fail.Erro
 		return nil, xerr
 	}
 
-	request := ec2.AssociateAddressInput{
+	req := ec2.AssociateAddressInput{
 		AllocationId:       addressID,
 		NetworkInterfaceId: nicID,
 	}
 	var resp *ec2.AssociateAddressOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.AssociateAddress(&request)
+			resp, err = s.EC2Service.AssociateAddress(&req)
 			return err
 		}, normalizeError,
 	)
@@ -893,12 +894,12 @@ func (s stack) rpcDisassociateAddress(id *string) fail.Error { // nolint
 		return xerr
 	}
 
-	request := ec2.DisassociateAddressInput{
+	req := ec2.DisassociateAddressInput{
 		AssociationId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DisassociateAddress(&request)
+			_, err := s.EC2Service.DisassociateAddress(&req)
 			return err
 		}, normalizeError,
 	)
@@ -909,7 +910,7 @@ func (s stack) rpcDescribeAddressByIP(ip *string) (*ec2.Address, fail.Error) {
 		return nil, xerr
 	}
 
-	request := ec2.DescribeAddressesInput{
+	req := ec2.DescribeAddressesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("public-ip"),
@@ -920,7 +921,7 @@ func (s stack) rpcDescribeAddressByIP(ip *string) (*ec2.Address, fail.Error) {
 	var resp *ec2.DescribeAddressesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeAddresses(&request)
+			resp, err = s.EC2Service.DescribeAddresses(&req)
 			return err
 		},
 		normalizeError,
@@ -960,7 +961,7 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 		return &ec2.Instance{}, xerr
 	}
 
-	request := ec2.DescribeInstancesInput{
+	req := ec2.DescribeInstancesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("tag:" + tagNameLabel),
@@ -971,7 +972,7 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 	var resp *ec2.DescribeInstancesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeInstances(&request)
+			resp, err = s.EC2Service.DescribeInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1013,11 +1014,11 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 }
 
 func (s stack) rpcDescribeAddresses(ids []*string) ([]*ec2.Address, fail.Error) {
-	var request ec2.DescribeAddressesInput
+	var req ec2.DescribeAddressesInput
 	if len(ids) > 0 {
 		for _, v := range ids {
-			request.Filters = append(
-				request.Filters, &ec2.Filter{
+			req.Filters = append(
+				req.Filters, &ec2.Filter{
 					Name:   aws.String("instance-id"),
 					Values: []*string{v},
 				},
@@ -1027,7 +1028,7 @@ func (s stack) rpcDescribeAddresses(ids []*string) ([]*ec2.Address, fail.Error) 
 	var resp *ec2.DescribeAddressesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeAddresses(&request)
+			resp, err = s.EC2Service.DescribeAddresses(&req)
 			return err
 		},
 		normalizeError,
@@ -1039,14 +1040,14 @@ func (s stack) rpcDescribeAddresses(ids []*string) ([]*ec2.Address, fail.Error) 
 }
 
 func (s stack) rpcDescribeInstances(ids []*string) ([]*ec2.Instance, fail.Error) {
-	var request ec2.DescribeInstancesInput
+	var req ec2.DescribeInstancesInput
 	if len(ids) > 0 {
-		request.InstanceIds = ids
+		req.InstanceIds = ids
 	}
 	var resp *ec2.DescribeInstancesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeInstances(&request)
+			resp, err = s.EC2Service.DescribeInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1065,10 +1066,8 @@ func (s stack) rpcDescribeInstances(ids []*string) ([]*ec2.Instance, fail.Error)
 			_ = ec2.InstanceState{}
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf(
-					"found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
-					aws.Int64Value(i.State.Code)&0xff,
-				)
+				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
+					aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
 			if state != hoststate.Terminated {
@@ -1084,13 +1083,13 @@ func (s stack) rpcImportKeyPair(name *string, pubKey []byte) fail.Error {
 		return xerr
 	}
 
-	request := ec2.ImportKeyPairInput{
+	req := ec2.ImportKeyPairInput{
 		KeyName:           name,
 		PublicKeyMaterial: pubKey,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.ImportKeyPair(&request)
+			_, err := s.EC2Service.ImportKeyPair(&req)
 			return err
 		},
 		normalizeError,
@@ -1098,14 +1097,14 @@ func (s stack) rpcImportKeyPair(name *string, pubKey []byte) fail.Error {
 }
 
 func (s stack) rpcDescribeKeyPairs(ids []*string) ([]*ec2.KeyPairInfo, fail.Error) {
-	request := ec2.DescribeKeyPairsInput{}
+	req := ec2.DescribeKeyPairsInput{}
 	if len(ids) > 0 {
-		request.KeyPairIds = ids
+		req.KeyPairIds = ids
 	}
 	var resp *ec2.DescribeKeyPairsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeKeyPairs(&request)
+			resp, err = s.EC2Service.DescribeKeyPairs(&req)
 			return err
 		},
 		normalizeError,
@@ -1139,13 +1138,13 @@ func (s stack) rpcDescribeKeyPairByName(name *string) (*ec2.KeyPairInfo, fail.Er
 		return &ec2.KeyPairInfo{}, xerr
 	}
 
-	request := ec2.DescribeKeyPairsInput{
+	req := ec2.DescribeKeyPairsInput{
 		KeyNames: []*string{name},
 	}
 	var resp *ec2.DescribeKeyPairsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeKeyPairs(&request)
+			resp, err = s.EC2Service.DescribeKeyPairs(&req)
 			return err
 		},
 		normalizeError,
@@ -1167,12 +1166,12 @@ func (s stack) rpcDeleteKeyPair(name *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteKeyPairInput{
+	req := ec2.DeleteKeyPairInput{
 		KeyName: name,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteKeyPair(&request)
+			_, err := s.EC2Service.DeleteKeyPair(&req)
 			return err
 		},
 		normalizeError,
@@ -1180,14 +1179,14 @@ func (s stack) rpcDeleteKeyPair(name *string) fail.Error {
 }
 
 func (s stack) rpcDescribeAvailabilityZones(ids []*string) ([]*ec2.AvailabilityZone, fail.Error) {
-	var request ec2.DescribeAvailabilityZonesInput
+	var req ec2.DescribeAvailabilityZonesInput
 	if len(ids) > 0 {
-		request.ZoneIds = ids
+		req.ZoneIds = ids
 	}
 	var resp *ec2.DescribeAvailabilityZonesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeAvailabilityZones(&request)
+			resp, err = s.EC2Service.DescribeAvailabilityZones(&req)
 			return err
 		},
 		normalizeError,
@@ -1199,14 +1198,14 @@ func (s stack) rpcDescribeAvailabilityZones(ids []*string) ([]*ec2.AvailabilityZ
 }
 
 func (s stack) rpcDescribeRegions(names []*string) ([]*ec2.Region, fail.Error) {
-	var request ec2.DescribeRegionsInput
+	var req ec2.DescribeRegionsInput
 	if len(names) > 0 {
-		request.RegionNames = names
+		req.RegionNames = names
 	}
 	var resp *ec2.DescribeRegionsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeRegions(&request)
+			resp, err = s.EC2Service.DescribeRegions(&req)
 			return err
 		},
 		normalizeError,
@@ -1217,36 +1216,109 @@ func (s stack) rpcDescribeRegions(names []*string) ([]*ec2.Region, fail.Error) {
 	return resp.Regions, nil
 }
 
-func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
-	var request ec2.DescribeImagesInput
+func rpcDescribeImagesByOwner(s stack, ids []*string, filters []*ec2.Filter) ([]*ec2.Image, fail.Error) {
+	var req ec2.DescribeImagesInput
 	if len(ids) > 0 {
-		request.ImageIds = ids
-	} else {
-		request.Filters = []*ec2.Filter{
-			{
-				Name:   aws.String("architecture"),
-				Values: []*string{aws.String("x86_64")},
-			},
-			{
-				Name:   aws.String("state"),
-				Values: []*string{aws.String("available")},
-			},
-		}
-
-		// Added filtering by owner-id
-		request.Filters = append(request.Filters, createFilters()...)
+		req.ImageIds = ids
 	}
+	req.Filters = filters
+
+	countDecodingProblems := 0
+
 	var resp *ec2.DescribeImagesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeImages(&request)
-			return err
+			resp, err = s.EC2Service.DescribeImages(&req)
+			if err != nil {
+				if awe, ok := err.(awserr.Error); ok {
+					if awe.Code() == request.ErrCodeSerialization {
+						countDecodingProblems++
+						if countDecodingProblems > 1 {
+							return retry.StopRetryError(err, "too many decoding errors")
+						}
+					}
+				}
+
+				return err
+			}
+
+			return nil
 		},
 		normalizeError,
 	)
 	if xerr != nil {
 		return []*ec2.Image{}, xerr
 	}
+
+	return resp.Images, nil
+}
+
+func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
+	var req ec2.DescribeImagesInput
+	if len(ids) > 0 {
+		req.ImageIds = ids
+	}
+
+	req.Filters = []*ec2.Filter{}
+	// Default filters
+	req.Filters = append(req.Filters, createFilters()...)
+	// Added filtering by owner-id
+	req.Filters = append(req.Filters, filterOwners(s)...)
+
+	countDecodingProblems := 0
+	var decodingProblems bool
+
+	var resp *ec2.DescribeImagesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeImages(&req)
+			if err != nil {
+				if awe, ok := err.(awserr.Error); ok {
+					if awe.Code() == "SerializationError" {
+						decodingProblems = true
+						countDecodingProblems++
+						if countDecodingProblems > 1 {
+							return retry.StopRetryError(err, "too many decoding errors")
+						}
+					}
+				}
+
+				return err
+			}
+
+			// no error, forget about decoding problems
+			decodingProblems = false
+
+			return nil
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		if !decodingProblems {
+			return []*ec2.Image{}, xerr
+		}
+	}
+
+	// either we had decoding problems or everything is ok
+	if decodingProblems {
+		for _, owner := range filterOwners(s) {
+			var filters []*ec2.Filter
+			filters = append(filters, createFilters()...)
+			filters = append(filters, owner)
+			newImages, err := rpcDescribeImagesByOwner(s, ids, filters)
+			if err != nil {
+				continue
+			}
+
+			if len(newImages) > 0 {
+				resp.Images = append(resp.Images, newImages...)
+			}
+		}
+
+		return resp.Images, nil
+	}
+
+	// everything ok
 	return resp.Images, nil
 }
 
@@ -1276,7 +1348,7 @@ func (s stack) rpcDescribeInstanceTypeOfferings(az *string) (*ec2.DescribeInstan
 			Values: []*string{az},
 		},
 	}
-	request := ec2.DescribeInstanceTypeOfferingsInput{
+	req := ec2.DescribeInstanceTypeOfferingsInput{
 		Filters:      filters,
 		LocationType: aws.String(ec2.LocationTypeAvailabilityZone),
 	}
@@ -1285,7 +1357,7 @@ func (s stack) rpcDescribeInstanceTypeOfferings(az *string) (*ec2.DescribeInstan
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			var err error
-			offerings, err = s.EC2Service.DescribeInstanceTypeOfferings(&request)
+			offerings, err = s.EC2Service.DescribeInstanceTypeOfferings(&req)
 			return err
 		},
 		normalizeError,
@@ -1305,13 +1377,13 @@ func (s stack) rpcModifyInstanceSecurityGroups(id *string, sgIDs []*string) fail
 		return fail.InvalidParameterError("sgIDs", "cannot be empty slice")
 	}
 
-	request := ec2.ModifyInstanceAttributeInput{
+	req := ec2.ModifyInstanceAttributeInput{
 		InstanceId: id,
 		Groups:     sgIDs,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.ModifyInstanceAttribute(&request)
+			_, err := s.EC2Service.ModifyInstanceAttribute(&req)
 			return err
 		},
 		normalizeError,
@@ -1341,7 +1413,7 @@ func (s stack) rpcGetProducts(ids []*string) ([]aws.JSONValue, fail.Error) {
 			)
 		}
 	}
-	request := pricing.GetProductsInput{
+	req := pricing.GetProductsInput{
 		Filters: filters,
 		// MaxResults:  aws.Int64(100),
 		ServiceCode: aws.String("AmazonEC2"),
@@ -1349,7 +1421,7 @@ func (s stack) rpcGetProducts(ids []*string) ([]aws.JSONValue, fail.Error) {
 	var resp *pricing.GetProductsOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.PricingService.GetProducts(&request)
+			resp, err = s.PricingService.GetProducts(&req)
 			return err
 		},
 		normalizeError,
@@ -1385,11 +1457,11 @@ func (s stack) rpcGetProductByID(id *string) (aws.JSONValue, fail.Error) {
 
 func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo, fail.Error) {
 	var emptySlice []*ec2.InstanceTypeInfo
-	request := ec2.DescribeInstanceTypesInput{}
+	req := ec2.DescribeInstanceTypesInput{}
 	if len(ids) > 0 {
-		request.InstanceTypes = ids
+		req.InstanceTypes = ids
 	} else {
-		request.Filters = []*ec2.Filter{
+		req.Filters = []*ec2.Filter{
 			{
 				// keep only x86_64 processor architecture
 				Name:   aws.String("processor-info.supported-architecture"),
@@ -1408,7 +1480,7 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 		var resp *ec2.DescribeInstanceTypesOutput
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
-				resp, err = s.EC2Service.DescribeInstanceTypes(&request)
+				resp, err = s.EC2Service.DescribeInstanceTypes(&req)
 				return err
 			},
 			normalizeError,
@@ -1435,7 +1507,7 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 		if resp.NextToken == nil {
 			break
 		}
-		request.NextToken = resp.NextToken
+		req.NextToken = resp.NextToken
 	}
 	return out, nil
 }
@@ -1466,7 +1538,7 @@ func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.Spo
 		return emptySlice, xerr
 	}
 
-	request := ec2.DescribeSpotPriceHistoryInput{
+	req := ec2.DescribeSpotPriceHistoryInput{
 		AvailabilityZone:    zone,
 		InstanceTypes:       []*string{templateID},
 		ProductDescriptions: []*string{aws.String("Linux/UNIX")},
@@ -1474,7 +1546,7 @@ func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.Spo
 	var resp *ec2.DescribeSpotPriceHistoryOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeSpotPriceHistory(&request)
+			resp, err = s.EC2Service.DescribeSpotPriceHistory(&req)
 			return err
 		},
 		normalizeError,
@@ -1489,24 +1561,23 @@ func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.Spo
 }
 
 func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
-	nullInstance := &ec2.SpotInstanceRequest{}
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(imageID, "imageID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(keypairName, "keypairName", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if publicIP == nil {
 		publicIP = aws.Bool(false)
 	}
 
-	request := ec2.RequestSpotInstancesInput{
+	req := ec2.RequestSpotInstancesInput{
 		InstanceCount: aws.Int64(1),
 		LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
 			ImageId:      imageID,
@@ -1527,42 +1598,42 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 		SpotPrice: price, // FIXME: Round up
 		Type:      aws.String("one-time"),
 	}
+
 	var resp *ec2.RequestSpotInstancesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.RequestSpotInstances(&request)
+			resp, err = s.EC2Service.RequestSpotInstances(&req)
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if len(resp.SpotInstanceRequests) == 0 {
-		return nullInstance, nil
+		return nil, nil
 	}
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
-	nullInstance := &ec2.Instance{}
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(subnetID, "subnetID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(imageID, "imageID", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(keypairName, "keypairName", true); xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if publicIP == nil {
 		publicIP = aws.Bool(false)
@@ -1584,7 +1655,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		}
 	}()
 
-	// If PublicIP is requested, satisfy the request
+	// If PublicIP is requested, satisfy the req
 	if aws.BoolValue(publicIP) {
 		// Allocate Elastic IP
 		description := fmt.Sprintf(
@@ -1629,7 +1700,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	}
 
 	// Request now the creation and start of new instance with the previously created interface
-	request := ec2.RunInstancesInput{
+	req := ec2.RunInstancesInput{
 		ImageId:      imageID,
 		InstanceType: templateID,
 		KeyName:      keypairName,
@@ -1678,19 +1749,30 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		},
 		UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),
 	}
+
+	if diskSize != 0 {
+		req.BlockDeviceMappings = []*ec2.BlockDeviceMapping{
+			{
+				DeviceName: aws.String("/dev/sda1"),
+				Ebs: &ec2.EbsBlockDevice{
+					VolumeSize: aws.Int64(int64(diskSize)),
+				},
+			}}
+	}
+
 	var resp *ec2.Reservation
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.RunInstances(&request)
+			resp, err = s.EC2Service.RunInstances(&req)
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nullInstance, xerr
+		return nil, xerr
 	}
 	if len(resp.Instances) == 0 {
-		return nullInstance, fail.InconsistentError("invalid empty response from Cloud Provider")
+		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
 	}
 
 	defer func() {
@@ -1709,7 +1791,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	}()
 
 	if len(resp.Instances) > 1 {
-		return nullInstance, fail.InconsistentError("more than one instance has been created by Cloud Provider")
+		return nil, fail.InconsistentError("more than one instance has been created by Cloud Provider")
 	}
 
 	instance := resp.Instances[0]
@@ -1737,6 +1819,11 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	var nics []*string
 	for _, v := range instance.NetworkInterfaces {
 		// Detach and release Elastic IP from the network interface if needed
@@ -1749,7 +1836,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 						// continue
 						debug.IgnoreError(xerr)
 					default:
-						return fail.Wrap(xerr, "failed to request information about Elastic IP '%s'", ip)
+						return fail.Wrap(xerr, "failed to req information about Elastic IP '%s'", ip)
 					}
 				} else {
 					xerr = s.rpcDisassociateAddress(address.AssociationId)
@@ -1770,13 +1857,13 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 	}
 
 	// now request to delete instance
-	request := ec2.TerminateInstancesInput{
+	req := ec2.TerminateInstancesInput{
 		InstanceIds: []*string{instance.InstanceId},
 	}
 	var resp *ec2.TerminateInstancesOutput
-	xerr := stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.TerminateInstances(&request)
+			resp, innerErr = s.EC2Service.TerminateInstances(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -1821,8 +1908,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostCleanupTimeout(),
+		timings.NormalDelay(),
+		timings.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1830,8 +1917,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId,
-				temporal.GetHostCleanupTimeout(),
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1859,12 +1945,12 @@ func (s stack) rpcStartInstances(ids []*string) fail.Error {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
 
-	request := ec2.StartInstancesInput{
+	req := ec2.StartInstancesInput{
 		InstanceIds: ids,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.StartInstances(&request)
+			_, err := s.EC2Service.StartInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1876,12 +1962,12 @@ func (s stack) rpcRebootInstances(ids []*string) fail.Error {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
 
-	request := ec2.RebootInstancesInput{
+	req := ec2.RebootInstancesInput{
 		InstanceIds: ids,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.RebootInstances(&request)
+			_, err := s.EC2Service.RebootInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1895,7 +1981,7 @@ func (s stack) rpcDescribeSubnets(ids []*string) ([]*ec2.Subnet, fail.Error) {
 	}
 
 	// FIXME: use NextToken to get all subnets (only the 100 first are currently recovered)
-	request := ec2.DescribeSubnetsInput{
+	req := ec2.DescribeSubnetsInput{
 		SubnetIds: ids,
 	}
 	out := make([]*ec2.Subnet, 0, 100)
@@ -1903,7 +1989,7 @@ func (s stack) rpcDescribeSubnets(ids []*string) ([]*ec2.Subnet, fail.Error) {
 		var resp *ec2.DescribeSubnetsOutput
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
-				resp, err = s.EC2Service.DescribeSubnets(&request)
+				resp, err = s.EC2Service.DescribeSubnets(&req)
 				return err
 			},
 			normalizeError,
@@ -1920,7 +2006,7 @@ func (s stack) rpcDescribeSubnets(ids []*string) ([]*ec2.Subnet, fail.Error) {
 			break
 		}
 
-		request.NextToken = resp.NextToken
+		req.NextToken = resp.NextToken
 	}
 	if len(out) == 0 {
 		if len(ids) > 0 {
@@ -1940,13 +2026,13 @@ func (s stack) rpcStopInstances(ids []*string, gracefully *bool) fail.Error {
 	}
 
 	force := aws.Bool(!aws.BoolValue(gracefully))
-	request := ec2.StopInstancesInput{
+	req := ec2.StopInstancesInput{
 		Force:       force,
 		InstanceIds: ids,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.StopInstances(&request)
+			_, err := s.EC2Service.StopInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1955,7 +2041,7 @@ func (s stack) rpcStopInstances(ids []*string, gracefully *bool) fail.Error {
 
 func (s stack) rpcDescribeNetworkInterfacesOfInstance(id *string) ([]*ec2.NetworkInterface, fail.Error) {
 	var emptySlice []*ec2.NetworkInterface
-	request := ec2.DescribeNetworkInterfacesInput{
+	req := ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("attachment.instance-id"),
@@ -1966,7 +2052,7 @@ func (s stack) rpcDescribeNetworkInterfacesOfInstance(id *string) ([]*ec2.Networ
 	var resp *ec2.DescribeNetworkInterfacesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeNetworkInterfaces(&request)
+			resp, err = s.EC2Service.DescribeNetworkInterfaces(&req)
 			return err
 		},
 		normalizeError,
@@ -1985,13 +2071,13 @@ func (s stack) rpcModifySecurityGroupsOfNetworkInterface(id *string, sgs []*stri
 		return xerr
 	}
 
-	request := ec2.ModifyNetworkInterfaceAttributeInput{
+	req := ec2.ModifyNetworkInterfaceAttributeInput{
 		NetworkInterfaceId: id,
 		Groups:             sgs,
 	}
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			_, err = s.EC2Service.ModifyNetworkInterfaceAttribute(&request)
+			_, err = s.EC2Service.ModifyNetworkInterfaceAttribute(&req)
 			return err
 		},
 		normalizeError,
@@ -2007,14 +2093,14 @@ func (s stack) rpcCreateNetworkInterface(subnetID *string, description string) (
 		return nil, xerr
 	}
 
-	request := ec2.CreateNetworkInterfaceInput{
+	req := ec2.CreateNetworkInterfaceInput{
 		Description: aws.String(description),
 		SubnetId:    subnetID,
 	}
 	var resp *ec2.CreateNetworkInterfaceOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.CreateNetworkInterface(&request)
+			resp, innerErr = s.EC2Service.CreateNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -2033,12 +2119,12 @@ func (s stack) rpcDeleteNetworkInterface(nicID *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DeleteNetworkInterfaceInput{
+	req := ec2.DeleteNetworkInterfaceInput{
 		NetworkInterfaceId: nicID,
 	}
 	return stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			_, innerErr = s.EC2Service.DeleteNetworkInterface(&request)
+			_, innerErr = s.EC2Service.DeleteNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -2053,14 +2139,14 @@ func (s stack) rpcAttachNetworkInterface(instanceID, nicID *string) (*string, fa
 		return nil, xerr
 	}
 
-	request := ec2.AttachNetworkInterfaceInput{
+	req := ec2.AttachNetworkInterfaceInput{
 		InstanceId:         instanceID,
 		NetworkInterfaceId: nicID,
 	}
 	var resp *ec2.AttachNetworkInterfaceOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.AttachNetworkInterface(&request)
+			resp, innerErr = s.EC2Service.AttachNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -2079,12 +2165,12 @@ func (s stack) rpcDetachNetworkInterface(attachmentID *string) fail.Error {
 		return xerr
 	}
 
-	request := ec2.DetachNetworkInterfaceInput{
+	req := ec2.DetachNetworkInterfaceInput{
 		AttachmentId: attachmentID,
 	}
 	return stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			_, innerErr = s.EC2Service.DetachNetworkInterface(&request)
+			_, innerErr = s.EC2Service.DetachNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -2092,13 +2178,13 @@ func (s stack) rpcDetachNetworkInterface(attachmentID *string) fail.Error {
 }
 
 func (s stack) rpcDescribeNetworkInterface(nicID *string) (*ec2.NetworkInterface, fail.Error) {
-	request := ec2.DescribeNetworkInterfacesInput{
+	req := ec2.DescribeNetworkInterfacesInput{
 		NetworkInterfaceIds: []*string{nicID},
 	}
 	var resp *ec2.DescribeNetworkInterfacesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeNetworkInterfaces(&request)
+			resp, err = s.EC2Service.DescribeNetworkInterfaces(&req)
 			return err
 		},
 		normalizeError,
@@ -2116,14 +2202,14 @@ func (s stack) rpcDescribeNetworkInterface(nicID *string) (*ec2.NetworkInterface
 }
 
 func (s stack) rpcDescribeVolumes(ids []*string) ([]*ec2.Volume, fail.Error) {
-	var request ec2.DescribeVolumesInput
+	var req ec2.DescribeVolumesInput
 	if len(ids) > 0 {
-		request.VolumeIds = ids
+		req.VolumeIds = ids
 	}
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&request)
+			resp, err = s.EC2Service.DescribeVolumes(&req)
 			return err
 		},
 		normalizeError,
@@ -2167,7 +2253,8 @@ func (s stack) rpcDescribeVolumeByName(name *string) (*ec2.Volume, fail.Error) {
 	if aws.StringValue(name) == "" {
 		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
 	}
-	request := ec2.DescribeVolumesInput{
+
+	req := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("tag:Name"),
@@ -2178,7 +2265,7 @@ func (s stack) rpcDescribeVolumeByName(name *string) (*ec2.Volume, fail.Error) {
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&request)
+			resp, err = s.EC2Service.DescribeVolumes(&req)
 			return err
 		},
 		normalizeError,
@@ -2207,7 +2294,7 @@ func (s stack) rpcCreateVolume(name *string, size int64, speed string) (_ *ec2.V
 		return &ec2.Volume{}, fail.InvalidParameterError("size", "cannot be negative or 0 integer")
 	}
 
-	request := ec2.CreateVolumeInput{
+	req := ec2.CreateVolumeInput{
 		Size:             aws.Int64(size),
 		VolumeType:       aws.String(speed),
 		AvailabilityZone: aws.String(s.AwsConfig.Zone),
@@ -2215,7 +2302,7 @@ func (s stack) rpcCreateVolume(name *string, size int64, speed string) (_ *ec2.V
 	var resp *ec2.Volume
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.EC2Service.CreateVolume(&request)
+			resp, err = s.EC2Service.CreateVolume(&req)
 			return err
 		},
 		normalizeError,
@@ -2265,12 +2352,12 @@ func (s stack) rpcDeleteVolume(id *string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty AWS String")
 	}
 
-	request := ec2.DeleteVolumeInput{
+	req := ec2.DeleteVolumeInput{
 		VolumeId: id,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.DeleteVolume(&request)
+			_, err := s.EC2Service.DeleteVolume(&req)
 			return err
 		},
 		normalizeError,

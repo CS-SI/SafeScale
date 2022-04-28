@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-release=develop
-folder="$HOME/Documents/Projects/SafeScale/${release}"
+branch=develop
+folder="$HOME/Documents/Projects/SafeScale/${branch}"
 
 if [ ! -d ${folder} ]; then
-    echo "release '$release' ($folder) not found"
+    echo "branch '$branch' ($folder) not found"
     return 2
 fi
 
@@ -15,13 +15,13 @@ if [ ! -d "${sources}" ]; then
     return 3
 fi
 
-case "$release" in 
+case "$branch" in
     "develop")
-	export GOROOT=/opt/homebrew/opt/go@1.16/libexec
-	;;
+        export GOROOT=/opt/homebrew/opt/go@1.17/libexec
+        ;;
     *)
-	export GOROOT=/opt/homebrew/opt/go@1.17/libexec
-	;;
+        export GOROOT=/opt/homebrew/opt/go@1.16/libexec
+        ;;
 esac
 
 export GOBIN="${folder}/bin:~/go/bin:/usr/local/bin"

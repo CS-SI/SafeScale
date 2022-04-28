@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -43,7 +46,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	api.Stack /**openstack.stack*/
+	api.Stack
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
@@ -119,13 +122,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	}
-
-	if _, err := govalidator.ValidateStruct(authOptions); err != nil {
-		return nil, fail.ConvertError(err)
+	err := validation.ValidateStruct(&authOptions,
+		validation.Field(&authOptions.Region, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
+		validation.Field(&authOptions.AvailabilityZone, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
+	)
+	if err != nil {
+		return nil, fail.NewError("Structure validation failure: %v", err)
 	}
 
 	providerName := "openstack"
@@ -140,17 +142,30 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					cloudferroDNSServers = append(cloudferroDNSServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				cloudferroDNSServers = append(cloudferroDNSServers, fragment)
 			}
 		}
 	}
+
+	var timings *temporal.MutableTimings
+	if tc, ok := params["timings"]; ok {
+		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
+			s := &temporal.MutableTimings{}
+			err := mapstructure.Decode(theRecoveredTiming, &s)
+			if err != nil {
+				goto next
+			}
+			timings = s
+		}
+	}
+next:
 
 	cfgOptions := stacks.ConfigurationOptions{
 		ProviderNetwork:           providerNetwork,
@@ -168,6 +183,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
 		MaxLifeTime:              maxLifeTime,
+		Timings:                  timings,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -175,9 +191,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	// Note: if timings have to be tuned, update stack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "cloudferro",
+		FullStack: stack,
+		Name:      "cloudferro",
 	}
 
 	newP := &provider{
@@ -186,8 +204,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: newP,
-		Name:          wrapped.Name,
+		Provider: newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -196,7 +214,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -215,7 +233,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -244,23 +262,23 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
-		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 	if xerr != nil {
-		return []abstract.HostTemplate{}, xerr
+		return nil, xerr
 	}
 	return allTemplates, nil
 }
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
-		return []abstract.Image{}, fail.InvalidInstanceError()
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)
@@ -283,8 +301,8 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
-		return map[string]interface{}{}, nil
+	if valid.IsNil(p) {
+		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 
 	return p.tenantParameters, nil
@@ -292,8 +310,8 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
-	if p.IsNull() {
-		return providers.Capabilities{}, nil
+	if valid.IsNil(p) {
+		return providers.Capabilities{}, fail.InvalidInstanceError()
 	}
 
 	return providers.Capabilities{
@@ -304,8 +322,8 @@ func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
-		return emptySlice, nil
+	if valid.IsNil(p) {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -314,7 +332,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

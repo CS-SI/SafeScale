@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
+
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
@@ -37,7 +39,7 @@ import (
 // There is no Security Group resource in GCP, so ListSecurityGroups always returns empty slice
 func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -50,12 +52,11 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
 func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullASG, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
@@ -63,7 +64,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 
 	auuid, err := uuid.NewV4()
 	if err != nil {
-		return nullASG, fail.Wrap(err, "failed to generate unique id for Security Group")
+		return nil, fail.Wrap(err, "failed to generate unique id for Security Group")
 	}
 
 	asg := abstract.NewSecurityGroup()
@@ -97,7 +98,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		var xerr fail.Error
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
-			return nullASG, fail.Wrap(xerr, "failed adding rule #%d", k)
+			return nil, fail.Wrap(xerr, "failed adding rule #%d", k)
 		}
 	}
 
@@ -173,11 +174,11 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsComplete() {
@@ -190,6 +191,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 	if len(asg.Rules) > 0 {
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
+				var xerr fail.Error
 				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -210,7 +212,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 // InspectSecurityGroup returns information about a security group
 // Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -223,16 +225,15 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 
 // ClearSecurityGroup removes all rules but keep group
 func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsComplete() {
-		return nullASG, fail.InvalidParameterError("sgParam", "must be complete")
+		return nil, fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -261,19 +262,18 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 
 // AddRuleToSecurityGroup adds a rule to a security group
 func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsComplete() {
-		return nullASG, fail.InvalidParameterError("sgParam", "must be complete")
+		return nil, fail.InvalidParameterError("sgParam", "must be complete")
 	}
 	if rule == nil {
-		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
+		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
@@ -304,19 +304,18 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 // DeleteRuleFromSecurityGroup deletes a rule from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
 func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsComplete() {
-		return nullASG, fail.InvalidParameterError("sgParam", "must contain Security Group ID")
+		return nil, fail.InvalidParameterError("sgParam", "must contain Security Group ID")
 	}
 	if rule == nil {
-		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
+		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
@@ -327,10 +326,10 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 // DisableSecurityGroup disables the rules of a Security Group
 func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup")
 	}
 	if !asg.IsComplete() {
@@ -362,10 +361,10 @@ func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 
 // EnableSecurityGroup enables the rules of a Security Group
 func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup")
 	}
 	if !asg.IsComplete() {
@@ -398,7 +397,7 @@ func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
 func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", nil
 	}
 

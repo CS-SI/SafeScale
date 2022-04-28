@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostClusterMembership ...
@@ -48,21 +51,22 @@ func (hcm *HostClusterMembership) IsNull() bool {
 }
 
 // Clone ...
-func (hcm HostClusterMembership) Clone() data.Clonable {
+func (hcm HostClusterMembership) Clone() (data.Clonable, error) {
 	return NewHostClusterMembership().Replace(&hcm)
 }
 
 // Replace ...
-func (hcm *HostClusterMembership) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hcm *HostClusterMembership) Replace(p data.Clonable) (data.Clonable, error) {
 	if hcm == nil || p == nil {
-		return hcm
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostClusterMembership) // nolint
+	src, ok := p.(*HostClusterMembership)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostClusterMembership")
+	}
 	*hcm = *src
-	return hcm
+	return hcm, nil
 }
 
 func init() {

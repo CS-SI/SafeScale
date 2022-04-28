@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -140,8 +140,12 @@ func Fibonacci(base time.Duration) *Officer {
 }
 
 func randomInt(min, max int) int {
+	// FIXME: if min > max, it PANICS -> randomInt has to return (int, error)
+	if min == max {
+		return min
+	}
 	mrand.Seed(time.Now().Unix())
-	return mrand.Intn(max-min) + min
+	return mrand.Intn(max-min) + min // nolint
 }
 
 func Randomized(bottom time.Duration, top time.Duration) *Officer { // FIXME: Use this

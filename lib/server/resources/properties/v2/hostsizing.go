@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,13 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // HostSizingRequirements describes host sizing requirements to fulfill
@@ -91,29 +95,31 @@ func NewHostSizing() *HostSizing {
 // IsNull ...
 // satisfies interface data.Clonable
 func (hs *HostSizing) IsNull() bool {
-	return hs == nil || (hs.RequestedSize.IsNull() && hs.Template == "" && hs.AllocatedSize.IsNull())
+	return hs == nil || (valid.IsNil(hs.RequestedSize) && hs.Template == "" && valid.IsNil(hs.AllocatedSize))
 }
 
 // Clone ... (data.Clonable interface)
-func (hs HostSizing) Clone() data.Clonable {
+func (hs HostSizing) Clone() (data.Clonable, error) {
 	return NewHostSizing().Replace(&hs)
 }
 
 // Replace ...
-func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hs *HostSizing) Replace(p data.Clonable) (data.Clonable, error) {
 	if hs == nil || p == nil {
-		return hs
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostSizing) // nolint
+	src, ok := p.(*HostSizing)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostSizing")
+	}
+
 	hs.RequestedSize = NewHostSizingRequirements()
 	*hs.RequestedSize = *src.RequestedSize
 	hs.AllocatedSize = NewHostEffectiveSizing()
 	*hs.AllocatedSize = *src.AllocatedSize
 	hs.Template = src.Template
-	return hs
+	return hs, nil
 }
 
 func init() {

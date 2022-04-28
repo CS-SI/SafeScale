@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,7 @@ import (
 	"fmt"
 
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/asaskevich/govalidator"
-	scribble "github.com/nanobox-io/golang-scribble"
+	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -50,11 +49,6 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/templates/list")
@@ -99,7 +93,8 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 
 	var finalList []*protocol.HostTemplate
 	for _, item := range originalList {
-		entry := converters.HostTemplateFromAbstractToProtocol(item)
+		item := item
+		entry := converters.HostTemplateFromAbstractToProtocol(*item)
 		acpu := StoredCPUInfo{}
 		if err := db.Read(folder, item.Name, &acpu); err != nil {
 			if scannedOnly {
@@ -158,10 +153,6 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/template/match")
 	if xerr != nil {
 		return nil, xerr
@@ -192,9 +183,9 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 }
 
 // Inspect returns information about a tenant
-func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, xerr error) {
-	defer fail.OnExitConvertToGRPCStatus(&xerr)
-	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -206,11 +197,6 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	ref, _ := srvutils.GetReference(in.GetTemplate())
 	job, xerr := PrepareJob(ctx, in.GetTemplate().GetTenantId(), fmt.Sprintf("template/%s/inspect", ref))
 	if xerr != nil {
@@ -220,7 +206,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := job.Service()
 	authOpts, xerr := svc.GetAuthenticationOptions()

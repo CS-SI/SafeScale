@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostSystem contains information about the operating system
@@ -44,21 +47,23 @@ func (hs *HostSystem) IsNull() bool {
 }
 
 // Clone ...
-func (hs HostSystem) Clone() data.Clonable {
+func (hs HostSystem) Clone() (data.Clonable, error) {
 	return NewHostSystem().Replace(&hs)
 }
 
 // Replace ...
-func (hs *HostSystem) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hs *HostSystem) Replace(p data.Clonable) (data.Clonable, error) {
 	if hs == nil || p == nil {
-		return hs
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostSystem) // nolint
+	src, ok := p.(*HostSystem)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostSystem")
+	}
+
 	*hs = *src
-	return hs
+	return hs, nil
 }
 
 func init() {

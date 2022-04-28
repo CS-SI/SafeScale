@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // network is the part of safescale client handling Networking
@@ -42,19 +44,37 @@ func (n network) List(all bool, timeout time.Duration) (*protocol.NetworkList, e
 		return nil, xerr
 	}
 
-	return service.List(ctx, &protocol.NetworkListRequest{
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	return service.List(newCtx, &protocol.NetworkListRequest{
 		All: all,
 	})
 }
 
+var forceCtxKey = "force"
+
 // Delete deletes several networks at the same time in goroutines
-func (n network) Delete(names []string, timeout time.Duration) error { // TODO: concurrent access if deleting multiple networks
+func (n network) Delete(names []string, timeout time.Duration, force bool) error { // TODO: concurrent access if deleting multiple networks
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
+	}
+
+	// finally, using context
+	newCtx := context.WithValue(ctx, &forceCtxKey, force)
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
 	}
 
 	var (
@@ -64,8 +84,14 @@ func (n network) Delete(names []string, timeout time.Duration) error { // TODO: 
 	)
 
 	networkDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.NetworkDeleteRequest{
+			Network: &protocol.Reference{Name: aname},
+			Force:   force,
+		})
 
 		if err != nil {
 			mutex.Lock()
@@ -97,7 +123,15 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 		return nil, xerr
 	}
 
-	return service.Inspect(ctx, &protocol.Reference{Name: name})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	return service.Inspect(newCtx, &protocol.Reference{Name: name})
 
 }
 
@@ -118,6 +152,14 @@ func (n network) Create(
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	def := &protocol.NetworkCreateRequest{
 		Name:          name,
 		Cidr:          cidr,
@@ -130,5 +172,5 @@ func (n network) Create(
 			SizingAsString: sizing,
 		},
 	}
-	return service.Create(ctx, def)
+	return service.Create(newCtx, def)
 }

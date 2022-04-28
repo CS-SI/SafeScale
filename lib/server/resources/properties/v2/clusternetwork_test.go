@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,11 +24,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNetwork_Clone(t *testing.T) {
+func TestClusterNetwork_IsNull(t *testing.T) {
+
+	var cn *ClusterNetwork = nil
+	if !cn.IsNull() {
+		t.Error("ClusterNetwork nil pointer is null")
+		t.Fail()
+	}
+	cn = newClusterNetwork()
+	if !cn.IsNull() {
+		t.Error("Empty ClusterNetwork is null")
+		t.Fail()
+	}
+	cn.NetworkID = "ClusterNetwork NetworkID"
+	if cn.IsNull() {
+		t.Error("ClusterNetwork is not null")
+		t.Fail()
+	}
+}
+
+func TestClusterNetwork_Replace(t *testing.T) {
+	var cn *ClusterNetwork = nil
+	cn2 := newClusterDefaults()
+	result, err := cn.Replace(cn2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
+}
+
+func TestClusterNetwork_Clone(t *testing.T) {
 	ct := newClusterNetwork()
 	ct.GatewayID = "None"
 
-	clonedCt, ok := ct.Clone().(*ClusterNetwork)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterNetwork)
 	if !ok {
 		t.Fail()
 	}

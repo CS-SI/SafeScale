@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,13 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -54,20 +57,24 @@ func (n *ClusterNetwork) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n ClusterNetwork) Clone() data.Clonable {
+func (n ClusterNetwork) Clone() (data.Clonable, error) {
 	return newClusterNetwork().Replace(&n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *ClusterNetwork) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (n *ClusterNetwork) Replace(p data.Clonable) (data.Clonable, error) {
 	if n == nil || p == nil {
-		return n
+		return nil, fail.InvalidInstanceError()
 	}
 
-	*n = *p.(*ClusterNetwork)
-	return n
+	cloned, ok := p.(*ClusterNetwork)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterNetwork")
+	}
+
+	*n = *cloned
+	return n, nil
 }
 
 func init() {

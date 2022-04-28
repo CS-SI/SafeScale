@@ -2,7 +2,7 @@
 // +build debug
 
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -201,24 +201,29 @@ func newSite(s string) (string, int64, crashTrigger, error) {
 	if len(parts) == 4 {
 		file := parts[0]
 		line, intParseErr := strconv.ParseInt(parts[1], 10, 64)
-		if intParseErr == nil {
-			switch parts[2] {
-			case "p":
-				prob, err := strconv.ParseFloat(parts[3], 64)
-				if err == nil {
-					return file, line, &probabilityTrigger{prob}, nil
-				}
-			case "i":
-				iter, err := strconv.ParseInt(parts[3], 10, 64)
-				if err == nil {
-					return file, line, &iterationTrigger{max: iter}, nil
-				}
-			case "o": // once
-				iter, err := strconv.ParseInt(parts[3], 10, 64)
-				if err == nil {
-					return file, line, &onceTrigger{target: iter}, nil
-				}
+		if intParseErr != nil {
+			return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)
+		}
+
+		switch parts[2] {
+		case "p":
+			prob, err := strconv.ParseFloat(parts[3], 64)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)
 			}
+			return file, line, &probabilityTrigger{prob}, nil
+		case "i":
+			iter, err := strconv.ParseInt(parts[3], 10, 64)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)
+			}
+			return file, line, &iterationTrigger{max: iter}, nil
+		case "o": // once
+			iter, err := strconv.ParseInt(parts[3], 10, 64)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)
+			}
+			return file, line, &onceTrigger{target: iter}, nil
 		}
 	}
 	return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)

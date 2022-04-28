@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,17 +20,18 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observer -o ../mocks/mock_observer.go
-//go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observable -o ../mocks/mock_observable.go
+//go:generate minimock -o mocks/mock_observer.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observer
 
 // Observer is the interface a struct must satisfy to be observed by outside
 type Observer interface {
 	data.Identifiable
 
 	SignalChange(id string)  // is called by Observable to signal an Observer a change occurred
-	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
+	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used any more (decreasing the counter of uses)
 	MarkAsDeleted(id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
 }
+
+//go:generate minimock -o mocks/mock_observable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/observer.Observable
 
 // Observable is the interface a struct must satisfy to signal internal change to observers
 type Observable interface {

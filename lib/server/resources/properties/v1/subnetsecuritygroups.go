@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // SubnetSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
@@ -46,30 +49,38 @@ func (ssg *SubnetSecurityGroups) IsNull() bool {
 }
 
 // Clone ...
-func (ssg SubnetSecurityGroups) Clone() data.Clonable {
+func (ssg SubnetSecurityGroups) Clone() (data.Clonable, error) {
 	return NewSubnetSecurityGroups().Replace(&ssg)
 }
 
 // Replace ...
-func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
 	if ssg == nil || p == nil {
-		return ssg
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*SubnetSecurityGroups) // nolint
+	src, ok := p.(*SubnetSecurityGroups)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *SubnetDescription")
+	}
+
 	*ssg = *src
 	ssg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		// FIXME: Replace should also return an error
-		ssg.ByID[k], _ = v.Clone().(*SecurityGroupBond) // nolint
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		ssg.ByID[k], ok = cloned.(*SecurityGroupBond)
+		if !ok {
+			return nil, fmt.Errorf("cloned is not a *SecurityGroupBond")
+		}
 	}
 	ssg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		ssg.ByName[k] = v
 	}
-	return ssg
+	return ssg, nil
 }
 
 func init() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/makholm/covertool/pkg/cover"
-	"github.com/makholm/covertool/pkg/exit"
+	"github.com/oscarpicas/covertool/pkg/cover"
+	"github.com/oscarpicas/covertool/pkg/exit"
 )
 
 func TestMain(m *testing.M) {

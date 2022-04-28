@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@
 package huaweicloud
 
 import (
+	"net/http"
+
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -129,7 +132,7 @@ type deleteResult struct {
 
 // ListFloatingIPs lists all the floating IP currently requested for the VPC
 func (s stack) ListFloatingIPs() pagination.Pager {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return pagination.Pager{}
 	}
 
@@ -141,7 +144,7 @@ func (s stack) ListFloatingIPs() pagination.Pager {
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
 func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
@@ -153,8 +156,10 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.Driver.Request("GET", url, &opts)
+			var hr *http.Response
+			hr, err := s.Driver.Request("GET", url, &opts) // nolint
 			r.Err = err
+			defer closer(hr)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -172,7 +177,7 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
 func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
@@ -209,7 +214,7 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 
 // CreateFloatingIP creates a floating IP
 func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 	if host == nil {
@@ -248,7 +253,9 @@ func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("POST", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			defer closer(hr)
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -266,7 +273,7 @@ func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 
 // DeleteFloatingIP deletes a floating IP
 func (s stack) DeleteFloatingIP(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -278,8 +285,10 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.Driver.Request("DELETE", url, &opts)
+			var hr *http.Response
+			hr, r.Err = s.Driver.Request("DELETE", url, &opts) // nolint
 			err := r.ExtractErr()
+			defer closer(hr)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -288,7 +297,7 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 
 // AssociateFloatingIP associates a floating ip to a host
 func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -305,8 +314,10 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 
 	return stacks.RetryableRemoteCall(
 		func() error {
+			var hr *http.Response
 			r := servers.ActionResult{}
-			_, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+			hr, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
+			defer closer(hr)
 			return normalizeError(r.ExtractErr())
 		},
 		normalizeError,
@@ -315,7 +326,7 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 
 // DissociateFloatingIP from host
 func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -332,8 +343,10 @@ func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 
 	return stacks.RetryableRemoteCall(
 		func() error {
+			var hr *http.Response
 			r := servers.ActionResult{}
-			_, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+			hr, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
+			defer closer(hr)
 			return normalizeError(r.ExtractErr())
 		},
 		normalizeError,

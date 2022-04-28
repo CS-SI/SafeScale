@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 
 	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -37,9 +37,11 @@ import (
 	_ "github.com/CS-SI/SafeScale/v21/lib/server"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/listeners"
-	app2 "github.com/CS-SI/SafeScale/v21/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
 )
 
@@ -63,6 +65,9 @@ func work(c *cli.Context) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		<-signalCh
 		cleanup(true)
 	}()
@@ -135,6 +140,8 @@ func work(c *cli.Context) {
 	// - /debug/fgprof
 	expose()
 
+	operations.StartFeatureFileWatcher()
+
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	if              //goland:noinspection GoBoolExpressions
 	len(Tags) > 1 { // nolint
@@ -196,28 +203,25 @@ func main() {
 	app.Usage = "safescaled [OPTIONS]"
 	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
 
-	app.Authors = []*cli.Author{
+	app.Authors = []cli.Author{
 		{
 			Name:  "CS-SI",
 			Email: "safescale@csgroup.eu",
 		},
 	}
 	cli.VersionFlag = &cli.BoolFlag{
-		Name:    "version",
-		Aliases: []string{"V"},
-		Usage:   "Print program version",
+		Name:  "version, V",
+		Usage: "Print program version",
 	}
 
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "verbose",
-			Aliases: []string{"v"},
-			Usage:   "Increase verbosity",
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
 		},
 		&cli.BoolFlag{
-			Name:    "debug",
-			Aliases: []string{"d"},
-			Usage:   "Show debug information",
+			Name:  "debug, d",
+			Usage: "Show debug information",
 		},
 		&cli.StringFlag{
 			Name: "profile",
@@ -229,13 +233,13 @@ func main() {
                 for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
 		},
 		&cli.StringFlag{
-			Name:    "listen",
-			Aliases: []string{"l"},
-			Usage:   "Listen on specified port `IP:PORT` (default: localhost:50051)",
+			Name:  "listen, l",
+			Usage: "Listen on specified port `IP:PORT` (default: localhost:50051)",
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		// Sets profiling
 		if c.IsSet("profile") {
 			what := c.String("profile")
@@ -244,27 +248,40 @@ func main() {
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
-			app2.Verbose = true
+			appwide.Verbose = true
 		} else {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
+		// default level is INFO
+		logrus.SetLevel(logrus.InfoLevel)
+
+		// if -d or -v specified -> DEBUG Level
 		if c.Bool("verbose") {
 			logrus.SetLevel(logrus.InfoLevel)
-			app2.Verbose = true
+			appwide.Verbose = true
 		}
+
 		if c.Bool("debug") {
 			if c.Bool("verbose") {
 				logrus.SetLevel(logrus.TraceLevel)
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
-			app2.Debug = true
+			appwide.Debug = true
+		}
+
+		// if -d AND -v specified -> TRACE Level
+		if c.Bool("debug") && c.Bool("verbose") {
+			logrus.SetLevel(logrus.TraceLevel)
+			appwide.Verbose = true
+			appwide.Debug = true
 		}
 		return nil
 	}
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		work(c)
 		return nil
 	}

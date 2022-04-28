@@ -1,8 +1,5 @@
-//go:build ignore
-// +build ignore
-
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +16,7 @@
 
 package utils
 
-//go:generate mockgen -destination=../mocks/mock_valid.go -package=mocks github.com/CS-SI/SafeScale/lib/utils Valid
+//go:generate minimock -o mocks/mock_valid.go -i github.com/CS-SI/SafeScale/v21/lib/utils.Valid
 
 // Valid interface is used to check data validity
 type Valid interface {

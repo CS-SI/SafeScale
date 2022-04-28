@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,14 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // ClusterControlplane contains information used by cluster control plane (when there is one)
@@ -38,31 +42,39 @@ func newClusterControlPlane() *ClusterControlplane {
 // IsNull ...
 // satisfies interface data.Clonable
 func (cp *ClusterControlplane) IsNull() bool {
-	return cp == nil || cp.VirtualIP.IsNull()
+	return cp == nil || valid.IsNil(cp.VirtualIP)
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cp ClusterControlplane) Clone() data.Clonable {
+func (cp ClusterControlplane) Clone() (data.Clonable, error) {
 	return newClusterControlPlane().Replace(&cp)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (cp *ClusterControlplane) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (cp *ClusterControlplane) Replace(p data.Clonable) (data.Clonable, error) {
 	if cp == nil || p == nil {
-		return cp
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterControlplane) // nolint
+	src, ok := p.(*ClusterControlplane)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterControlplane")
+	}
+
 	*cp = *src
 	if src.VirtualIP != nil {
-		// FIXME: Replace should also return an error
-		cp.VirtualIP, _ = src.VirtualIP.Clone().(*abstract.VirtualIP) // nolint
+		cloned, err := src.VirtualIP.Clone()
+		if err != nil {
+			return nil, err
+		}
+		cp.VirtualIP, ok = cloned.(*abstract.VirtualIP)
+		if !ok {
+			return nil, fmt.Errorf("cloned is not a *abstract.VirtualIP")
+		}
 	}
-	return cp
+	return cp, nil
 }
 
 func init() {

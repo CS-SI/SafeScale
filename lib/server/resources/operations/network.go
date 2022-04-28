@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -34,43 +31,36 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	networkKind = "network"
-	// networksFolderName is the technical name of the container used to store networks info
+	// networksFolderName is the technical name of the Object Storage container used to store networks info
 	networksFolderName = "networks"
 )
 
 // Network links Object Storage MetadataFolder and Networking
 type Network struct {
 	*MetadataCore
-
-	lock sync.RWMutex
-}
-
-// NullValue returns a *Network representing a null value
-func NullValue() *Network {
-	return &Network{MetadataCore: NullCore()}
 }
 
 // NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {
-		return NullValue(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := NewCore(svc, networkKind, networksFolderName, &abstract.Network{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullValue(), xerr
+		return nil, xerr
 	}
 
 	instance := &Network{
@@ -80,7 +70,8 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Network, ferr fail.Error) {
+// if 'options' contains WithReloadOption, the instance is refreshed from metadata
+func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (networkInstance resources.Network, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be null value")
 	}
@@ -88,67 +79,42 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	networkCache, xerr := svc.GetCache(networkKind)
-	xerr = debug.InjectPlannedFail(xerr)
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(svc, ref) }
+	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	options := iaas.CacheMissOption(
-		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
-		temporal.GetMetadataTimeout(),
-	)
-	cacheEntry, xerr := networkCache.Get(ref, options...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nil, fail.NotFoundError("failed to find Network '%s'", ref)
-		default:
-			return nil, xerr
-		}
-	}
-
 	var ok bool
-	networkInstance, ok = cacheEntry.Content().(resources.Network)
+	networkInstance, ok = anon.(resources.Network)
 	if !ok {
 		return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
 	}
 	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
-	_ = cacheEntry.LockContent()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			_ = cacheEntry.UnlockContent()
-		}
-	}()
-
-	// FIXME: The reload problem
-	// VPL: what state of a Network/VPC would you like to be updated by Reload?
-	/*
-		xerr = networkInstance.Reload()
-		if xerr != nil {
-			return nil, xerr
-		}
-	*/
 
 	return networkInstance, nil
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
-func onNetworkCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	networkInstance, innerXErr := NewNetwork(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	blank, innerXErr := NewNetwork(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
 		return nil, innerXErr
+	}
+
+	if strings.Compare(fail.IgnoreError(networkInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+		return nil, fail.NotFoundError("network with ref '%s' does NOT exist", ref)
 	}
 
 	return networkInstance, nil
@@ -156,23 +122,25 @@ func onNetworkCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Err
 
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *Network) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
+	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // Create creates a Network
+// returns:
+//   - *fail.ErrInvalidParameter: one parameter is invalid
+//   - *failErrInvalidInstance: Create() is called from bad instance (nil or null value)
+//   - *fail.ErrNotAvailable: a Network with the same name is currently created
+//   - *fail.ErrDuplicate: a Network with the same name already exist on Provider Side (managed or not by SafeScale)
+//   - *fail.ErrAborted: abort signal has been received
 func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
-		networkName := instance.GetName()
-		if networkName != "" {
-			return fail.NotAvailableError("already carrying Network '%s'", networkName)
-		}
-		return fail.InvalidInstanceContentError("instance", "is not null value")
+	if !valid.IsNil(instance.MetadataCore) && instance.MetadataCore.IsTaken() {
+		return fail.NotAvailableError("already carrying information")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -181,15 +149,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -199,12 +159,16 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	tracer := debug.NewTracer(task, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
-	// Check if subnet already exists and is managed by SafeScale
-	svc := instance.GetService()
-	existing, xerr := LoadNetwork(svc, req.Name)
+	svc := instance.Service()
+
+	childCtx, cancel := context.WithCancel(task.Context())
+	defer cancel()
+
+	// Check if Network already exists and is managed by SafeScale
+	_, xerr = LoadNetwork(childCtx, svc, req.Name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -214,8 +178,9 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 			return xerr
 		}
 	} else {
-		existing.Released()
-		return fail.DuplicateError("Network '%s' already exists", req.Name)
+		xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
+		_ = xerr.Annotate("managed", true)
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -234,7 +199,9 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 			return xerr
 		}
 	} else {
-		return fail.DuplicateError("Network '%s' already exists (not managed by SafeScale)", req.Name)
+		xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
+		_ = xerr.Annotate("managed", false)
+		return xerr
 	}
 
 	// Verify the CIDR is not routable
@@ -277,70 +244,38 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	// Write subnet object metadata
-	logrus.Debugf("Saving subnet metadata '%s' ...", abstractNetwork.Name)
+	logrus.Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
 	abstractNetwork.Imported = false
-	return instance.carry(abstractNetwork)
+	return instance.carry(childCtx, abstractNetwork)
 }
 
 // carry registers clonable as core value and deals with cache
-func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
-	if instance == nil {
+func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if instance.MetadataCore.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
-	identifiable, ok := clonable.(data.Identifiable)
-	if !ok {
-		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
-	}
-
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
-			}
-		}
-	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cacheEntry.LockContent()
 
 	return nil
 }
 
 // Import imports an existing Network in SafeScale metadata
-func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !instance.IsNull() {
+	if !valid.IsNil(instance) && instance.MetadataCore.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if ctx == nil {
@@ -350,15 +285,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -368,22 +295,20 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 	tracer := debug.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	// Check if Network already exists and is managed by SafeScale
-	svc := instance.GetService()
-	existing, xerr := LoadNetwork(svc, ref)
+	svc := instance.Service()
+	_, xerr = LoadNetwork(task.Context(), svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
 			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}
 	} else {
-		existing.Released()
 		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
 	}
 
@@ -413,12 +338,12 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 	// Write subnet object metadata
 	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
 	abstractNetwork.Imported = true
-	return instance.carry(abstractNetwork)
+	return instance.carry(task.Context(), abstractNetwork)
 }
 
 // Browse walks through all the metadata objects in subnet
-func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
@@ -434,23 +359,15 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
 		if task.Aborted() {
@@ -474,17 +391,17 @@ var (
 )
 
 // Delete deletes subnet
-func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		networkAbstract, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -497,18 +414,10 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -518,8 +427,13 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractNetwork, ok := clonable.(*abstract.Network)
@@ -527,7 +441,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		svc := instance.GetService()
+		svc := instance.Service()
 
 		var subnets map[string]string
 		innerXErr := props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -555,26 +469,28 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 				if k == instance.GetName() {
 					found = true
+					deleted := false
 					// the single subnet present is a subnet named like the Network, delete it first
-					subnetInstance, xerr := LoadSubnet(svc, "", v)
+					subnetInstance, xerr := LoadSubnet(task.Context(), svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
 							// Subnet is already deleted, considered as a success and continue
 							debug.IgnoreError(xerr)
-							continue
+							deleted = true
 						default:
 							return xerr
 						}
 					}
 
-					subnetName := subnetInstance.GetName()
-
-					xerr = subnetInstance.Delete(ctx)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+					if !deleted {
+						subnetName := subnetInstance.GetName()
+						xerr = subnetInstance.Delete(task.Context())
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+						}
 					}
 				}
 			}
@@ -594,7 +510,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 
 				for k := range nsgV1.ByID {
-					sgInstance, propsXErr := LoadSecurityGroup(svc, k)
+					sgInstance, propsXErr := LoadSecurityGroup(task.Context(), svc, k)
 					if propsXErr != nil {
 						switch propsXErr.(type) {
 						case *fail.ErrNotFound:
@@ -605,11 +521,11 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					}
 
 					// -- delete Security Group
-					sgInstance.lock.Lock()
-					//goland:noinspection GoDeferInLoop
-					defer sgInstance.lock.Unlock()
+					// sgInstance.lock.Lock()
+					// //goland:noinspection GoDeferInLoop
+					// defer sgInstance.lock.Unlock()
 
-					propsXErr = sgInstance.unsafeDelete(ctx, true)
+					propsXErr = sgInstance.unsafeDelete(task.Context(), true)
 					if propsXErr != nil {
 						return propsXErr
 					}
@@ -646,8 +562,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 							return fail.Wrap(recErr, "another kind of error")
 						},
-						temporal.GetMinDelay(),
-						temporal.GetContextTimeout(),
+						timings.SmallDelay(),
+						timings.ContextTimeout(),
 					)
 					if errWaitMore != nil {
 						_ = innerXErr.AddConsequence(errWaitMore)
@@ -674,7 +590,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
-				time.Sleep(temporal.GetDefaultDelay())
+				time.Sleep(timings.NormalDelay())
 			}
 		}
 		return nil
@@ -693,18 +609,18 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) GetCIDR() (cidr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
 	cidr = ""
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -717,25 +633,24 @@ func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) ToProtocol() (out *protocol.Network, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	// instance.lock.RLock()
+	// defer instance.lock.RUnlock()
 
-	var pn *protocol.Network
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 
 		}
 
-		pn = &protocol.Network{
+		out = &protocol.Network{
 			Id:   an.ID,
 			Name: an.Name,
 			Cidr: an.CIDR,
@@ -747,7 +662,7 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			for k := range nsV1.ByName {
-				pn.Subnets = append(pn.Subnets, k)
+				out.Subnets = append(out.Subnets, k)
 			}
 			return nil
 		})
@@ -757,26 +672,26 @@ func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 		return nil, xerr
 	}
 
-	return pn, nil
+	return out, nil
 }
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) InspectSubnet(ctx context.Context, ref string) (_ resources.Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return LoadSubnet(instance.GetService(), instance.GetID(), ref)
+	return LoadSubnet(ctx, instance.Service(), instance.GetID(), ref)
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata
-func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -789,30 +704,21 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
-	parentNetwork, xerr := subnet.InspectNetwork()
+	parentNetwork, xerr := subnet.InspectNetwork(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-	defer parentNetwork.Released()
 
 	if parentNetwork.GetName() != instance.GetName() {
 		return fail.InvalidRequestError("cannot adopt Subnet '%s' because Network '%s' does not own it", subnet.GetName(), instance.GetName())
@@ -835,36 +741,28 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 }
 
 // AbandonSubnet unregisters a Subnet from the Network (does not imply the Subnet is deleted)
-func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {

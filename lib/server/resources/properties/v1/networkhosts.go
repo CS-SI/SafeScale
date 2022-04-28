@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // NetworkHosts contains information about hosts connected to the network
@@ -50,19 +53,21 @@ func (nh *NetworkHosts) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (nh NetworkHosts) Clone() data.Clonable {
+func (nh NetworkHosts) Clone() (data.Clonable, error) {
 	return NewNetworkHosts().Replace(&nh)
 }
 
 // Replace ... (data.Clonable interface)
-func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (nh *NetworkHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	if nh == nil || p == nil {
-		return nh
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*NetworkHosts) // nolint
+	src, ok := p.(*NetworkHosts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *NetworkHosts")
+	}
+
 	nh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		nh.ByID[k] = v
@@ -71,7 +76,7 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByName {
 		nh.ByName[k] = v
 	}
-	return nh
+	return nh, nil
 }
 
 func init() {

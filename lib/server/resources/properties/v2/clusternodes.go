@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv2
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // ClusterNode describes a node in the cluster
@@ -61,20 +64,22 @@ func (n *ClusterNodes) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (n ClusterNodes) Clone() data.Clonable {
+func (n ClusterNodes) Clone() (data.Clonable, error) {
 	return newClusterNodes().Replace(&n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (n *ClusterNodes) Replace(p data.Clonable) (data.Clonable, error) {
 	if n == nil || p == nil {
-		return n
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*ClusterNodes) // nolint
+	src, ok := p.(*ClusterNodes)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *ClusterNodes")
+	}
+
 	*n = *src
 	n.Masters = make([]*ClusterNode, 0, len(src.Masters))
 	// copy(n.Masters, src.Masters)
@@ -89,7 +94,7 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 		node := *v
 		n.PrivateNodes = append(n.PrivateNodes, &node)
 	}
-	return n
+	return n, nil
 }
 
 func init() {

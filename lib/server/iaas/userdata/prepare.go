@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -54,7 +56,8 @@ type Content struct {
 	FinalPrivateKey             string                        // is the private key used to connect tp Host starting phase3 (disabling FirstPrivateKey)
 	ConfIF                      bool                          // if set to true, configure all interfaces to DHCP
 	IsGateway                   bool                          // if set to true, activate IP forwarding
-	PublicIP                    string                        // contains a public IP binded to the host
+	SSHPort                     string                        // Define Gateway SSHport
+	PublicIP                    string                        // contains a public IP bound to the host
 	AddGateway                  bool                          // if set to true, configure default gateway
 	DNSServers                  []string                      // contains the list of DNS servers to use; used only if IsGateway is true
 	CIDR                        string                        // contains the cidr of the network
@@ -71,6 +74,7 @@ type Content struct {
 	GatewayHAKeepalivedPassword string                        // contains the password to use in keepalived configurations
 	ProviderName                string
 	BuildSubnetworks            bool
+	Debug                       bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -109,7 +113,10 @@ func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as
 }
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string) fail.Error {
+func (ud *Content) Prepare(
+	options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
+	timings temporal.Timings,
+) fail.Error {
 	if ud == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -145,7 +152,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		dnsList = []string{"1.1.1.1"}
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		return xerr
 	}
@@ -160,6 +167,10 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		}
 	}
 
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag != "" {
+		ud.Debug = true
+	}
+
 	ud.BashLibraryDefinition = *bashLibraryDefinition
 	ud.Header = scriptHeader
 	ud.Revision = REV
@@ -171,6 +182,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.IsGateway = request.IsGateway /*&& request.Subnets[0].Name != abstract.SingleHostNetworkName*/
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
+	ud.SSHPort = strconv.Itoa(int(request.SSHPort))
 	ud.CIDR = cidr
 	ud.DefaultRouteIP = ip
 	ud.Password = request.Password

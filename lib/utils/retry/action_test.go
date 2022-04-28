@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,10 @@
 package retry
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -27,9 +30,616 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
+
+func Test_NewAction(t *testing.T) {
+
+	var (
+		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
+		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		run     func() error = func() (nested error) {
+			return nil
+		}
+		notify  Notify
+		timeout time.Duration = 5 * time.Second
+	)
+
+	action := NewAction(officer, arbiter, run, notify, timeout)
+	require.EqualValues(t, "*retry.action", reflect.TypeOf(action).String())
+
+}
+
+func Test_Action(t *testing.T) {
+
+	var (
+		run func() error = func() (nested error) {
+			return nil
+		}
+		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
+		first   func() error = func() (nested error) {
+			return nil
+		}
+		last func() error = func() (nested error) {
+			return nil
+		}
+		notify Notify
+	)
+
+	err := Action(nil, arbiter, officer, first, last, notify)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	//	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter run"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+
+	err = Action(run, nil, officer, first, last, notify)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	//	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter arbiter"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+
+	err = Action(run, arbiter, nil, first, last, notify)
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+	//	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter officer"), true)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+
+	err = Action(run, arbiter, officer, first, last, notify)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_TimeoutSelector(t *testing.T) {
+
+	f := TimeoutSelector(false)
+	require.EqualValues(t, "func(retry.action) fail.Error", reflect.TypeOf(f).String())
+
+	f = TimeoutSelector(true)
+	require.EqualValues(t, "func(retry.action) fail.Error", reflect.TypeOf(f).String())
+
+}
+
+func Test_DefaultTimeoutSelector(t *testing.T) {
+
+	f := DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Hard")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Soft")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+	os.Setenv("SAFESCALE_TIMEOUT_STYLE", "Banana!")
+	f = DefaultTimeoutSelector()
+	require.EqualValues(t, reflect.TypeOf(f).String(), "func(retry.action) fail.Error")
+
+}
+
+func Test_BackoffSelector(t *testing.T) {
+
+	backoff := BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Constant")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Incremental")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Linear")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Exponential")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Fibonacci")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+	os.Setenv("SAFESCALE_ALGO_DELAY", "Banana!")
+	backoff = BackoffSelector()
+	require.EqualValues(t, reflect.TypeOf(backoff).String(), "retry.Backoff")
+
+}
+
+func Test_WhileUnsuccessful(t *testing.T) {
+
+	// no waitfor
+	maxtries := 5
+	tries := 0
+	err := WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+	maxtries = 5
+	tries = 0
+	err = WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+}
+
+func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithLimitedRetries(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			3,
+		)
+		require.EqualValues(t, err, nil)
+	})
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		3,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		3,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		0,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		3,
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		0,
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithHardTimeout(
+			func() error {
+				return nil
+			},
+			100*time.Millisecond,
+			40*time.Millisecond,
+		)
+		require.EqualValues(t, err, nil)
+	})
+
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithHardTimeout(
+		func() error {
+			return nil
+		},
+		100*time.Millisecond,
+		-1*time.Second,
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
+			func() error {
+				return nil
+			},
+			100*time.Millisecond,
+			40*time.Millisecond,
+			DefaultNotifier(),
+		)
+		require.EqualValues(t, err, nil)
+	})
+
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		100*time.Millisecond,
+		-1*time.Millisecond,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+		func() error {
+			return nil
+		},
+		100*time.Millisecond,
+		1*time.Second,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithNotify(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			DefaultNotifier(),
+		)
+		require.EqualValues(t, err, nil)
+	})
+
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		nil,
+	)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+
+	err = WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithNotify(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
+
+	arb := func(arbiters ...Arbiter) Arbiter {
+		var arb Arbiter
+		if len(arbiters) > 0 {
+			arb = arbiters[0]
+		}
+		return arb
+	}
+
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithAggregator(
+			func() error {
+				return nil
+			},
+			50*time.Millisecond,
+			40*time.Millisecond,
+			arb,
+			DefaultNotifier(),
+		)
+		require.EqualValues(t, err, nil)
+	})
+
+	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+
+	err := WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		arb,
+		nil,
+	)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+
+	err = WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		-1*time.Millisecond,
+		40*time.Millisecond,
+		arb,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		-1*time.Millisecond,
+		arb,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+	err = WhileUnsuccessfulWithAggregator(
+		func() error {
+			return nil
+		},
+		50*time.Millisecond,
+		1*time.Second,
+		arb,
+		DefaultNotifier(),
+	)
+	require.EqualValues(t, err, nil)
+
+}
+
+func Test_WhileSuccessful(t *testing.T) {
+
+	// no waitfor
+	maxtries := 5
+	tries := 0
+	err := WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+	maxtries = 5
+	tries = 0
+	err = WhileUnsuccessful(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1)
+	require.EqualValues(t, err, nil)
+	require.EqualValues(t, tries, maxtries)
+
+}
+
+func Test_WhileSuccessfulWithNotify(t *testing.T) {
+
+	var notify Notify
+
+	// no waitfor
+	maxtries := 5
+	tries := 0
+	err := WhileSuccessfulWithNotify(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any errior")
+		}
+	}, 50*time.Millisecond, -1, nil)
+	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+	require.NotEqual(t, tries, maxtries)
+
+	notify = func(Try, verdict.Enum) {
+
+	}
+
+	// no waitfor
+	maxtries = 5
+	tries = 0
+	err = WhileSuccessfulWithNotify(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any error")
+		}
+	}, 50*time.Millisecond, -1, notify)
+	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.NotEqual(t, tries, maxtries)
+
+	maxtries = 5
+	tries = 0
+	err = WhileSuccessfulWithNotify(func() error {
+		tries = tries + 1
+		if tries >= maxtries {
+			return nil
+		} else {
+			return errors.New("Any error")
+		}
+	}, 50*time.Millisecond, -1, notify)
+	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.NotEqual(t, tries, maxtries)
+
+}
+
+func Test_DefaultNotifier(t *testing.T) {
+
+	forensics := os.Getenv("SAFESCALE_FORENSICS")
+	os.Setenv("SAFESCALE_FORENSICS", "test")
+	d := DefaultNotifier()
+	n := Try{Err: errors.New("nope"), Count: 0}
+	log := tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	n = Try{Count: 2}
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Undecided)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Abort)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	os.Setenv("SAFESCALE_FORENSICS", forensics)
+
+}
+
+func Test_DefaultMetadataNotifier(t *testing.T) {
+
+	d := DefaultMetadataNotifier("metaID")
+	n := Try{Err: errors.New("nope"), Count: 0}
+	log := tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Undecided)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Abort)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+
+}
+
+func Test_DefaultNotifierWithContext(t *testing.T) {
+
+	ctx := context.Background()
+	d, err := DefaultNotifierWithContext(ctx)
+	require.EqualValues(t, err, nil)
+
+	n := Try{}
+	log := tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+
+	forensics := os.Getenv("SAFESCALE_FORENSICS")
+	os.Setenv("SAFESCALE_FORENSICS", "test")
+
+	n = Try{Err: errors.New("nope"), Count: 0}
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Retry)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Done)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Undecided)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+	log = tests.LogrusCapture(func() {
+		d(n, verdict.Abort)
+	})
+	require.EqualValues(t, strings.TrimSpace(log), "")
+
+	os.Setenv("SAFESCALE_FORENSICS", forensics)
+
+}
+
+// --------------------------------------------------------------------------------------------------------
 
 func quickSleepy() error {
 	fmt.Println("Quick OK")
@@ -61,8 +671,8 @@ func complexSleepyFailure() error {
 	return fail.NotFoundError("Not here")
 }
 
-func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
-	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+func CreateErrorWithNConsequences(n uint) (ferr fail.Error) {
+	xerr := WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -72,8 +682,8 @@ func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
 	return xerr
 }
 
-func CreateSkippableError() (xerr fail.Error) {
-	xerr = WhileSuccessful(
+func CreateSkippableError() (ferr fail.Error) {
+	xerr := WhileSuccessful(
 		func() error {
 			fmt.Println("Around the world...")
 			return StopRetryError(fail.NotFoundError("wrong place"), "no more")
@@ -82,8 +692,8 @@ func CreateSkippableError() (xerr fail.Error) {
 	return xerr
 }
 
-func CreateSkippableErrorBis() (xerr fail.Error) {
-	xerr = WhileSuccessful(
+func CreateSkippableErrorBis() (ferr fail.Error) {
+	xerr := WhileSuccessful(
 		func() error {
 			fmt.Println("Around the world...")
 			return StopRetryError(fail.AbortedError(fail.NotFoundError("wrong place"), "indeed"), "no more")
@@ -92,8 +702,8 @@ func CreateSkippableErrorBis() (xerr fail.Error) {
 	return xerr
 }
 
-func CreateComplexErrorWithNConsequences(n uint) (xerr fail.Error) {
-	xerr = WhileUnsuccessful(complexSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+func CreateComplexErrorWithNConsequences(n uint) (ferr fail.Error) {
+	xerr := WhileUnsuccessful(complexSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -111,37 +721,37 @@ func JustThrowError() fail.Error {
 	return abstract.ResourceDuplicateError("host", "boo")
 }
 
-func JustThrowComplexError() (xerr fail.Error) {
-	xerr = abstract.ResourceDuplicateError("host", "booboo")
+func JustThrowComplexError() (ferr fail.Error) {
+	xerr := abstract.ResourceDuplicateError("host", "booboo")
 	_ = xerr.AddConsequence(fmt.Errorf("cleanup error"))
 	return xerr
 }
 
-func CreateDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
+func CreateDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				_ = xerr.AddConsequence(nerr)
+				_ = ferr.AddConsequence(nerr)
 			}
 		}
 	}()
 
-	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+	xerr := WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	return xerr
 }
 
-func CreateWrappedDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
+func CreateWrappedDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				_ = xerr.AddConsequence(nerr)
+				_ = ferr.AddConsequence(nerr)
 			}
 		}
 	}()
 
-	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
+	xerr := WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	return xerr
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,22 +19,20 @@ package listeners
 import (
 	"context"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -69,8 +67,8 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 }
 
 // PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -95,10 +93,10 @@ type JobManagerListener struct {
 // func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot stop job")
-	defer fail.OnPanic(&err)
+func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot stop job")
+	defer fail.OnPanic(&ferr)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -109,10 +107,6 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	uuid := in.Uuid
@@ -128,7 +122,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer := debug.NewTracer(task, true, "('%s')", uuid).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
@@ -158,10 +152,6 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
@@ -171,7 +161,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := JobManagerHandler(tenant.GetService)
+	// handler := JobManagerHandler(tenant.Service)
 	jobMap := server.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {

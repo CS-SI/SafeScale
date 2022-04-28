@@ -1,3 +1,22 @@
+//go:build integration
+// +build integration
+
+/*
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package main
 
 import (
@@ -7,18 +26,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/integrationtests/enums/providers"
 )
 
-func Test_ApacheIgnite(t *testing.T) {
-	integrationtests.ApacheIgnite(t, providers.OVH)
-}
-
 func Test_Helm(t *testing.T) {
 	integrationtests.Helm(t, providers.OVH)
 }
 
 func Test_Kubernetes(t *testing.T) {
 	integrationtests.Kubernetes(t, providers.OVH)
-}
-
-func Test_Spark(t *testing.T) {
-	integrationtests.Spark(t, providers.OVH)
 }

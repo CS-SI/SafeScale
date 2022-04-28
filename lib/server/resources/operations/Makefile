@@ -1,10 +1,8 @@
 include ../../../../common.mk
 
-.PHONY:	clean generate vet
+.PHONY:	clean vet
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
-
-all: generate
 
 generate: clean
 	@:

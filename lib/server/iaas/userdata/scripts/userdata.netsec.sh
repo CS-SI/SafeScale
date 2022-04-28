@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 # Script customized for {{.ProviderName}} driver
 
 {{.Header}}
+
+last_error=
 
 function print_error() {
   read -r line file <<< "$(caller)"
@@ -50,12 +52,35 @@ function failure() {
 }
 export -f failure
 
+function rv() {
+  declare -n ret=$1
+  local message=$3
+  ret=$message
+  return $2
+}
+
+function return_failure() {
+  rv last_error $1 "$2"
+}
+export -f return_failure
+
 # Redirects outputs to /opt/safescale/var/log/user_data.netsec.log
 LOGFILE=/opt/safescale/var/log/user_data.netsec.log
 
 ### All output to one file and all output to the screen
+{{- if .Debug }}
+if [[ -e /home/{{.Username}}/tss ]]; then
+  exec > >(/home/{{.Username}}/tss | tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+else
+  exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+fi
+{{- else }}
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- end }}
+
 set -x
+
+date
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
 uptime > /opt/safescale/var/state/user_data.netsec.done
@@ -70,15 +95,10 @@ function reset_fw() {
   case $LINUX_KIND in
   debian)
     echo "Reset firewall"
-    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 207 "reset_fw(): failure running apt update"
-    if [[ $(lsb_release -rs | cut -d. -f1) -eq 10 ]]; then
-      codename=$(sfGetFact "linux_codename")
-      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports iptables" || failure 208 "reset_fw(): failure installing iptables"
-      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld" || failure 209 "reset_fw(): failure installing firewalld"
-    else
-      sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 210 "reset_fw(): failure installing iptables"
-      sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 211 "reset_fw(): failure installing firewalld"
-    fi
+    sfRetry4 "sfApt update" || failure 207 "reset_fw(): failure running apt update"
+    sfRetry4 "sfApt -y autoclean autoremove" || failure 210 "reset_fw(): failure running cleanup"
+    sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 210 "reset_fw(): failure installing iptables"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 211 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -87,14 +107,15 @@ function reset_fw() {
     systemctl is-enabled ufw &> /dev/null && {
       systemctl disable ufw || true # set to true to fix issues
     }
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null" || failure 212 "reset_fw(): failure purging ufw"
+    dpkg --purge --force-remove-reinstreq ufw &>/dev/null || failure 212 "reset_fw(): failure purging ufw"
     ;;
 
   ubuntu)
     echo "Reset firewall"
-    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 213 "reset_fw(): failure running apt update"
-    sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 214 "reset_fw(): failure installing iptables"
-    sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 215 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt update" || failure 213 "reset_fw(): failure running apt update"
+    sfRetry4 "sfApt -y autoclean autoremove" || failure 213 "reset_fw(): failure running cleanup"
+    sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 214 "reset_fw(): failure installing iptables"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 215 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -103,7 +124,7 @@ function reset_fw() {
     systemctl is-enabled ufw &> /dev/null && {
       systemctl disable ufw || true # set to true to fix issues
     }
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null" || failure 216 "reset_fw(): failure purging ufw"
+    dpkg --purge --force-remove-reinstreq ufw &>/dev/null || failure 216 "reset_fw(): failure purging ufw"
     ;;
 
   redhat | rhel | centos | fedora)
@@ -111,7 +132,11 @@ function reset_fw() {
     if ! systemctl is-active firewalld &> /dev/null; then
       if ! systemctl status firewalld &> /dev/null; then
         is_network_reachable || failure 219 "reset_fw(): failure installing firewalld because repositories are not reachable"
-        sfRetryEx 3m 5 "sfYum install -q -y firewalld" || failure 220 "reset_fw(): failure installing firewalld"
+        if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
+          sudo dnf config-manager -y --disable epel-modular
+          sudo dnf config-manager -y --disable epel
+        fi
+        sfRetry4 "sfYum install -q -y firewalld python3 python3-pip" || failure 220 "reset_fw(): failure installing firewalld"
       fi
     fi
     ;;
@@ -126,12 +151,10 @@ function reset_fw() {
 
   # Attach Internet interface or source IP to zone public if host is gateway
   [[ ! -z ${PU_IF} ]] && {
-    # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
     firewall-offline-cmd --zone=public --add-interface=${PU_IF} || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding interfaces"
   }
   {{- if or .PublicIP .IsGateway }}
   [[ -z ${PU_IF} ]] && {
-    # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
     firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || failure 222 "reset_fw(): firewall-offline-cmd failed with $? adding sources"
   }
   {{- end }}
@@ -142,12 +165,10 @@ function reset_fw() {
   # Attach LAN interfaces to zone trusted
   [[ ! -z ${PR_IFs} ]] && {
     for i in ${PR_IFs}; do
-      # sfFirewallAdd --zone=trusted --add-interface=${PR_IFs} || return 1
       firewall-offline-cmd --zone=trusted --add-interface=${PR_IFs} || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding ${PR_IFs} to trusted"
     done
   }
   # Attach lo interface to zone trusted
-  # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
   firewall-offline-cmd --zone=trusted --add-interface=lo || failure 225 "reset_fw(): firewall-offline-cmd failed with $? adding lo to trusted"
 
   # Allow service ssh on public zone
@@ -202,7 +223,7 @@ FEN=
 # Don't update default route
 function configure_dhclient() {
   # kill any dhclient process already running
-  pkill dhclient || true
+  sudo pkill dhclient || true
 
   [ -f /etc/dhcp/dhclient.conf ] && (sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf || true)
 
@@ -216,7 +237,7 @@ function configure_dhclient() {
 			{{- if .AddGateway }}
 			unset new_routers
 			{{- end}}
-		EOF
+EOF
     chmod +x $HOOK_FILE
   fi
 }
@@ -337,13 +358,13 @@ function ensure_curl_is_installed() {
       return 0
     fi
     DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt-get update || return 1
-    DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt-get install -y curl || return 1
+    DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt-get install --no-install-recommends -y curl || return 1
     ;;
   redhat | rhel | centos | fedora)
     if [[ -n $(which curl) ]]; then
       return 0
     fi
-    sfRetryEx 3m 5 "sfYum install -y -q curl &>/dev/null" || return 1
+    sfRetry4 "sfYum install -y -q curl &>/dev/null" || return 1
     ;;
   *)
     failure 216 "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -373,12 +394,12 @@ function ensure_network_connectivity() {
   [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
 
   {{- if .AddGateway }}
-  if [[ -n $(which route) ]]; then
-    route del -net default &> /dev/null
-    route add -net default gw {{ .DefaultRouteIP }}
+  if [[ -n $(PATH=$PATH:/usr/sbin:/sbin which route) ]]; then
+    PATH=$PATH:/usr/sbin:/sbin sudo route del -net default &> /dev/null
+    PATH=$PATH:/usr/sbin:/sbin sudo route add -net default gw {{ .DefaultRouteIP }}
   else
-    ip route del default
-    ip route add default via {{ .DefaultRouteIP }}
+    PATH=$PATH:/usr/sbin:/sbin sudo ip route del default
+    PATH=$PATH:/usr/sbin:/sbin sudo ip route add default via {{ .DefaultRouteIP }}
   fi
   {{- else }}
   :
@@ -423,22 +444,30 @@ function install_route_if_needed() {
   case $LINUX_KIND in
   debian)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfApt install -y net-tools" || return 1
+      for iter in {1..4}
+      do
+        sfApt install -y --no-install-recommends net-tools && break
+        [[ "$iter" == '4' ]] && return 1
+      done
     fi
     ;;
   ubuntu)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfApt install -y net-tools" || return 1
+      for iter in {1..4}
+      do
+        sfApt install -y --no-install-recommends net-tools && break
+        [[ "$iter" == '4' ]] && return 1
+      done
     fi
     ;;
   redhat | rhel | centos)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfYum install -y net-tools" || return 1
+      sfRetry4 "sfYum install -y net-tools" || return 1
     fi
     ;;
   fedora)
     if [[ -z $(which route) ]]; then
-      sfRetryEx 3m 5 "sfYum install -y net-tools" || return 1
+      sfRetry4 "sfYum install -y net-tools" || return 1
     fi
     ;;
   *)
@@ -453,7 +482,7 @@ function allow_custom_env_ssh_vars() {
   cat >> /etc/ssh/sshd_config <<- EOF
 		AcceptEnv SAFESCALESSHUSER
 		AcceptEnv SAFESCALESSHPASS
-	EOF
+EOF
   systemctl reload sshd
 }
 
@@ -518,7 +547,7 @@ function configure_network_debian() {
       cat > ${path}/10-${IF}-public.cfg <<- EOF
 				auto ${IF}
 				iface ${IF} inet dhcp
-			EOF
+EOF
     else
       cat > ${path}/11-${IF}-private.cfg <<- EOF
 				auto ${IF}
@@ -526,9 +555,30 @@ function configure_network_debian() {
 				{{- if .AddGateway }}
 					up route add -net default gw {{ .DefaultRouteIP }}
 				{{- end}}
-			EOF
+EOF
     fi
   done
+
+  {{- if .IsGateway }}
+  {{- else }}
+  for IF in ${NICS}; do
+    if [[ "$IF" == "$PU_IF" ]]; then
+      :
+    else
+      local tmppath=/tmp
+      local altpath=/etc/network/if-up.d
+      cat <<- EOF > ${tmppath}/my-route
+			#!/bin/sh
+			if [ "\${IFACE}" = "${IF}" ]; then
+			  ip route add default via {{ .DefaultRouteIP }}
+			  sudo /usr/sbin/resolvconf -u
+			fi
+EOF
+      sudo cp ${tmppath}/my-route ${altpath}/my-route
+      sudo chmod 751 ${altpath}/my-route
+    fi
+  done
+  {{- end }}
 
   echo "Looking for network..."
   check_for_network || {
@@ -537,7 +587,7 @@ function configure_network_debian() {
 
   configure_dhclient
 
-  /sbin/dhclient || true
+  sudo /sbin/dhclient || true
 
   echo "Looking for network..."
   check_for_network || {
@@ -545,6 +595,8 @@ function configure_network_debian() {
   }
 
   systemctl restart networking
+
+  PATH=$PATH:/usr/sbin:/sbin sudo dhclient || true
 
   echo "Looking for network..."
   check_for_network || {
@@ -589,7 +641,7 @@ function configure_network_systemd_networkd() {
 				      dhcp4-overrides:
 				          use-dns: false
 				          use-routes: true
-			EOF
+EOF
     else
       cat <<- EOF > /etc/netplan/11-${IF}-private.yaml
 				network:
@@ -613,9 +665,36 @@ function configure_network_systemd_networkd() {
 				{{- else }}
 				        use-routes: true
 				{{- end}}
-			EOF
+EOF
     fi
   done
+
+  {{- if .IsGateway }}
+  {{- else }}
+  case $LINUX_KIND in
+  debian)
+    for IF in ${NICS}; do
+      if [[ "$IF" == "$PU_IF" ]]; then
+        :
+      else
+        local tmppath=/tmp
+        local altpath=/etc/network/if-up.d
+        cat <<- EOF > ${tmppath}/my-route
+				#!/bin/sh
+				if [ "\${IFACE}" = "${IF}" ]; then
+				  ip route add default via {{ .DefaultRouteIP }}
+				  sudo /usr/sbin/resolvconf -u
+				fi
+EOF
+        sudo cp ${tmppath}/my-route ${altpath}/my-route
+        sudo chmod 751 ${altpath}/my-route
+      fi
+    done
+    ;;
+  *);;
+  esac
+
+  {{- end }}
 
   if [[ "{{.ProviderName}}" == "aws" ]]; then
     echo "It actually IS AWS"
@@ -644,7 +723,7 @@ function configure_network_systemd_networkd() {
 						      dhcp4-overrides:
 						          use-dns: true
 						          use-routes: true
-					EOF
+EOF
         else
           cat <<- EOF > /etc/netplan/11-${IF}-private.yaml
 						network:
@@ -668,7 +747,7 @@ function configure_network_systemd_networkd() {
 						{{- else }}
 						        use-routes: true
 						{{- end}}
-					EOF
+EOF
         fi
       done
     fi
@@ -801,7 +880,7 @@ function configure_network_redhat_without_nmcli() {
   stop_svc NetworkManager &> /dev/null
   disable_svc NetworkManager &> /dev/null
   if [[ ${FEN} -eq 0 ]]; then
-    sfRetryEx 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
+    sfRetry4 "sfYum remove -y NetworkManager &>/dev/null"
     echo "exclude=NetworkManager" >> /etc/yum.conf
 
     if which dnf; then
@@ -813,8 +892,8 @@ function configure_network_redhat_without_nmcli() {
         firewall-cmd --complete-reload
       }
     else
-      yum install -q -y network-scripts || {
-        yum install -q -y NetworkManager-config-routing-rules
+      sfYum install -q -y network-scripts || {
+        sfYum install -q -y NetworkManager-config-routing-rules
         echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
         sysctl -w net.ipv4.ip_forward=1
         sysctl -p
@@ -822,7 +901,7 @@ function configure_network_redhat_without_nmcli() {
       }
     fi
   else
-    yum remove -y NetworkManager &> /dev/null
+    sfYum remove -y NetworkManager &> /dev/null
   fi
 
   # Configure all network interfaces in dhcp
@@ -833,7 +912,7 @@ function configure_network_redhat_without_nmcli() {
 				BOOTPROTO=dhcp
 				ONBOOT=yes
 				NM_CONTROLLED=no
-			EOF
+EOF
       {{- if .DNSServers }}
       i=1
       {{- range .DNSServers }}
@@ -867,10 +946,6 @@ function configure_network_redhat_without_nmcli() {
 
   echo "exclude=NetworkManager" >> /etc/yum.conf
   sleep 5
-
-  is_network_reachable || {
-    failure 206 "without network"
-  }
 
   reset_fw || failure 206 "problem resetting firewall"
 
@@ -955,10 +1030,10 @@ function check_for_network_refined() {
   [ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
 
   [ ! -z "$PU_IF" ] && {
-    sfRetryEx 3m 10 check_for_ip $PU_IF || return 1
+    sfRetry4 check_for_ip $PU_IF || return 1
   }
   for i in $PR_IFs; do
-    sfRetryEx 3m 10 check_for_ip $i || return 1
+    sfRetry4 check_for_ip $i || return 1
   done
   return 0
 }
@@ -984,7 +1059,7 @@ function configure_as_gateway() {
     cat > /etc/sysctl.d/21-gateway.conf <<- EOF
 			net.ipv4.ip_forward=1
 			net.ipv4.ip_nonlocal_bind=1
-		EOF
+EOF
     case $LINUX_KIND in
     ubuntu) systemctl restart systemd-sysctl ;;
     *) sysctl -p ;;
@@ -1005,7 +1080,12 @@ function configure_as_gateway() {
   # Allows default services on public zone
   firewall-offline-cmd --zone=public --add-service=ssh 2> /dev/null
   # Applies fw rules
-  # sfFirewallReload
+
+  # Update ssh port
+  [ ! -f /etc/firewalld/services/ssh.xml ] && [ -f /usr/lib/firewalld/services/ssh.xml ] && cp /usr/lib/firewalld/services/ssh.xml /etc/firewalld/services/ssh.xml
+  sed -i -E "s/<port(.*)protocol=\"tcp\"(.*)port=\"([0-9]+)\"(.*)\/>/<port\1protocol=\"tcp\"\2port=\"{{ .SSHPort }}\"\4\/>/gm" /etc/firewalld/services/ssh.xml
+  sed -i -E "s/<port(.*)port=\"([0-9]+)\"(.*)protocol=\"tcp\"(.*)\/>/<port\1port=\"{{ .SSHPort }}\"\3protocol=\"tcp\"\4\/>/gm" /etc/firewalld/services/ssh.xml
+  sfFirewallReload
 
   sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 208 "failure allowing tcp forwarding"
 
@@ -1048,13 +1128,13 @@ function configure_dns_fallback() {
   fi
   cat > /etc/resolv.conf <<- EOF
 		nameserver 1.1.1.1
-	EOF
+EOF
 
   cp /etc/resolv.conf /etc/resolv.conf.tested
   touch /etc/resolv.conf && sleep 2 || true
 
   # give it a try
-  sudo dhclient
+  PATH=$PATH:/usr/sbin:/sbin sudo dhclient
   sleep 2
 
   op=-1
@@ -1096,13 +1176,13 @@ function configure_dns_legacy() {
 		{{- else }}
 		nameserver 1.1.1.1
 		{{- end }}
-	EOF
+EOF
 
   cp /etc/resolv.conf /etc/resolv.conf.tested
   touch /etc/resolv.conf && sleep 2 || true
 
   # give it a try
-  sudo dhclient
+  PATH=$PATH:/usr/sbin:/sbin sudo dhclient
   sleep 2
 
   op=-1
@@ -1127,7 +1207,7 @@ function configure_dns_resolvconf() {
 		{{- else }}
 		nameserver 1.1.1.1
 		{{- end }}
-	EOF
+EOF
 
   resolvconf -u
   echo "done"
@@ -1150,7 +1230,7 @@ function configure_dns_systemd_resolved() {
     {{- end}}
     Cache=yes
     DNSStubListener=yes
-	EOF
+EOF
   systemctl restart systemd-resolved
   echo "done"
 }
@@ -1195,9 +1275,9 @@ function install_drivers_nvidia() {
   ubuntu)
     sfFinishPreviousInstall
     add-apt-repository -y ppa:graphics-drivers &> /dev/null
-    sfRetryEx 3m 5 "sfApt update" || failure 201 "apt update failed"
-    sfRetryEx 3m 5 "sfApt -y install nvidia-410 &>/dev/null" || {
-      sfRetryEx 3m 5 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
+    sfRetry4 "sfApt update" || failure 201 "apt update failed"
+    sfRetry4 "sfApt -y install nvidia-410 &>/dev/null" || {
+      sfRetry4 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
     }
     ;;
 
@@ -1206,11 +1286,11 @@ function install_drivers_nvidia() {
       echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >> /etc/modprobe.d/blacklist-nouveau.conf
       rmmod nouveau
     fi
-    sfRetryEx 3m 5 "sfApt update &>/dev/null"
-    sfRetryEx 3m 5 "sfApt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
+    sfRetry4 "sfApt update"
+    sfRetry4 "sfApt install -y --no-install-recommends dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
     dpkg --add-architecture i386 &> /dev/null
-    sfRetryEx 3m 5 "sfApt update &>/dev/null"
-    sfRetryEx 3m 5 "sfApt install -y lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
+    sfRetry4 "sfApt update"
+    sfRetry4 "sfApt install -y --no-install-recommends lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &> /dev/null || failure 204 "failure downloading nvidia installer"
     bash NVIDIA-Linux-x86_64-410.78.run -s || failure 205 "failure running nvidia installer"
     ;;
@@ -1221,7 +1301,7 @@ function install_drivers_nvidia() {
       dracut --force
       rmmod nouveau
     fi
-    sfRetryEx 3m 5 "sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null" || failure 206 "failure installing nvidia requirements"
+    sfRetry4 "sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null" || failure 206 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || failure 207 "failure downloading nvidia installer"
     # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
     if [ $(uname -r) == $(sfYum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
@@ -1235,16 +1315,6 @@ function install_drivers_nvidia() {
   esac
 }
 
-function disable_upgrades() {
-  case $LINUX_KIND in
-  ubuntu)
-    sfApt remove -y unattended-upgrades || true
-    ;;
-  *) ;;
-
-  esac
-}
-
 function early_packages_update() {
   # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
   cat > /etc/gai.conf <<- EOF
@@ -1252,7 +1322,7 @@ function early_packages_update() {
 		scopev4 ::ffff:169.254.0.0/112  2
 		scopev4 ::ffff:127.0.0.0/104    2
 		scopev4 ::ffff:0.0.0.0/96       14
-	EOF
+EOF
 
   case $LINUX_KIND in
   debian)
@@ -1262,9 +1332,15 @@ function early_packages_update() {
     # # Force use of IPv4 addresses when installing packages
     # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    sfApt update
+    sfApt update || {
+      echo "problem updating package repos"
+      return 209
+    }
     # Force update of systemd, pciutils
-    sfApt install -q -y systemd pciutils sudo || failure 209 "failure installing systemd and other basic requirements"
+    sfApt install -q -y systemd pciutils sudo || {
+      echo "failure installing systemd and other basic requirements"
+      return 209
+    }
     # systemd, if updated, is restarted, so we may need to ensure again network connectivity
     ensure_network_connectivity
     ;;
@@ -1276,35 +1352,57 @@ function early_packages_update() {
     # # Force use of IPv4 addresses when installing packages
     # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    disable_upgrades
-
-    sfApt update || failure 210 "problem updating package repos"
+    sfApt update || {
+      echo "problem updating package repos"
+      return 210
+    }
     # Force update of systemd, pciutils and netplan
 
     if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-      sfApt install -y --force-yes pciutils || failure 210 "problem installing pciutils"
+      sfApt install -y --no-install-recommends pciutils || {
+        echo "problem installing pciutils"
+        return 210
+      }
       if [[ ! -z ${FEN} && ${FEN} -eq 0 ]]; then
         which netplan || {
-          sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
+          sfApt install -y --no-install-recommends netplan.io || {
+            echo "problem installing netplan.io"
+            return 210
+          }
         }
       else
-        sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
+        sfApt install -y --no-install-recommends netplan.io || {
+          echo "problem installing netplan.io"
+          return 210
+        }
       fi
       # netplan.io may break networking... So ensure networking is working as expected
       ensure_network_connectivity
-      sfApt install -y --force-yes sudo || failure 210 "problem installing sudo"
+      sfApt install -y --no-install-recommends sudo || {
+        echo "problem installing sudo"
+        return 210
+      }
     else
-      sfApt install -y systemd pciutils sudo || failure 211
+      sfApt install -y --no-install-recommends systemd pciutils sudo || {
+        echo "problem installing pciutils and sudo"
+        return 211
+      }
     fi
 
     if dpkg --compare-versions $(sfGetFact "linux_version") ge 20.04; then
       if [ "{{.ProviderName}}" == "aws" ]; then
         : # do nothing
       else
-        sfApt install -y --force-yes systemd || failure 210 "problem installing systemd"
+        sfApt install -y --no-install-recommends systemd || {
+          echo "problem installing systemd"
+          return 210
+        }
       fi
     else
-      sfApt install -y --force-yes systemd || failure 210 "problem installing systemd"
+      sfApt install -y --no-install-recommends systemd || {
+        echo "problem installing systemd"
+        return 210
+      }
       # systemd, if updated, is restarted, so we may need to ensure again network connectivity
       ensure_network_connectivity
     fi
@@ -1318,12 +1416,15 @@ function early_packages_update() {
     # echo "ip_resolve=4" >>/etc/yum.conf
 
     # Force update of systemd and pciutils
-    yum install -q -y systemd pciutils yum-utils sudo || failure 212 "failure installing systemd and other basic requirements"
+    sfYum install -q -y systemd pciutils yum-utils sudo || {
+      echo "failure installing systemd and other basic requirements"
+      return 212
+    }
     # systemd, if updated, is restarted, so we may need to ensure again network connectivity
     ensure_network_connectivity
 
     # # install security updates
-    # yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
+    # sfYum install -y yum-plugin-security yum-plugin-changelog && sfYum update -y --security
     ;;
   esac
   sfProbeGPU
@@ -1332,10 +1433,14 @@ function early_packages_update() {
 function install_packages() {
   case $LINUX_KIND in
   ubuntu | debian)
-    sfApt install -y -qq wget curl jq zip unzip time at &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
+    sfApt install -y -qq --no-install-recommends wget curl jq zip unzip time at &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
     ;;
   redhat | centos)
-    yum install --enablerepo=epel -y -q wget curl jq zip unzip time at &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+    if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
+      sfYum install -y -q wget curl jq zip unzip time at &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+    else
+      sfYum install --enablerepo=epel -y -q wget curl jq zip unzip time at &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+    fi
     ;;
   *)
     failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
@@ -1357,8 +1462,19 @@ function install_rclone() {
       mandb
     ;;
   redhat | centos)
-    yum makecache fast || sfFail 192 "Problem updating sources"
-    yum install -y rclone || sfFail 192 "Problem installing node common requirements"
+    if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
+      curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip &&
+        unzip rclone-current-linux-amd64.zip &&
+        cp rclone-*-linux-amd64/rclone /usr/bin &&
+        mkdir -p /usr/share/man/man1 &&
+        cp rclone-*-linux-amd64/rclone.1 /usr/share/man/man1/ &&
+        rm -rf rclone-* &&
+        chown root:root /usr/bin/rclone &&
+        chmod 755 /usr/bin/rclone &&
+        mandb
+    else
+      sfYum install -y rclone || sfFail 192 "Problem installing node common requirements"
+    fi
     ;;
   fedora)
     dnf install -y rclone || sfFail 192 "Problem installing node common requirements"
@@ -1420,20 +1536,43 @@ function add_common_repos() {
   redhat | rhel | centos)
     if which dnf; then
       # Install EPEL repo ...
-      sfRetryEx 3m 5 "dnf install -y epel-release" || failure 217 "failure installing epel repo"
-      sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
+      if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
+        sudo bash -c "echo '8-stream' > /etc/yum/vars/releasever"
+        sfRetry4 "dnf install -y epel-release" || {
+          echo "failure installing custom epel repo"
+          return 217
+        }
+      else
+        sfRetry4 "dnf install -y epel-release" || {
+          echo "failure installing default epel repo"
+          return 217
+        }
+      fi
+      sfRetry4 "dnf makecache fast -y || dnf makecache -y" || {
+        echo "failure updating cache"
+        return 218
+      }
       # ... but don't enable it by default
       dnf config-manager --set-disabled epel &> /dev/null || true
     else
       # Install EPEL repo ...
-      sfRetryEx 3m 5 "yum install -y epel-release" || failure 217 "failure installing epel repo"
-      sfRetryEx 3m 5 "yum makecache fast || yum makecache" || failure 218 "failure updating cache"
+      sfRetry4 "yum install -y epel-release" || {
+        echo "failure installing epel repo"
+        return 217
+      }
+      sfRetry4 "yum makecache fast || yum makecache" || {
+        echo "failure updating cache"
+        return 218
+      }
       # ... but don't enable it by default
       yum-config-manager --disablerepo=epel &> /dev/null || true
     fi
     ;;
   fedora)
-    sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
+    sfRetry4 "dnf makecache fast -y || dnf makecache -y" || {
+      echo "failure updating cache"
+      return 218
+    }
     ;;
   esac
 }
@@ -1503,7 +1642,7 @@ function configure_root_password_if_needed() {
 function update_kernel_settings() {
   cat > /etc/sysctl.d/20-safescale.conf <<- EOF
 		vm.max_map_count=262144
-	EOF
+EOF
   case $LINUX_KIND in
   ubuntu) systemctl restart systemd-sysctl ;;
   *) sysctl -p ;;
@@ -1530,7 +1669,7 @@ function enable_at_daemon() {
         echo "@reboot sleep 30 && /usr/sbin/dhclient eth0"
       } | crontab -
     fi
-    sfRetryEx 1m 5 "service atd start" || true
+    sfRetry4 "service atd start" || true
     sleep 4
     ;;
   *) ;;
@@ -1565,16 +1704,21 @@ function check_unsupported() {
 
 # ---- Main
 check_unsupported
-#unsafe_update_credentials
 check_providers
+
+{{- if .Debug }}
+unsafe_update_credentials
+{{- else }}
 update_credentials
+{{- end }}
+
 configure_locale
 
 {{- if .IsGateway }}
-{{- else}}
+{{- else }}
 # Without the route in place, we won't have working DNS either, so we set the route first
 ensure_network_connectivity || echo "Network not ready yet: setting the route for machines other than the gateways"
-{{- end}}
+{{- end }}
 
 # Now, we can check if DNS works, if it's a gateway it should work every time; if not it depends on the previous route working
 check_dns_configuration && echo "DNS is ready" || echo "DNS NOT ready yet"
@@ -1588,23 +1732,24 @@ check_dns_configuration || {
 
 {{- if .IsGateway }}
 ensure_network_connectivity || echo "Network not ready yet"
-{{- end}}
+{{- end }}
 
+cr=-1
+ep=-1
 is_network_reachable && {
-  add_common_repos || failure 215 "failure adding common repos, 1st try"
-}
-is_network_reachable && {
-  early_packages_update || failure 215 "failure in early packages update, 1st try"
+  add_common_repos && cr=0 || echo "failure adding common repos, 1st try"
+  early_packages_update && ep=0 || echo "failure in early packages update, 1st try"
 }
 
 identify_nics
 configure_network || failure 215 "failure configuring network"
 is_network_reachable || failure 215 "network is NOT ready after trying changing its DNS and configuration"
 
-is_network_reachable && {
+[[ $cr -eq -1 ]] && {
   add_common_repos || failure 215 "failure adding common repos, 2nd try"
 }
-is_network_reachable && {
+
+[[ $ep -eq -1 ]] && {
   early_packages_update || failure 215 "failure in early packages update, 2nd try"
 }
 

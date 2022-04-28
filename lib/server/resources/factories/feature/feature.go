@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 package feature
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
@@ -25,7 +27,7 @@ import (
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(svc iaas.Service, name string) (resources.Feature, fail.Error) {
+func New(ctx context.Context, svc iaas.Service, name string) (resources.Feature, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -33,7 +35,7 @@ func New(svc iaas.Service, name string) (resources.Feature, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	feat, xerr := operations.NewFeature(svc, name)
+	feat, xerr := operations.NewFeature(ctx, svc, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -43,7 +45,7 @@ func New(svc iaas.Service, name string) (resources.Feature, fail.Error) {
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		if feat, xerr = operations.NewEmbeddedFeature(svc, name); xerr != nil {
+		if feat, xerr = operations.NewEmbeddedFeature(ctx, svc, name); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -52,6 +54,6 @@ func New(svc iaas.Service, name string) (resources.Feature, fail.Error) {
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(svc iaas.Service, name string) (resources.Feature, error) {
-	return operations.NewEmbeddedFeature(svc, name)
+func NewEmbedded(ctx context.Context, svc iaas.Service, name string) (resources.Feature, fail.Error) {
+	return operations.NewEmbeddedFeature(ctx, svc, name)
 }

@@ -1,4 +1,4 @@
-VERSION=21.11.0
+VERSION=21.11.1
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -59,6 +59,7 @@ BROWSER?=firefox
 GREP?=grep
 EGREP?=egrep
 CAT?=cat
+TAIL?=tail
 CUT?=cut
 AWK?=awk
 SED?=sed

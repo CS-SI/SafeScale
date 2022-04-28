@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/commonlog"
 )
 
-const outputStopwatchTemplate = "%s (elapsed: %s)"
+//go:generate minimock -o mocks/mock_stopwatch.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Stopwatch
 
 // Stopwatch interface to expose methods available for a stopwatch
 type Stopwatch interface {
@@ -122,7 +122,7 @@ func (sw *stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func
 	sw.Start()
 	return func() {
 		sw.Stop()
-		logLevelFn(fmt.Sprintf(outputStopwatchTemplate, out, FormatDuration(sw.GetDuration())))
+		logLevelFn(fmt.Sprintf("%s (elapsed: %s)", out, FormatDuration(sw.GetDuration()))) // nolint
 	}
 }
 

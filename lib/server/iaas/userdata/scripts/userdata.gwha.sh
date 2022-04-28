@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 # Script customized for {{.ProviderName}} driver
 
 {{.Header}}
+
+last_error=
 
 function print_error() {
   read -r line file <<< "$(caller)"
@@ -54,8 +56,19 @@ export -f fail
 LOGFILE=/opt/safescale/var/log/user_data.phase2.log
 
 ### All output to one file and all output to the screen
+{{- if .Debug }}
+if [[ -e /home/{{.Username}}/tss ]]; then
+  exec > >(/home/{{.Username}}/tss | tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+else
+  exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+fi
+{{- else }}
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- end }}
+
 set -x
+
+date
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'gwha' is already done (otherwise will deadlock)
 uptime > /opt/safescale/var/state/user_data.gwha.done
@@ -67,11 +80,11 @@ rm -f /opt/safescale/var/state/user_data.gwha.done
 function install_keepalived() {
   case $LINUX_KIND in
   ubuntu | debian)
-    sfApt update && sfApt -y install keepalived || return 1
+    sfApt install -y keepalived || return 1
     ;;
 
   redhat | centos)
-    yum install -q -y keepalived || return 1
+    sfYum install -q -y keepalived || return 1
     ;;
   *)
     echo "Unsupported Linux distribution '$LINUX_KIND'!"
@@ -93,8 +106,7 @@ function install_keepalived() {
 		    advert_int 2
 		    authentication {
 		        auth_type PASS
-		        auth_pass {{ .GatewayHAKeepalivedPassword }}
-		
+		        auth_pass "{{ .GatewayHAKeepalivedPassword }}"
 		    }
 		{{ if eq .IsPrimaryGateway true }}
 		    # Unicast specific option, this is the IP of the interface keepalived listens on

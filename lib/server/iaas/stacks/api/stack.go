@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
-//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api.Stack
+//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api.Stack
 
 // Stack is the interface to cloud stack
 type Stack interface {
@@ -39,17 +40,17 @@ type Stack interface {
 	ListRegions() ([]string, fail.Error)
 
 	// InspectImage returns the Image referenced by id
-	InspectImage(id string) (abstract.Image, fail.Error)
+	InspectImage(id string) (*abstract.Image, fail.Error)
 
 	// InspectTemplate returns the Template referenced by id
-	InspectTemplate(id string) (abstract.HostTemplate, fail.Error)
+	InspectTemplate(id string) (*abstract.HostTemplate, fail.Error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*abstract.KeyPair, fail.Error)
 	// InspectKeyPair returns the key pair identified by id
 	InspectKeyPair(id string) (*abstract.KeyPair, fail.Error)
 	// ListKeyPairs lists available key pairs
-	ListKeyPairs() ([]abstract.KeyPair, fail.Error)
+	ListKeyPairs() ([]*abstract.KeyPair, fail.Error)
 	// DeleteKeyPair deletes the key pair identified by id
 	DeleteKeyPair(id string) fail.Error
 
@@ -93,7 +94,7 @@ type Stack interface {
 	CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)
 	// InspectSubnet returns the network identified by id
 	InspectSubnet(id string) (*abstract.Subnet, fail.Error)
-	// InspectSubnetByName returns the network identified by name)
+	// InspectSubnetByName returns the network identified by 'name'
 	InspectSubnetByName(networkID, name string) (*abstract.Subnet, fail.Error)
 	// ListSubnets lists all subnets of a network (or all subnets if no networkRef is provided)
 	ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error)
@@ -147,7 +148,7 @@ type Stack interface {
 	// InspectVolume returns the volume identified by id
 	InspectVolume(id string) (*abstract.Volume, fail.Error)
 	// ListVolumes list available volumes
-	ListVolumes() ([]abstract.Volume, fail.Error)
+	ListVolumes() ([]*abstract.Volume, fail.Error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) fail.Error
 
@@ -156,23 +157,26 @@ type Stack interface {
 	// InspectVolumeAttachment returns the volume attachment identified by id
 	InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error)
 	// ListVolumeAttachments lists available volume attachment
-	ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error)
+	ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) fail.Error
 
 	// Migrate runs custom code without breaking Interfaces
 	Migrate(operation string, params map[string]interface{}) fail.Error
+
+	// Timings ...
+	Timings() (temporal.Timings, fail.Error)
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally
 type ReservedForProviderUse interface {
-	ListImages(all bool) ([]abstract.Image, fail.Error)                      // lists available OS images
-	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)            // lists available host templates
+	ListImages(all bool) ([]*abstract.Image, fail.Error)                     // lists available OS images
+	ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error)           // lists available host templates
 	GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error)   // Returns a read-only struct containing configuration options
 	GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) // Returns a read-only struct containing authentication options
 }
 
-// FullStack is the interface that MUST actually implement all the providers, don't do it, and we can encounter runtime panics
+// FullStack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
 type FullStack interface {
 	Stack
 	ReservedForProviderUse

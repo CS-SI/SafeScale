@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2022, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,30 @@ feature:
         cluster: all
 
     parameters:
-        - DockerComposeVersion=1.27.4
+        - name: DockerComposeVersion
+          value: latest
+          description: |-
+              docker-compose version to install (default: latest)
+          control: |
+              VERSION="{{.ParameterValue}}"
+              if [[ "latest" = "${VERSION}" ]]; then
+                  VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq -r .name") && op=$? || true
+                  [ $op -ne 0 ] && sfFail 192 "error getting latest docker-compose version"
+              fi
+              echo $VERSION
+              sfExit 0
+
+        - name: DockerHubUsername
+          value: ''
+          description: |-
+              Username to use to authenticate DockerHub (default: empty, disabling authentication)
+              Note: not handled yet
+
+        - name: DockerHubPassword
+          value: ''
+          description: |-
+              Password to use to authenticate DockerHub (default: empty, useless if DockerHubUsername is empty)
+              Note: not handle yet...
 
     install:
         bash:
@@ -93,10 +116,10 @@ feature:
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry "sfApt update"
-                                    sfRetry "sfApt remove -y docker docker-engine docker.io containerd runc"
+                                    sfRetry "dpkg --remove --force-remove-reinstreq docker docker-engine docker.io containerd runc"
                                     ;;
                                 centos|redhat)
-                                    sfRetry "yum remove -y docker docker-client ocker-client-latest \
+                                    sfRetry "yum remove -y docker docker-client docker-client-latest \
                                                                    docker-common docker-latest docker-latest-logrotate \
                                                                    docker-logrotate docker-engine"
                                     ;;
@@ -107,7 +130,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 192
+                                    sfFail 192 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
                             sfExit
@@ -120,20 +143,28 @@ feature:
                             nodes: all
                         run: |
                             case $LINUX_KIND in
-                                debian|ubuntu)
+                                debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes gnupg2 || sfApt install -qqy --force-yes gnupg"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "(apt-cache show gnupg2 && apt install -qqy gnupg2) || (apt-cache show gnupg && apt install -qqy gnupg)"
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    ;;
+                                ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
+                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update" || sfFail 192 "error updating"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
                                     ;;
                                 centos|redhat|rhel)
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 196 "error installing yum prerequisites"
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 197 "error adding docker-ce repo"
-                                    kop=0
                                     op=-1
                                     yum install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then
@@ -151,7 +182,6 @@ feature:
                                 fedora)
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 201
                                     sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo"
-                                    kop=0
                                     op=-1
                                     dnf install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then
@@ -183,9 +213,10 @@ feature:
                             op=-1
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
-                                VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
-                                [ $op -ne 0 ] && sfFail 206 "error getting last docker-compose version"
+                                VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq -r .name") && op=$? || true
+                                [ $op -ne 0 ] && sfFail 206 "error getting latest docker-compose version"
                             fi
+                            echo "docker-compose version=$VERSION"
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || sfFail 207 "error downloading last docker-compose ${VERSION}"
                             chmod +x docker-compose && mv docker-compose /usr/bin
@@ -318,7 +349,7 @@ feature:
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y docker-ce*
+                                    dpkg --purge --force-remove-reinstreq docker-ce*
                                     ;;
                                 centos|redhat|rhel)
                                     yum remove -y docker-ce*

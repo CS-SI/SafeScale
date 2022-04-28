@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,31 +23,32 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
-	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
-		return nullAKP, fail.InvalidInstanceError()
+func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAKP, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	var xerr fail.Error
 	akp, xerr = abstract.NewKeyPair(name)
 	if xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 	return akp, s.ImportKeyPair(akp)
 }
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
-func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -61,13 +62,12 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
-	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
-		return nullAKP, fail.InvalidInstanceError()
+func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
@@ -75,7 +75,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 
 	resp, xerr := s.rpcReadKeypairByName(id)
 	if xerr != nil {
-		return nullAKP, xerr
+		return nil, xerr
 	}
 
 	kp := abstract.KeyPair{
@@ -86,10 +86,9 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
-	var emptySlice []abstract.KeyPair
-	if s.IsNull() {
-		return emptySlice, fail.InvalidInstanceError()
+func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
@@ -97,12 +96,12 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 
 	resp, xerr := s.rpcReadKeypairs(nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
-	var kps []abstract.KeyPair
+	var kps []*abstract.KeyPair
 	for _, kp := range resp {
-		kps = append(kps, abstract.KeyPair{
+		kps = append(kps, &abstract.KeyPair{
 			ID:   kp.KeypairName,
 			Name: kp.KeypairName,
 		})
@@ -112,8 +111,8 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) DeleteKeyPair(name string) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

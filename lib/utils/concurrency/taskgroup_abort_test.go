@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,16 +30,16 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-func problemsHappen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func problemsHappen(t Task, parameters TaskParameters) (result TaskResult, ferr fail.Error) {
 	return heavyDutyTaskThatFails(40*time.Millisecond, true, true)
 }
 
-func happyPath(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func happyPath(t Task, parameters TaskParameters) (result TaskResult, ferr fail.Error) {
 	return heavyDutyTaskThatFails(40*time.Millisecond, true, false)
 }
 
 // this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' and checks if abortion is requested between operations
-func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, ferr fail.Error) {
 	var iRes int
 
 	defer func(err *fail.Error) {
@@ -48,13 +48,14 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
-	}(&xerr)
+	}(&ferr)
 
 	if t.Aborted() {
 		fmt.Println("Exiting before real execution")
 		return iRes, nil
 	}
 
+	var xerr fail.Error
 	_, xerr = heavyDutyTask(10*time.Millisecond, true)
 	if xerr != nil {
 		return nil, xerr
@@ -92,7 +93,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 }
 
 // this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' but doesn't care checking for abortion
-func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, ferr fail.Error) {
 	var iRes int
 
 	defer func(err *fail.Error) {
@@ -101,8 +102,9 @@ func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult,
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
-	}(&xerr)
+	}(&ferr)
 
+	var xerr fail.Error
 	_, xerr = heavyDutyTask(10*time.Millisecond, true)
 	if xerr != nil {
 		return nil, xerr
@@ -125,7 +127,7 @@ func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult,
 }
 
 // this function never returns, it just leaks
-func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, ferr fail.Error) {
 	var iRes int
 
 	defer func(err *fail.Error) {
@@ -134,7 +136,7 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
-	}(&xerr)
+	}(&ferr)
 
 	theCh := parameters.(chan string)
 

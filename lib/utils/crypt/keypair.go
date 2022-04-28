@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 )
 
 // GenerateRSAKeyPair creates a key pair
-func GenerateRSAKeyPair(name string) (privKey string, pubKey string, xerr fail.Error) {
+func GenerateRSAKeyPair(name string) (privKey string, pubKey string, ferr fail.Error) {
 	if name == "" {
 		return "", "", fail.InvalidParameterCannotBeEmptyStringError("name")
 	}

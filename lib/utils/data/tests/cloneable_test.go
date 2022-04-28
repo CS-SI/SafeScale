@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,15 @@ func TestEasyCloneable(t *testing.T) {
 	a.Content = "easy"
 	a.Rumba = 9
 
-	b := a.Clone().(*StructWithoutPointers)
+	at, err := a.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, ok := at.(*StructWithoutPointers)
+	if !ok {
+		t.Error("invalid cast")
+	}
 
 	a.Rumba = 3
 	ieq := reflect.DeepEqual(a, b)
@@ -67,7 +75,7 @@ func (m *Memoria) Replace(clonable data.Clonable) data.Clonable {
 }
 */
 
-// This test, if it succeeds, means the Replace implementation is defective
+// This test, if it succeeds, means the 'Replace' implementation is defective
 func TestDefectiveCloneableImplementation(t *testing.T) {
 	a := NewStructWithPointersAndDefectiveReplace()
 	a.Rumba = 9
@@ -77,7 +85,15 @@ func TestDefectiveCloneableImplementation(t *testing.T) {
 		"key2": "value2",
 	}
 
-	b := a.Clone().(*StructWithPointersAndDefectiveReplace)
+	at, err := a.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, ok := at.(*StructWithPointersAndDefectiveReplace)
+	if !ok {
+		t.Error("Invalid cast")
+	}
 
 	a.Rumba = 3
 	ieq := reflect.DeepEqual(a, b)
@@ -102,7 +118,15 @@ func TestValidCloneableImplementation(t *testing.T) {
 		"key2": "value2",
 	}
 
-	b := a.Clone().(*StructWithPointersAndCorrectReplace)
+	at, err := a.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	b, ok := at.(*StructWithPointersAndCorrectReplace)
+	if !ok {
+		t.Error("Invalid cast")
+	}
 
 	a.Rumba = 3
 	ieq := reflect.DeepEqual(a, b)

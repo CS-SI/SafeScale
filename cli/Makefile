@@ -8,6 +8,9 @@ vet:
 	@(cd safescale && $(MAKE) $@)
 	@(cd safescaled && $(MAKE) $@)
 
+beta:
+	@$(eval GO = "go1.18beta1")
+
 cli/safescale:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building binary safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd safescale && $(MAKE))

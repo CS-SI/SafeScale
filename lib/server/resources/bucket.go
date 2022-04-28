@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,22 +22,22 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
+
+// DISABLED go:generate minimock -o mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Bucket
 
 // Bucket GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {
 	Metadata
 	data.Identifiable
-	cache.Cacheable
 	observer.Observable
 
 	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
 	Create(ctx context.Context, name string) fail.Error
 	Delete(ctx context.Context) fail.Error
 	Mount(ctx context.Context, hostname string, path string) fail.Error
-	ToProtocol() (*protocol.BucketResponse, fail.Error)
+	ToProtocol(ctx context.Context) (*protocol.BucketResponse, fail.Error)
 	Unmount(ctx context.Context, hostname string) fail.Error
 }

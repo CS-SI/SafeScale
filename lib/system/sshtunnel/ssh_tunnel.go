@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/sanity-io/litter"
-	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -234,8 +234,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		tunnel.logf("ssh tunnel lifetime (%s): %s", tunnel.command, tunnel.timeTunnelRunning)
 	}(time.Now())
 
-	var quittingErr error
-
 	for {
 		if !tunnel.isOpen {
 			break
@@ -283,6 +281,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				defer OnPanic(&crash)
 
 				var fwErr error
+				var quittingErr error
 				for {
 					fwErr = tunnel.forward(conn)
 					if fwErr == nil {
@@ -336,14 +335,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		return fmt.Errorf("error closing the listener: %w", err)
 	}
 
-	if quittingErr != nil {
-		litter.Config.HidePrivateFields = false
-		tunnel.errorf("tunnel closed due to error: %s", litter.Sdump(quittingErr))
-	} else {
-		tunnel.logf("tunnel closed")
-	}
-
-	return quittingErr
+	return nil
 }
 
 func TunnelOptionWithDialTimeout(timeout time.Duration) Option {
@@ -719,7 +711,7 @@ func NewSSHTunnelWithLocalBinding(
 	return sshTunnel, nil
 }
 
-func setConnectionDeadlines(in net.Conn, read time.Duration, write time.Duration) (net.Conn, bool) {
+func setConnectionDeadlines(in net.Conn, read time.Duration, write time.Duration) (net.Conn, bool) { // nolint
 	var err error
 	if tcpConn, ok := in.(*net.TCPConn); ok {
 		failures := 0

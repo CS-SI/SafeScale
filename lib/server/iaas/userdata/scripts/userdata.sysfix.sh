@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 # Script customized for {{.ProviderName}} driver
 
 {{.Header}}
+
+last_error=
 
 function print_error() {
   read -r line file <<< "$(caller)"
@@ -54,8 +56,19 @@ export -f fail
 LOGFILE=/opt/safescale/var/log/user_data.sysfix.log
 
 ### All output to one file and all output to the screen
-exec > >(tee ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- if .Debug }}
+if [[ -e /home/{{.Username}}/tss ]]; then
+  exec > >(/home/{{.Username}}/tss | tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+else
+  exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+fi
+{{- else }}
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- end }}
+
 set -x
+
+date
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'sysfix' is already done (otherwise will deadlock)
 uptime > /opt/safescale/var/state/user_data.sysfix.done

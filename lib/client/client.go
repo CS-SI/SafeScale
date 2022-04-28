@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
@@ -56,8 +57,8 @@ type Session struct {
 
 // DefaultTimeout tells to use the timeout by default depending on context
 var (
-	DefaultConnectionTimeout = temporal.GetConnectSSHTimeout()
-	DefaultExecutionTimeout  = temporal.GetExecutionTimeout()
+	DefaultConnectionTimeout = temporal.SSHConnectionTimeout()
+	DefaultExecutionTimeout  = temporal.ExecutionTimeout()
 )
 
 const (
@@ -66,7 +67,8 @@ const (
 )
 
 // New returns an instance of safescale Client
-func New(server string) (_ *Session, xerr fail.Error) {
+func New(server string) (_ *Session, ferr fail.Error) {
+	var xerr fail.Error
 	// Validate server parameter (can be empty string...)
 	if server != "" {
 		if server, xerr = validateServerString(server); xerr != nil {
@@ -159,7 +161,7 @@ func (s *Session) Connect() {
 // dial returns a connection to GRPC server
 func dial(server string) *grpc.ClientConn {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	conn, err := grpc.Dial(server, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Fatalf("failed to connect to safescaled (%s): %v", server, err)
 	}

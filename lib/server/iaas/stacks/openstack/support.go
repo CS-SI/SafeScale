@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,11 +62,14 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, fail.Error) {
 }
 
 func reinterpretGophercloudErrorCode(gopherErr error, success []int64, transparent []int64, abort []int64, defaultHandler func(error) error) error {
-	if gopherErr == nil {
-		return nil
-	}
-
-	if code, err := GetUnexpectedGophercloudErrorCode(gopherErr); code != 0 && err == nil {
+	if gopherErr != nil {
+		code, err := GetUnexpectedGophercloudErrorCode(gopherErr)
+		if err != nil {
+			return gopherErr
+		}
+		if code == 0 {
+			return gopherErr
+		}
 		for _, tcode := range success {
 			if tcode == code {
 				return nil
@@ -91,8 +94,7 @@ func reinterpretGophercloudErrorCode(gopherErr error, success []int64, transpare
 
 		return defaultHandler(gopherErr)
 	}
-
-	return gopherErr
+	return nil
 }
 
 func defaultErrorInterpreter(inErr error) error { // nolint

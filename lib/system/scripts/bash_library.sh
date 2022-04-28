@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,10 +89,10 @@ export -f sfWaitForApt
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 function sfApt() {
   echo "waiting for apt lock..."
-  rc=-1
   sfWaitForApt
   [ $? -ne 0 ] && return $?
   echo "running apt " "$@"
+  rc=-1
   DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt -o Dpkg::Options::=--force-confnew "$@" && rc=$?
   [ $rc -eq -1 ] && return 1
   return $rc
@@ -327,6 +327,15 @@ function sfRetry {
 }
 export -f sfRetry
 
+function sfRetry4 {
+  for iter in {1..4}
+  do
+    $* && break
+    [[ "$iter" == '4' ]] && return 1
+  done
+  return 0
+}
+
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
 # Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dusb as dependency to
@@ -416,8 +425,8 @@ function sfInstall() {
   debian | ubuntu)
     export DEBIAN_FRONTEND=noninteractive
     export UCF_FORCE_CONFFNEW=1
-    sfRetryEx 5m 3 "sfApt update"
-    sfApt install $1 -y --force-yes || return 194
+    sfRetry4 "sfApt update"
+    sfApt install $1 -y || return 194
     command -v $1 || return 194
     ;;
   centos | rhel)
@@ -887,9 +896,15 @@ function sfIsPodRunning() {
 }
 export -f sfIsPodRunning
 
+# Returns the version corresponding to latest release
+function sfGitHubTagOfRelease() {
+  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/$3" | jq -r .tag_name
+}
+export -f sfGitHubTagOfRelease
+
 # Returns the tag name corresponding to latest release
 function sfGithubLastRelease() {
-  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/latest" | jq -r .tag_name
+  sfGitHubTagOfRelease $1 $2 latest
 }
 export -f sfGithubLastRelease
 
@@ -963,7 +978,7 @@ function sfDetectFacts() {
   redhat | rhel | centos | fedora)
     FACTS["redhat_like"]=1
     FACTS["debian_like"]=0
-    FACTS["docker_version"]=$(yum info docker-ce || true)
+    FACTS["docker_version"]=$(rpm -qi docker-ce 2> /dev/null | grep "^Version" | cut -d: -f2 || true)
     ;;
   debian | ubuntu)
     FACTS["redhat_like"]=0

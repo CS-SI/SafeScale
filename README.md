@@ -1,6 +1,20 @@
 # SafeScale: multicloud management platform
 
-SafeScale is an Infrastructure and Platform as a Code tool.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/CS-SI/SafeScale/blob/master/LICENSE)
+[![Version](https://img.shields.io/github/release/CS-SI/SafeScale.svg)](https://github.com/CS-SI/SafeScale/releases/latest)
+![Downloads](https://img.shields.io/github/downloads/CS-SI/SafeScale/total)
+
+![Contributors](https://img.shields.io/github/contributors/CS-SI/SafeScale)
+![Forks](https://img.shields.io/github/forks/CS-SI/SafeScale?style=flat)
+![Stars](https://img.shields.io/github/stars/CS-SI/SafeScale)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/CS-SI/SafeScale/v21)](https://goreportcard.com/report/github.com/CS-SI/SafeScale/v21)
+![Go Versions](https://img.shields.io/badge/go-1.16%2C1.17-brightgreen)
+![CodeSizeInBytes](https://img.shields.io/github/languages/code-size/CS-SI/SafeScale)
+
+[![Packages Documentation](https://img.shields.io/badge/go-documentation-blue.svg?label=packages)](https://pkg.go.dev/github.com/CS-SI/SafeScale/v21/lib)
+
+SafeScale is an Infrastructure and Platform as Code tool.
 
 ## Table of content
   - [Description](#description)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -36,7 +37,7 @@ const defaultSecurityGroupName = "default"
 // Parameter 'networkRef' is not used in Openstack (they are tenant-wide)
 func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -70,12 +71,11 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 // Returns nil, *fail.ErrDuplicate if already 1 security group exists with that name
 // Returns nil, *fail.ErrDuplicate(with a cause *fail.ErrDuplicate) if more than 1 security group exist with that name
 func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullASG, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	asg, xerr := s.InspectSecurityGroup(name)
@@ -89,12 +89,12 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
-			return nullASG, fail.DuplicateErrorWithCause(xerr, "more than one Security Group named '%s' found", name)
+			return nil, fail.DuplicateErrorWithCause(xerr, nil, "more than one Security Group named '%s' found", name)
 		default:
-			return nullASG, xerr
+			return nil, xerr
 		}
 	} else {
-		return nullASG, fail.DuplicateError("a security group named '%s' already exist", name)
+		return nil, fail.DuplicateError("a security group named '%s' already exist", name)
 	}
 
 	// create security group on provider side
@@ -114,7 +114,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 
 	// Starting from here, delete security group on error
@@ -129,27 +129,29 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	// In OpenStack, freshly created security group may contain default rules; we do not want them
 	asg, xerr = s.ClearSecurityGroup(asg)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 
 	// now adds security rules
 	asg.Rules = make(abstract.SecurityGroupRules, 0, len(rules))
 	for _, v := range rules {
 		if asg, xerr = s.AddRuleToSecurityGroup(asg, v); xerr != nil {
-			return nullASG, xerr
+			return nil, xerr
 		}
 	}
 	return asg, nil
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
+
+	var xerr fail.Error
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
 		if xerr != nil {
@@ -186,13 +188,12 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 
 // InspectSecurityGroup returns information about a security group
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, asgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 
 	var r *secgroups.SecGroup
@@ -222,37 +223,36 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		case *retry.ErrStopRetry:
 			cause := fail.ConvertError(xerr.Cause())
 			if _, ok := cause.(*fail.ErrNotFound); ok {
-				return nullASG, fail.NotFoundError("failed to query Security Group %s", asgLabel)
+				return nil, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 			}
-			return nullASG, cause
+			return nil, cause
 		case *fail.ErrNotFound:
-			return nullASG, fail.NotFoundError("failed to query Security Group %s", asgLabel)
+			return nil, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 		default:
-			return nullASG, xerr
+			return nil, xerr
 		}
 	}
 	if r == nil {
-		return nullASG, fail.NotFoundError("failed to find Security Group %s", asgLabel)
+		return nil, fail.NotFoundError("failed to find Security Group %s", asgLabel)
 	}
 
 	asg.ID = r.ID
 	asg.Name = r.Name
 	asg.Description = r.Description
 	if asg.Rules, xerr = toAbstractSecurityGroupRules(r.Rules); xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	return asg, nil
 }
 
 // ClearSecurityGroup removes all rules but keep group
 func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	asg, xerr = s.InspectSecurityGroup(asg.ID)
 	if xerr != nil {
@@ -374,15 +374,15 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 
 // AddRuleToSecurityGroup adds a rule to a security group
 // On success, return Security Group with added rule
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
+	var xerr fail.Error
 	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 
 	if !asg.IsConsistent() {
@@ -502,14 +502,15 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
+
+	var xerr fail.Error
 	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -518,7 +519,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		}
 	}
 	if rule == nil {
-		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
+		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
@@ -555,8 +556,8 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
 func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
-	if s.IsNull() {
-		return "", nil
+	if valid.IsNil(s) {
+		return "", fail.InvalidInstanceError()
 	}
 
 	cfg, err := s.GetRawConfigurationOptions()

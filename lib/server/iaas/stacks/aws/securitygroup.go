@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -32,7 +33,7 @@ import (
 // ListSecurityGroups lists existing security groups
 func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -58,12 +59,11 @@ func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, 
 // CreateSecurityGroup creates a security group
 // Note: parameter 'networkRef' is used in AWS, Security Groups scope is Network/VPC-wide.
 func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
-	nullSG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullSG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullSG, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
@@ -71,13 +71,13 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 
 	network, xerr := s.InspectNetwork(networkRef)
 	if xerr != nil {
-		return nullSG, xerr
+		return nil, xerr
 	}
 
 	// Create the security group with the VPC, name and description.
 	resp, xerr := s.rpcCreateSecurityGroup(aws.String(network.ID), aws.String(name), aws.String(description))
 	if xerr != nil {
-		return nullSG, fail.Wrap(xerr, "failed to create security group named '%s'", name)
+		return nil, fail.Wrap(xerr, "failed to create security group named '%s'", name)
 	}
 
 	defer func() {
@@ -142,11 +142,12 @@ func (s stack) fromAbstractSecurityGroupRules(asg abstract.SecurityGroup, in abs
 }
 
 // fromAbstractSecurityGroupRule converts an abstract.SecurityGroupRule to AWS ec2.IpPermission
-func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (_ *ec2.IpPermission, xerr fail.Error) {
+func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (_ *ec2.IpPermission, ferr fail.Error) {
 	var (
 		involved   []string
 		usesGroups bool
 	)
+	var xerr fail.Error
 	switch in.Direction {
 	case securitygroupruledirection.Ingress:
 		involved = in.Sources
@@ -208,14 +209,15 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if valid.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
+		var xerr fail.Error
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
 		if xerr != nil {
 			return xerr
@@ -230,13 +232,12 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 
 // InspectSecurityGroup returns information about a security group
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -252,7 +253,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 
 	if asg.Name != "" {
 		if asg.Network == "" {
-			return nullASG, fail.InvalidParameterError("sgParam", "field 'Network' cannot be empty string when using Security Group name")
+			return nil, fail.InvalidParameterError("sgParam", "field 'Network' cannot be empty string when using Security Group name")
 		}
 		resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(asg.Network), aws.String(asg.Name))
 		if xerr != nil {
@@ -261,11 +262,11 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return toAbstractSecurityGroup(resp)
 	}
 
-	return nullASG, fail.NotFoundError("failed to find Security Group %s", sgLabel)
+	return nil, fail.NotFoundError("failed to find Security Group %s", sgLabel)
 }
 
 // toAbstractSecurityGroup converts a security group coming from AWS to an abstracted Security Group
-func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, xerr fail.Error) {
+func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -275,6 +276,7 @@ func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, 
 		Name:        aws.StringValue(in.GroupName),
 		Description: aws.StringValue(in.Description),
 	}
+	var xerr fail.Error
 	out.Rules, xerr = toAbstractSecurityGroupRules(in)
 	if xerr != nil {
 		return nil, xerr
@@ -330,16 +332,15 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 }
 
 // InspectSecurityGroupByName inspects a security group identified by name
-func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.SecurityGroup, xerr fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.SecurityGroup, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if networkRef == "" {
-		return nullASG, fail.InvalidParameterError("networkRef", "cannot be empty string")
+		return nil, fail.InvalidParameterError("networkRef", "cannot be empty string")
 	}
 	if name == "" {
-		return nullASG, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	an, xerr := s.InspectNetwork(networkRef)
@@ -348,29 +349,28 @@ func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
 			if xerr != nil {
-				return nullASG, xerr
+				return nil, xerr
 			}
 		default:
-			return nullASG, xerr
+			return nil, xerr
 		}
 	}
 
 	resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(an.ID), aws.String(name))
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	return toAbstractSecurityGroup(resp)
 }
 
 // ClearSecurityGroup removes all rules but keep group
 func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -402,13 +402,12 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 
 // AddRuleToSecurityGroup adds a rule to a security group
 func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -417,7 +416,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		}
 	}
 	if rule == nil {
-		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
+		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -454,13 +453,12 @@ func (s stack) addRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPe
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
 func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	nullASG := abstract.NewSecurityGroup()
-	if s.IsNull() {
-		return nullASG, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nullASG, xerr
+		return nil, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -469,7 +467,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		}
 	}
 	if rule == nil {
-		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
+		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()

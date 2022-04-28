@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,22 +32,15 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // delete effectively remove a Security Group
 func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -177,7 +170,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 
 		// delete SecurityGroup resource
-		return deleteProviderSecurityGroup(instance.GetService(), abstractSG)
+		return deleteProviderSecurityGroup(instance.Service(), abstractSG)
 	})
 	if xerr != nil {
 		return xerr
@@ -192,15 +185,15 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 	// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)
 	removingNetworkAbstract := ctx.Value(CurrentNetworkAbstractContextKey)
 	if removingNetworkAbstract == nil {
-		return instance.updateNetworkMetadataOnRemoval(networkID)
+		return instance.updateNetworkMetadataOnRemoval(ctx, networkID)
 	}
 	return nil
 }
 
 // updateNetworkMetadataOnRemoval removes the reference to instance in Network metadata
-func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(networkID string) fail.Error {
+func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(ctx context.Context, networkID string) fail.Error {
 	// -- update Security Groups in Network metadata
-	networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
+	networkInstance, xerr := LoadNetwork(ctx, instance.Service(), networkID)
 	if xerr != nil {
 		return xerr
 	}
@@ -228,16 +221,16 @@ func (instance *SecurityGroup) unsafeClear() fail.Error {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.GetService().ClearSecurityGroup(asg)
+		_, innerXErr := instance.Service().ClearSecurityGroup(asg)
 		return innerXErr
 	})
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	xerr = rule.Validate()
+	xerr := rule.Validate()
 	if xerr != nil {
 		return xerr
 	}
@@ -248,7 +241,7 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.GetService().AddRuleToSecurityGroup(asg, rule)
+		_, innerXErr := instance.Service().AddRuleToSecurityGroup(asg, rule)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -259,28 +252,20 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 }
 
 // unsafeUnbindFromSubnet unbinds the security group from a subnet
-func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -301,7 +286,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.GetService().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
+			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -322,10 +307,10 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 
 // unsafeBindToSubnet binds the security group to a host
 // This method is called assuming Subnet resource is locked (so do not used the resource directly to prevent deadlock
-func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -338,26 +323,18 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 		return fail.InvalidParameterCannotBeNilError("subnetProps")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	switch enable {
 	case resources.SecurityGroupEnable:
@@ -410,21 +387,13 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 
 // unsafeBindToHost binds the security group to a host.
 // instance is not locked, it must have been done outside to prevent data races
-func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -470,7 +439,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := instance.GetService().BindSecurityGroupToHost(instance.GetID(), hostID)
+				xerr := instance.Service().BindSecurityGroupToHost(instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -483,7 +452,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				xerr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
+				xerr := instance.Service().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {

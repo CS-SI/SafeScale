@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,17 +24,17 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
+
+// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Volume -o mocks/mock_volume.go
 
 // Volume links Object Storage folder and getVolumes
 type Volume interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
-	cache.Cacheable
 
 	Attach(ctx context.Context, host Host, path, format string, doNotFormat, doNotMount bool) fail.Error // attaches a volume to a host
 	Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) fail.Error                   // walks through all the metadata objects in network
@@ -44,5 +44,5 @@ type Volume interface {
 	GetAttachments() (*propertiesv1.VolumeAttachments, fail.Error)                                       // returns the property containing where the volume is attached
 	GetSize() (int, fail.Error)                                                                          // returns the size of volume in GB
 	GetSpeed() (volumespeed.Enum, fail.Error)                                                            // returns the speed of the volume (more or less the type of hardware)
-	ToProtocol() (*protocol.VolumeInspectResponse, fail.Error)                                           // converts volume to equivalent protocol message
+	ToProtocol(ctx context.Context) (*protocol.VolumeInspectResponse, fail.Error)                        // converts volume to equivalent protocol message
 }

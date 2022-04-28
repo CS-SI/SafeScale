@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,14 @@ type ErrorLike interface {
 
 // IsError ...
 func IsError(err error) bool {
-	if err == nil {
-		return false
+	if err != nil {
+		ei, ok := err.(ErrorLike)
+		if !ok {
+			return true
+		}
+		return ei.IsError()
 	}
-	ei, ok := err.(ErrorLike)
-	if !ok {
-		return true
-	}
-	return ei.IsError()
+	return false
 }
 
 // Status interface

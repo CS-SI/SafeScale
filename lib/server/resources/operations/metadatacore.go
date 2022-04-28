@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,12 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	serializer "github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 const (
@@ -45,19 +44,18 @@ const (
 	byNameFolderName = "byName"
 
 	NullMetadataKind = "nil"
-	NullMetadataName = "<NullCore>"
-	NullMetadataID   = NullMetadataName
 )
 
 // MetadataCore contains the core functions of a persistent object
 type MetadataCore struct {
-	id   atomic.Value
-	name atomic.Value
+	id    atomic.Value
+	name  atomic.Value
+	taken atomic.Value
 
-	lock       sync.RWMutex
 	shielded   *shielded.Shielded
-	properties *serialize.JSONProperties
+	properties *serializer.JSONProperties
 	observers  map[string]observer.Observer
+	sync.RWMutex
 
 	kind              string
 	folder            MetadataFolder
@@ -66,41 +64,42 @@ type MetadataCore struct {
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
-func NullCore() *MetadataCore {
-	return &MetadataCore{kind: NullMetadataKind}
-}
-
 // NewCore creates an instance of MetadataCore
-func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
-		return NullCore(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if kind == "" {
-		return NullCore(), fail.InvalidParameterError("kind", "cannot be empty string")
+		return nil, fail.InvalidParameterError("kind", "cannot be empty string")
 	}
 	if path == "" {
-		return NullCore(), fail.InvalidParameterError("path", "cannot be empty string")
+		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
 	fld, xerr := NewMetadataFolder(svc, path)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return NullCore(), xerr
+		return nil, xerr
 	}
 
-	props, err := serialize.NewJSONProperties("resources." + kind)
+	props, err := serializer.NewJSONProperties("resources." + kind)
 	err = debug.InjectPlannedFail(err)
 	if err != nil {
-		return NullCore(), err
+		return nil, err
+	}
+
+	protected, cerr := shielded.NewShielded(instance)
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
 	}
 
 	c := MetadataCore{
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		shielded:   shielded.NewShielded(instance),
+		shielded:   protected,
 		observers:  map[string]observer.Observer{},
 	}
 	switch kind {
@@ -109,146 +108,162 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	default:
 		c.kindSplittedStore = true
 	}
+	c.taken.Store(false)
+
 	return &c, nil
 }
 
 // IsNull returns true if the MetadataCore instance represents the null value for MetadataCore
-func (c *MetadataCore) IsNull() bool {
-	return c == nil || (c.kind == "" || c.kind == NullMetadataKind || c.folder.IsNull() || (c.getID() == NullMetadataID && c.getName() == NullMetadataName))
+func (myself *MetadataCore) IsNull() bool {
+	return myself == nil || myself.kind == "" || myself.kind == NullMetadataKind
 }
 
-// GetService returns the iaas.GetService used to create/load the persistent object
-func (c *MetadataCore) GetService() iaas.Service {
-	if c == nil {
-		return nil
-	}
-
-	return c.folder.GetService()
+// Service returns the iaas.Service used to create/load the persistent object
+func (myself *MetadataCore) Service() iaas.Service {
+	return myself.folder.Service()
 }
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (c *MetadataCore) GetID() string {
-	if c == nil || c.IsNull() {
-		return NullMetadataID
-	}
-
-	return c.getID()
+func (myself *MetadataCore) GetID() string {
+	return myself.getID()
 }
 
-func (c *MetadataCore) getID() string {
-	id, ok := c.id.Load().(string)
-	if !ok {
-		return NullMetadataID
-	}
-
+func (myself *MetadataCore) getID() string {
+	id := myself.id.Load().(string) // nolint, better panic than error-hiding
 	return id
 }
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (c *MetadataCore) GetName() string {
-	if c == nil || c.IsNull() {
-		return NullMetadataName
-	}
-
-	return c.getName()
+func (myself *MetadataCore) GetName() string {
+	return myself.getName()
 }
 
-func (c *MetadataCore) getName() string {
-	name, ok := c.name.Load().(string)
-	if !ok {
-		return NullMetadataName
-	}
-
+func (myself *MetadataCore) getName() string {
+	name := myself.name.Load().(string) // nolint, better panic than error-hiding
 	return name
 }
 
-// GetKind returns the kind of object served
-func (c *MetadataCore) GetKind() string {
-	if c == nil {
-		return NullMetadataKind
+func (myself *MetadataCore) IsTaken() bool {
+	taken, ok := myself.taken.Load().(bool)
+	if !ok {
+		return false
 	}
-	return c.kind
+	return taken
+}
+
+// GetKind returns the kind of object served
+func (myself *MetadataCore) GetKind() string {
+	return myself.kind
 }
 
 // Inspect protects the data for shared read
-func (c *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
-	if c == nil || c.IsNull() {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-	if c.properties == nil {
-		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
+	if myself.properties == nil {
+		return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
+	}
+
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
 	}
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
-	c.lock.Lock()
-	xerr = c.reload()
-	c.lock.Unlock() // nolint
-	xerr = debug.InjectPlannedFail(xerr)
+	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		myself.Lock()
+		xerr = myself.unsafeReload()
+		myself.Unlock() // nolint
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to unsafeReload metadata")
+		}
+		return nil
+	},
+		timings.SmallDelay(),
+		timings.ContextTimeout(),
+		6)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to reload metadata")
+		return fail.ConvertError(xerr.Cause())
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return c.shielded.Inspect(func(clonable data.Clonable) fail.Error {
-		return callback(clonable, c.properties)
-	})
+	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
+			return callback(clonable, myself.properties)
+		})
+	},
+		timings.SmallDelay(),
+		timings.ConnectionTimeout(),
+		6)
+	if xerr != nil {
+		return fail.ConvertError(xerr.Cause())
+	}
+	return nil
 }
 
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// change thru time).
-func (c *MetadataCore) Review(callback resources.Callback) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+// change through time).
+func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if c == nil || c.IsNull() {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-	if c.properties == nil {
-		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
+	if myself.properties == nil {
+		return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return c.shielded.Inspect(func(clonable data.Clonable) fail.Error {
-		return callback(clonable, c.properties)
+	return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
+		return callback(clonable, myself.properties)
 	})
 }
 
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
-// - "Reload": bool = allow to disable reloading from Object Storage if set to false (default is true)
-func (c *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+// - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
+func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
-	if c == nil || c.IsNull() {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-	if c.shielded == nil {
-		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
+	if myself.shielded == nil {
+		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	// Make sure c.properties is populated
-	if c.properties == nil {
-		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+	if myself.getName() == "" || myself.getID() == "" {
+		return fail.InconsistentError("uninitalized metadata should not be altered")
+	}
+
+	// Make sure myself.properties is populated
+	if myself.properties == nil {
+		myself.properties, xerr = serializer.NewJSONProperties("resources." + myself.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -267,17 +282,17 @@ func (c *MetadataCore) Alter(callback resources.Callback, options ...data.Immuta
 			}
 		}
 	}
-	// Reload reloads data from objectstorage to be sure to have the last revision
+	// Reload reloads data from object storage to be sure to have the last revision
 	if doReload {
-		xerr = c.reload()
+		xerr = myself.unsafeReload()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to reload metadata")
+			return fail.Wrap(xerr, "failed to unsafeReload metadata")
 		}
 	}
 
-	xerr = c.shielded.Alter(func(clonable data.Clonable) fail.Error {
-		return callback(clonable, c.properties)
+	xerr = myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
+		return callback(clonable, myself.properties)
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -289,16 +304,16 @@ func (c *MetadataCore) Alter(callback resources.Callback, options ...data.Immuta
 		}
 	}
 
-	c.committed = false
+	myself.committed = false
 
-	xerr = c.write()
+	xerr = myself.write()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// notify observers there has been changed in the instance
-	return fail.ConvertError(c.notifyObservers())
+	return fail.ConvertError(myself.unsafeNotifyObservers())
 }
 
 // Carry links metadata with real data
@@ -308,41 +323,48 @@ func (c *MetadataCore) Alter(callback resources.Callback, options ...data.Immuta
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the MetadataCore instance already carries a data
-func (c *MetadataCore) Carry(clonable data.Clonable) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	// Note: do not test with IsNull() here, it MUST be null value on call
-	if c == nil {
+	if myself == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !c.IsNull() {
-		return fail.InvalidRequestError("cannot carry, already carries something")
+	if !valid.IsNil(myself) {
+		if myself.IsTaken() {
+			return fail.InvalidRequestError("cannot carry, already carries something")
+		}
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-	if c.shielded == nil {
-		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
+	if myself.shielded == nil {
+		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
 	}
-	if c.loaded {
+	if myself.loaded {
 		return fail.NotAvailableError("already carrying a value")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	c.shielded = shielded.NewShielded(clonable)
-	c.loaded = true
+	var cerr error
+	myself.shielded, cerr = shielded.NewShielded(clonable)
+	if cerr != nil {
+		return fail.Wrap(cerr)
+	}
+	myself.loaded = true
 
-	xerr = c.updateIdentity()
+	xerr = myself.updateIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	c.committed = false
+	myself.committed = false
 
-	xerr = c.write()
+	xerr = myself.write()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -352,92 +374,153 @@ func (c *MetadataCore) Carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // updateIdentity updates instance cached identity
-func (c *MetadataCore) updateIdentity() fail.Error {
-	if c.loaded {
-		return c.shielded.Inspect(func(clonable data.Clonable) fail.Error {
+func (myself *MetadataCore) updateIdentity() fail.Error {
+	if myself.loaded {
+		issue := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 			ident, ok := clonable.(data.Identifiable)
 			if !ok {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			if c.kindSplittedStore {
-				c.id.Store(ident.GetID())
+			if myself.kindSplittedStore {
+				myself.id.Store(ident.GetID())
 			} else {
-				c.id.Store(ident.GetName())
+				myself.id.Store(ident.GetName())
 			}
-			c.name.Store(ident.GetName())
+			myself.name.Store(ident.GetName())
+			myself.taken.Store(true)
 
 			return nil
 		})
+		if issue != nil {
+			return issue
+		}
+
+		// notify observers there has been changed in the instance
+		err := myself.unsafeNotifyObservers()
+		err = debug.InjectPlannedError(err)
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+		return nil
 	}
 
-	c.name.Store(NullMetadataName)
-	c.id.Store(NullMetadataID)
-
-	// notify observers there has been changed in the instance
-	err := c.notifyObservers()
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return fail.ConvertError(err)
-	}
-
-	return nil
+	return fail.InconsistentError("uninitialized data should NOT be updated")
 }
 
 // Read gets the data from Object Storage
-func (c *MetadataCore) Read(ref string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	// Note: do not test with .IsNull() here, it may be null value on first read
-	if c == nil {
+	if myself == nil {
 		return fail.InvalidInstanceError()
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
-	if c.loaded {
+	if myself.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	xerr = c.readByReference(ref)
-	xerr = debug.InjectPlannedFail(xerr)
+	bu, xerr := myself.folder.getBucket()
 	if xerr != nil {
 		return xerr
 	}
 
-	c.loaded = true
-	c.committed = true
+	if !myself.kindSplittedStore {
+		isName, xerr := myself.Service().HasObject(bu.GetName(), myself.folder.absolutePath("", ref))
+		if xerr != nil {
+			return xerr
+		}
 
-	return c.updateIdentity()
+		if isName {
+			xerr := myself.readByName(ref)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+
+			myself.loaded = true
+			myself.committed = true
+
+			return myself.updateIdentity()
+		}
+
+		return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.absolutePath("", ref))
+	}
+
+	isName, xerr := myself.Service().HasObject(bu.GetName(), myself.folder.absolutePath(byNameFolderName, ref))
+	if xerr != nil {
+		return xerr
+	}
+
+	if isName {
+		xerr := myself.readByName(ref)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	isID, xerr := myself.Service().HasObject(bu.GetName(), myself.folder.absolutePath(byIDFolderName, ref))
+	if xerr != nil {
+		return xerr
+	}
+
+	if isID {
+		xerr := myself.readByID(ref)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	if !isID && !isName {
+		return fail.NotFoundError("nor %s nor %s were found in the bucket", myself.folder.absolutePath(byNameFolderName, ref), myself.folder.absolutePath(byIDFolderName, ref))
+	}
+
+	myself.loaded = true
+	myself.committed = true
+
+	return myself.updateIdentity()
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) ReadByID(id string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Note: do not test with .IsNull() here, it may be null value on first read
-	if c == nil {
+	if myself == nil {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-	if c.loaded {
+	if myself.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 
-	if c.kindSplittedStore {
+	myself.Lock()
+	defer myself.Unlock()
+
+	if myself.kindSplittedStore {
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := c.readByID(id); innerXErr != nil {
+				if innerXErr := myself.readByID(id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
 						return retry.StopRetryError(innerXErr)
 					default:
 						return innerXErr
@@ -445,15 +528,17 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetContextTimeout(),
+			timings.SmallDelay(),
+			timings.ContextTimeout(),
 		)
 	} else {
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := c.readByName(id); innerXErr != nil {
+				if innerXErr := myself.readByName(id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
 						return retry.StopRetryError(innerXErr)
 					default:
 						return innerXErr
@@ -461,187 +546,200 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetContextTimeout(),
+			timings.SmallDelay(),
+			timings.ContextTimeout(),
 		)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
 		case *retry.ErrStopRetry:
-			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
 		default:
-			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(xerr, "failed to read %s by id %s", myself.kind, id)
 		}
 	}
 
-	c.loaded = true
-	c.committed = true
+	myself.loaded = true
+	myself.committed = true
 
-	return c.updateIdentity()
+	return myself.updateIdentity()
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (c *MetadataCore) readByID(id string) fail.Error {
+func (myself *MetadataCore) readByID(id string) fail.Error {
 	var path string
-	if c.kindSplittedStore {
+	if myself.kindSplittedStore {
 		path = byIDFolderName
 	}
-	return c.folder.Read(path, id, func(buf []byte) fail.Error {
-		if innerXErr := c.deserialize(buf); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrSyntax:
-				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
-			default:
-				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
-			}
-		}
-		return nil
-	})
-}
 
-// readByReference gets the data from Object Storage
-// First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
-func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
-	timeout := temporal.GetCommunicationTimeout()
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
 
-	xerr = retry.WhileUnsuccessful(
-		func() error {
-			if innerXErr := c.readByID(ref); innerXErr != nil {
-				innerXErr = debug.InjectPlannedFail(innerXErr)
+	rerr := retry.WhileUnsuccessful(func() error {
+		werr := myself.folder.Read(path, id, func(buf []byte) fail.Error {
+			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					if c.kindSplittedStore {
-						// Try to read by name
-						innerXErr = c.readByName(ref)
-						innerXErr = debug.InjectPlannedFail(innerXErr)
-					}
-					if innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrNotFound:
-							return retry.StopRetryError(innerXErr)
-						default:
-							return innerXErr
-						}
-					}
+				case *fail.ErrNotAvailable:
+					return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+				case *fail.ErrSyntax:
+					return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+				case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
+					return retry.StopRetryError(innerXErr)
 				default:
-					return innerXErr
+					return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
 				}
 			}
 			return nil
-		},
-		temporal.GetMinDelay(),
-		timeout,
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			return fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
-		case *retry.ErrStopRetry:
-			return fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s'", c.kind, ref)
-		case *fail.ErrNotFound:
-			return fail.Wrap(xerr, "failed to find metadata of %s '%s'", c.kind, ref)
-		default:
-			return fail.Wrap(xerr, "something failed reading metadata of %s '%s'", c.kind, ref)
+		})
+		if werr != nil {
+			switch werr.Cause().(type) {
+			case *fail.ErrNotFound:
+				return retry.StopRetryError(werr, "quit trying")
+			default:
+				return werr
+			}
 		}
+		return nil
+	},
+		timings.SmallDelay(),
+		timings.ContextTimeout())
+
+	if rerr != nil {
+		return fail.ConvertError(rerr.Cause())
 	}
+
 	return nil
+
 }
 
 // readByName reads a metadata identified by name
-func (c *MetadataCore) readByName(name string) fail.Error {
+func (myself *MetadataCore) readByName(name string) fail.Error {
 	var path string
-	if c.kindSplittedStore {
+	if myself.kindSplittedStore {
 		path = byNameFolderName
 	}
-	return c.folder.Read(path, name, func(buf []byte) fail.Error {
-		if innerXErr := c.deserialize(buf); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", c.kind, name)
+
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	rerr := retry.WhileUnsuccessful(func() error {
+		werr := myself.folder.Read(path, name, func(buf []byte) fail.Error {
+			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
+				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
+			}
+			return nil
+		})
+		if werr != nil {
+			switch werr.Cause().(type) {
+			case *fail.ErrNotFound:
+				return retry.StopRetryError(werr, "quit trying")
+			default:
+				return werr
+			}
 		}
 		return nil
-	})
+	},
+		timings.SmallDelay(),
+		timings.ContextTimeout())
+
+	if rerr != nil {
+		return fail.ConvertError(rerr.Cause())
+	}
+
+	return nil
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (c *MetadataCore) write() fail.Error {
-	if !c.committed {
-		jsoned, xerr := c.serialize()
+func (myself *MetadataCore) write() fail.Error {
+	if !myself.committed {
+		jsoned, xerr := myself.unsafeSerialize()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
-		name, ok := c.name.Load().(string)
+		name, ok := myself.name.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
 
-		if c.kindSplittedStore {
-			xerr = c.folder.Write(byNameFolderName, name, jsoned)
+		if myself.kindSplittedStore {
+			xerr = myself.folder.Write(byNameFolderName, name, jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
-			id, ok := c.id.Load().(string)
+			id, ok := myself.id.Load().(string)
 			if !ok {
 				return fail.InconsistentError("field 'id' is not set with string")
 			}
 
-			xerr = c.folder.Write(byIDFolderName, id, jsoned)
+			xerr = myself.folder.Write(byIDFolderName, id, jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		} else {
-			xerr = c.folder.Write("", name, jsoned)
+			xerr = myself.folder.Write("", name, jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		}
 
-		c.loaded = true
-		c.committed = true
+		myself.loaded = true
+		myself.committed = true
 	}
 	return nil
 }
 
 // Reload reloads the content from the Object Storage
-func (c *MetadataCore) Reload() (xerr fail.Error) {
-	if c == nil || c.IsNull() {
+func (myself *MetadataCore) Reload() (ferr fail.Error) {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	return c.reload()
+	return myself.unsafeReload()
 }
 
-// reload reloads the content from the Object Storage
+// unsafeReload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (c *MetadataCore) reload() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if c.loaded && !c.committed {
-		return fail.InconsistentError("cannot reload a not committed data")
+	timings, xerr := myself.Service().Timings()
+	if xerr != nil {
+		return xerr
 	}
 
-	if c.kindSplittedStore {
-		id, ok := c.id.Load().(string)
+	if myself.loaded && !myself.committed {
+		return fail.InconsistentError("cannot unsafeReload a not committed data")
+	}
+
+	if myself.kindSplittedStore {
+		id, ok := myself.id.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'id' is not set with string")
 		}
 
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := c.readByID(id); innerXErr != nil {
+				if innerXErr := myself.readByID(id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
 						return retry.StopRetryError(innerXErr)
 					default:
 						return innerXErr
@@ -649,22 +747,22 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			2*temporal.GetMetadataTimeout(),
+			timings.SmallDelay(),
+			2*timings.MetadataTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
-				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
+				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
 			case *retry.ErrStopRetry:
-				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
+				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
 			default:
-				return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
+				return fail.Wrap(xerr, "failed to read %s by id %s", myself.kind, myself.id)
 			}
 		}
 	} else {
-		name, ok := c.name.Load().(string)
+		name, ok := myself.name.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
@@ -674,9 +772,11 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := c.readByName(name); innerXErr != nil {
+				if innerXErr := myself.readByName(name); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
 						return retry.StopRetryError(innerXErr)
 					default:
 						return innerXErr
@@ -684,62 +784,62 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetContextTimeout(),
+			timings.SmallDelay(),
+			timings.ContextTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
-				return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to read %s '%s'", c.kind, name)
+				return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to read %s '%s'", myself.kind, name)
 			case *retry.ErrStopRetry:
-				return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", c.kind, name)
+				return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", myself.kind, name)
 			default:
-				return fail.Wrap(xerr, "failed to read %s '%s'", c.kind, name)
+				return fail.Wrap(xerr, "failed to read %s '%s'", myself.kind, name)
 			}
 		}
 	}
 
-	c.loaded = true
-	c.committed = true
+	myself.loaded = true
+	myself.committed = true
 
-	return fail.ConvertError(c.notifyObservers())
+	return fail.ConvertError(myself.unsafeNotifyObservers())
 }
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
-func (c *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if c == nil {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	if c.kindSplittedStore {
-		return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
+	if myself.kindSplittedStore {
+		return myself.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
 			return callback(buf)
 		})
 	}
-	return c.folder.Browse("", func(buf []byte) fail.Error {
+	return myself.folder.Browse("", func(buf []byte) fail.Error {
 		return callback(buf)
 	})
 }
 
 // Delete deletes the metadata
-func (c *MetadataCore) Delete() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Delete() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if c == nil || c.IsNull() {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	var (
 		idFound, nameFound bool
@@ -747,13 +847,14 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 	)
 
 	// Checks entries exist in Object Storage
-	if c.kindSplittedStore {
-		id, ok := c.id.Load().(string)
+	if myself.kindSplittedStore {
+		id, ok := myself.id.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'id' is not set with string")
 		}
 
-		xerr = c.folder.Lookup(byIDFolderName, id)
+		var xerr fail.Error
+		xerr = myself.folder.Lookup(byIDFolderName, id)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -767,7 +868,7 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 			idFound = true
 		}
 
-		name, ok := c.name.Load().(string)
+		name, ok := myself.name.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
@@ -775,7 +876,7 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 			return fail.InconsistentError("field 'name' cannot be empty")
 		}
 
-		xerr = c.folder.Lookup(byNameFolderName, name)
+		xerr = myself.folder.Lookup(byNameFolderName, name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -791,26 +892,27 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 
 		// Deletes entries found
 		if idFound {
-			xerr = c.folder.Delete(byIDFolderName, id)
+			xerr = myself.folder.Delete(byIDFolderName, id)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
 			}
 		}
 		if nameFound {
-			xerr = c.folder.Delete(byNameFolderName, name)
+			xerr = myself.folder.Delete(byNameFolderName, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
 			}
 		}
 	} else {
-		name, ok := c.name.Load().(string)
+		name, ok := myself.name.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
 
-		xerr = c.folder.Lookup("", name)
+		var xerr fail.Error
+		xerr = myself.folder.Lookup("", name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -824,7 +926,7 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 			nameFound = true
 		}
 		if nameFound {
-			xerr = c.folder.Delete("", name)
+			xerr = myself.folder.Delete("", name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
@@ -832,33 +934,33 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 		}
 	}
 
-	c.loaded = false
-	c.committed = false
+	myself.loaded = false
+	myself.committed = false
 
 	if len(errors) > 0 {
 		return fail.NewErrorList(errors)
 	}
 
-	c.destroyed() // notifies cache that the instance has been deleted
+	myself.unsafeDestroyed() // notifies cache that the instance has been deleted
 	return nil
 }
 
-// Serialize serializes instance into bytes (output json code)
-func (c *MetadataCore) Serialize() (_ []byte, xerr fail.Error) {
-	if c == nil || c.IsNull() {
-		return nil, fail.InvalidInstanceError()
+func (myself *MetadataCore) Sdump() (_ string, ferr fail.Error) {
+	if valid.IsNil(myself) {
+		return "", fail.InvalidInstanceError()
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return c.serialize()
+	dumped, _ := myself.shielded.Sdump()
+	return dumped, nil
 }
 
-// serialize serializes instance into bytes (output json code)
+// unsafeSerialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (c *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) unsafeSerialize() (_ []byte, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	var (
 		shieldedJSONed []byte
@@ -866,7 +968,8 @@ func (c *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 		propsMapped    = map[string]string{}
 	)
 
-	shieldedJSONed, xerr = c.shielded.Serialize()
+	var xerr fail.Error
+	shieldedJSONed, xerr = myself.shielded.Serialize()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -878,8 +981,8 @@ func (c *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 		return nil, fail.NewErrorWithCause(err, "*MetadataCore.Serialize(): Unmarshalling JSONed shielded into map failed!")
 	}
 
-	if c.properties.Count() > 0 {
-		propsJSONed, xerr := c.properties.Serialize()
+	if myself.properties.Count() > 0 {
+		propsJSONed, xerr := myself.properties.Serialize()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -894,7 +997,6 @@ func (c *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 	}
 
 	shieldedMapped["properties"] = propsMapped
-	// logrus.Tracef("everything mapped:\n%s\n", spew.Sdump(shieldedMapped))
 
 	r, err := json.Marshal(shieldedMapped)
 	err = debug.InjectPlannedError(err)
@@ -906,24 +1008,25 @@ func (c *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates
-func (c *MetadataCore) Deserialize(buf []byte) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (myself *MetadataCore) Deserialize(buf []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	if c == nil || c.IsNull() {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	return c.deserialize(buf)
+	return myself.unsafeDeserialize(buf)
 }
 
-// deserialize reads json code and reinstantiates
+// unsafeDeserialize reads json code and instantiates a MetadataCore
 // Note: must be called after locking the instance
-func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
-	if c.properties == nil {
-		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+func (myself *MetadataCore) unsafeDeserialize(buf []byte) (ferr fail.Error) {
+	if myself.properties == nil {
+		var xerr fail.Error
+		myself.properties, xerr = serializer.NewJSONProperties("resources." + myself.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -940,7 +1043,10 @@ func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		err := json.Unmarshal(buf, &mapped)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxErrorWithCause(err, "unmarshalling JSON to map failed")
+			if strings.Contains(err.Error(), "unexpected end of input") {
+				return fail.NotAvailableErrorWithCause(err, nil, "server returned incomplete data")
+			}
+			return fail.SyntaxErrorWithCause(err, nil, "unmarshalling JSON to map failed")
 		}
 		if props, ok = mapped["properties"].(map[string]interface{}); ok {
 			delete(mapped, "properties")
@@ -950,10 +1056,10 @@ func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 	jsoned, err := json.Marshal(mapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return fail.SyntaxErrorWithCause(err, "failed to marshal MetadataCore to JSON")
+		return fail.SyntaxErrorWithCause(err, nil, "failed to marshal MetadataCore to JSON")
 	}
 
-	xerr = c.shielded.Deserialize(jsoned)
+	xerr := myself.shielded.Deserialize(jsoned)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "deserializing MetadataCore failed")
@@ -963,13 +1069,13 @@ func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 		jsoned, err = json.Marshal(props)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxErrorWithCause(err, "failed to marshal properties to JSON")
+			return fail.SyntaxErrorWithCause(err, nil, "failed to marshal properties to JSON")
 		}
 
-		xerr = c.properties.Deserialize(jsoned)
+		xerr = myself.properties.Deserialize(jsoned)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to deserialize properties")
+			return fail.Wrap(xerr, "failed to unsafeDeserialize properties")
 		}
 	}
 	return nil
@@ -977,127 +1083,123 @@ func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 
 // Released is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
-// Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c *MetadataCore) Released() {
-	if c == nil || c.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("", "Released called on an invalid instance", "cannot be nil or null value", 0))
-		return
+func (myself *MetadataCore) Released() error {
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	c.released()
+	return myself.unsafeReleased()
 }
 
-// released is used to tell cache that the instance has been used and will not be anymore.
+// unsafeReleased is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: must be called after locking the instance
-func (c *MetadataCore) released() {
-	id, ok := c.id.Load().(string)
+func (myself *MetadataCore) unsafeReleased() error {
+	id, ok := myself.id.Load().(string)
 	if !ok {
-		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
-		return
+		return fail.InconsistentError("field 'id' is not set with string")
 	}
 
-	for _, v := range c.observers {
+	for _, v := range myself.observers {
 		v.MarkAsFreed(id)
 	}
+	return nil
 }
 
 // Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
-// Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c *MetadataCore) Destroyed() {
-	if c == nil || c.IsNull() {
-		logrus.Warnf("Destroyed called on an invalid instance")
-		return
+func (myself *MetadataCore) Destroyed() error {
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	c.destroyed()
+	myself.unsafeDestroyed()
+	return nil
 }
 
-// destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
+// unsafeDestroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
-// Note: must be called after locking the instance
-func (c *MetadataCore) destroyed() {
-	id, ok := c.id.Load().(string)
+func (myself *MetadataCore) unsafeDestroyed() {
+	id, ok := myself.id.Load().(string)
 	if !ok {
 		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
 		return
 	}
 
-	for _, v := range c.observers {
+	for _, v := range myself.observers {
 		v.MarkAsDeleted(id)
 	}
 }
 
 // AddObserver ...
 // satisfies interface data.Observable
-func (c *MetadataCore) AddObserver(o observer.Observer) error {
-	if c == nil || c.IsNull() {
+func (myself *MetadataCore) AddObserver(o observer.Observer) error {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if o == nil {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	if pre, ok := c.observers[o.GetID()]; ok {
+	if pre, ok := myself.observers[o.GetID()]; ok {
 		if pre == o {
 			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
 		}
 		return nil
 	}
-	c.observers[o.GetID()] = o
+	myself.observers[o.GetID()] = o
 	return nil
 }
 
 // NotifyObservers sends a signal to all registered Observers to notify change
 // Satisfies interface data.Observable
-func (c *MetadataCore) NotifyObservers() error {
-	if c == nil || c.IsNull() {
+func (myself *MetadataCore) NotifyObservers() error {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
-	return c.notifyObservers()
+	return myself.unsafeNotifyObservers()
 }
 
-// notifyObservers sends a signal to all registered Observers to notify change
+// unsafeNotifyObservers sends a signal to all registered Observers to notify change
 // Note: must be called after locking the instance
-func (c *MetadataCore) notifyObservers() error {
-	id, ok := c.id.Load().(string)
+func (myself *MetadataCore) unsafeNotifyObservers() error {
+	id, ok := myself.id.Load().(string)
 	if !ok {
 		return fail.InconsistentError("field 'id' is not set with string")
 	}
 
-	for _, v := range c.observers {
+	for _, v := range myself.observers {
 		v.SignalChange(id)
 	}
 	return nil
 }
 
 // RemoveObserver ...
-func (c *MetadataCore) RemoveObserver(name string) error {
-	if c == nil || c.IsNull() {
+func (myself *MetadataCore) RemoveObserver(name string) error {
+	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	myself.Lock()
+	defer myself.Unlock()
 
-	delete(c.observers, name)
+	delete(myself.observers, name)
 	return nil
 }

@@ -1,8 +1,5 @@
-//go:build alltests
-// +build alltests
-
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
@@ -38,9 +34,7 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	clusters, _ := NewJSONProperties("clusters")
 	assert.NotNil(t, clusters)
 
-	task, _ := concurrency.NewUnbreakableTask()
-
-	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
+	xerr := clusters.Alter("first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
@@ -55,12 +49,12 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
+		oerr := clusters.Alter("first", func(clonable data.Clonable) fail.Error {
 			thing := clonable.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(50 * time.Millisecond)
-			return clusters.Inspect(task, "second", func(clonable data.Clonable) fail.Error {
+			return clusters.Inspect("second", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks here")
@@ -74,12 +68,12 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(10 * time.Millisecond)
-		oerr := clusters.Alter(task, "second", func(clonable data.Clonable) fail.Error {
+		oerr := clusters.Alter("second", func(clonable data.Clonable) fail.Error {
 			thing := clonable.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(50 * time.Millisecond)
-			return clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
+			return clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks")
@@ -90,7 +84,10 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	}()
 
 	failed := waitTimeout(&wg, 5*time.Second)
-	if failed { // It ended with a deadlock
+	if failed { // It ended with a deadlock, it is expected
+		t.Log("If we do not handle carefully nested locks, we have deadlocks")
+	} else {
+		t.Error("This should have ended with deadlock, something fundamental has changed")
 		t.Fail()
 	}
 }

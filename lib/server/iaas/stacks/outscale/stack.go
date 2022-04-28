@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,9 @@ package outscale // Package outscale contains stack implementation for Outscale
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
@@ -28,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Credentials outscale credentials
@@ -80,9 +83,10 @@ type ConfigurationOptions struct {
 	Network       NetworkConfiguration  `json:"network,omitempty"`
 	ObjectStorage StorageConfiguration  `json:"objectstorage,omitempty"`
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
+	Timings       *temporal.MutableTimings
 }
 
-// stack Outscale stack to adapt outscale IaaS API
+// stack implements Outscale IaaS API
 type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
@@ -91,8 +95,10 @@ type stack struct {
 	VolumeSpeedsMap      map[string]volumespeed.Enum
 	configurationOptions *stacks.ConfigurationOptions
 	deviceNames          []string
-	templates            []abstract.HostTemplate
+	templates            []*abstract.HostTemplate
 	vpc                  *abstract.Network
+
+	*temporal.MutableTimings
 }
 
 // NullStack returns a null value of the stack
@@ -106,7 +112,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // New creates a new stack
-func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
+func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	if options == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
@@ -154,10 +160,26 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 			// BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
 			// WhitelistImageRegexp:      options.Compute.WhitelistImageRegexp,
 			// WhitelistTemplateRegexp:   options.Compute.WhitelistTemplateRegexp,
+			Timings: options.Timings,
 		},
 		auth: auth,
 	}
 	s.buildTemplateList()
+
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+	if options.Timings != nil {
+		s.MutableTimings = options.Timings
+		_ = s.MutableTimings.Update(temporal.NewTimings())
+	} else {
+		// outscale needs more time
+		s.MutableTimings = temporal.NewTimings() // take default timings, but...
+	}
+
+	// change a few things
+	s.MutableTimings.HostOperation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.HostOperation)
+	s.MutableTimings.HostCreation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.HostCreation)
+	s.MutableTimings.SSHConnection = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.SSHConnection)
+	s.MutableTimings.Operation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.Operation)
 
 	return &s, s.initDefaultNetwork()
 }
@@ -205,8 +227,8 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s stack) ListRegions() (_ []string, xerr fail.Error) {
-	if s.IsNull() {
+func (s stack) ListRegions() (_ []string, ferr fail.Error) {
+	if valid.IsNil(s) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
@@ -227,9 +249,9 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (az map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
@@ -246,4 +268,15 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 		az[r.SubregionName] = true
 	}
 	return az, nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() (temporal.Timings, fail.Error) {
+	if s == nil {
+		return temporal.NewTimings(), fail.InvalidInstanceError()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings, nil
 }

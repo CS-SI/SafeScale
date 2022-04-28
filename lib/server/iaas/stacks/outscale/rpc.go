@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -720,6 +720,28 @@ func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() error {
 			_, hr, err := s.client.NicApi.LinkNic(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcUnLinkNic(linkNicID string) fail.Error {
+	if linkNicID == "" {
+		return fail.InvalidParameterError("nicLinkID", "cannot be empty string")
+	}
+
+	opts := osc.UnlinkNicOpts{
+		UnlinkNicRequest: optional.NewInterface(osc.UnlinkNicRequest{
+			LinkNicId: linkNicID,
+		}),
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, hr, err := s.client.NicApi.UnlinkNic(s.auth, &opts)
 			if err != nil {
 				return newOutscaleError(hr, err)
 			}

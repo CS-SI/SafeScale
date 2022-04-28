@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
@@ -32,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // TenantListener server is used to implement SafeScale.safescale.
@@ -51,11 +48,6 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -85,11 +77,6 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -128,11 +115,6 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	defer fail.OnExitLogError(&err)
 
 	xerr := operations.SetCurrentTenant(in.GetName())
@@ -157,11 +139,6 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -221,9 +198,9 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 }
 
 // Inspect returns information about a tenant
-func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, xerr error) {
-	defer fail.OnExitConvertToGRPCStatus(&xerr)
-	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -235,11 +212,6 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
 	if xerr != nil {
@@ -249,7 +221,7 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	handler := handlers.NewTenantHandler(job)
 	tenantInfo, err := handler.Inspect(name)
@@ -273,11 +245,6 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()

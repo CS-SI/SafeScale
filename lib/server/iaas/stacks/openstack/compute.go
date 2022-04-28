@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
@@ -52,16 +52,15 @@ import (
 )
 
 // ListRegions ...
-func (s stack) ListRegions() (list []string, xerr fail.Error) {
-	var emptySlice []string
-	if s.IsNull() {
-		return emptySlice, fail.InvalidInstanceError()
+func (s stack) ListRegions() (list []string, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
 				// ParentRegionID: "RegionOne",
@@ -72,12 +71,12 @@ func (s stack) ListRegions() (list []string, xerr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	allRegions, err := regions.ExtractRegions(allPages)
 	if err != nil {
-		return emptySlice, fail.ConvertError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	var results []string
@@ -88,18 +87,20 @@ func (s stack) ListRegions() (list []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var emptyMap map[string]bool
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
 			return innerErr
@@ -131,15 +132,16 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
-	var emptySlice []abstract.Image
-	if s.IsNull() {
-		return emptySlice, fail.InvalidInstanceError()
+func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	opts := images.ListOpts{
 		Status: images.ImageStatusActive,
@@ -150,7 +152,7 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	pager := images.List(s.ComputeClient, opts)
 
 	// Define an anonymous function to be executed on each page's iteration
-	imgList = []abstract.Image{}
+	imgList = []*abstract.Image{}
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
 			imageList, err := images.ExtractImages(page)
@@ -159,32 +161,31 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 			}
 
 			for _, img := range imageList {
-				imgList = append(imgList, abstract.Image{ID: img.ID, Name: img.Name})
+				imgList = append(imgList, &abstract.Image{ID: img.ID, Name: img.Name})
 			}
 			return true, nil
 		},
 	)
 	if err != nil {
-		return emptySlice, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return imgList, nil
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
-	nullAI := abstract.Image{}
-	if s.IsNull() {
-		return nullAI, fail.InvalidInstanceError()
+func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			img, innerErr = images.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -192,10 +193,10 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAI, xerr
+		return nil, xerr
 	}
 
-	out := abstract.Image{
+	out := &abstract.Image{
 		ID:       img.ID,
 		Name:     img.Name,
 		DiskSize: int64(img.MinDiskGigabytes),
@@ -204,13 +205,12 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
-	nullAHT := abstract.HostTemplate{}
-	if s.IsNull() {
-		return nullAHT, fail.InvalidInstanceError()
+func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -218,7 +218,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 	// Try to get template
 	var flv *flavors.Flavor
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -226,9 +226,9 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAHT, xerr
+		return nil, xerr
 	}
-	template = abstract.HostTemplate{
+	template = &abstract.HostTemplate{
 		Cores:    flv.VCPUs,
 		RAMSize:  float32(flv.RAM) / 1000.0,
 		DiskSize: flv.Disk,
@@ -240,10 +240,9 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
-	var emptySlice []abstract.HostTemplate
-	if s.IsNull() {
-		return emptySlice, fail.InvalidInstanceError()
+func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
@@ -251,7 +250,7 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 
 	opts := flavors.ListOpts{}
 
-	var flvList []abstract.HostTemplate
+	var flvList []*abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
@@ -260,10 +259,10 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 					if err != nil {
 						return false, err
 					}
-					flvList = make([]abstract.HostTemplate, 0, len(list))
+					flvList = make([]*abstract.HostTemplate, 0, len(list))
 					for _, v := range list {
 						flvList = append(
-							flvList, abstract.HostTemplate{
+							flvList, &abstract.HostTemplate{
 								Cores:    v.VCPUs,
 								RAMSize:  float32(v.RAM) / 1000.0,
 								DiskSize: v.Disk,
@@ -281,11 +280,11 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *fail.ErrTimeout:
-			return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
-			return emptySlice, xerr
+			return nil, xerr
 		}
 	}
 	if len(flvList) == 0 {
@@ -297,12 +296,11 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 // CreateKeyPair TODO: replace with code to create KeyPair on provider side if it exists
 // creates and import a key pair
 func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
-		return nullAKP, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
@@ -314,12 +312,11 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 // InspectKeyPair TODO: replace with openstack code to get keypair (if it exits)
 // returns the key pair identified by id
 func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-	nullAKP := &abstract.KeyPair{}
-	if s.IsNull() {
-		return nullAKP, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
@@ -339,15 +336,14 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	var emptySlice []abstract.KeyPair
-	if s.IsNull() {
-		return emptySlice, fail.InvalidInstanceError()
+func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	var kpList []abstract.KeyPair
+	var kpList []*abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			return keypairs.List(s.ComputeClient, nil).EachPage(
@@ -359,7 +355,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 
 					for _, v := range list {
 						kpList = append(
-							kpList, abstract.KeyPair{
+							kpList, &abstract.KeyPair{
 								ID:         v.Name,
 								Name:       v.Name,
 								PublicKey:  v.PublicKey,
@@ -374,7 +370,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	// Note: empty list is not an error, so do not raise one
 	return kpList, nil
@@ -382,7 +378,7 @@ func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s stack) DeleteKeyPair(id string) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -404,27 +400,36 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing) {
+func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing, ferr fail.Error) {
 	hostSizing := abstract.NewHostEffectiveSizing()
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)
 		if !ok {
-			return hostSizing
+			return hostSizing, fail.NewError("flavor is not a string: %v", i)
 		}
 		tpl, xerr := s.InspectTemplate(fid)
 		if xerr != nil {
-			return hostSizing // FIXME: Missing error handling, this function should also return an error
+			return hostSizing, xerr
 		}
 		hostSizing.Cores = tpl.Cores
 		hostSizing.DiskSize = tpl.DiskSize
 		hostSizing.RAMSize = tpl.RAMSize
 	} else if _, ok := flavor["vcpus"]; ok {
-		hostSizing.Cores, _ = flavor["vcpus"].(int)     // nolint // FIXME: Missing error handling, this function should also return an error
-		hostSizing.DiskSize, _ = flavor["disk"].(int)   // nolint // FIXME: Missing error handling, this function should also return an error
-		hostSizing.RAMSize, _ = flavor["ram"].(float32) // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.Cores, ok = flavor["vcpus"].(int)
+		if !ok {
+			return hostSizing, fail.NewError("flavor[vcpus] is not an int: %v", flavor["vcpus"])
+		}
+		hostSizing.DiskSize, ok = flavor["disk"].(int)
+		if !ok {
+			return hostSizing, fail.NewError("flavor[disk] is not an int: %v", flavor["disk"])
+		}
+		hostSizing.RAMSize, ok = flavor["ram"].(float32)
+		if !ok {
+			return hostSizing, fail.NewError("flavor[ram] is not a float32: %v", flavor["ram"])
+		}
 		hostSizing.RAMSize /= 1000.0
 	}
-	return hostSizing
+	return hostSizing, nil
 }
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
@@ -445,31 +450,34 @@ func toHostState(status string) hoststate.Enum {
 
 // InspectHost gathers host information from provider
 func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
-	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
-		return nullAHF, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
 				ahf.Core.LastState = hoststate.Error
-				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong
+				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it's a 404
 			}
-			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it's a 404
 		default:
-			return nullAHF, xerr
+			return nil, xerr
 		}
 	}
 
@@ -494,8 +502,8 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Updates intrinsic data of host if needed
 	if hostCore.ID == "" {
@@ -531,7 +539,11 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 		host.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
 	}
 
-	host.Sizing = s.toHostSize(server.Flavor)
+	var xerr fail.Error
+	host.Sizing, xerr = s.toHostSize(server.Flavor)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if len(hostNets) > 0 {
 		if len(hostPorts) != len(hostNets) {
@@ -549,7 +561,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 				subnetsByID[port.FixedIPs[0].SubnetID] = ""
 			} else {
 				for _, ip := range port.FixedIPs {
-					if govalidator.IsIPv6(ip.IPAddress) {
+					if valid.IsIPv6(ip.IPAddress) {
 						ipv6 = ip.IPAddress
 					} else {
 						ipv4 = ip.IPAddress
@@ -575,7 +587,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 			port := hostPorts[k]
 			for _, ip := range port.FixedIPs {
 				subnetID := ip.SubnetID
-				if govalidator.IsIPv6(ip.IPAddress) {
+				if valid.IsIPv6(ip.IPAddress) {
 					ipv6Addresses[subnetID] = ip.IPAddress
 				} else {
 					ipv4Addresses[subnetID] = ip.IPAddress
@@ -595,12 +607,11 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 
 // InspectHostByName returns the host using the name passed as parameter
 func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
-	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
-		return nullAHF, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
@@ -619,7 +630,7 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
@@ -627,44 +638,41 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 		for _, anon := range serverList {
 			entry, ok := anon.(map[string]interface{})
 			if !ok {
-				return nullAHF, fail.InconsistentError("anon should be a map[string]interface{}")
+				return nil, fail.InconsistentError("anon should be a map[string]interface{}")
 			}
 			if entry["name"].(string) == name {
 				host := abstract.NewHostCore()
 				host.ID, ok = entry["id"].(string)
 				if !ok {
-					return nullAHF, fail.InconsistentError("entry[id] should be a string")
+					return nil, fail.InconsistentError("entry[id] should be a string")
 				}
 				host.Name = name
 				hostFull, xerr := s.InspectHost(host)
 				if xerr != nil {
-					return nullAHF, fail.Wrap(xerr, "failed to inspect host '%s'", name)
+					return nil, fail.Wrap(xerr, "failed to inspect host '%s'", name)
 				}
 				return hostFull, nil
 			}
 		}
 	}
-	return nullAHF, abstract.ResourceNotFoundError("host", name)
+	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
 // CreateHost creates a new host
 func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
-	nullAHF := abstract.NewHostFull()
-	nullUDC := userdata.NewContent()
-	if s.IsNull() {
-		return nullAHF, nullUDC, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)",
 		request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
-	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError(
+		return nil, nil, abstract.ResourceInvalidRequestError(
 			"host creation", "cannot create a host without --public flag and without attached Network/Subnet",
 		)
 	}
@@ -674,33 +682,72 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defaultSubnetID := defaultSubnet.ID
 
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for the host")
+		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
+	timings, xerr := s.Timings()
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
+		return nil, nil, xerr
+	}
+
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
+	if xerr != nil {
+		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image")
+		return nil, nil, fail.Wrap(xerr, "failed to get image")
+	}
+
+	rim, xerr := s.InspectImage(request.ImageID)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
+		diskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
+	}
+
+	if diskSize == 0 {
+		// Determines appropriate disk size
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
+		} else {
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
+		}
+	}
+
+	if diskSize < 10 {
+		diskSize = 10
 	}
 
 	// Sets provider parameters to create host
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 
 	// Select usable availability zone, the first one in the list
 	azone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to select availability zone")
+		return nil, nil, fail.Wrap(xerr, "failed to select availability zone")
 	}
 
 	// --- Initializes abstract.HostCore ---
@@ -762,7 +809,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}()
 
 			server, innerXErr = s.rpcCreateServer(
-				request.ResourceName, hostNets, request.TemplateID, request.ImageID, userDataPhase1, azone,
+				request.ResourceName, hostNets, request.TemplateID, request.ImageID, diskSize, userDataPhase1, azone,
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -782,7 +829,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 				return innerXErr
 			}
-			if server == nil || server.ID == "" {
+			if server == nil || server.ID == "" { // TODO: this should be a validation method
 				innerXErr = fail.NewError("failed to create server")
 				return innerXErr
 			}
@@ -821,7 +868,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 
 			// Wait that host is ready, not just that the build is started
-			timeout := temporal.GetHostTimeout()
+			timings, innerXErr := s.Timings()
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			timeout := timings.HostOperationTimeout()
 			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
 				logrus.Errorf(
@@ -830,7 +882,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					// FIXME: Wrong, we need name, status and ID at least here
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
 					return innerXErr
@@ -838,15 +889,15 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		timings.NormalDelay(),
+		timings.HostLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
-		case *retry.ErrStopRetry:
-			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+			return nil, nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotAvailable); ok {
@@ -856,26 +907,26 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					ahc.LastState = hoststate.Error
 				}
 			}
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 	}
 
 	newHost, xerr := s.complementHost(ahc, *server, hostNets, hostPorts)
 	if xerr != nil {
-		return nullAHF, nullUDC, xerr
+		return nil, nil, xerr
 	}
 	newHost.Networking.DefaultSubnetID = defaultSubnetID
 	// newHost.Networking.DefaultGatewayID = defaultGatewayID
 	// newHost.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	newHost.Networking.IsGateway = request.IsGateway
-	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	// if Floating IP are used and public address is requested
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
 		var ip *floatingips.FloatingIP
 		if ip, xerr = s.rpcCreateFloatingIP(); xerr != nil {
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -904,7 +955,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			NormalizeError,
 		)
 		if xerr != nil {
-			return nullAHF, nullUDC, xerr
+			return nil, nil, xerr
 		}
 
 		if ipversion.IPv4.Is(ip.IP) {
@@ -1015,7 +1066,7 @@ func (s stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
 func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -1058,7 +1109,7 @@ func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 
 // SelectedAvailabilityZone returns the selected availability zone
 func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -1087,36 +1138,34 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	nullAHC := abstract.NewHostCore()
-	if s.IsNull() {
-		return nullAHC, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	server, xerr := s.WaitHostState(hostParam, hoststate.Started, timeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
 				ahf.Core.LastState = hoststate.Error
 				return ahf.Core, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
-			return nullAHC, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 		default:
-			return nullAHC, xerr
+			return nil, xerr
 		}
 	}
 
 	ahf, xerr = s.complementHost(ahf.Core, *server, nil, nil)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nil, xerr
 	}
 
 	return ahf.Core, nil
@@ -1124,19 +1173,23 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
-	nullServer := &servers.Server{}
-	if s.IsNull() {
-		return nullServer, fail.InvalidInstanceError()
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullServer, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
@@ -1195,13 +1248,13 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				)
 			}
 		},
-		temporal.GetMinDelay(),
+		timings.SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			return nullServer, fail.Wrap(
+			return nil, fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout,
 			)
 		case *fail.ErrAborted:
@@ -1211,11 +1264,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			}
 			return server, retryErr // Not available error keeps the server info, good
 		default:
-			return nullServer, retryErr
+			return nil, retryErr
 		}
 	}
 	if server == nil {
-		return nullServer, fail.NotFoundError("failed to query Host '%s'", hostLabel)
+		return nil, fail.NotFoundError("failed to query Host '%s'", hostLabel)
 	}
 	return server, nil
 }
@@ -1223,7 +1276,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
 func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
@@ -1239,7 +1292,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 // ListHosts lists all hosts
 func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
@@ -1320,7 +1373,7 @@ func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1373,6 +1426,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
+	timings, xerr := s.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Try to remove host for 3 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -1390,7 +1448,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// 2nd, check host status every 5 seconds until check failed.
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error is not 'not found', retry
-			var state hoststate.Enum = hoststate.Unknown
+			var state = hoststate.Unknown
 			innerXErr := retry.WhileUnsuccessful(
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
@@ -1408,8 +1466,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
 				},
-				temporal.GetDefaultDelay(),
-				temporal.GetContextTimeout(),
+				timings.NormalDelay(),
+				timings.ContextTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1427,10 +1485,10 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return nil
 		},
 		0,
-		temporal.GetHostCleanupTimeout(),
+		timings.HostCleanupTimeout(),
 	)
 	if xerr != nil {
-		switch xerr.(type) { // FIXME: Look at that
+		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {
@@ -1454,7 +1512,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
-	// Removes ports freed from host
+	// Remove ports freed from host
 	var errors []error
 	for _, v := range portList {
 		if derr := s.rpcDeletePort(v.ID); derr != nil {
@@ -1475,13 +1533,13 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // rpcGetServer returns
-func (s stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
+func (s stack) rpcGetServer(id string) (_ *servers.Server, ferr fail.Error) {
 	if id == "" {
 		return &servers.Server{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	var resp *servers.Server
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = servers.Get(s.ComputeClient, id).Extract()
 			return err
@@ -1496,7 +1554,7 @@ func (s stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
 
 // StopHost stops the host identified by id
 func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1516,7 +1574,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 
 // RebootHost reboots unconditionally the host identified by id
 func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1545,7 +1603,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 
 // StartHost starts the host identified by id
 func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1565,13 +1623,12 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 
 // ResizeHost ...
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
-		return nullAHF, fail.InvalidInstanceError()
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
 	}
 	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHF, xerr
+		return nil, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
@@ -1588,7 +1645,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1615,7 +1672,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s.IsNull() {
+	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ type Filter struct {
 }
 
 // Predicate ...
-type Predicate func(abstract.HostTemplate) bool
+type Predicate func(*abstract.HostTemplate) bool
 
 // NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
@@ -36,7 +36,7 @@ func NewFilter(predicate Predicate) *Filter {
 // Not ...
 func (f *Filter) Not() *Filter {
 	oldFilter := f.filter
-	f.filter = func(in abstract.HostTemplate) bool {
+	f.filter = func(in *abstract.HostTemplate) bool {
 		return !oldFilter(in)
 	}
 	return f
@@ -45,7 +45,7 @@ func (f *Filter) Not() *Filter {
 // And ...
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in abstract.HostTemplate) bool {
+	f.filter = func(in *abstract.HostTemplate) bool {
 		return oldFilter(in) && other.filter(in)
 	}
 	return f
@@ -54,7 +54,7 @@ func (f *Filter) And(other *Filter) *Filter {
 // Or ...
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in abstract.HostTemplate) bool {
+	f.filter = func(in *abstract.HostTemplate) bool {
 		return oldFilter(in) || other.filter(in)
 	}
 	return f
@@ -62,14 +62,14 @@ func (f *Filter) Or(other *Filter) *Filter {
 
 // Not ...
 func Not(f Predicate) Predicate {
-	return func(in abstract.HostTemplate) bool {
+	return func(in *abstract.HostTemplate) bool {
 		return !f(in)
 	}
 }
 
 // OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-	return func(in abstract.HostTemplate) bool {
+	return func(in *abstract.HostTemplate) bool {
 		for _, f := range filters {
 			if f(in) {
 				return true
@@ -81,7 +81,7 @@ func OrFilter(filters ...Predicate) Predicate {
 
 // AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-	return func(in abstract.HostTemplate) bool {
+	return func(in *abstract.HostTemplate) bool {
 		for _, f := range filters {
 			if !f(in) {
 				return false
@@ -92,8 +92,8 @@ func AndFilter(filters ...Predicate) Predicate {
 }
 
 // FilterTemplates ...
-func FilterTemplates(templates []abstract.HostTemplate, f *Filter) []abstract.HostTemplate {
-	res := make([]abstract.HostTemplate, 0)
+func FilterTemplates(templates []*abstract.HostTemplate, f *Filter) []*abstract.HostTemplate {
+	res := make([]*abstract.HostTemplate, 0)
 	for _, template := range templates {
 
 		if f.filter(template) {

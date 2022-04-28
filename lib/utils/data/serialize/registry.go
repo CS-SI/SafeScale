@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,11 @@ func (r propertyTypeRegistry) Lookup(module, key string) bool {
 // ZeroValue returns a zeroed value corresponding to module and key (if it exists)
 func (r propertyTypeRegistry) ZeroValue(module, key string) data.Clonable {
 	if zeroValue, found := r[module][key]; found {
-		return zeroValue.Clone()
+		zv, err := zeroValue.Clone()
+		if err != nil {
+			panic(err)
+		}
+		return zv
 	}
 
 	panic(fmt.Sprintf("Missing match for key '%s' in module '%s' and go type! Please use PropertyTypeRegistry.Register!", key, module))

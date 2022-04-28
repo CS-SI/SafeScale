@@ -1,4 +1,4 @@
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,10 +23,18 @@ feature:
         cluster: all
 
     parameters:
-        - Username
-        - Password
-        - GuacamolePort=63011
-        - TomcatPort=9009
+        - name: Username
+          description: |-
+              Username to use to authenticate Remote Desktop (default: none)
+        - name: Password
+          description: |-
+              Password to use to authenticate Remote Desktop (default: none)
+        - name: GuacamolePort
+          value: 63011
+          description: Port guacamole must use
+        - name: TomcatPort
+          value: 9009
+          description: Port tomcat must use
 
     install:
         bash:
@@ -106,7 +114,7 @@ feature:
                         timeout: 15
                         run: |
                             URL="https://sourceforge.net/projects/tigervnc/files/stable/1.10.1/tigervnc-1.10.1.x86_64.tar.gz/download"
-                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194
+                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194 "failed to download tigervnc archive"
                             tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195 "failed to extract tigervnc archive"
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
@@ -377,9 +385,13 @@ feature:
                             cat >${SF_ETCDIR}/remotedesktop/build/user-mapping.xml <<'EOF'
                             <user-mapping>
                                 <authorize
+                            {{ if not .ClusterFlavor }}
+                                    username="{{ .Username }}"
+                                    password="{{ .Password }}">
+                            {{ else }}
                                     username="{{ .ClusterAdminUsername }}"
                                     password="{{ .ClusterAdminPassword }}">
-
+                            {{ end }}
                                     <!-- First authorized connection -->
                                     <connection name="{{ .Hostname }}">
                                         <protocol>vnc</protocol>
@@ -507,7 +519,6 @@ feature:
                             masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
-                            # DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet)
                             cat >>/etc/ssh/sshd_config <<-EOF
                             # Allow Password Authentication from user {{.Username}} for guacd to work
                             Match User {{.Username}} Address $(sfSubnetOfDockerBridge)

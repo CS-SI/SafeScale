@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"gomodules.xyz/stow"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
@@ -29,13 +30,15 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Bucket
+//go:generate minimock -o ../mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Bucket
 
 const (
 	// RootPath defines the path corresponding of the root of a Bucket
 	RootPath = ""
 	// NoPrefix corresponds to ... no prefix...
 	NoPrefix = ""
+	// NotFound is the 'Not found' error according to stow internals
+	NotFound = "not found"
 )
 
 // Bucket interface
@@ -77,7 +80,6 @@ type bucket struct {
 	stowContainer stow.Container
 
 	name string
-	// // NbItems int `json:"nbitems,omitempty"`
 }
 
 // newBucket ...
@@ -88,26 +90,21 @@ func newBucket(location stow.Location) (bucket, fail.Error) {
 	return bucket{stowLocation: location}, nil
 }
 
-// NullBucket returns a bucket instance corresponding to null value
-func NullBucket() Bucket {
-	return &bucket{}
-}
-
 // IsNull tells if the bucket corresponds to its null value
-func (b *bucket) IsNull() bool {
-	return b == nil || b.stowLocation == nil
+func (instance *bucket) IsNull() bool {
+	return instance == nil || instance.stowLocation == nil
 }
 
 // CreateObject ...
-func (b bucket) CreateObject(objectName string) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) CreateObject(objectName string) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
-	o, err := newObject(&b, objectName)
+	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -115,38 +112,38 @@ func (b bucket) CreateObject(objectName string) (_ Object, xerr fail.Error) {
 }
 
 // InspectObject ...
-func (b bucket) InspectObject(objectName string) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) InspectObject(objectName string) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
-	o, err := newObject(&b, objectName)
+	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
 	}
 	if o.item == nil {
-		return nil, fail.NotFoundError("not found")
+		return nil, fail.NotFoundError(NotFound)
 	}
 	return &o, nil
 }
 
-func (b bucket) estimateSize(path, prefix string) (int, error) {
+func (instance bucket) estimateSize(path, prefix string) (int, error) {
 	itemSet := make(map[string]bool) // New empty set
 	currentPageSize := 10
 
 	for {
 		err := stow.Walk(
-			b.stowContainer, path, currentPageSize,
+			instance.stowContainer, path, currentPageSize,
 			func(item stow.Item, err error) error {
 				if err != nil {
 					return err
 				}
 
 				if itemSet[item.Name()] {
-					return fail.DuplicateError(fmt.Sprintf("we found a duplicate: %s, we had %d items by then", item.Name(), len(itemSet)))
+					return fail.DuplicateError(fmt.Sprintf("we found a duplicate (prefix %s): %s, we had %d items by then", prefix, item.Name(), len(itemSet)))
 				}
 				itemSet[item.Name()] = true
 
@@ -172,9 +169,9 @@ func (b bucket) estimateSize(path, prefix string) (int, error) {
 }
 
 // ListObjects list objects of a GetBucket
-func (b bucket) ListObjects(path, prefix string) (_ []string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) ListObjects(path, prefix string) (_ []string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -184,13 +181,13 @@ func (b bucket) ListObjects(path, prefix string) (_ []string, xerr fail.Error) {
 
 	fullPath := buildFullPath(path, prefix)
 
-	estimatedPageSize, err := b.estimateSize(path, prefix)
+	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
 		return list, fail.ConvertError(err)
 	}
 
 	// log.Println("location.Container => : ", c.GetName()
-	err = stow.Walk(b.stowContainer, path, estimatedPageSize,
+	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -208,9 +205,9 @@ func (b bucket) ListObjects(path, prefix string) (_ []string, xerr fail.Error) {
 }
 
 // Browse walks through the objects in the GetBucket and executes callback on each Object found
-func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Error) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -218,18 +215,18 @@ func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) (x
 
 	fullPath := buildFullPath(path, prefix)
 
-	estimatedPageSize, err := b.estimateSize(path, prefix)
+	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 
-	err = stow.Walk(b.stowContainer, path, estimatedPageSize,
+	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
-				o := newObjectFromStow(&b, item)
+				o := newObjectFromStow(&instance, item)
 				return callback(&o)
 			}
 			return nil
@@ -239,9 +236,9 @@ func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) (x
 }
 
 // Clear empties a bucket
-func (b bucket) Clear(path, prefix string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) Clear(path, prefix string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -249,23 +246,21 @@ func (b bucket) Clear(path, prefix string) (xerr fail.Error) {
 
 	fullPath := buildFullPath(path, prefix)
 
-	estimatedPageSize, err := b.estimateSize(path, prefix)
+	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 
-	err = stow.Walk(b.stowContainer, path, estimatedPageSize,
+	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
-				err = b.stowContainer.RemoveItem(item.Name())
+				err = instance.stowContainer.RemoveItem(item.Name())
 				if err != nil {
-					// log.Println("erreur RemoveItem => : ", err)
 					return err
 				}
-				// l.NbItem = 0
 			}
 			return nil
 		},
@@ -274,9 +269,9 @@ func (b bucket) Clear(path, prefix string) (xerr fail.Error) {
 }
 
 // DeleteObject deletes an object from a bucket
-func (b bucket) DeleteObject(objectName string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) DeleteObject(objectName string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if objectName == "" {
@@ -285,7 +280,7 @@ func (b bucket) DeleteObject(objectName string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()
 
-	o, err := newObject(&b, objectName)
+	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return err
 	}
@@ -293,15 +288,15 @@ func (b bucket) DeleteObject(objectName string) (xerr fail.Error) {
 }
 
 // ReadObject ...
-func (b bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().Exiting()
 
-	o, err := newObject(&b, objectName)
+	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -313,15 +308,15 @@ func (b bucket) ReadObject(objectName string, target io.Writer, from int64, to i
 }
 
 // WriteObject ...
-func (b bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().Exiting()
 
-	o, err := newObject(&b, objectName)
+	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -340,20 +335,20 @@ func (b bucket) WriteObject(objectName string, source io.Reader, sourceSize int6
 }
 
 // WriteMultiPartObject ...
-func (b bucket) WriteMultiPartObject(
+func (instance bucket) WriteMultiPartObject(
 	objectName string,
 	source io.Reader, sourceSize int64,
 	chunkSize int,
 	metadata abstract.ObjectStorageItemMetadata,
-) (_ Object, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+) (_ Object, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().Exiting()
 
-	o, err := newObject(&b, objectName)
+	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -369,19 +364,19 @@ func (b bucket) WriteMultiPartObject(
 }
 
 // GetName returns the name of the GetBucket
-func (b bucket) GetName() (_ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) GetName() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
-	return b.name, nil
+	return instance.name, nil
 }
 
 // GetCount returns the count of objects in the GetBucket
 // 'path' corresponds to stow prefix, and 'prefix' allows filtering what to count
-func (b bucket) GetCount(path, prefix string) (_ int64, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) GetCount(path, prefix string) (_ int64, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -390,12 +385,12 @@ func (b bucket) GetCount(path, prefix string) (_ int64, xerr fail.Error) {
 	var count int64
 	fullPath := buildFullPath(path, prefix)
 
-	estimatedPageSize, err := b.estimateSize(path, prefix)
+	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
 		return -1, fail.ConvertError(err)
 	}
 
-	err = stow.Walk(b.stowContainer, path, estimatedPageSize,
+	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
 		func(c stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -413,9 +408,9 @@ func (b bucket) GetCount(path, prefix string) (_ int64, xerr fail.Error) {
 }
 
 // GetSize returns the total size of the Objects inside the GetBucket
-func (b bucket) GetSize(path, prefix string) (_ int64, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-	if b.IsNull() {
+func (instance bucket) GetSize(path, prefix string) (_ int64, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if valid.IsNil(instance) {
 		return 0, "", fail.InvalidInstanceError()
 	}
 
@@ -423,13 +418,13 @@ func (b bucket) GetSize(path, prefix string) (_ int64, _ string, xerr fail.Error
 
 	fullPath := buildFullPath(path, prefix)
 
-	estimatedPageSize, err := b.estimateSize(path, prefix)
+	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
 		return -1, "", fail.ConvertError(err)
 	}
 
 	var totalSize int64
-	err = stow.Walk(b.stowContainer, path, estimatedPageSize,
+	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err

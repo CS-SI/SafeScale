@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,6 @@ func New(svc iaas.Service) (resources.Subnet, fail.Error) {
 }
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
-func Load(svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	return operations.LoadSubnet(svc, networkRef, subnetRef)
+func Load(ctx context.Context, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
+	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef, operations.WithReloadOption)
 }

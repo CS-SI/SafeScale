@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,32 +37,30 @@ const (
 
 // OnExitLogErrorWithLevel logs error with the log level wanted
 func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interface{}) {
-	if err == nil {
-		return
-	}
-
-	logLevelFn, ok := commonlog.LogLevelFnMap[level]
-	if !ok {
-		logLevelFn = logrus.Error
-	}
-
-	switch v := err.(type) {
-	case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
-		// These errors are systematically logged, no need to log them twice
-	case *Error:
-		if *v != nil {
-			logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
+	if err != nil {
+		logLevelFn, ok := commonlog.LogLevelFnMap[level]
+		if !ok {
+			logLevelFn = logrus.Error
 		}
-	case *error:
-		if *v != nil {
-			if IsGRPCError(*v) {
-				logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), grpcstatus.Convert(*v).Message()))
-			} else {
+
+		switch v := err.(type) {
+		case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
+			// These errors are systematically logged, no need to log them twice
+		case *Error:
+			if *v != nil {
 				logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
 			}
+		case *error:
+			if *v != nil {
+				if IsGRPCError(*v) {
+					logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), grpcstatus.Convert(*v).Message()))
+				} else {
+					logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
+				}
+			}
+		default:
+			logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 		}
-	default:
-		logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 	}
 }
 
@@ -160,22 +158,71 @@ func OnExitTraceError(err interface{}, msg ...interface{}) {
 // OnPanic captures panic error and fill the error pointer with a ErrRuntimePanic.
 // func OnPanic(err *error) {
 func OnPanic(err interface{}) {
+	logCall := getEventLogger()
+
 	if x := recover(); x != nil {
 		switch v := err.(type) {
+		case *ErrorList:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrUnqualified:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrWarning:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrTimeout:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotFound:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrAborted:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrRuntimePanic:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotAvailable:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrDuplicate:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidRequest:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrSyntax:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotAuthenticated:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrForbidden:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrOverflow:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrOverload:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotImplemented:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidInstance:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidParameter:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidInstanceContent:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInconsistent:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrExecution:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrAlteredNothing:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrUnknown:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
 		case *Error:
 			if v != nil {
-				*v = RuntimePanicError("runtime panic occurred:\n%s", callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.FirstOccurrence))
+				recTrace := callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.LastOccurrence)
+				*v = RuntimePanicError("runtime panic occurred:\n%s", recTrace)
 			} else {
-				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but '*err' is nil", "", 5))
+				logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but '*err' is nil", "", 4))
 			}
 		case *error:
 			if v != nil {
 				*v = RuntimePanicError("runtime panic occurred: %+v", x)
 			} else {
-				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but '*err' is nil", "", 5))
+				logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but '*err' is nil", "", 4))
 			}
 		default:
-			logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but parameter 'err' is invalid", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
+			logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but parameter 'err' is invalid", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 4))
 		}
 	}
 }

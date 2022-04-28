@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 )
 
 // const (
@@ -42,7 +43,7 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 		asg.ID = sgParam
 		sgLabel = asg.ID
 	case *abstract.SecurityGroup:
-		if sgParam.IsNull() {
+		if valid.IsNil(sgParam) {
 			return asg, "", fail.InvalidParameterError("sgParam", "cannot be *abstract.ScurityGroup null value")
 		}
 		asg = sgParam

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package callstack
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -29,15 +30,22 @@ var sourceFileRemovePart atomic.Value
 func SourceFilePathUpdater() func(string) string {
 	removePath := sourceFilePrefixToRemove()
 	fn := func(path string) string {
-		newPath := strings.Replace(path, removePath, "...", 1)
+		newPath := strings.Replace(path, removePath, "", 1)
+		if !strings.HasPrefix(newPath, "/") {
+			if ind := strings.Index(newPath, "/"); ind != -1 {
+				newPath = newPath[ind:]
+			}
+		}
+		newPath = fmt.Sprintf("...%s", newPath)
 		return newPath
 	}
 	return fn
 }
 
 const (
-	defaultPartToRemove    = "go/src/github.com/CS-SI/SafeScale/"
-	sourceFileSearchString = "github.com/CS-SI/SafeScale/"
+	defaultPartToRemove     = "go/src/github.com/CS-SI/SafeScale/"
+	sourceFileSearchString  = "github.com/CS-SI/SafeScale/"
+	sourceCodeRootDirSuffix = "SafeScale"
 )
 
 // sourceFilePrefixToRemove returns the part of the file path to remove before display.
@@ -53,6 +61,11 @@ func init() {
 	if _, f, _, ok := runtime.Caller(0); ok {
 		rootPath = strings.TrimRight(strings.Split(f, sourceFileSearchString)[0], "/")
 		rootPath = filepath.Dir(filepath.Dir(rootPath))
+		rootPath = filepath.ToSlash(rootPath)
+		ind := strings.LastIndex(rootPath, sourceCodeRootDirSuffix)
+		if ind != -1 {
+			rootPath = rootPath[0 : ind+len(sourceCodeRootDirSuffix)]
+		}
 	}
 	sourceFileRemovePart.Store(rootPath)
 }

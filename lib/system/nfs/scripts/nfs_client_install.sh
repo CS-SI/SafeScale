@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ debian | ubuntu)
   sfWaitForApt
   finishPreviousInstall
 
-  sfRetryEx 3m 5 "sfWaitForApt && apt -y update"
-  sfRetryEx 5m 5 "sfWaitForApt && apt-get install -qqy --force-yes nfs-common"
+  sfRetry4 "sfWaitForApt && apt -y update"
+  sfRetry4 "apt-get install -qqy nfs-common"
   ;;
 
 rhel | centos)

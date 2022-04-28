@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // HostSecurityGroups contains a list of security groups bound to the host
@@ -46,30 +49,38 @@ func (hsg *HostSecurityGroups) IsNull() bool {
 }
 
 // Clone ...
-func (hsg HostSecurityGroups) Clone() data.Clonable {
+func (hsg HostSecurityGroups) Clone() (data.Clonable, error) {
 	return NewHostSecurityGroups().Replace(&hsg)
 }
 
 // Replace ...
-func (hsg *HostSecurityGroups) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (hsg *HostSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
 	if hsg == nil || p == nil {
-		return hsg
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*HostSecurityGroups) // nolint
+	src, ok := p.(*HostSecurityGroups)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *HostSecurityGroups")
+	}
+
 	*hsg = *src
 	hsg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		// FIXME: Replace should also return an error
-		hsg.ByID[k], _ = v.Clone().(*SecurityGroupBond) // nolint
+		cloned, err := v.Clone()
+		if err != nil {
+			return nil, err
+		}
+		hsg.ByID[k], ok = cloned.(*SecurityGroupBond)
+		if !ok {
+			return nil, fmt.Errorf("cloned is not a *SecurityGroupBond")
+		}
 	}
 	hsg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		hsg.ByName[k] = v
 	}
-	return hsg
+	return hsg, nil
 }
 
 func init() {

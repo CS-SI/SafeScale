@@ -11,6 +11,7 @@ vet:
 	@$(GO) vet ./...
 
 test:
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) 2>&1
 	@(cd scripts && $(MAKE) $(@))
 
 bashtest:
@@ -26,7 +27,7 @@ generate: clean gensrc
 	@(cd bucketfs && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
 	@$(GO) generate . >/dev/null 2>&1
-	@$(GO) fmt $(VERSIONFILE) >/dev/null 2>&1
+	@gofmt $(VERSIONFILE) >/dev/null 2>&1
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
@@ -35,9 +36,8 @@ gensrc:
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo "  Tags = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
-	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
+	@gofmt $(VERSIONFILE) > /dev/null 2>&1
 
 clean:
 	@(cd bucketfs && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
-	@$(RM) rice-box.go || true

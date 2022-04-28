@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,12 +32,15 @@ import (
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	c := make(chan struct{})
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer close(c)
 		wg.Wait()
 	}()
 	select {
 	case <-c:
-		return false // completed normally
+		return false // completed normally or panic in Wait
 	case <-time.After(timeout):
 		return true // timed out
 	}
@@ -48,8 +51,7 @@ func randomInt(min, max int) int {
 	if min == max {
 		return min
 	}
-	// mrand.Seed(time.Now().UnixNano())
-	return mrand.Intn(max-min) + min
+	return mrand.Intn(max-min) + min // nolint
 }
 
 // randomIntWithReseed restarts pseudorandom seed then returns a random integer between a specified range.
@@ -58,30 +60,11 @@ func randomIntWithReseed(min, max int) int { // nolint
 		return min
 	}
 	mrand.Seed(time.Now().UnixNano())
-	return mrand.Intn(max-min) + min
-}
-
-func validTest(st int, latency int) bool { // nolint
-	iterations := int64(math.Ceil(float64(st) / float64(latency)))
-	tempo := time.Duration(latency) * time.Millisecond
-	count := int64(0)
-	begin := time.Now()
-
-	for { // do some work, then look for aborted, again and again
-		if count >= iterations {
-			break
-		}
-		// some work
-		time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
-		count++
-	}
-
-	elapsed := time.Since(begin)
-	return elapsed <= time.Duration(st+latency)*time.Millisecond
+	return mrand.Intn(max-min) + min // nolint
 }
 
 func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func(chan string) error) TaskAction {
-	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+	return func(t Task, parameters TaskParameters) (_ TaskResult, ferr fail.Error) {
 		traceR := newTracer(t, false) // change to true to display traces
 
 		type internalRes struct {
@@ -90,7 +73,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		}
 
 		if actionHandlesPanicByItself {
-			defer fail.OnPanic(&xerr)
+			defer fail.OnPanic(&ferr)
 		}
 
 		ctx := t.Context()
@@ -100,6 +83,17 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 
 		resch := make(chan internalRes)
 		go func() {
+			var crash error
+			defer func() {
+				if crash != nil {
+					resch <- internalRes{
+						ir:  "InternalPanic",
+						err: fail.ConvertError(crash),
+					}
+				}
+			}()
+			defer fail.OnPanic(&crash)
+
 			iterations := int64(math.Ceil(float64(rd) / float64(latency)))
 			tempo := time.Duration(math.Min(float64(latency), float64(rd))) * time.Millisecond
 			count := int64(0)

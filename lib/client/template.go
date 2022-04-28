@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -39,8 +40,16 @@ func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.List(ctx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
+	return service.List(newCtx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
 }
 
 // Match returns the list of templates that match the sizing
@@ -53,8 +62,16 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.Match(ctx, &protocol.TemplateMatchRequest{Sizing: sizing})
+	return service.Match(newCtx, &protocol.TemplateMatchRequest{Sizing: sizing})
 }
 
 // Inspect returns details of a template identified by name of ID
@@ -67,7 +84,15 @@ func (t template) Inspect(name string, timeout time.Duration) (*protocol.HostTem
 		return nil, xerr
 	}
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 
-	return service.Inspect(ctx, &protocol.TemplateInspectRequest{Template: &protocol.Reference{Name: name}})
+	return service.Inspect(newCtx, &protocol.TemplateInspectRequest{Template: &protocol.Reference{Name: name}})
 }

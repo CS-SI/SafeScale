@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,48 +17,15 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/bucketproperty"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
-// // BucketMount stores information about the mount of a Bucket
-// // not FROZEN yet
-// type BucketMount struct {
-// 	HostID    string `json:"host_id"`    // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
-// 	MountPath string `json:"mount_path"` // Path is the mount point of the device
-// }
-//
-// // NewBucketMount ...
-// func NewBucketMount() *BucketMount {
-// 	return &BucketMount{}
-// }
-//
-// // IsNull ...
-// // satisfies interface data.Clonable
-// func (bm *BucketMount) IsNull() bool {
-// 	return bm == nil || bm.HostID == ""
-// }
-//
-// // Clone ...
-// // satisfies interface data.Clonable
-// func (bm BucketMount) Clone() data.Clonable {
-// 	return NewBucketMount().Replace(&bm)
-// }
-//
-// // Replace ...
-// func (bm *BucketMount) Replace(p data.Clonable) data.Clonable {
-// 	// Do not test with isNull(), it's allowed to clone a null value...
-// 	if bm == nil || p == nil {
-// 		return bm
-// 	}
-//
-// 	src := p.(*BucketMount)
-// 	*bm = *src
-// 	return bm
-// }
-
-// BucketMounts contains information about hosts that havec mounted the bucket
+// BucketMounts contains information about hosts that have mounted the bucket
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
@@ -82,19 +49,21 @@ func (bm *BucketMounts) IsNull() bool {
 }
 
 // Clone ...  (data.Clonable interface)
-func (bm *BucketMounts) Clone() data.Clonable {
+func (bm *BucketMounts) Clone() (data.Clonable, error) {
 	return NewBucketMounts().Replace(bm)
 }
 
 // Replace ...  (data.Clonable interface)
-func (bm *BucketMounts) Replace(p data.Clonable) data.Clonable {
-	// Note: do not validate with IsNull(), it's allowed to replace a null value...
+func (bm *BucketMounts) Replace(p data.Clonable) (data.Clonable, error) {
 	if bm == nil || p == nil {
-		return bm
+		return nil, fail.InvalidInstanceError()
 	}
 
-	// FIXME: Replace should also return an error
-	src, _ := p.(*BucketMounts) // nolint
+	src, ok := p.(*BucketMounts)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *BucketMounts")
+	}
+
 	bm.ByHostID = make(map[string]string, len(src.ByHostID))
 	for k, v := range src.ByHostID {
 		bm.ByHostID[k] = v
@@ -103,7 +72,7 @@ func (bm *BucketMounts) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByHostName {
 		bm.ByHostName[k] = v
 	}
-	return bm
+	return bm, nil
 }
 
 func init() {

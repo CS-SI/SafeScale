@@ -1,8 +1,5 @@
-//go:build !race
-// +build !race
-
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,12 +27,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
-
-// Lorem ipsum dolor sit amet, consectetur adipiscing elit. In et nulla eros. Ut pharetra, arcu at bibendum ullamcorper, leo magna condimentum leo, at rhoncus dui turpis vel ante. Curabitur ac leo vel massa pretium maximus. In sed gravida felis. Etiam lacinia, sem at sollicitudin tempus, tortor dolor porta leo, ut suscipit ex mi eget eros. Praesent id ultricies metus. Morbi condimentum placerat elementum. Morbi et sem ligula.
 
 // LikeFeatures ...
 type LikeFeatures struct {
@@ -57,17 +53,19 @@ func (f *LikeFeatures) IsNull() bool {
 	return f == nil || (len(f.Installed) == 0 && len(f.Disabled) == 0)
 }
 
-func (f LikeFeatures) Clone() data.Clonable {
+func (f LikeFeatures) Clone() (data.Clonable, error) {
 	return newLikeFeatures().Replace(&f)
 }
 
-func (f *LikeFeatures) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+func (f *LikeFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 	if f == nil || p == nil {
-		return f
+		return nil, fail.InvalidInstanceError()
 	}
 
-	src := p.(*LikeFeatures)
+	src, ok := p.(*LikeFeatures)
+	if !ok {
+		return nil, fmt.Errorf("p is not a *LikeFeatures")
+	}
 	f.Installed = make(map[string]string, len(src.Installed))
 	for k, v := range src.Installed {
 		f.Installed[k] = v
@@ -76,14 +74,68 @@ func (f *LikeFeatures) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}
-	return f
+	return f, nil
+}
+
+func TestJsonProperty_IsNull(t *testing.T) {
+
+	var jp *jsonProperty = nil
+	result := jp.IsNull()
+	require.EqualValues(t, result, true)
+
+}
+
+func TestJsonProperty_Replace(t *testing.T) {
+
+	var jp *jsonProperty = nil
+	var data data.Clonable = nil
+
+	_, err := jp.Replace(data)
+	if err == nil {
+		t.FailNow()
+	} else {
+		t.Log(err)
+	}
+}
+
+func TestJsonPropertyRealReplace(t *testing.T) {
+	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
+	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
+
+	clusters, _ := NewJSONProperties("clusters")
+	assert.NotNil(t, clusters)
+
+	err := clusters.Alter("first", func(clonable data.Clonable) fail.Error {
+		thing := clonable.(*LikeFeatures)
+		thing.Installed["Loren"] = "Ipsum"
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	allbad, _ := NewJSONProperties("clusters")
+	assert.NotNil(t, allbad)
+
+	err = allbad.Alter("first", func(clonable data.Clonable) fail.Error {
+		thing := clonable.(*LikeFeatures)
+		thing.Disabled["Wonderland"] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestNewJSONProperties(t *testing.T) {
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 
-	clusters, _ := NewJSONProperties("clusters")
+	clusters, err := NewJSONProperties("clusters")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	assert.NotNil(t, clusters)
 }
 
@@ -91,11 +143,15 @@ func TestLockForReadDoesNotChange(t *testing.T) {
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 
-	clusters, _ := NewJSONProperties("clusters")
+	clusters, err := NewJSONProperties("clusters")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
 
 	assert.NotNil(t, clusters)
 
-	err := clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
+	err = clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
@@ -481,6 +537,7 @@ func TestNestedLocks(t *testing.T) {
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(500 * time.Millisecond)
+
 			return clusters.Inspect("second", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
@@ -499,6 +556,7 @@ func TestNestedLocks(t *testing.T) {
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(500 * time.Millisecond)
+
 			return clusters.Inspect("first", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
@@ -509,7 +567,7 @@ func TestNestedLocks(t *testing.T) {
 		assert.Nil(t, oerr)
 	}()
 
-	failed := waitTimeout(&wg, 5*time.Second)
+	failed := waitTimeout(&wg, 500*time.Second)
 	if failed { // It ended with a deadlock
 		t.Fail()
 	}

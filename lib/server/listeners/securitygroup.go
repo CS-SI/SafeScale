@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,15 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
-
-	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
@@ -53,10 +50,6 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, "", "/securitygroups/list")
@@ -99,10 +92,6 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-
 	name := in.GetName()
 	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	job, err := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
@@ -116,12 +105,10 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(svc, networkRef)
+	networkInstance, xerr := networkfactory.Load(job.Context(), svc, networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer networkInstance.Released()
 
 	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.Rules)
 	if xerr != nil {
@@ -137,8 +124,6 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer sgInstance.Released()
 
 	return sgInstance.ToProtocol()
 }
@@ -159,13 +144,6 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	// FIXME: networkRef is missing to locate security group if name is provided
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -182,12 +160,10 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer sgInstance.Released()
 
 	xerr = sgInstance.Clear(job.Context())
 	if xerr != nil {
@@ -214,13 +190,6 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -236,12 +205,10 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-
-	defer sgInstance.Released()
 
 	xerr = sgInstance.Reset(job.Context())
 	if xerr != nil {
@@ -267,13 +234,6 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	// FIXME: networkRef missing if security group is provided by name
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -290,12 +250,10 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer sgInstance.Released()
 
 	return sgInstance.ToProtocol()
 }
@@ -316,13 +274,6 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	// FIXME: networkRef missing if security group is provided by name
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
@@ -339,7 +290,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -368,13 +319,6 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	sgRef, sgRefLabel := srvutils.GetReference(in.Group)
 	if sgRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -395,12 +339,10 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer sgInstance.Released()
 
 	xerr = sgInstance.AddRule(job.Context(), rule)
 	if xerr != nil {
@@ -426,13 +368,6 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
-	}
-
 	ref, refLabel := srvutils.GetReference(in.GetGroup())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -453,12 +388,10 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer sgInstance.Released()
 
 	xerr = sgInstance.DeleteRule(job.Context(), rule)
 	if xerr != nil {
@@ -483,13 +416,6 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in)
-		}
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -526,15 +452,6 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil {
-		logrus.Warnf("Error running structure validator: %v", err)
-	}
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
-	}
-	// FIXME: what if err != nil ?
-
 	ref, refLabel := srvutils.GetReference(in.GetTarget())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
@@ -560,12 +477,10 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer sgInstance.Released()
 
 	out := &protocol.SecurityGroupBondsResponse{}
 	switch loweredKind {

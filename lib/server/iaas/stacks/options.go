@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
@@ -33,7 +34,7 @@ const (
 type AuthenticationOptions struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
 	// the Identity API of the appropriate version. While it's ultimately needed by
-	// all of the identity services, it will often be populated by a provider-level
+	// all the identity services, it will often be populated by a provider-level
 	// function.
 	IdentityEndpoint string
 
@@ -85,6 +86,9 @@ type AuthenticationOptions struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
+	AK string
+	AS string
+	CK string
 	// // Name of the VPC (Virtual Private Cloud)
 	// DefaultNetworkName string
 	// // CIDR of the VPC
@@ -144,4 +148,6 @@ type ConfigurationOptions struct {
 	BlacklistImageRegexp *regexp.Regexp
 
 	MaxLifeTime int
+
+	Timings *temporal.MutableTimings
 }

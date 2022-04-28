@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,8 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 
 	// Default network has no metadata, so we need to "simulate" them.
 	if withDefaultNetwork {
-		an, xerr := svc.GetDefaultNetwork()
+		var an *abstract.Network
+		an, xerr = svc.GetDefaultNetwork()
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -76,6 +77,6 @@ func New(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(svc iaas.Service, ref string) (resources.Network, fail.Error) {
-	return operations.LoadNetwork(svc, ref)
+func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
+	return operations.LoadNetwork(ctx, svc, ref, operations.WithReloadOption)
 }

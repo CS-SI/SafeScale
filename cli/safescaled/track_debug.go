@@ -2,7 +2,7 @@
 // +build debug
 
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,16 @@
 package main
 
 import (
+	"runtime"
+
 	"github.com/nakabonne/gosivy/agent"
 	"github.com/sirupsen/logrus"
 )
 
 func startTrack() {
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(5)
+
 	// Track goroutines with gosivy
 	if err := agent.Listen(agent.Options{}); err != nil {
 		logrus.Fatal(err)

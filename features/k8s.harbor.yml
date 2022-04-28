@@ -1,4 +1,4 @@
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 feature:
     suitableFor:
         host: no
-        cluster: k8s,dcos
+        cluster: k8s
 
     requirements:
         features:
@@ -814,7 +814,7 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 223 "exiture purging kubernetes"
+                                    dpkg --purge --force-remove-reinstreq kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 223 "exiture purging kubernetes"
                                     ;;
                                 redhat|rhel|fedora|centos)
                                     yum remove -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 224 "exiture purging kubernetes"

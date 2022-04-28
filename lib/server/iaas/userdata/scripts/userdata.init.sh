@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 # Script customized for {{.ProviderName}} driver
 
 {{.Header}}
+
+last_error=
 
 function print_error() {
   read -r line file <<< "$(caller)"
@@ -59,6 +61,8 @@ LOGFILE=/opt/safescale/var/log/user_data.init.log
 ### All output to one file and all output to the screen
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
+
+date
 
 LINUX_KIND=
 VERSION_ID=
@@ -131,33 +135,6 @@ EOF
   chmod -R 0600 /home/{{.Username}}/.ssh/*
   cat /home/{{.Username}}/.ssh/id_rsa
 
-  cat >> /home/{{.Username}}/.bashrc <<- EOF
-		pathremove() {
-      local IFS=':'
-      local NEWPATH
-      local DIR
-      local PATHVARIABLE=${2:-PATH}
-      for DIR in ${!PATHVARIABLE} ; do
-              if [ "$DIR" != "$1" ] ; then
-                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-              fi
-      done
-      export $PATHVARIABLE="$NEWPATH"
-		}
-		pathprepend() {
-      pathremove $1 $2
-      local PATHVARIABLE=${2:-PATH}
-      export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-		}
-		pathappend() {
-      pathremove $1 $2
-      local PATHVARIABLE=${2:-PATH}
-      export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-		}
-		pathprepend $HOME/.local/bin
-		pathappend /opt/safescale/bin
-EOF
-
   chown -R {{.Username}}:{{.Username}} /opt/safescale
   chmod -R 0640 /opt/safescale
   find /opt/safescale -type d -exec chmod a+rx {} \;
@@ -178,6 +155,7 @@ EOF
 # - /etc/hostname contains short hostname
 function put_hostname_in_hosts() {
   echo "{{ .HostName }}" > /etc/hostname
+  echo "127.0.0.1 {{ .HostName }}" >> /etc/hosts
   hostname {{ .HostName }}
   SHORT_HOSTNAME=$(hostname -s)
   [[ "$SHORT_HOSTNAME" == "{{ .HostName }}" ]] && return
@@ -193,6 +171,9 @@ function disable_cloudinit_network_autoconf() {
 
 # For testing purposes
 function unsafe_sshd() {
+  {{- if .IsGateway }}
+  sed -i -E 's/(#|)Port\ ([0-9]+)/Port\ {{ .SSHPort }}/g' /etc/ssh/sshd_config || fail 208 "failure changing ssh service port"
+  {{- end }}
   sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
     sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config &&
     sed -i '/^.*PubkeyAuthentication / s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config &&
@@ -200,6 +181,9 @@ function unsafe_sshd() {
 }
 
 function secure_sshd() {
+  {{- if .IsGateway }}
+  sed -i -E 's/(#|)Port\ ([0-9]+)/Port\ {{ .SSHPort }}/g' /etc/ssh/sshd_config || fail 208 "failure changing ssh service port"
+  {{- end }}
   sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config &&
     sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config &&
     sed -i '/^.*PubkeyAuthentication / s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config &&
@@ -220,10 +204,27 @@ function disable_services() {
   esac
 }
 
+function sfFinishPreviousInstall() {
+  local unfinished
+  unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+  if [[ "$unfinished" == 0 ]]; then
+    echo "good"
+    return 0
+  else
+    echo "there are unconfigured packages !"
+    sudo dpkg --configure -a --force-all && {
+      return $?
+    }
+    return 0
+  fi
+}
+export -f sfFinishPreviousInstall
+
 function disable_upgrades() {
   case $LINUX_KIND in
   ubuntu)
-    sfApt remove -y unattended-upgrades || true
+    sfFinishPreviousInstall
+    dpkg --remove --force-remove-reinstreq unattended-upgrades || true
     ;;
   *) ;;
 
@@ -273,8 +274,12 @@ disable_cloudinit_network_autoconf
 disable_services
 disable_upgrades
 
-#unsafe_sshd
+{{- if .Debug }}
+unsafe_sshd
+{{- else }}
 secure_sshd
+{{- end }}
+
 create_user
 
 no_daily_update

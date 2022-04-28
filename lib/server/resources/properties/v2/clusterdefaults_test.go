@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDefaults_Clone(t *testing.T) {
+func TestClusterDefault_IsNull(t *testing.T) {
+
+	var sd *ClusterDefaults = nil
+	if !sd.IsNull() {
+		t.Error("ClusterDefaults nil pointer is null")
+		t.Fail()
+	}
+	sd = newClusterDefaults()
+	if !sd.IsNull() {
+		t.Error("Empty ClusterDefaults is null")
+		t.Fail()
+	}
+	sd.GatewaySizing.MinCores = 1
+	if sd.IsNull() {
+		t.Error("ClusterDefaults is not null")
+		t.Fail()
+	}
+}
+
+func TestClusterDefault_Replace(t *testing.T) {
+	var sgs *ClusterDefaults = nil
+	sgs2 := newClusterDefaults()
+	result, err := sgs.Replace(sgs2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
+}
+
+func TestClusterDefault_Clone(t *testing.T) {
 	ct := newClusterDefaults()
 	ct.Image = "something"
 	ct.GatewaySizing = HostSizingRequirements{
@@ -32,7 +61,12 @@ func TestDefaults_Clone(t *testing.T) {
 		MinGPU:   1,
 	}
 
-	clonedCt, ok := ct.Clone().(*ClusterDefaults)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*ClusterDefaults)
 	if !ok {
 		t.Fail()
 	}

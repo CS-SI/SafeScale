@@ -32,6 +32,11 @@ rice-box.go
 *_string.go
 mock_*.go
 gomock_reflect*
+lib/utils/data/consts.go
+lib/utils/valid/consts.go
+
+#ignore coverage files
+cover.goconvey
 
 # ignore pipfile.lock
 lib/Pipfile.lock

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,17 +19,110 @@ package propertiesv1
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func TestVolumeDescription_IsNull(t *testing.T) {
+
+	var vd *VolumeDescription = nil
+	if !vd.IsNull() {
+		t.Error("VolumeDescription nil pointer is null")
+		t.Fail()
+	}
+	vd = NewVolumeDescription()
+	if !vd.IsNull() {
+		t.Error("Empty VolumeDescription is null")
+		t.Fail()
+	}
+	vd.Purpose = "VolumeDescription Purpose"
+	if vd.IsNull() {
+		t.Error("VolumeDescription is not null")
+		t.Fail()
+	}
+}
+
+func TestVolumeDescription_Replace(t *testing.T) {
+	var ssg *VolumeDescription = nil
+	ssg2 := NewVolumeDescription()
+	result, err := ssg.Replace(ssg2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
+}
+
+func TestVolumeDescription_Clone(t *testing.T) {
+
+	vd := &VolumeDescription{
+		Purpose: "VolumeDescription Purpose",
+		Created: time.Now(),
+	}
+
+	cloned, err := vd.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+	clonedVd, ok := cloned.(*VolumeDescription)
+	if !ok {
+		t.Fail()
+	}
+
+	assert.Equal(t, vd, clonedVd)
+	require.EqualValues(t, vd, clonedVd)
+	clonedVd.Purpose = "VolumeDescription Purpose2"
+
+	areEqual := reflect.DeepEqual(vd, clonedVd)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+	require.NotEqualValues(t, vd, clonedVd)
+}
+
+func TestVolumeAttachments_IsNull(t *testing.T) {
+
+	var ssg *VolumeAttachments = nil
+	if !ssg.IsNull() {
+		t.Error("VolumeAttachments nil pointer is null")
+		t.Fail()
+	}
+	ssg = NewVolumeAttachments()
+	if !ssg.IsNull() {
+		t.Error("Empty VolumeAttachments is null")
+		t.Fail()
+	}
+	ssg.Hosts["ID"] = "Host"
+	if ssg.IsNull() {
+		t.Error("VolumeAttachments is not null")
+		t.Fail()
+	}
+}
+
+func TestVolumeAttachments_Replace(t *testing.T) {
+	var ssg *VolumeAttachments = nil
+	ssg2 := NewVolumeAttachments()
+	result, err := ssg.Replace(ssg2)
+	if err == nil {
+		t.Errorf("Replace should NOT work with nil")
+	}
+	require.Nil(t, result)
+}
+
 func TestVolumeAttachments_Clone(t *testing.T) {
+
 	ct := NewVolumeAttachments()
 	ct.Shareable = true
 	ct.Hosts = map[string]string{"id1": "host1"}
 
-	clonedCt, ok := ct.Clone().(*VolumeAttachments)
+	cloned, err := ct.Clone()
+	if err != nil {
+		t.Error(err)
+	}
+
+	clonedCt, ok := cloned.(*VolumeAttachments)
 	if !ok {
 		t.Fail()
 	}

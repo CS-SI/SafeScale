@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,9 +34,9 @@ import (
 const featureFileExt = ".yml"
 
 var (
-	availableEmbeddedFeaturesMap = map[installmethod.Enum]map[string]*Feature{}
-	allEmbeddedFeaturesMap       = map[string]*Feature{}
-	allEmbeddedFeatures          []*Feature
+	availableEmbeddedFeaturesMap = map[installmethod.Enum]map[string]*FeatureFile{}
+	allEmbeddedFeaturesMap       = map[string]*FeatureFile{}
+	allEmbeddedFeatures          []*FeatureFile
 )
 
 func getSHA256Hash(text string) string {
@@ -84,253 +84,205 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 }
 
 // dockerFeature ...
-func dockerFeature() *Feature {
+func dockerFeature() *FeatureFile {
 	name := "docker"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // dockerSwarmFeature ...
-func dockerSwarmFeature() *Feature {
+func dockerSwarmFeature() *FeatureFile {
 	name := "docker-swarm"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // ntpServerFeature ...
-func ntpServerFeature() *Feature {
+func ntpServerFeature() *FeatureFile {
 	name := "ntpserver"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // ntpServerFeature ...
-func ntpClientFeature() *Feature {
+func ntpClientFeature() *FeatureFile {
 	name := "ntpclient"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // ansibleFeature from official repos ...
-func ansibleFeature() *Feature {
+func ansibleFeature() *FeatureFile {
 	name := "ansible"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
+
+	return newFeatureFile(filename, name, true, specs)
+}
+
+// ansibleForClusterFeature  ...
+func ansibleForClusterFeature() *FeatureFile {
+	name := "ansible-for-cluster"
+	filename, specs, err := loadSpecFile(name)
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		panic(err.Error())
 	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // certificateAuthorityFeature from official repos ...
-func certificateAuthorityFeature() *Feature {
+func certificateAuthorityFeature() *FeatureFile {
 	name := "certificateauthority"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // nVidiaDockerFeature ...
-func nVidiaDockerFeature() *Feature {
+func nVidiaDockerFeature() *FeatureFile {
 	name := "nvidiadocker"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // kubernetesFeature ...
-func kubernetesFeature() *Feature {
+func kubernetesFeature() *FeatureFile {
 	name := "kubernetes"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // helm2Feature ...
-func helm2Feature() *Feature {
+func helm2Feature() *FeatureFile {
 	name := "helm2"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // helm3Feature ...
-func helm3Feature() *Feature {
+func helm3Feature() *FeatureFile {
 	name := "helm3"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // remoteDesktopFeature ...
-func remoteDesktopFeature() *Feature {
+func remoteDesktopFeature() *FeatureFile {
 	name := "remotedesktop"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // proxycacheServerFeature ...
-func proxycacheServerFeature() *Feature {
+func proxycacheServerFeature() *FeatureFile {
 	name := "proxycache-server"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // proxycacheClientFeature ...
-func proxycacheClientFeature() *Feature {
+func proxycacheClientFeature() *FeatureFile {
 	name := "proxycache-client"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // postgres4gatewayFeature ...
-func postgres4gatewayFeature() *Feature {
+func postgres4gatewayFeature() *FeatureFile {
 	name := "postgres4gateway"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 // edgeproxy4subnetFeature ...
-func edgeproxy4subnetFeature() *Feature {
+func edgeproxy4subnetFeature() *FeatureFile {
 	name := "edgeproxy4subnet"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+
+	return newFeatureFile(filename, name, true, specs)
 }
 
 func init() {
-	allEmbeddedFeatures = []*Feature{
+	allEmbeddedFeatures = []*FeatureFile{
 		dockerFeature(),
 		dockerSwarmFeature(),
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
-		// ansibleForClusterFeature(),
+		ansibleForClusterFeature(),
 		certificateAuthorityFeature(),
 		// postgresql4platformFeature(),
 		nVidiaDockerFeature(),
@@ -369,7 +321,7 @@ func init() {
 		for k := range installers {
 			meth, err := installmethod.Parse(k)
 			if err != nil {
-				displayFilename := item.GetDisplayFilename()
+				displayFilename := item.DisplayFilename()
 				if displayFilename == "" {
 					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
 				} else {
@@ -378,7 +330,7 @@ func init() {
 				continue
 			}
 			if _, found := availableEmbeddedFeaturesMap[meth]; !found {
-				availableEmbeddedFeaturesMap[meth] = map[string]*Feature{
+				availableEmbeddedFeaturesMap[meth] = map[string]*FeatureFile{
 					itemName: item,
 				}
 			} else {

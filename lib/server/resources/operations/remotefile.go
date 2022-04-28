@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 )
 
 // Item is a helper struct to ease the copy of local files to remote
@@ -43,8 +42,8 @@ type Item struct {
 }
 
 // Upload transfers the local file to the hostname
-func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -59,6 +58,11 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 	}
 
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Check the local file exists first
 	if _, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
@@ -67,15 +71,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -89,7 +85,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			iterations++
-			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
+			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, timings.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				xerr.Annotate("iterations", iterations)
@@ -107,14 +103,14 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 			}
 
 			if retcode != 0 {
-				problem := fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+				problem := fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d)", rfc.Local, host.GetName(), rfc.Remote, retcode)
 				problem.Annotate("iterations", iterations)
 				return problem
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetConnectionTimeout()+2*temporal.GetExecutionTimeout(),
+		timings.NormalDelay(),
+		timings.ConnectionTimeout()+2*timings.ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
@@ -151,8 +147,17 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 
 // RemoveRemote deletes the remote file from host
 func (rfc Item) RemoveRemote(ctx context.Context, host resources.Host) fail.Error {
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
+	}
+
+	timings, xerr := host.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil || retcode != 0 {
 		return fail.NewError("failed to remove file '%s:%s'", host.GetName(), rfc.Remote)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
@@ -80,7 +81,7 @@ func (t *tracer) isNull() bool {
 
 // entering logs the input message (signifying we are going in) using TRACE level
 func (t *tracer) entering() *tracer {
-	if !t.isNull() && !t.inDone {
+	if !valid.IsNil(t) && !t.inDone {
 		if t.enabled {
 			t.inDone = true
 			logrus.Tracef(enteringPrefix + t.buildMessage())
@@ -91,7 +92,7 @@ func (t *tracer) entering() *tracer {
 
 // exiting logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
 func (t *tracer) exiting() *tracer {
-	if !t.isNull() && !t.outDone {
+	if !valid.IsNil(t) && !t.outDone {
 		if t.enabled {
 			t.outDone = true
 			logrus.Tracef(exitingPrefix + t.buildMessage())
@@ -102,7 +103,7 @@ func (t *tracer) exiting() *tracer {
 
 // buildMessage builds the message with available information from stack trace
 func (t *tracer) buildMessage() string {
-	if t == nil || t.isNull() {
+	if t == nil || valid.IsNil(t) {
 		return ""
 	}
 
@@ -114,14 +115,14 @@ func (t *tracer) buildMessage() string {
 }
 
 // Trace traces a message
-func (t *tracer) trace(msg ...interface{}) *tracer {
-	if !t.isNull() && t.enabled {
+func (t *tracer) trace(msg ...interface{}) *tracer { // nolint
+	if !valid.IsNil(t) && t.enabled {
 		fmt.Println(messagePrefix + t.buildMessage() + ": " + strprocess.FormatStrings(msg...))
 	}
 	return t
 }
 
-// removePart contains the basedir to remove from file pathes
+// removePart contains the basedir to remove from file paths
 var removePart atomic.Value
 
 func getPartToRemove() string {

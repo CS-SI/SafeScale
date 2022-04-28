@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,9 +42,8 @@ type genericPackager struct {
 }
 
 // Check checks if the Feature is installed
-func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
-	r = nil
-	defer fail.OnPanic(xerr)
+func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -58,9 +57,7 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 
 	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in Feature '%s' specification file (%s):
-				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
@@ -86,9 +83,9 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 }
 
 // Add installs the Feature using apt
-func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -102,9 +99,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 
 	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in Feature '%s' specification file (%s):
-				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Add, g.addCommand)
@@ -131,9 +126,9 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 }
 
 // Remove uninstalls the Feature using the RemoveScript script
-func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -147,9 +142,7 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 
 	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in Feature '%s' specification file (%s):
-				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)

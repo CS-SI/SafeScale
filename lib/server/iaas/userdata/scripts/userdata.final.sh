@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@
 # Script customized for {{.ProviderName}} driver
 
 {{.Header}}
+
+last_error=
 
 function print_error() {
   read -r line file <<< "$(caller)"
@@ -58,8 +60,19 @@ export -f fail
 LOGFILE=/opt/safescale/var/log/user_data.final.log
 
 ### All output to one file and all output to the screen
+{{- if .Debug }}
+if [[ -e /home/{{.Username}}/tss ]]; then
+  exec > >(/home/{{.Username}}/tss | tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+else
+  exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+fi
+{{- else }}
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+{{- end }}
+
 set -x
+
+date
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'user_data.final' is already done (otherwise will deadlock)
 uptime > /opt/safescale/var/state/user_data.final.done
@@ -101,10 +114,10 @@ function install_drivers_nvidia() {
       dracut --force
       rmmod nouveau
     fi
-    yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &> /dev/null || fail 206 "failure updating kernel"
+    sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &> /dev/null || fail 206 "failure updating kernel"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207 "failure downloading nvidia drivers"
     # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
-    if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
+    if [ $(uname -r) == $(sfYum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
       bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208 "failure installing nvidia"
     fi
     rm -f NVIDIA-Linux-x86_64-410.78.run
@@ -115,25 +128,8 @@ function install_drivers_nvidia() {
   esac
 }
 
-function install_python3() {
-  case $LINUX_KIND in
-  debian | ubuntu)
-    sfFinishPreviousInstall || fail 200 "failure finishing previous install"
-    sfApt update || fail 201 "failure updating packages"
-    sfApt -y install python3 python3-pip &> /dev/null || fail 210 "failure installing python3"
-    ;;
-  redhat | rhel | centos)
-    yum install -y python3 python3-pip || fail 210 "failure installing python3"
-    ;;
-  *)
-    fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
-    ;;
-  esac
-}
-
 # ---- Main
 install_drivers_nvidia
-install_python3
 # ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.final.done

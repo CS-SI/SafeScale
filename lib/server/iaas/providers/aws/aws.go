@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,10 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/asaskevich/govalidator"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 )
 
 //goland:noinspection GoPreferNilSlice
@@ -69,8 +72,8 @@ func (p provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
 }
 
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
-	if p.IsNull() {
-		return map[string]interface{}{}, nil
+	if valid.IsNil(p) {
+		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
 }
@@ -112,6 +115,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return &provider{}, fail.SyntaxError("field 'Zone' in section 'compute' not found in tenants.toml")
 	}
 
+	var owners []string
+	if _, ok = computeCfg["Owners"]; ok {
+		ownerList, ok := computeCfg["Owners"].(string)
+		if !ok {
+			logrus.Debugf("error reading owners: %v", computeCfg["Owners"])
+		} else {
+			frag := strings.Split(ownerList, ",")
+			for _, item := range frag {
+				owners = append(owners, strings.TrimSpace(item))
+			}
+		}
+	}
+
 	awsConf := stacks.AWSConfiguration{
 		// S3Endpoint:  s3Endpoint,
 		Ec2Endpoint: fmt.Sprintf("https://ec2.%s.amazonaws.com", region),
@@ -119,6 +135,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:      region,
 		Zone:        zone,
 		NetworkName: networkName,
+		Owners:      owners,
 	}
 
 	username, ok := identityCfg["Username"].(string) // nolint
@@ -178,23 +195,38 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	metadataBucketName = strings.ReplaceAll(metadataBucketName, ".", "-")
+
 	customDNS, _ := computeCfg["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {
 				fragment = strings.TrimSpace(fragment)
-				if govalidator.IsIP(fragment) {
+				if valid.IsIP(fragment) {
 					dnsServers = append(dnsServers, fragment)
 				}
 			}
 		} else {
 			fragment := strings.TrimSpace(customDNS)
-			if govalidator.IsIP(fragment) {
+			if valid.IsIP(fragment) {
 				dnsServers = append(dnsServers, fragment)
 			}
 		}
 	}
+
+	var timings *temporal.MutableTimings
+	if tc, ok := params["timings"]; ok {
+		if theRecoveredTiming, ok := tc.(map[string]interface{}); ok {
+			s := &temporal.MutableTimings{}
+			err := mapstructure.Decode(theRecoveredTiming, &s)
+			if err != nil {
+				goto next
+			}
+			timings = s
+		}
+	}
+next:
 
 	cfgOptions := stacks.ConfigurationOptions{
 		DNSList:                   dnsServers,
@@ -212,6 +244,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
 		DefaultSecurityGroupName: "default",
 		MaxLifeTime:              maxLifeTime,
+		Timings:                  timings,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -219,9 +252,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.ConvertError(err)
 	}
 
+	// Note: if timings have to be tuned, update awsStack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: awsStack,
-		Name:       "amazon",
+		FullStack: awsStack,
+		Name:      "amazon",
 	}
 
 	newP := &provider{
@@ -230,8 +265,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: newP,
-		Name:          wrapped.Name,
+		Provider: newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil
@@ -240,7 +275,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -259,7 +294,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	if p.IsNull() {
+	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
@@ -299,17 +334,17 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
-func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	if p.IsNull() {
-		return []abstract.Image{}, fail.InvalidInstanceError()
+func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
-func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	if p.IsNull() {
-		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }
@@ -324,8 +359,8 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
-	if p.IsNull() {
-		return emptySlice, nil
+	if valid.IsNil(p) {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -335,7 +370,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, nil
+			return emptySlice, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

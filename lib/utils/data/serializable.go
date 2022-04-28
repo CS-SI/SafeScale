@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 
 package data
 
-//go:generate minimock -o ../mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Serializable
+//go:generate minimock -o mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data.Serializable
 
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
-// and reverse operation (Unserialize()
+// and reverse operation (Deserialize()
 type Serializable interface {
 	Serialize() ([]byte, error)
 	Deserialize([]byte) error

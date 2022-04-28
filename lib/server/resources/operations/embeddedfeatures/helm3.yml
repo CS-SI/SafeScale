@@ -1,4 +1,4 @@
-# Copyright 2018-2021, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2022, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ feature:
             - kubernetes
 
     parameters:
-        - Version=3.6.3
+        - Version=3.6.3 # helm version to install
 
     install:
         bash:

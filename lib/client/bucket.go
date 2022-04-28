@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
 	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -42,7 +44,15 @@ func (c bucket) List(all bool, timeout time.Duration) (*protocol.BucketListRespo
 		return nil, xerr
 	}
 
-	r, err := service.List(ctx, &protocol.BucketListRequest{All: all})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	r, err := service.List(newCtx, &protocol.BucketListRequest{All: all})
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +70,15 @@ func (c bucket) Create(name string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Create(ctx, &protocol.BucketRequest{Name: name})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Create(newCtx, &protocol.BucketRequest{Name: name})
 	return err
 }
 
@@ -80,9 +98,20 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 		errs  []string
 	)
 
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
 	bucketDeleter := func(aname string) {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.BucketRequest{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.BucketRequest{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -112,7 +141,15 @@ func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketRes
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &protocol.BucketRequest{Name: name})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	return service.Inspect(newCtx, &protocol.BucketRequest{Name: name})
 }
 
 // Mount ...
@@ -125,7 +162,15 @@ func (c bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dura
 		return xerr
 	}
 
-	_, err := service.Mount(ctx, &protocol.BucketMountRequest{
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Mount(newCtx, &protocol.BucketMountRequest{
 		Bucket: bucketName,
 		Host:   &protocol.Reference{Name: hostName},
 		Path:   mountPoint,
@@ -143,7 +188,15 @@ func (c bucket) Unmount(bucketName, hostName string, timeout time.Duration) erro
 		return xerr
 	}
 
-	_, err := service.Unmount(ctx, &protocol.BucketMountRequest{
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Unmount(newCtx, &protocol.BucketMountRequest{
 		Bucket: bucketName,
 		Host:   &protocol.Reference{Name: hostName},
 	})

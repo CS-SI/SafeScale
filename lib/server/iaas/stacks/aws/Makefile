@@ -13,7 +13,6 @@ generate:
 test:
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -v ./...
 
-clean:
-	@$(RM) rice-box.go || true
+clean: ;
 
 

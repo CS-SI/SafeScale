@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.Security
 }
 
 // New creates an instance of resources.SecurityGroup
-func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
+func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -67,6 +67,6 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
-	return operations.LoadSecurityGroup(svc, ref)
+func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
+	return operations.LoadSecurityGroup(ctx, svc, ref, operations.WithReloadOption)
 }

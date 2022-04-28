@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v21/lib/protocol"
@@ -39,5 +40,13 @@ func (img image) List(all bool, timeout time.Duration) (*protocol.ImageList, err
 		return nil, xerr
 	}
 
-	return service.List(ctx, &protocol.ImageListRequest{All: all})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	return service.List(newCtx, &protocol.ImageListRequest{All: all})
 }
