@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/makholm/covertool/pkg/exit"
+	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
