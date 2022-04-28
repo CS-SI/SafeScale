@@ -11,4 +11,4 @@ vet:
 	@$(GO) vet ./...
 
 clean:
-	@:
+	@$(RM) ./mocks/mock_*.go || true

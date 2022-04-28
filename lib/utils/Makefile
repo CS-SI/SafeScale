@@ -33,3 +33,4 @@ clean:
 	@(cd fail && $(MAKE) $@)
 	@(cd temporal && $(MAKE) $@)
 	@(cd retry && $(MAKE) $@)
+	@$(RM) ./mocks/mock_*.go || true
