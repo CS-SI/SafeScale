@@ -89,9 +89,15 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	}
 
 	if aId := ctx.Value(concurrency.KeyForID); aId != nil {
-		t.taskSig = ctx.Value(concurrency.KeyForID).(string)
+		var ok bool
+		t.taskSig, ok = aId.(string) // nolint
+		if !ok {
+			nId, _ := uuid.NewV4() //  nolint
+			t.taskSig = nId.String()
+		}
 	} else {
-		aId, _ = uuid.NewV4()
+		nId, _ := uuid.NewV4() // nolint
+		t.taskSig = nId.String()
 	}
 
 	message := strprocess.FormatStrings(msg...)
