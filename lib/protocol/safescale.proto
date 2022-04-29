@@ -410,6 +410,7 @@ message Host {
 	string creation_date = 16;
 	bool managed = 17;
 	string template = 18;
+  repeated string tag_names = 19;
 }
 
 message HostStatus {
@@ -452,6 +453,8 @@ service HostService {
 	rpc EnableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
 	rpc DisableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
 	rpc ListSecurityGroups(SecurityGroupHostBindRequest) returns (SecurityGroupBondsResponse){}
+  rpc Tag(TagRequest) returns (google.protobuf.Empty){}
+	rpc Untag(TagRequest) returns (google.protobuf.Empty){}
 }
 
 message HostTemplate {
@@ -1154,4 +1157,41 @@ service PublicIPService {
 	rpc List(PublicIPListRequest) returns (PublicIPListResponse){}
 	rpc Bind(PublicIPBindRequest) returns (google.protobuf.Empty){}
 	rpc Unbind(PublicIPBindRequest) returns (google.protobuf.Empty){}
+}
+
+message TagCreateRequest {
+	string name = 1;
+	string tenant_id = 2;
+}
+
+message TagDetachmentRequest {
+	Reference tag = 1;
+	Reference host = 2;
+}
+
+message TagInspectResponse {
+	string id = 1;
+	string name = 2;
+	repeated string hosts = 3;
+}
+
+message TagListRequest {
+	bool all = 1;
+	string tenant_id = 2;
+}
+
+message TagListResponse {
+	repeated TagInspectResponse tags = 1;
+}
+
+message TagRequest {
+	Reference tag = 1;
+	Reference host = 2;
+}
+
+service TagService {
+	rpc Create(TagCreateRequest) returns (TagInspectResponse) {}
+	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc List(TagListRequest) returns (TagListResponse) {}
+	rpc Inspect(Reference) returns (TagInspectResponse){}
 }
