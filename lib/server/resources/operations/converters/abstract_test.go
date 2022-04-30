@@ -468,45 +468,61 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gw_scfg := ssh.Config{
-		Hostname:               "Config GW Hostname",
-		IPAddress:              "Config GW Hostname",
-		Port:                   42,
-		User:                   "Config GW Hostname",
-		PrivateKey:             "Config GW Hostname",
-		LocalPort:              43,
-		GatewayConfig:          nil,
-		SecondaryGatewayConfig: nil,
-	}
-	gw2_scfg := ssh.Config{
-		Hostname:               "Config GW2 Hostname",
-		IPAddress:              "Config GW2 Hostname",
-		Port:                   0,
-		User:                   "Config GW2 Hostname",
-		PrivateKey:             "Config GW2 Hostname",
-		LocalPort:              45,
-		GatewayConfig:          nil,
-		SecondaryGatewayConfig: nil,
-	}
-	scfg := ssh.Config{
-		Hostname:               "Config Hostname",
-		IPAddress:              "Config Hostname",
-		Port:                   46,
-		User:                   "Config Hostname",
-		PrivateKey:             "Config Hostname",
-		LocalPort:              47,
-		GatewayConfig:          &gw_scfg,
-		SecondaryGatewayConfig: &gw2_scfg,
-	}
-	pcfg := SSHConfigFromAbstractToProtocol(scfg)
-	require.EqualValues(t, scfg.Hostname, pcfg.HostName)
-	require.EqualValues(t, scfg.User, pcfg.User)
-	require.EqualValues(t, scfg.IPAddress, pcfg.Host)
-	require.EqualValues(t, scfg.Port, pcfg.Port)
-	require.EqualValues(t, scfg.PrivateKey, pcfg.PrivateKey)
-	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.GatewayConfig), pcfg.Gateway)
-	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.SecondaryGatewayConfig), pcfg.SecondaryGateway)
+	gwConf, xerr := ssh.NewConfig("Config GW Hostname", "Config GW Hostname", 42, "Config GW Hostname", "Config GW Hostname")
+	require.NotNil(t, gwConf)
+	require.Nil(t, xerr)
+	xerr = gwConf.SetLocalPort(43)
+	require.Nil(t, xerr)
 
+	gw2Conf, xerr := ssh.NewConfig("Config GW2 Hostname", "Config GW2 Hostname", 0, "Config GW2 Hostname", "Config GW2 Hostname")
+	require.NotNil(t, gwConf)
+	require.Nil(t, xerr)
+	xerr = gwConf.SetLocalPort(45)
+	require.Nil(t, xerr)
+
+	hostConf, xerr := ssh.NewConfig("Config Hostname", "Config Hostname", 46, "Config Hostname", "Config Hostname", gwConf, gw2Conf)
+	require.NotNil(t, gwConf)
+	require.Nil(t, xerr)
+	xerr = gwConf.SetLocalPort(47)
+	require.Nil(t, xerr)
+
+	pgwcfg, xerr := SSHConfigFromAbstractToProtocol(gwConf)
+	require.Nil(t, xerr)
+	require.EqualValues(t, gwConf.Hostname(), pgwcfg.HostName)
+	require.EqualValues(t, gwConf.User(), pgwcfg.User)
+	require.EqualValues(t, gwConf.IPAddress(), pgwcfg.Host)
+	require.EqualValues(t, gwConf.Port(), pgwcfg.Port)
+	require.EqualValues(t, gwConf.PrivateKey(), pgwcfg.PrivateKey)
+
+	pgw2cfg, xerr := SSHConfigFromAbstractToProtocol(gw2Conf)
+	require.Nil(t, xerr)
+	require.EqualValues(t, gw2Conf.Hostname(), pgw2cfg.HostName)
+	require.EqualValues(t, gw2Conf.User(), pgw2cfg.User)
+	require.EqualValues(t, gw2Conf.IPAddress(), pgw2cfg.Host)
+	require.EqualValues(t, gw2Conf.Port(), pgw2cfg.Port)
+	require.EqualValues(t, gw2Conf.PrivateKey(), pgw2cfg.PrivateKey)
+
+	phostcfg, xerr := SSHConfigFromAbstractToProtocol(hostConf)
+	require.Nil(t, xerr)
+	require.EqualValues(t, hostConf.Hostname(), phostcfg.HostName)
+	require.EqualValues(t, hostConf.User(), phostcfg.User)
+	require.EqualValues(t, hostConf.IPAddress(), phostcfg.Host)
+	require.EqualValues(t, hostConf.Port(), phostcfg.Port)
+	require.EqualValues(t, hostConf.PrivateKey(), phostcfg.PrivateKey)
+
+	gwConf = hostConf.GatewayConfig(ssh.PrimaryGateway)
+	require.NotNil(t, gwConf)
+	pgwcfg, xerr = SSHConfigFromAbstractToProtocol(gwConf)
+	require.Nil(t, xerr)
+	require.NotNil(t, pgwcfg)
+	require.EqualValues(t, pgwcfg, phostcfg.Gateway)
+
+	gw2Conf = hostConf.GatewayConfig(ssh.SecondaryGateway)
+	require.NotNil(t, gw2Conf)
+	pgw2cfg, xerr = SSHConfigFromAbstractToProtocol(gw2Conf)
+	require.Nil(t, xerr)
+	require.NotNil(t, pgw2cfg)
+	require.EqualValues(t, pgw2cfg, phostcfg.SecondaryGateway)
 }
 
 func Test_HostStatusFromAbstractToProtocol(t *testing.T) {
