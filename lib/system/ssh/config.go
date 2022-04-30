@@ -100,8 +100,12 @@ type sshConfigInternal struct {
 }
 
 // Clone makes a clone of instance
-func (sci sshConfigInternal) Clone() *sshConfigInternal {
-	out := sci
+func (sci *sshConfigInternal) Clone() *sshConfigInternal {
+	if sci == nil {
+		return nil
+	}
+
+	out := *sci
 	if sci.GatewayConfig != nil {
 		out.GatewayConfig = sci.GatewayConfig.Clone()
 	}
@@ -1020,17 +1024,18 @@ func (sconf sshConfig) GatewayConfig(idx WhatGateway) Config {
 	var newConf *sshConfigInternal
 	switch idx {
 	case PrimaryGateway:
-		newConf = sconf._private.GatewayConfig
+		newConf = sconf._private.GatewayConfig.Clone()
 	case SecondaryGateway:
-		newConf = sconf._private.SecondaryGatewayConfig
+		newConf = sconf._private.SecondaryGatewayConfig.Clone()
 	default:
 		return nil
 	}
 
-	out := sshConfig{
-		_private: *newConf,
+	if newConf == nil {
+		return NewEmptyConfig()
 	}
-	return &out
+
+	return &sshConfig{*newConf}
 }
 
 // PrimaryGatewayConfig ...
