@@ -17,17 +17,17 @@
 package converters
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v21/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // Contains the function used to convert from abstract structures
@@ -267,14 +267,14 @@ func SSHConfigFromAbstractToProtocol(in ssh.Config) (*protocol.SshConfig, fail.E
 	}
 
 	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
-	gwSSHConf, xerr := in.PrimaryGatewayConfig()
+	gwSSHConf, xerr := in.GatewayConfig(ssh.PrimaryGateway)
 	if xerr == nil && !valid.IsNil(gwSSHConf) {
 		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
-	gwSSHConf, xerr = in.SecondaryGatewayConfig()
+	gwSSHConf, xerr = in.GatewayConfig(ssh.SecondaryGateway)
 	if xerr == nil && !valid.IsNil(gwSSHConf) {
 		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
