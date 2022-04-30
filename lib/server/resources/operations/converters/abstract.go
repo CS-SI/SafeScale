@@ -266,16 +266,19 @@ func SSHConfigFromAbstractToProtocol(in ssh.Config) (*protocol.SshConfig, fail.E
 		return nil, fail.InvalidInstanceError()
 	}
 
-	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
-	gwSSHConf, xerr := in.GatewayConfig(ssh.PrimaryGateway)
-	if xerr == nil && !valid.IsNil(gwSSHConf) {
+	var (
+		pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
+		xerr                                 fail.Error
+	)
+	gwSSHConf := in.GatewayConfig(ssh.PrimaryGateway)
+	if !valid.IsNil(gwSSHConf) {
 		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
-	gwSSHConf, xerr = in.GatewayConfig(ssh.SecondaryGateway)
-	if xerr == nil && !valid.IsNil(gwSSHConf) {
+	gwSSHConf = in.GatewayConfig(ssh.SecondaryGateway)
+	if !valid.IsNil(gwSSHConf) {
 		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr
