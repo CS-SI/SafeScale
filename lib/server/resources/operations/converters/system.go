@@ -22,21 +22,25 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // SSHConfigFromSystemToProtocol converts a system.Config into a SshConfig
 func SSHConfigFromSystemToProtocol(from ssh.Config) (*protocol.SshConfig, fail.Error) {
-	var pgw, sgw *protocol.SshConfig
-	pgwConf, xerr := from.GatewayConfig(ssh.PrimaryGateway)
-	if xerr == nil && pgwConf != nil {
+	var (
+		pgw, sgw *protocol.SshConfig
+		xerr     fail.Error
+	)
+	pgwConf := from.GatewayConfig(ssh.PrimaryGateway)
+	if !valid.IsNil(pgwConf) {
 		pgw, xerr = SSHConfigFromSystemToProtocol(pgwConf)
 	}
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgwConf, xerr := from.GatewayConfig(ssh.SecondaryGateway)
-	if xerr == nil && sgwConf != nil {
+	sgwConf := from.GatewayConfig(ssh.SecondaryGateway)
+	if !valid.IsNil(sgwConf) {
 		sgw, xerr = SSHConfigFromSystemToProtocol(sgwConf)
 	}
 	if xerr != nil {
