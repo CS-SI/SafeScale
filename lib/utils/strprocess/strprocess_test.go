@@ -1,5 +1,5 @@
-//go:build !generics
-// +build !generics
+//go:build !go1.18
+// +build !go1.18
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
