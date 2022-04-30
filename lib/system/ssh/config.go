@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -62,18 +63,18 @@ type Config interface {
 	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
 	CreateTunneling() (Tunnels, Config, fail.Error)
 	Enter(string, string) fail.Error
-	GatewayConfig(gwIndex WhatGateway) (Config, fail.Error)
+	GatewayConfig(gwIndex WhatGateway) Config
 	Hostname() string
 	IPAddress() string
 	LocalPort() uint
 	NewCommand(context.Context, string) (*Command, fail.Error)
 	NewSudoCommand(context.Context, string) (*Command, fail.Error)
 	Port() uint
-	PrimaryGatewayConfig() (Config, fail.Error)
 	PrivateKey() string
 	SetGatewayConfig(gwIndex WhatGateway, sshConfig Config) fail.Error
 	SetHostname(hostname string) fail.Error
 	SetIPAddress(ipAddress string) fail.Error
+	SetLocalPort(port uint) fail.Error
 	SetPort(port uint) fail.Error
 	SetPrivateKey(privateKey string) fail.Error
 	SetUser(user string) fail.Error
@@ -83,17 +84,10 @@ type Config interface {
 
 // sshConfig helper to manage ssh session
 type sshConfig struct {
-	// user                   string
-	// ipAddress              string
-	// privateKey             string
-	// hostname               string
-	// gatewayConfig          *sshConfig
-	// secondaryGatewayConfig *sshConfig
-	// port                   int
-	// localPort              int
 	_private sshConfigInternal
 }
 
+// sshConfigInternal describes the internal content of sshConfig
 type sshConfigInternal struct {
 	User                   string             `json:"user"`
 	IPAddress              string             `json:"ip_address"`
@@ -103,6 +97,18 @@ type sshConfigInternal struct {
 	SecondaryGatewayConfig *sshConfigInternal `json:"secondary_gateway_config,omitempty"`
 	Port                   uint               `json:"port"`
 	LocalPort              uint               `json:"-"`
+}
+
+// Clone makes a clone of instance
+func (sci sshConfigInternal) Clone() *sshConfigInternal {
+	out := sci
+	if sci.GatewayConfig != nil {
+		out.GatewayConfig = sci.GatewayConfig.Clone()
+	}
+	if sci.SecondaryGatewayConfig != nil {
+		out.SecondaryGatewayConfig = sci.SecondaryGatewayConfig.Clone()
+	}
+	return &out
 }
 
 // NewEmptyConfig instanciates a sshConfig instance
@@ -116,6 +122,7 @@ func NewEmptyConfig() Config {
 	return out
 }
 
+// NewConfig ...
 func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, gws ...Config) (Config, fail.Error) {
 	if hostname == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostname")
@@ -160,9 +167,12 @@ func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, g
 	return out, nil
 }
 
+// Clone ...
+
 // SetHostname ...
 func (sconf *sshConfig) SetHostname(hostname string) fail.Error {
-	if valid.IsNil(sconf) {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
 	if hostname == "" {
@@ -175,7 +185,8 @@ func (sconf *sshConfig) SetHostname(hostname string) fail.Error {
 
 // SetIPAddress ...
 func (sconf *sshConfig) SetIPAddress(ipAddress string) fail.Error {
-	if valid.IsNil(sconf) {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
 	if ipAddress == "" {
@@ -188,7 +199,8 @@ func (sconf *sshConfig) SetIPAddress(ipAddress string) fail.Error {
 
 // SetPort ...
 func (sconf *sshConfig) SetPort(port uint) fail.Error {
-	if valid.IsNil(sconf) {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
 	if port == 0 {
@@ -198,9 +210,23 @@ func (sconf *sshConfig) SetPort(port uint) fail.Error {
 	return nil
 }
 
+// SetLocalPort ...
+func (sconf *sshConfig) SetLocalPort(port uint) fail.Error {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
+		return fail.InvalidInstanceError()
+	}
+	if port == 0 {
+		port = 22
+	}
+	sconf._private.LocalPort = port
+	return nil
+}
+
 // SetPrivateKey ...
 func (sconf *sshConfig) SetPrivateKey(privateKey string) fail.Error {
-	if valid.IsNil(sconf) {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
 	if privateKey == "" {
@@ -213,7 +239,8 @@ func (sconf *sshConfig) SetPrivateKey(privateKey string) fail.Error {
 
 // SetUser ...
 func (sconf *sshConfig) SetUser(user string) fail.Error {
-	if valid.IsNil(sconf) {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
 	if user == "" {
@@ -226,7 +253,8 @@ func (sconf *sshConfig) SetUser(user string) fail.Error {
 
 // SetGatewayConfig ...
 func (sconf *sshConfig) SetGatewayConfig(idx WhatGateway, gwConfig Config) fail.Error {
-	if valid.IsNil(sconf) {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
+	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
 	if idx > 1 {
@@ -260,6 +288,7 @@ func (sconf sshConfig) MarshalJSON() ([]byte, error) {
 }
 
 func (sconf *sshConfig) UnmarshalJSON(in []byte) error {
+	// Do not use valid.IsNil() here, the instance may be null value when calling this method
 	if sconf == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -277,7 +306,7 @@ func (sconf *sshConfig) IsNull() bool {
 	return sconf == nil || sconf._private.IPAddress == ""
 }
 
-// GetFreePort get a free port
+// GetFreePort finds a free port on the system
 func getFreePort() (uint, fail.Error) {
 	listener, err := net.Listen("tcp", ":0")
 	defer func() {
@@ -316,7 +345,7 @@ func isTunnelReady(port uint) bool {
 
 // buildTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's automatically chosen
-func buildTunnel(scfg sshConfigInternal) (*Tunnel, fail.Error) {
+func buildTunnel(scfg *sshConfigInternal) (*Tunnel, fail.Error) {
 	f, err := utils.CreateTempFileFromString(scfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
@@ -336,9 +365,10 @@ func buildTunnel(scfg sshConfigInternal) (*Tunnel, fail.Error) {
 	if scfg.GatewayConfig.Port == 0 {
 		scfg.GatewayConfig.Port = 22
 	}
-	if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
-		scfg.SecondaryGatewayConfig.Port = 22
-	}
+	// VPL: never used in this case...
+	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
+	// 	scfg.SecondaryGatewayConfig.Port = 22
+	// }
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
@@ -386,54 +416,136 @@ func buildTunnel(scfg sshConfigInternal) (*Tunnel, fail.Error) {
 }
 
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
-func createConsecutiveTunnels(sc sshConfigInternal, tunnels *Tunnels) (*Tunnel, fail.Error) {
-	tunnel, xerr := createConsecutiveTunnels(*sc.GatewayConfig, tunnels)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	cfg := sc
-	if tunnel != nil {
-		gateway := *sc.GatewayConfig
-		gateway.Port = tunnel.port
-		gateway.IPAddress = "127.0.0.1"
-		cfg.GatewayConfig = &gateway
-	}
-	if cfg.GatewayConfig != nil {
-		failures := 0
-		xerr = retry.WhileUnsuccessful(
-			func() error {
-				tunnel, xerr = buildTunnel(cfg)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotAvailable: // When this happens, resources are close to exhaustion
-						failures++
-						if failures > 6 { // TODO: retry lib should provide some kind of circuit-breaker pattern
-							return retry.StopRetryError(xerr, "not enough resources, pointless to retry")
-						}
-						return xerr
-					default:
-						return xerr
+func createConsecutiveTunnels(sci *sshConfigInternal, tunnels *Tunnels) (*Tunnel, fail.Error) {
+	// var (
+	// 	tunnel *Tunnel
+	// 	xerr fail.Error
+	// )
+	// if sci.GatewayConfig != nil {
+	// 	tunnel, xerr = createConsecutiveTunnels(*sci.GatewayConfig, tunnels)
+	// 	if xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	// }
+	//
+	// cfg := sci
+	// if tunnel != nil {
+	// 	gateway := sci.GatewayConfig
+	// 	gateway.Port = tunnel.port
+	// 	gateway.IPAddress = "127.0.0.1"
+	// 	cfg.GatewayConfig = gateway
+	// }
+	// if cfg.GatewayConfig != nil {
+	// 	failures := 0
+	// 	xerr = retry.WhileUnsuccessful(
+	// 		func() error {
+	// 			tunnel, xerr = buildTunnel(&cfg)
+	// 			if xerr != nil {
+	// 				switch xerr.(type) {
+	// 				case *fail.ErrNotAvailable: // When this happens, resources are close to exhaustion
+	// 					failures++
+	// 					if failures > 6 { // TODO: retry lib should provide some kind of circuit-breaker pattern
+	// 						return retry.StopRetryError(xerr, "not enough resources, pointless to retry")
+	// 					}
+	// 					return xerr
+	// 				default:
+	// 					return xerr
+	// 				}
+	// 			}
+	//
+	// 			// Note: provokes LIFO (Last In First Out) during the deletion of tunnels
+	// 			*tunnels = append(Tunnels{tunnel}, *tunnels...)
+	// 			return nil
+	// 		},
+	// 		temporal.DefaultDelay(),
+	// 		temporal.OperationTimeout(),
+	// 	)
+	// 	if xerr != nil {
+	// 		switch xerr.(type) { // nolint
+	// 		case *retry.ErrStopRetry:
+	// 			return nil, fail.Wrap(fail.Cause(xerr))
+	// 		case *retry.ErrTimeout:
+	// 			return nil, fail.ConvertError(fail.Cause(xerr))
+	// 		}
+	// 		return nil, xerr
+	// 	}
+	// 	return tunnel, nil
+	// }
+	if sci != nil {
+		// determine what gateway to use
+		var gwConf *sshConfigInternal
+		if !valid.IsNil(sci.GatewayConfig) {
+			gwConf = sci.GatewayConfig
+			if !netutils.CheckRemoteTCP(gwConf.IPAddress, int(gwConf.Port)) {
+				if !valid.IsNil(sci.SecondaryGatewayConfig) {
+					gwConf = sci.SecondaryGatewayConfig
+					if !netutils.CheckRemoteTCP(gwConf.IPAddress, int(gwConf.Port)) {
+						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
 					}
+				} else {
+					return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
 				}
-
-				// Note: provokes LIFO (Last In First Out) during the deletion of tunnels
-				*tunnels = append(Tunnels{tunnel}, *tunnels...)
-				return nil
-			},
-			temporal.DefaultDelay(),
-			temporal.OperationTimeout(),
-		)
-		if xerr != nil {
-			switch xerr.(type) { // nolint
-			case *retry.ErrStopRetry:
-				return nil, fail.Wrap(fail.Cause(xerr))
-			case *retry.ErrTimeout:
-				return nil, fail.ConvertError(fail.Cause(xerr))
 			}
-			return nil, xerr
 		}
-		return tunnel, nil
+
+		tunnel, xerr := createConsecutiveTunnels(gwConf, tunnels)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotAvailable:
+				gwConf = sci.SecondaryGatewayConfig
+				tunnel, xerr = createConsecutiveTunnels(gwConf, tunnels)
+				if xerr != nil {
+					return nil, xerr
+				}
+			default:
+				return nil, xerr
+			}
+		}
+
+		if gwConf != nil {
+			cfg := sci.Clone()
+			cfg.GatewayConfig = gwConf
+			if tunnel != nil {
+				gateway := *gwConf
+				gateway.Port = tunnel.port
+				gateway.IPAddress = "127.0.0.1"
+				cfg.GatewayConfig = &gateway
+			}
+			failures := 0
+			xerr = retry.WhileUnsuccessful(
+				func() error {
+					tunnel, xerr = buildTunnel(cfg)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotAvailable: // When this happens, resources are close to exhaustion
+							failures++
+							if failures > 6 { // TODO: retry lib should provide some kind of circuit-breaker pattern
+								return retry.StopRetryError(xerr, "not enough resources, pointless to retry")
+							}
+							return xerr
+						default:
+							return xerr
+						}
+					}
+
+					// Note: provokes LIFO (Last In First Out) during the deletion of tunnels
+					*tunnels = append(Tunnels{tunnel}, *tunnels...)
+					return nil
+				},
+				temporal.DefaultDelay(),
+				temporal.OperationTimeout(),
+			)
+			if xerr != nil {
+				switch xerr.(type) { // nolint
+				case *retry.ErrStopRetry:
+					return nil, fail.Wrap(fail.Cause(xerr))
+				case *retry.ErrTimeout:
+					return nil, fail.ConvertError(fail.Cause(xerr))
+				}
+				return nil, xerr
+			}
+			return tunnel, nil
+		}
 	}
 	return nil, nil
 }
@@ -452,7 +564,7 @@ func (sconf *sshConfig) CreateTunneling() (_ Tunnels, _ Config, ferr fail.Error)
 		}
 	}()
 
-	tunnel, xerr := createConsecutiveTunnels(sconf._private, &tunnels)
+	tunnel, xerr := createConsecutiveTunnels(&sconf._private, &tunnels)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to create SSH Tunnels")
 	}
@@ -896,14 +1008,13 @@ func (sconf sshConfig) Hostname() string {
 
 // IPAddress ...
 func (sconf sshConfig) IPAddress() string {
-	_ = sshConfigInternal{}
-	return sconf._private.Hostname
+	return sconf._private.IPAddress
 }
 
 // GatewayConfig ...
-func (sconf sshConfig) GatewayConfig(idx WhatGateway) (Config, fail.Error) {
+func (sconf sshConfig) GatewayConfig(idx WhatGateway) Config {
 	if idx > 1 {
-		return nil, fail.InvalidParameterError("idx", "must be 0 for primary gateway or 1 for secondary gateway")
+		return nil
 	}
 
 	var newConf *sshConfigInternal
@@ -913,22 +1024,22 @@ func (sconf sshConfig) GatewayConfig(idx WhatGateway) (Config, fail.Error) {
 	case SecondaryGateway:
 		newConf = sconf._private.SecondaryGatewayConfig
 	default:
-		return nil, fail.InvalidParameterError("idx", "must be 0 for primary or 1 for secondary gateway")
+		return nil
 	}
 
 	out := sshConfig{
 		_private: *newConf,
 	}
-	return &out, nil
+	return &out
 }
 
 // PrimaryGatewayConfig ...
-func (sconf sshConfig) PrimaryGatewayConfig() (Config, fail.Error) {
+func (sconf sshConfig) PrimaryGatewayConfig() Config {
 	return sconf.GatewayConfig(0)
 }
 
 // SecondaryGatewayConfig ...
-func (sconf sshConfig) SecondaryGatewayConfig() (Config, fail.Error) {
+func (sconf sshConfig) SecondaryGatewayConfig() Config {
 	return sconf.GatewayConfig(1)
 }
 
