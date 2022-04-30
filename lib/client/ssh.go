@@ -28,10 +28,6 @@ import (
 	"strings"
 	"time"
 
-	ssh2 "github.com/CS-SI/SafeScale/v21/lib/system/ssh"
-	utils2 "github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -147,6 +143,7 @@ func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	return cfg, nil
 }
 

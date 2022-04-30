@@ -30,21 +30,23 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+type WhatGateway uint
+
 const (
-	PrimaryGateway   uint8 = 0
-	SecondaryGateway uint8 = 1
+	PrimaryGateway   WhatGateway = 0
+	SecondaryGateway WhatGateway = 1
 )
 
 const (
@@ -60,7 +62,7 @@ type Config interface {
 	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
 	CreateTunneling() (Tunnels, Config, fail.Error)
 	Enter(string, string) fail.Error
-	GatewayConfig(uint8) (Config, fail.Error)
+	GatewayConfig(gwIndex WhatGateway) (Config, fail.Error)
 	Hostname() string
 	IPAddress() string
 	LocalPort() uint
@@ -69,8 +71,12 @@ type Config interface {
 	Port() uint
 	PrimaryGatewayConfig() (Config, fail.Error)
 	PrivateKey() string
-	SecondaryGatewayConfig() (Config, fail.Error)
-	SetGatewayConfig(uint8, Config) fail.Error
+	SetGatewayConfig(gwIndex WhatGateway, sshConfig Config) fail.Error
+	SetHostname(hostname string) fail.Error
+	SetIPAddress(ipAddress string) fail.Error
+	SetPort(port uint) fail.Error
+	SetPrivateKey(privateKey string) fail.Error
+	SetUser(user string) fail.Error
 	User() string
 	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)
 }
@@ -99,16 +105,37 @@ type sshConfigInternal struct {
 	LocalPort              uint               `json:"-"`
 }
 
-func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, gws ...Config) (Config, fail.Error) {
+// NewEmptyConfig instanciates a sshConfig instance
+func NewEmptyConfig() Config {
 	out := &sshConfig{
 		_private: sshConfigInternal{
-			User:       user,
-			Hostname:   hostname,
-			IPAddress:  ipAddress,
-			Port:       port,
-			PrivateKey: privateKey,
+			GatewayConfig:          nil,
+			SecondaryGatewayConfig: nil,
 		},
 	}
+	return out
+}
+
+func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, gws ...Config) (Config, fail.Error) {
+	if hostname == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostname")
+	}
+	if ipAddress == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ipAddress")
+	}
+	if privateKey == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("privateKey")
+	}
+	if port == 0 {
+		port = 22
+	}
+
+	out := NewEmptyConfig()
+	out.SetUser(user)
+	out.SetHostname(hostname)
+	out.SetIPAddress(ipAddress)
+	out.SetPort(port)
+	out.SetPrivateKey(privateKey)
 
 	if len(gws) > 0 {
 		gw := gws[PrimaryGateway]
@@ -133,7 +160,72 @@ func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, g
 	return out, nil
 }
 
-func (sconf *sshConfig) SetGatewayConfig(idx uint8, gwConfig Config) fail.Error {
+// SetHostname ...
+func (sconf *sshConfig) SetHostname(hostname string) fail.Error {
+	if valid.IsNil(sconf) {
+		return fail.InvalidInstanceError()
+	}
+	if hostname == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("hostname")
+	}
+
+	sconf._private.Hostname = hostname
+	return nil
+}
+
+// SetIPAddress ...
+func (sconf *sshConfig) SetIPAddress(ipAddress string) fail.Error {
+	if valid.IsNil(sconf) {
+		return fail.InvalidInstanceError()
+	}
+	if ipAddress == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("ipAddress")
+	}
+
+	sconf._private.IPAddress = ipAddress
+	return nil
+}
+
+// SetPort ...
+func (sconf *sshConfig) SetPort(port uint) fail.Error {
+	if valid.IsNil(sconf) {
+		return fail.InvalidInstanceError()
+	}
+	if port == 0 {
+		port = 22
+	}
+	sconf._private.Port = port
+	return nil
+}
+
+// SetPrivateKey ...
+func (sconf *sshConfig) SetPrivateKey(privateKey string) fail.Error {
+	if valid.IsNil(sconf) {
+		return fail.InvalidInstanceError()
+	}
+	if privateKey == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("privateKey")
+	}
+
+	sconf._private.PrivateKey = privateKey
+	return nil
+}
+
+// SetUser ...
+func (sconf *sshConfig) SetUser(user string) fail.Error {
+	if valid.IsNil(sconf) {
+		return fail.InvalidInstanceError()
+	}
+	if user == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("user")
+	}
+
+	sconf._private.User = user
+	return nil
+}
+
+// SetGatewayConfig ...
+func (sconf *sshConfig) SetGatewayConfig(idx WhatGateway, gwConfig Config) fail.Error {
 	if valid.IsNil(sconf) {
 		return fail.InvalidInstanceError()
 	}
@@ -809,7 +901,7 @@ func (sconf sshConfig) IPAddress() string {
 }
 
 // GatewayConfig ...
-func (sconf sshConfig) GatewayConfig(idx uint8) (Config, fail.Error) {
+func (sconf sshConfig) GatewayConfig(idx WhatGateway) (Config, fail.Error) {
 	if idx > 1 {
 		return nil, fail.InvalidParameterError("idx", "must be 0 for primary gateway or 1 for secondary gateway")
 	}
