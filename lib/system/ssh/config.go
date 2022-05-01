@@ -142,11 +142,11 @@ func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, g
 	}
 
 	out := NewEmptyConfig()
-	out.SetUser(user)
-	out.SetHostname(hostname)
-	out.SetIPAddress(ipAddress)
-	out.SetPort(port)
-	out.SetPrivateKey(privateKey)
+	_ = out.SetUser(user)
+	_ = out.SetHostname(hostname)
+	_ = out.SetIPAddress(ipAddress)
+	_ = out.SetPort(port)
+	_ = out.SetPrivateKey(privateKey)
 
 	if len(gws) > 0 {
 		gw := gws[PrimaryGateway]

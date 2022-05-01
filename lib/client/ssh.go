@@ -476,19 +476,20 @@ func (s sshClient) CreateTunnel(name string, localPort int, remotePort int, time
 		return xerr
 	}
 
-	if sshCfg.GatewayConfig == nil {
+	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
 		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
-		sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+
+		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
 		if xerr != nil {
 			return xerr
 		}
 	}
-	sshCfg.SetIPAddress("127.0.0.1")
-	sshCfg.SetPort(uint(remotePort))
-	sshCfg.SetLocalPort(uint(localPort))
+	_ = sshCfg.SetIPAddress("127.0.0.1")
+	_ = sshCfg.SetPort(uint(remotePort))
+	_ = sshCfg.SetLocalPort(uint(localPort))
 
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
@@ -522,8 +523,12 @@ func (s sshClient) CloseTunnels(name string, localPort string, remotePort string
 			return xerr
 		}
 
-		sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
-		sshCfg.SetIPAddress("127.0.0.1")
+		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+		if xerr != nil {
+			return xerr
+		}
+
+		_ = sshCfg.SetIPAddress("127.0.0.1")
 	}
 
 	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
