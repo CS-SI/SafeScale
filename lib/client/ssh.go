@@ -137,7 +137,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
+func (s sshClient) getHostSSHConfig(hostname string) (ssh.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -562,11 +562,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 		}
 	}
 
-	cmdString := fmt.Sprintf(
-		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(),
-		sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress(),
-	)
-	// cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
+	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err != nil {

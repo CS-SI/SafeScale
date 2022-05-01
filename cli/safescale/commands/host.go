@@ -534,7 +534,7 @@ var hostSSH = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 
-		out, xerr := formatSSHConfig(*resp)
+		out, xerr := formatSSHConfig(resp)
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 		}
