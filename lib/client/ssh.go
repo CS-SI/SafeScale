@@ -142,7 +142,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshClient) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
+func (s sshClient) getHostSSHConfig(hostname string) (ssh.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -488,8 +488,8 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		}
 	}
 	sshCfg.SetIPAddress("127.0.0.1")
-	sshCfg.SetPort(remotePort)
-	sshCfg.SetLocalPort(localPort)
+	sshCfg.SetPort(uint(remotePort))
+	sshCfg.SetLocalPort(uint(localPort))
 
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
@@ -517,7 +517,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 		return xerr
 	}
 
-	if sshCfg.GatewayConfig == nil {
+	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
 		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
@@ -527,10 +527,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 		sshCfg.SetIPAddress("127.0.0.1")
 	}
 
-	cmdString := fmt.Sprintf(
-		"sshClient .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig().User(),
-		sshCfg.GatewayConfig().IPAddress(),
-	)
+	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err != nil {

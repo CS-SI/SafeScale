@@ -229,10 +229,10 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			ip, xerr = gw.GetAccessIP(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
+			// ip, xerr = gw.GetAccessIP(ctx)
+			// if xerr != nil {
+			// 	return nil, xerr
+			// }
 
 			primaryGatewayConf, xerr = gw.GetSSHConfig(ctx)
 			if xerr != nil {
@@ -266,10 +266,10 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			ip, xerr = gw.GetAccessIP(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
+			// ip, xerr = gw.GetAccessIP(ctx)
+			// if xerr != nil {
+			// 	return nil, xerr
+			// }
 
 			secondaryGatewayConf, xerr = gw.GetSSHConfig(ctx)
 			if xerr != nil {
