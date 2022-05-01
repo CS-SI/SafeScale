@@ -49,7 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -80,7 +80,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    *system.SSHConfig
+		sshProfile                    ssh.Config
 	}
 }
 
@@ -188,7 +188,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig *system.SSHConfig
+		var primaryGatewayConfig, secondaryGatewayConfig ssh.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -237,19 +237,13 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 					}
 
-					ip, xerr := castedGW.GetAccessIP(ctx)
-					if xerr != nil {
-						return xerr
+					ip, inXErr := castedGW.GetAccessIP(ctx)
+					if inXErr != nil {
+						return inXErr
 					}
 
-					primaryGatewayConfig = &system.SSHConfig{
-						PrivateKey: gwahc.PrivateKey,
-						Port:       int(gwahc.SSHPort),
-						IPAddress:  ip,
-						Hostname:   gwahc.Name,
-						User:       opUser,
-					}
-					return nil
+					primaryGatewayConfig, inXErr = ssh.NewConfig(gwahc.Name, ip, uint(gwahc.SSHPort), opUser, gwahc.PrivateKey)
+					return inXErr
 				})
 				if gwErr != nil {
 					return gwErr
@@ -278,19 +272,13 @@ func (instance *Host) updateCachedInformation() fail.Error {
 							return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 						}
 
-						ip, xerr := castedGW.GetAccessIP(ctx)
-						if xerr != nil {
-							return xerr
+						ip, inXErr := castedGW.GetAccessIP(ctx)
+						if inXErr != nil {
+							return inXErr
 						}
 
-						secondaryGatewayConfig = &system.SSHConfig{
-							PrivateKey: gwahc.PrivateKey,
-							Port:       int(gwahc.SSHPort),
-							IPAddress:  ip,
-							Hostname:   gwInstance.GetName(),
-							User:       opUser,
-						}
-						return nil
+						secondaryGatewayConfig, inXErr = ssh.NewConfig(gwInstance.GetName(), ip, uint(gwahc.SSHPort), opUser, gwahc.PrivateKey)
+						return inXErr
 					})
 					if gwErr != nil {
 						return gwErr
@@ -303,16 +291,10 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return innerXErr
 		}
 
-		instance.localCache.sshProfile = &system.SSHConfig{
-			Port:                   int(ahc.SSHPort),
-			IPAddress:              instance.localCache.accessIP,
-			Hostname:               instance.GetName(),
-			User:                   opUser,
-			PrivateKey:             ahc.PrivateKey,
-			GatewayConfig:          primaryGatewayConfig,
-			SecondaryGatewayConfig: secondaryGatewayConfig,
+		instance.localCache.sshProfile, innerXErr = ssh.NewConfig(instance.GetName(), instance.localCache.accessIP, uint(ahc.SSHPort), opUser, ahc.PrivateKey, primaryGatewayConfig, secondaryGatewayConfig)
+		if innerXErr != nil {
+			return innerXErr
 		}
-
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
@@ -2669,7 +2651,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ *system.SSHConfig, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ ssh.Config, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {

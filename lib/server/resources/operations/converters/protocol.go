@@ -29,28 +29,29 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
-	var pgw, sgw *system.SSHConfig
+// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.Config
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) (ssh.Config, fail.Error) {
+	var (
+		pgw, sgw ssh.Config
+		xerr     fail.Error
+	)
 	if from.Gateway != nil {
-		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
+		pgw, xerr = SSHConfigFromProtocolToSystem(from.Gateway)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
 	if from.SecondaryGateway != nil {
-		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
+		sgw, xerr = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
-	return &system.SSHConfig{
-		User:                   from.User,
-		Hostname:               from.HostName,
-		IPAddress:              from.Host,
-		PrivateKey:             from.PrivateKey,
-		Port:                   int(from.Port),
-		GatewayConfig:          pgw,
-		SecondaryGatewayConfig: sgw,
-	}
+	return ssh.NewConfig(from.HostName, from.Host, uint(from.Port), from.User, from.PrivateKey, pgw, sgw)
 }
 
 // FeatureSettingsFromProtocolToResource ...

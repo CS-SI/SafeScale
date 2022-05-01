@@ -20,16 +20,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
-
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -56,7 +55,7 @@ type Host interface {
 	GetPublicIP(ctx context.Context) (ip string, err fail.Error)                                                                                 // returns the public IP address of the host, with error handling
 	GetShare(shareRef string) (*propertiesv1.HostShare, fail.Error)                                                                              // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares() (*propertiesv1.HostShares, fail.Error)                                                                                           // returns the shares hosted on the host
-	GetSSHConfig(ctx context.Context) (*system.SSHConfig, fail.Error)                                                                            // loads SSH configuration for host from metadata
+	GetSSHConfig(ctx context.Context) (ssh.Config, fail.Error)                                                                                   // loads SSH configuration for host from metadata
 	GetState() (hoststate.Enum, fail.Error)                                                                                                      // returns the current state of the host, with error handling
 	GetVolumes() (*propertiesv1.HostVolumes, fail.Error)                                                                                         // returns the volumes attached to the host
 	IsClusterMember() (bool, fail.Error)                                                                                                         // returns true if the host is member of a cluster

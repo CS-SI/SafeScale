@@ -37,7 +37,7 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -58,7 +58,7 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (*system.SSHConfig, fail.Error)
+	GetConfig(stacks.HostParameter) (ssh.Config, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -73,8 +73,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
-// GetConfig creates SSHConfig to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, ferr fail.Error) {
+// GetConfig creates Config to connect to a host
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig ssh.Config, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -124,13 +124,6 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	sshConfig = &system.SSHConfig{
-		Port:      22, // will be overwritten later
-		IPAddress: ip,
-		Hostname:  host.GetName(),
-		User:      user,
-	}
-
 	isSingle, xerr := host.IsSingle()
 	if xerr != nil {
 		return nil, xerr
@@ -141,6 +134,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
+	var (
+		primaryGatewayConf, secondaryGatewayConf ssh.Config
+		port                                     uint = 22
+		privateKey                               string
+	)
 	if isSingle || isGateway {
 		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
@@ -148,8 +146,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return fail.InconsistentError("")
 			}
 
-			sshConfig.PrivateKey = ahc.PrivateKey
-			sshConfig.Port = int(ahc.SSHPort)
+			privateKey = ahc.PrivateKey
+			port = uint(ahc.SSHPort)
 			return nil
 		})
 		if xerr != nil {
@@ -163,8 +161,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return fail.InconsistentError("")
 			}
 
-			sshConfig.PrivateKey = ahc.PrivateKey
-			sshConfig.Port = int(ahc.SSHPort)
+			privateKey = ahc.PrivateKey
+			port = uint(ahc.SSHPort)
 			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
@@ -232,23 +230,15 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
+			// ip, xerr = gw.GetAccessIP(ctx)
+			// if xerr != nil {
+			// 	return nil, xerr
+			// }
+
+			primaryGatewayConf, xerr = gw.GetSSHConfig(ctx)
+			if xerr != nil {
 				return nil, xerr
 			}
-
-			var gwcfg *system.SSHConfig
-			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			GatewayConfig := system.SSHConfig{
-				PrivateKey: gwahc.PrivateKey,
-				Port:       gwcfg.Port,
-				IPAddress:  ip,
-				Hostname:   gw.GetName(),
-				User:       user,
-			}
-			sshConfig.GatewayConfig = &GatewayConfig
 		}
 
 		// gets secondary gateway information
@@ -258,7 +248,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
-				if sshConfig.GatewayConfig == nil {
+				if primaryGatewayConf == nil {
 					return nil, fail.NotFoundError("failed to find a gateway to reach Host")
 				}
 			default:
@@ -270,30 +260,28 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				if !ok {
 					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+
 				return nil
 			})
 			if xerr != nil {
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
+			// ip, xerr = gw.GetAccessIP(ctx)
+			// if xerr != nil {
+			// 	return nil, xerr
+			// }
+
+			secondaryGatewayConf, xerr = gw.GetSSHConfig(ctx)
+			if xerr != nil {
 				return nil, xerr
 			}
-
-			var gwcfg *system.SSHConfig
-			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			GatewayConfig := system.SSHConfig{
-				PrivateKey: gwahc.PrivateKey,
-				Port:       gwcfg.Port,
-				IPAddress:  ip,
-				Hostname:   gw.GetName(),
-				User:       user,
-			}
-			sshConfig.SecondaryGatewayConfig = &GatewayConfig
 		}
+	}
+
+	sshConfig, xerr = ssh.NewConfig(host.GetName(), ip, port, user, privateKey, primaryGatewayConf, secondaryGatewayConf)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return sshConfig, nil
@@ -349,7 +337,9 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	stdErr := ""
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.sshProfile"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -360,8 +350,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 		return invalid, "", "", xerr
 	}
 
-	// retrieve ssh config to perform some commands
-	ssh, xerr := host.GetSSHConfig(task.Context())
+	// retrieve sshProfile config to perform some commands
+	sshProfile, xerr := host.GetSSHConfig(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -381,13 +371,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
-			if xerr != nil {
-				return xerr
-			}
-
-			retCode, stdOut, stdErr = aretCode, astdOut, astdErr
-			return nil
+			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(sshProfile, cmd, timings.HostOperationTimeout())
+			return xerr
 		},
 		timings.SmallDelay(),
 		timings.HostOperationTimeout(),
@@ -409,11 +394,11 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (handler *sshHandler) runWithTimeout(sshProfile ssh.Config, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
 	// Create the command
-	sshCmd, xerr := ssh.NewCommand(handler.job.Task().Context(), cmd)
+	sshCmd, xerr := sshProfile.NewCommand(handler.job.Task().Context(), cmd)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

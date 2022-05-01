@@ -1,5 +1,5 @@
-//go:build !tunnel
-// +build !tunnel
+//go:build obsolete
+// +build obsolete
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package system
+package ssh
 
 import (
 	"context"

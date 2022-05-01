@@ -17,14 +17,13 @@
  * limitations under the License.
  */
 
-package system
+package ssh
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -33,74 +32,47 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/sshtunnel"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
-	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	terminal "golang.org/x/term"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/pkg/sftp"
 )
 
-// SSHConfig helper to manage ssh session
-type SSHConfig struct {
+// Config helper to manage ssh session
+type sshConfig struct {
 	User                   string
 	IPAddress              string
 	PrivateKey             string
 	Port                   int
 	LocalPort              int
 	LocalHost              string
-	GatewayConfig          *SSHConfig
-	SecondaryGatewayConfig *SSHConfig
+	GatewayConfig          *sshConfig
+	SecondaryGatewayConfig *sshConfig
 	Hostname               string
 }
 
-// SSHTunnel a SSH tunnel
+// Tunnel a SSH tunnel
 type SSHTunnel struct {
-	cfg  SSHConfig // nolint
+	cfg  sshConfig // nolint
 	port int       // nolint
 }
 
-// CreateTempFileFromString creates a temporary file containing 'content'
-func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
-	defaultTmpDir := os.TempDir()
-
-	f, err := ioutil.TempFile(defaultTmpDir, "")
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to create temporary file")
-	}
-	_, err = f.WriteString(content)
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to wrote string to temporary file")
-	}
-
-	err = f.Chmod(filemode)
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
-	}
-
-	err = f.Close()
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to close temporary file")
-	}
-
-	return f, nil
-}
-
-// SSHCommand defines a SSH command
+// Command defines a SSH command
 type SSHCommand struct {
 	withSudo bool
 	username string
-	cfg      *SSHConfig
+	cfg      *sshConfig
 	cmd      *exec.Cmd
 	tunnels  *sshtunnel.SSHTunnel
 }
@@ -146,43 +118,15 @@ func (sc *SSHCommand) Display() string {
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	var rc int
-	var rout string
-	var rerr string
-	var pb fail.Error
-
-	expandedTimeout := timeout
-	if expandedTimeout > 0 {
-		expandedTimeout = expandedTimeout + 5*time.Second
+	tu, _, err := sc.cfg.CreateTunneling()
+	if err != nil {
+		return 0, "", "", fail.NewError("failure creating tunnel: %w", err)
 	}
+	sc.tunnels = tu
+	defer tu.Close()
 
-	xerr := retry.WhileUnsuccessful(func() error { // retry only if we have a tunnel problem
-		tu, _, err := sc.cfg.CreateTunneling()
-		if err != nil {
-			return fail.NewError("failure creating tunnel: %w", err)
-		}
-		sc.tunnels = tu
-		defer tu.Close()
-
-		rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
-		if rv == -2 {
-			// logrus.Warningf("tunnel problem")
-			return fmt.Errorf("tunnel problem")
-		}
-		rc = rv
-		rout = out
-		rerr = sterr
-		pb = xerr
-		return nil
-	},
-		time.Second,
-		expandedTimeout) // no need to increase this, if there is a tunnel problem, it happens really fast
-
-	if xerr != nil {
-		return -1, "", "", xerr
-	}
-
-	return rc, rout, rerr, pb
+	rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
+	return rv, out, sterr, xerr
 }
 
 // PublicKeyFromStr ...
@@ -196,7 +140,7 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 
 // NewRunWithTimeout ...
 func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, "", "", xerr
@@ -229,7 +173,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				PublicKeyFromStr(sc.cfg.PrivateKey),
 			},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         10 * time.Second,
+			Timeout:         2 * time.Second,
 		}
 
 		logrus.Debugf("Dialing to %s:%d using %s:%d", sc.cfg.LocalHost, sc.cfg.LocalPort, "localhost", sc.tunnels.GetLocalEndpoint().Port())
@@ -274,7 +218,6 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 		beginDial := time.Now()
 		retries := 0
-		eofCount := 0
 
 		var session *ssh.Session
 
@@ -285,44 +228,23 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			var newsession *ssh.Session
 			newsession, internalErr = client.NewSession()
 			if internalErr != nil {
-				retries = retries + 1 // nolint
-				logrus.Tracef("problem creating session: %s", internalErr.Error())
-				if strings.Contains(internalErr.Error(), "EOF") {
-					eofCount = eofCount + 1
-					if eofCount >= 14 {
-						// logrus.Warningf("client seems dead")
-						return retry.StopRetryError(internalErr, "client seems dead")
-					}
-				}
-				if strings.Contains(internalErr.Error(), "unexpected packet") {
-					// logrus.Warningf("client seems dead")
-					return retry.StopRetryError(internalErr, "client seems dead")
-				}
+				retries++
+				logrus.Debugf("problem creating session: %s", internalErr.Error())
 				return internalErr
 			}
 			if session != nil { // race condition mitigation
-				// logrus.Warningf("too late")
 				return fmt.Errorf("too late")
 			}
-			logrus.Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
+			logrus.Debugf("creating the session took %s and %d retries", time.Since(beginDial), retries)
 			session = newsession
 			return nil
-		}, 2*time.Second, 150*time.Second)
+		}, time.Second, 150*time.Second)
 		if err != nil {
-			if strings.Contains(err.Error(), "seems dead") {
-				results <- result{
-					errorcode: -2,
-					stdout:    "",
-					stderr:    "",
-					reserr:    err,
-				}
-			} else {
-				results <- result{
-					errorcode: -1,
-					stdout:    "",
-					stderr:    "",
-					reserr:    err,
-				}
+			results <- result{
+				errorcode: -1,
+				stdout:    "",
+				stderr:    "",
+				reserr:    err,
 			}
 			return
 		}
@@ -376,7 +298,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 			beginIter := time.Now()
 			if err := sshtunnel.RunCommandInSSHSessionWithTimeout(session, sc.cmd.String(), opTimeout); err != nil {
-				logrus.Debugf("Error running command after %s: %s", time.Since(beginIter), err.Error())
+				logrus.Debugf("Running with session timeout here after %s", time.Since(beginIter))
 				errorCode = -1
 
 				if ee, ok := err.(*ssh.ExitError); ok {
@@ -386,7 +308,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 				if _, ok := err.(*ssh.ExitMissingError); ok {
 					logrus.Warnf("Found exit missing error of command '%s'", sc.cmd.String())
-					errorCode = -2
+					errorCode = -1
 				}
 
 				if _, ok := err.(net.Error); ok {
@@ -451,7 +373,7 @@ func (sc *SSHCommand) Close() fail.Error {
 }
 
 // CreateTunneling ...
-func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error) {
+func (sc *sshConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *sshConfig, error) {
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
@@ -460,9 +382,6 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 
 	internalPort := 22 // all machines use port 22... // TODO Remove magic number
 	var gateway *sshtunnel.Endpoint
-	var altgateway *sshtunnel.Endpoint
-	var remote bool
-
 	if sc.GatewayConfig == nil { // it has to be a gateway
 		internalPort = sc.Port // ... except maybe the gateway itself
 
@@ -474,30 +393,10 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 		}
 	} else {
 		var rerr error
-		remote = true
 		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.GatewayConfig.User, sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port),
 			sshtunnel.EndpointOptionKeyFromString(sc.GatewayConfig.PrivateKey, ""))
 		if rerr != nil {
 			return nil, nil, rerr
-		}
-	}
-
-	if sc.SecondaryGatewayConfig != nil {
-		var rerr error
-		remote = true
-		altgateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.SecondaryGatewayConfig.User, sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port),
-			sshtunnel.EndpointOptionKeyFromString(sc.SecondaryGatewayConfig.PrivateKey, ""))
-		if rerr != nil {
-			return nil, nil, rerr
-		}
-	}
-
-	if remote {
-		if !netutils.CheckRemoteTCP(sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port) {
-			if !netutils.CheckRemoteTCP(sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port) {
-				return nil, nil, fail.NewError("No direct connection to any gateway")
-			}
-			gateway = altgateway // connect through alternative gateway
 		}
 	}
 
@@ -539,26 +438,26 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 }
 
 // Command returns the cmd struct to execute cmdString remotely
-func (sc *SSHConfig) Command(cmdString string) (*SSHCommand, fail.Error) {
+func (sc *sshConfig) Command(cmdString string) (*SSHCommand, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
 // NewCommand returns the cmd struct to execute cmdString remotely
-func (sc *SSHConfig) NewCommand(_ context.Context, cmdString string) (*SSHCommand, fail.Error) {
+func (sc *sshConfig) NewCommand(_ context.Context, cmdString string) (*SSHCommand, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, fail.Error) {
+func (sc *sshConfig) SudoCommand(cmdString string) (*SSHCommand, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
 // NewSudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *SSHConfig) NewSudoCommand(_ context.Context, cmdString string) (*SSHCommand, fail.Error) {
+func (sc *sshConfig) NewSudoCommand(_ context.Context, cmdString string) (*SSHCommand, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
-func (sc *SSHConfig) command(cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
+func (sc *sshConfig) command(cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
 	cmd := exec.Command(cmdString)
 	sshCommand := SSHCommand{
 		withSudo: withSudo,
@@ -571,7 +470,7 @@ func (sc *SSHConfig) command(cmdString string, withTty, withSudo bool) (*SSHComm
 
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
-func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, err fail.Error) {
+func (sc *sshConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, err fail.Error) {
 	if sc == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -591,11 +490,6 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %s)", phase, temporal.FormatDuration(timeout)).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// no timeout is unsafe, we set an upper limit
-	if timeout == 0 {
-		timeout = temporal.HostLongOperationTimeout()
-	}
-
 	originalPhase := phase
 	if phase == "ready" { // FIXME: Hardcoded strings
 		phase = "final"
@@ -610,13 +504,11 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode = -1
 			iterations++
 
 			// FIXME: Remove WaitServerReady logs and ensure minimum of iterations
 			if task != nil {
 				if task != nil && task.Aborted() {
-					// logrus.Warningf("Someone aborted")
 					return fail.AbortedError(nil, "task already aborted by the parent")
 				}
 			}
@@ -624,7 +516,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 			cmd, _ := sc.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 10*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				return xerr
 			}
@@ -648,20 +540,15 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 		logrus.Debugf("WaitServerReady: the wait finished with: %v", retryErr)
 		return stdout, retryErr
 	}
-
-	if !strings.HasPrefix(stdout, "0,") {
-		return stdout, fail.NewError("PROVISIONING ERROR: host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sc.IPAddress, originalPhase,
-			temporal.FormatDuration(time.Since(begins)), stdout)
-	}
-
 	logrus.Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sc.IPAddress, originalPhase,
-		temporal.FormatDuration(time.Since(begins)), stdout)
+		temporal.FormatDuration(time.Since(begins)), stdout,
+	)
 	return stdout, nil
 }
 
 // CopyWithTimeout ...
-func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, timeout time.Duration) (int, string, string, fail.Error) {
+func (sc *sshConfig) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, timeout time.Duration) (int, string, string, fail.Error) {
 	if ctx == nil {
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -707,14 +594,11 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 	if ctx.Err() != nil {
 		return -1, "", "", fail.Wrap(ctx.Err())
 	}
-	if currentCtx.Err() != nil {
-		return -1, "", "", fail.Wrap(currentCtx.Err())
-	}
 	return -1, "", "", fail.NewError("timeout copying...")
 }
 
 // Copy copies a file/directory from/to local to/from remote
-func (sc *SSHConfig) Copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
+func (sc *sshConfig) Copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
 	// FIXME: Use ctx if it can be handled at lower levels, if not, remove it as a parameter
 
 	tu, sshConfig, err := sc.CreateTunneling()
@@ -892,7 +776,7 @@ func (sc *SSHConfig) Copy(ctx context.Context, remotePath string, localPath stri
 }
 
 // Enter runs interactive shell
-func (sc *SSHConfig) Enter(username, shell string) (err error) {
+func (sc *sshConfig) Enter(username, shell string) (err error) {
 	userPass := ""
 	if username != "" && username != sc.User {
 		fmt.Printf("Password: ")
@@ -928,7 +812,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 		Auth: []ssh.AuthMethod{
 			pk,
 		},
-		Timeout:         7 * time.Second,
+		Timeout:         5 * time.Second,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
