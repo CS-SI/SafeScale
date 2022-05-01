@@ -46,12 +46,12 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.Nil(t, first)
 
 	first, xerr = NewConfig("host1", "10.11.12.13", 22, "me", "")
-	require.NotNil(xerr)
-	require.Nil(first)
+	require.NotNil(t, xerr)
+	require.Nil(t, first)
 
 	first, xerr = NewConfig("host1", "10.11.12.13", 22, "me", "privatekey")
 	require.Nil(t, xerr)
-	require.NotNil(first)
+	require.NotNil(t, first)
 
 	casted := first.(*sshConfig)
 	require.EqualValues(t, casted._private.Hostname, "host1")
@@ -63,8 +63,8 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.Nil(t, casted._private.SecondaryGatewayConfig)
 
 	second, xerr := NewConfig("host2", "14.15.16.17", 0, "me2", "privatekey2", first)
-	require.Nil(xerr)
-	require.NotNil(second)
+	require.Nil(t, xerr)
+	require.NotNil(t, second)
 
 	casted = second.(*sshConfig)
 	require.EqualValues(t, casted._private.Hostname, "host2")
@@ -76,10 +76,10 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.Nil(t, casted._private.SecondaryGatewayConfig)
 
 	third, xerr := NewConfig("host3", "18.19.20.21", 8022, "me3", "privatekey3", first, second)
-	require.Nil(xerr)
-	require.NotNil(third)
+	require.Nil(t, xerr)
+	require.NotNil(t, third)
 
-	casted := in.(*sshConfig)
+	casted = third.(*sshConfig)
 	require.EqualValues(t, casted._private.Hostname, "host3")
 	require.EqualValues(t, casted._private.IPAddress, "18.19.20.21")
 	require.EqualValues(t, casted._private.Port, 8022)
@@ -87,7 +87,7 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.EqualValues(t, casted._private.PrivateKey, "privatekey3")
 	require.NotNil(t, casted._private.GatewayConfig)
 	require.NotNil(t, casted._private.SecondaryGatewayConfig)
-	require.EqualValues(t, casted.GatewayConfig().Hostname(), "host2")
-	require.EqualValues(t, casted.SecondaryGatewayConfig().Hostname(), "host3")
+	require.EqualValues(t, casted.GatewayConfig(PrimaryGateway).Hostname(), "host2")
+	require.EqualValues(t, casted.GatewayConfig(SecondaryGateway).Hostname(), "host3")
 
 }
