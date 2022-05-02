@@ -425,7 +425,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		w.availableGateway = gw
 	} else {
 		// In cluster context
-		netCfg, xerr := w.cluster.GetNetworkConfig()
+		netCfg, xerr := w.cluster.GetNetworkConfig(nil)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -505,7 +505,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
-		netCfg, xerr = w.cluster.GetNetworkConfig()
+		netCfg, xerr = w.cluster.GetNetworkConfig(nil)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1155,7 +1155,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return nil
 	}
 
-	netprops, xerr := w.cluster.GetNetworkConfig()
+	netprops, xerr := w.cluster.GetNetworkConfig(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1562,7 +1562,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	var rs resources.Subnet
 	if w.cluster != nil {
 		var netprops *propertiesv3.ClusterNetwork
-		if netprops, xerr = w.cluster.GetNetworkConfig(); xerr != nil {
+		if netprops, xerr = w.cluster.GetNetworkConfig(nil); xerr != nil {
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

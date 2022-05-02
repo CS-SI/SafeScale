@@ -55,7 +55,7 @@ type Feature interface {
 	Dependencies(ctx context.Context) (map[string]struct{}, fail.Error)                             // returns the other features needed as requirements
 	ListParametersWithControl(ctx context.Context) []string                                         // returns a list of parameter containing version information
 	Remove(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // uninstalls the feature from the target
-	ToProtocol() *protocol.FeatureResponse
+	ToProtocol(ctx context.Context) *protocol.FeatureResponse
 }
 
 // FeatureSettings are used to tune the feature

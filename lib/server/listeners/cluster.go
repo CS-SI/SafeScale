@@ -117,7 +117,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, xerr
 	}
 
-	return instance.ToProtocol()
+	return instance.ToProtocol(job.Context())
 }
 
 // State returns the status of a cluster
@@ -154,7 +154,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 		return nil, xerr
 	}
 
-	st, xerr := instance.GetState()
+	st, xerr := instance.GetState(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -197,7 +197,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	return instance.ToProtocol()
+	return instance.ToProtocol(job.Context())
 }
 
 // Start ...

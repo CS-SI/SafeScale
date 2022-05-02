@@ -201,7 +201,7 @@ func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (dat
 		return nil, xerr
 	}
 
-	flavor, xerr := clusterInstance.GetFlavor()
+	flavor, xerr := clusterInstance.GetFlavor(nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -418,7 +418,7 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 }
 
 // GetIdentity returns the identity of the Cluster
-func (instance *Cluster) GetIdentity() (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
+func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
 	}
@@ -430,7 +430,7 @@ func (instance *Cluster) GetIdentity() (clusterIdentity abstract.ClusterIdentity
 }
 
 // GetFlavor returns the flavor of the Cluster
-func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, ferr fail.Error) {
+func (instance *Cluster) GetFlavor(context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -445,7 +445,7 @@ func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, ferr fail.Error
 }
 
 // GetComplexity returns the complexity of the Cluster
-func (instance *Cluster) GetComplexity() (_ clustercomplexity.Enum, ferr fail.Error) {
+func (instance *Cluster) GetComplexity(context.Context) (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -460,7 +460,7 @@ func (instance *Cluster) GetComplexity() (_ clustercomplexity.Enum, ferr fail.Er
 
 // GetAdminPassword returns the password of the Cluster admin account
 // satisfies interface Cluster.Controller
-func (instance *Cluster) GetAdminPassword() (adminPassword string, ferr fail.Error) {
+func (instance *Cluster) GetAdminPassword(context.Context) (adminPassword string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -470,7 +470,7 @@ func (instance *Cluster) GetAdminPassword() (adminPassword string, ferr fail.Err
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
-	aci, xerr := instance.GetIdentity()
+	aci, xerr := instance.GetIdentity(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -479,14 +479,14 @@ func (instance *Cluster) GetAdminPassword() (adminPassword string, ferr fail.Err
 }
 
 // GetKeyPair returns the key pair used in the Cluster
-func (instance *Cluster) GetKeyPair() (keyPair *abstract.KeyPair, ferr fail.Error) {
+func (instance *Cluster) GetKeyPair(context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	aci, xerr := instance.GetIdentity()
+	aci, xerr := instance.GetIdentity(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -496,7 +496,7 @@ func (instance *Cluster) GetKeyPair() (keyPair *abstract.KeyPair, ferr fail.Erro
 }
 
 // GetNetworkConfig returns subnet configuration of the Cluster
-func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
+func (instance *Cluster) GetNetworkConfig(context.Context) (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -1033,7 +1033,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 
 // GetState returns the current state of the Cluster
 // Uses the "maker" ForceGetState
-func (instance *Cluster) GetState() (state clusterstate.Enum, ferr fail.Error) {
+func (instance *Cluster) GetState(context.Context) (state clusterstate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	state = clusterstate.Unknown
@@ -3137,7 +3137,7 @@ func (instance *Cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 }
 
 // ToProtocol converts instance to protocol.ClusterResponse message
-func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, ferr fail.Error) {
+func (instance *Cluster) ToProtocol(context.Context) (_ *protocol.ClusterResponse, ferr fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}

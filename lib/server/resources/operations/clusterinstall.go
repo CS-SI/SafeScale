@@ -130,7 +130,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 			v["Username"] = abstract.DefaultUser
 		}
 	}
-	networkCfg, xerr := instance.GetNetworkConfig()
+	networkCfg, xerr := instance.GetNetworkConfig(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -579,7 +579,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	netCfg, xerr := instance.GetNetworkConfig()
+	netCfg, xerr := instance.GetNetworkConfig(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

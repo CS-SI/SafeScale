@@ -1840,7 +1840,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	netCfg, xerr := instance.GetNetworkConfig()
+	netCfg, xerr := instance.GetNetworkConfig(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2411,7 +2411,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
-	netCfg, xerr := instance.GetNetworkConfig()
+	netCfg, xerr := instance.GetNetworkConfig(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

@@ -98,7 +98,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		return converters.FeatureSliceFromResourceToProtocol(list), nil
+		return converters.FeatureSliceFromResourceToProtocol(ctx, list), nil
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
 		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
@@ -116,7 +116,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		return converters.FeatureSliceFromResourceToProtocol(list), nil
+		return converters.FeatureSliceFromResourceToProtocol(ctx, list), nil
 	}
 
 	// Should not reach this

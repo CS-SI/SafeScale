@@ -797,7 +797,7 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 			return xerr
 		}
 
-		if flavor, flErr := instance.GetFlavor(); flErr == nil && flavor == clusterflavor.K8S {
+		if flavor, flErr := instance.GetFlavor(nil); flErr == nil && flavor == clusterflavor.K8S {
 			var (
 				featName string
 				feat     resources.Feature
@@ -869,7 +869,7 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 				}
 			}
 
-			netconf, inErr := instance.GetNetworkConfig()
+			netconf, inErr := instance.GetNetworkConfig(nil)
 			if inErr != nil {
 				return inErr
 			}
@@ -1106,7 +1106,7 @@ func (tv toV21_05_0) upgradeClusterNodesPropertyIfNeeded(instance *operations.Cl
 
 // upgradeClusterNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
 func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.Cluster) (bool, fail.Error) {
-	identity, xerr := instance.GetIdentity()
+	identity, xerr := instance.GetIdentity(nil)
 	if xerr != nil {
 		return true, xerr
 	}
