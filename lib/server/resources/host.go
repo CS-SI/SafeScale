@@ -55,7 +55,7 @@ type Host interface {
 	GetPrivateIP(ctx context.Context) (ip string, err fail.Error)                                                                                // returns the IP address of the host on the default subnet, with error handling
 	GetPrivateIPOnSubnet(subnetID string) (ip string, err fail.Error)                                                                            // returns the IP address of the host on the requested subnet, with error handling
 	GetPublicIP(ctx context.Context) (ip string, err fail.Error)                                                                                 // returns the public IP address of the host, with error handling
-	GetShare(shareRef string) (*propertiesv1.HostShare, fail.Error)                                                                              // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
+	GetShare(ctx context.Context, shareRef string) (*propertiesv1.HostShare, fail.Error)                                                         // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares() (*propertiesv1.HostShares, fail.Error)                                                                                           // returns the shares hosted on the host
 	GetSSHConfig(ctx context.Context) (*system.SSHConfig, fail.Error)                                                                            // loads SSH configuration for host from metadata
 	GetState() (hoststate.Enum, fail.Error)                                                                                                      // returns the current state of the host, with error handling

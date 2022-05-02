@@ -325,7 +325,7 @@ func (instance *Share) Create(
 	}
 
 	// Check if a Share already exists with the same name
-	_, xerr = server.GetShare(shareName)
+	_, xerr = server.GetShare(ctx, shareName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1234,7 +1234,7 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 		return nil, xerr
 	}
 
-	share, xerr := server.GetShare(shareID)
+	share, xerr := server.GetShare(ctx, shareID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

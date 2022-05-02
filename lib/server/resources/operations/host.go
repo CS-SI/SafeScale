@@ -2409,7 +2409,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				}
 
 				// Retrieve data about v from its server
-				item, loopErr := hostServer.GetShare(i.ShareID)
+				item, loopErr := hostServer.GetShare(ctx, i.ShareID)
 				if loopErr != nil {
 					return loopErr
 				}
@@ -2887,7 +2887,7 @@ func (instance *Host) Push(
 }
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, ferr fail.Error) {
+func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propertiesv1.HostShare, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
