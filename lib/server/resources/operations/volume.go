@@ -202,7 +202,7 @@ func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.Vol
 	// defer instance.lock.RUnlock()
 
 	var vaV1 *propertiesv1.VolumeAttachments
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
@@ -299,7 +299,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
@@ -498,7 +498,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	targetName := host.GetName()
 
 	// -- proceed some checks on volume --
-	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -558,7 +558,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	// -- proceed some checks on target server --
-	xerr = host.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
@@ -1221,13 +1221,13 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 			return nil, xerr
 		}
 
-		vols, _ := hostInstance.(*Host).unsafeGetVolumes()
+		vols, _ := hostInstance.(*Host).unsafeGetVolumes(ctx)
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 
-		mnts, _ := hostInstance.(*Host).unsafeGetMounts()
+		mnts, _ := hostInstance.(*Host).unsafeGetMounts(ctx)
 		if mnts != nil {
 			path, ok := mnts.LocalMountsByDevice[device]
 			if !ok {

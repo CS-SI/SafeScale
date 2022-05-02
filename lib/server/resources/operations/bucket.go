@@ -228,7 +228,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -268,7 +268,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())

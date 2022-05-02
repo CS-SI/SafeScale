@@ -352,9 +352,9 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 // unsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
 // Note: must be used with wisdom
-func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
+func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
@@ -375,8 +375,8 @@ func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 
 // unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, ferr fail.Error) {
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {

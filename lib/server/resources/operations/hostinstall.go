@@ -548,7 +548,7 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	return found, instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return found, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {

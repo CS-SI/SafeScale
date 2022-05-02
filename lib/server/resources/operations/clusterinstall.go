@@ -151,7 +151,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["CIDR"] = networkCfg.CIDR
 
 	var controlPlaneV1 *propertiesv1.ClusterControlplane
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlplane)
@@ -846,7 +846,7 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.M
 	}
 
 	disabled := false
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -911,7 +911,7 @@ func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (f
 	}
 
 	disabled := false
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {

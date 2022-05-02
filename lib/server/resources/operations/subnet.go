@@ -189,7 +189,7 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 
 		if networkInstance != nil { // nolint
 			// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
-			xerr = networkInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = networkInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 					subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 					if !ok {
@@ -677,7 +677,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 			}
 		}
 	} else {
-		xerr = networkInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = networkInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			an, ok = clonable.(*abstract.Network)
 			if !ok {
@@ -805,7 +805,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 	hostName := host.GetName()
 
 	// To apply the request, the instance must be one of the Subnets of the Host
-	xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -1158,7 +1158,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 
 	svc := instance.Service()
 	subnetName := instance.GetName()
-	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1792,7 +1792,7 @@ func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygr
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return list, instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return list, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
@@ -1862,7 +1862,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 			}
 
 			var asg *abstract.SecurityGroup
-			innerXErr := sgInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			innerXErr := sgInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1979,7 +1979,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 			}
 
 			var abstractSG *abstract.SecurityGroup
-			innerXErr := sgInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			innerXErr := sgInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if abstractSG, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())

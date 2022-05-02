@@ -345,7 +345,7 @@ func (instance *Share) Create(
 	}
 
 	// -- make some validations --
-	xerr = server.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = server.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if the path to Share isn't a remote mount or contains a remote mount
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			serverMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -690,7 +690,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	xerr = rhServer.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -726,7 +726,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	// Lock for read, won't change data other than properties, which are protected by their own way
 	targetID = target.GetID()
-	xerr = target.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = target.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if Share is already mounted
 		// Check if there is already volume mounted in the path (or in subpath)
 		innerXErr := props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
@@ -988,7 +988,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		return xerr
 	}
 
-	xerr = rhServer.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			rhServer, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {

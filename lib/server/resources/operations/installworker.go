@@ -1218,7 +1218,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 			primaryGatewayVariables["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
@@ -1293,7 +1293,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 				secondaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain = ""
-				xerr = h.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 						if !ok {

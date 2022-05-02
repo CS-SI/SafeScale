@@ -216,7 +216,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 			logrus.Debugf("Cleaning up on failure, deleting Hosts...")
 			var list map[uint]*propertiesv3.ClusterNode
-			derr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
@@ -1854,19 +1854,17 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	// -- Create the Host --
-	xerr = subnet.Inspect(
-		func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
+	xerr = subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError(
+				"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+			)
+		}
 
-			hostReq.Subnets = []*abstract.Subnet{as}
-			return nil
-		},
-	)
+		hostReq.Subnets = []*abstract.Subnet{as}
+		return nil
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2423,7 +2421,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	// -- Create the Host instance corresponding to the new node --
-	xerr = subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

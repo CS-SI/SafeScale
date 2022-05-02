@@ -1060,7 +1060,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	// Update userdata of gateway(s)
-	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

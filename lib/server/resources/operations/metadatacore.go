@@ -160,7 +160,7 @@ func (myself *MetadataCore) GetKind() string {
 }
 
 // Inspect protects the data for shared read
-func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Error) {
+func (myself *MetadataCore) Inspect(ctx context.Context, callback resources.Callback) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1009,7 +1009,7 @@ func (myself *MetadataCore) unsafeSerialize() (_ []byte, ferr fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates
-func (myself *MetadataCore) Deserialize(buf []byte) (ferr fail.Error) {
+func (myself *MetadataCore) Deserialize(ctx context.Context, buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {

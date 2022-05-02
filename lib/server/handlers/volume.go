@@ -129,7 +129,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		}
 	}
 
-	xerr = volumeInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = volumeInstance.Inspect(task.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {

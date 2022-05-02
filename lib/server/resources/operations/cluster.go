@@ -339,7 +339,7 @@ func (instance *Cluster) Sdump(ctx context.Context) (_ string, ferr fail.Error) 
 }
 
 // Deserialize reads json code and recreates Cluster metadata
-func (instance *Cluster) Deserialize(buf []byte) (ferr fail.Error) {
+func (instance *Cluster) Deserialize(ctx context.Context, buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -506,23 +506,21 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Inspect(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-					networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					// config = networkV3.Clone().(*propertiesv3.ClusterNetwork)
-					config = networkV3
-					return nil
-				},
-			)
-		},
-	)
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(
+			clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+				networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
+				// config = networkV3.Clone().(*propertiesv3.ClusterNetwork)
+				config = networkV3
+				return nil
+			},
+		)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1092,7 +1090,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hostImage             string
 		nodeDefaultDefinition *propertiesv2.HostSizingRequirements
 	)
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV3) {
 			return props.Inspect(clusterproperty.DefaultsV3, func(clonable data.Clonable) fail.Error {
 				defaultsV3, ok := clonable.(*propertiesv3.ClusterDefaults)
@@ -1826,7 +1824,7 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 	}
 
 	found = false
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -1871,7 +1869,7 @@ func (instance *Cluster) CountNodes(ctx context.Context) (count uint, ferr fail.
 		return 0, xerr
 	}
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -1928,7 +1926,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 	}
 
 	found := false
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -2536,7 +2534,7 @@ func (instance *Cluster) extractNetworkingInfo(ctx context.Context) (networkInst
 	networkInstance, subnetInstance = nil, nil
 	deleteNetwork = false
 
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
 			if !ok {
@@ -3467,7 +3465,7 @@ func (instance *Cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 		return false, xerr
 	}
 
-	return found, instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return found, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {

@@ -179,7 +179,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	xerr = k.subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = k.subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

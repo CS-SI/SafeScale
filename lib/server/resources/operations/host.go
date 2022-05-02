@@ -230,7 +230,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 					return xerr
 				}
 
-				gwErr := gwInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				gwErr := gwInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					gwahc, ok := clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2248,7 +2248,7 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Do not remove a Host that is a gateway
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
@@ -2298,7 +2298,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 	}
 
 	var shares map[string]*propertiesv1.HostShare
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Do not remove a Host having shares that are currently remotely mounted
 		innerXErr := props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -2897,46 +2897,44 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 		hostShare *propertiesv1.HostShare
 		// ok        bool
 	)
-	err := instance.Inspect(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
-					sharesV1, ok := clonable.(*propertiesv1.HostShares)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					if item, ok := sharesV1.ByID[shareRef]; ok {
-						cloned, cerr := item.Clone()
-						if cerr != nil {
-							return fail.Wrap(cerr)
-						}
-						hostShare, ok = cloned.(*propertiesv1.HostShare)
-						if !ok {
-							return fail.InconsistentError("item should be a *propertiesv1.HostShare")
-						}
-						return nil
-					}
-					if item, ok := sharesV1.ByName[shareRef]; ok {
-						cloned, cerr := sharesV1.ByID[item].Clone()
-						if cerr != nil {
-							return fail.Wrap(cerr)
-						}
-						hostShare, ok = cloned.(*propertiesv1.HostShare)
-						if !ok {
-							return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
-						}
-						return nil
-					}
-					return fail.NotFoundError(
-						"share '%s' not found in server '%s' metadata", shareRef, instance.GetName(),
+	err := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(
+			hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+				sharesV1, ok := clonable.(*propertiesv1.HostShares)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String(),
 					)
-				},
-			)
-		},
-	)
+				}
+
+				if item, ok := sharesV1.ByID[shareRef]; ok {
+					cloned, cerr := item.Clone()
+					if cerr != nil {
+						return fail.Wrap(cerr)
+					}
+					hostShare, ok = cloned.(*propertiesv1.HostShare)
+					if !ok {
+						return fail.InconsistentError("item should be a *propertiesv1.HostShare")
+					}
+					return nil
+				}
+				if item, ok := sharesV1.ByName[shareRef]; ok {
+					cloned, cerr := sharesV1.ByID[item].Clone()
+					if cerr != nil {
+						return fail.Wrap(cerr)
+					}
+					hostShare, ok = cloned.(*propertiesv1.HostShare)
+					if !ok {
+						return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
+					}
+					return nil
+				}
+				return fail.NotFoundError(
+					"share '%s' not found in server '%s' metadata", shareRef, instance.GetName(),
+				)
+			},
+		)
+	})
 	err = debug.InjectPlannedFail(err)
 	if err != nil {
 		return nil, err
@@ -2956,7 +2954,7 @@ func (instance *Host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolum
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	return instance.unsafeGetVolumes()
+	return instance.unsafeGetVolumes(ctx)
 }
 
 // Start starts the Host
@@ -3286,7 +3284,7 @@ func (instance *Host) GetPrivateIPOnSubnet(ctx context.Context, subnetID string)
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -3336,7 +3334,7 @@ func (instance *Host) GetShares(ctx context.Context) (shares *propertiesv1.HostS
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -3362,7 +3360,7 @@ func (instance *Host) GetMounts(ctx context.Context) (mounts *propertiesv1.HostM
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	return instance.unsafeGetMounts()
+	return instance.unsafeGetMounts(ctx)
 }
 
 // IsClusterMember returns true if the Host is member of a cluster
@@ -3377,7 +3375,7 @@ func (instance *Host) IsClusterMember(ctx context.Context) (yes bool, ferr fail.
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.ClusterMembershipV1, func(clonable data.Clonable) fail.Error {
 			hostClusterMembershipV1, ok := clonable.(*propertiesv1.HostClusterMembership)
 			if !ok {
@@ -3406,7 +3404,7 @@ func (instance *Host) IsGateway(ctx context.Context) (_ bool, ferr fail.Error) {
 	// defer instance.RUnlock()
 
 	var state bool
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -3437,7 +3435,7 @@ func (instance *Host) IsSingle(ctx context.Context) (_ bool, ferr fail.Error) {
 	// defer instance.RUnlock()
 
 	var state bool
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -3545,7 +3543,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 	publicIP, _ := instance.GetPublicIP(ctx)   // There may be no public ip, but the returned value is pertinent in this case, no need to handle error
 	privateIP, _ := instance.GetPrivateIP(ctx) // Idem
 
-	xerr := instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		ahc, ok = clonable.(*abstract.HostCore)
 		if !ok {
@@ -3777,7 +3775,7 @@ func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygrou
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -3836,7 +3834,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sg.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr := sg.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())

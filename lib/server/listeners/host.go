@@ -415,27 +415,25 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	reduce := false
-	xerr = hostInstance.Inspect(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
-					hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = hostInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(
+			hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+				hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
-					reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
-					reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
-					reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
-					reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
-					return nil
-				},
-			)
-		},
-	)
+				reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
+				reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
+				reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
+				reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
+				reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
+				return nil
+			},
+		)
+	})
 	if xerr != nil {
 		return nil, xerr
 	}

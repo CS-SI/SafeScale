@@ -692,7 +692,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 	// defer instance.lock.Unlock()
 
 	var rules abstract.SecurityGroupRules
-	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -880,7 +880,7 @@ func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 	// defer instance.lock.RUnlock()
 
 	var list []*propertiesv1.SecurityGroupBond
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -925,7 +925,7 @@ func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
@@ -963,7 +963,7 @@ func (instance *SecurityGroup) ToProtocol(ctx context.Context) (_ *protocol.Secu
 	// defer instance.lock.RUnlock()
 
 	out := &protocol.SecurityGroupResponse{}
-	return out, instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return out, instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())

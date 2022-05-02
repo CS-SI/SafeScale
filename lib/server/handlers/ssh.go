@@ -142,7 +142,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	}
 
 	if isSingle || isGateway {
-		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
 			if !ok {
 				return fail.InconsistentError("")
@@ -157,7 +157,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		}
 	} else {
 		var subnetInstance resources.Subnet
-		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
 			if !ok {
 				return fail.InconsistentError("")
@@ -221,7 +221,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				if gwahc, ok = clonable.(*abstract.HostCore); !ok {
 					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -265,7 +265,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				gwahc, ok = clonable.(*abstract.HostCore)
 				if !ok {
 					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
