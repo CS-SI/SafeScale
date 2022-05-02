@@ -1519,7 +1519,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 	portID, xerr := s.getOpenstackPortID(host)
 	if xerr != nil {
-		return fail.NewError("failed to disable Router Mode on host '%s'", host.Core.Name)
+		return fail.NewErrorWithCause(xerr, "failed to disable Router Mode on host '%s'", host.Core.Name)
 	}
 	if portID == nil {
 		return fail.NewError(

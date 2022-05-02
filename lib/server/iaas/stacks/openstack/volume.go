@@ -100,7 +100,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
 	az, xerr := s.SelectedAvailabilityZone()
-	if xerr != nil {
+	if xerr != nil { // nolint
 		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
