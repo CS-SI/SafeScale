@@ -1899,11 +1899,11 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			state, xerr := toHostState(resp[0].State)
 			if xerr != nil {
-				return fail.NewError("failed to convert instance state")
+				return fail.NewErrorWithCause(xerr, "failed to convert instance state")
 			}
 
 			if state != hoststate.Terminated {
-				return fail.NewError(innerXErr, "not in terminated state (current state: %s)", state.String())
+				return fail.NewError("not in terminated state (current state: %s)", state.String())
 			}
 
 			return nil

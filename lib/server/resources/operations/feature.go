@@ -153,7 +153,7 @@ func (instance *Feature) GetID() string {
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling
-func (instance *Feature) GetFilename() string {
+func (instance *Feature) GetFilename(ctx context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
@@ -162,7 +162,7 @@ func (instance *Feature) GetFilename() string {
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
-func (instance *Feature) GetDisplayFilename() string {
+func (instance *Feature) GetDisplayFilename(ctx context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
@@ -201,19 +201,19 @@ func (instance *Feature) Specs() *viper.Viper {
 }
 
 // Applicable tells if the Feature is installable on the target
-func (instance *Feature) Applicable(t resources.Targetable) (bool, fail.Error) {
+func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable) (bool, fail.Error) {
 	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
 	// 1st check Feature is suitable for target
-	switch t.TargetType() {
+	switch tg.TargetType() {
 	case featuretargettype.Cluster:
-		casted, ok := t.(*Cluster)
+		casted, ok := tg.(*Cluster)
 		if !ok {
 			return false, fail.InconsistentError("failed to cast target as '*Cluster'")
 		}
-		flavor, xerr := casted.GetFlavor()
+		flavor, xerr := casted.GetFlavor(ctx)
 		if xerr != nil {
 			return false, fail.Wrap(xerr, "failed to get Cluster Flavor")
 		}
@@ -228,14 +228,14 @@ func (instance *Feature) Applicable(t resources.Targetable) (bool, fail.Error) {
 	}
 
 	// 2nd in case of a cluster, check cluster sizing requirements
-	switch t.TargetType() {
+	switch tg.TargetType() {
 	case featuretargettype.Cluster:
 		// FIXME: implement this
 	default:
 	}
 
 	// 2nd check there is an install method the target can use
-	methods, xerr := t.InstallMethods()
+	methods, xerr := tg.InstallMethods(ctx)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -286,7 +286,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr = castedTarget.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {
@@ -313,7 +313,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 
 	switch ata := target.(type) {
 	case resources.Host:
-		state, xerr := ata.GetState()
+		state, xerr := ata.GetState(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -337,7 +337,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	}
 
 	// -- fall back to active check
-	installer, xerr := instance.determineInstallerForTarget(target, "check")
+	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -433,8 +433,8 @@ func (instance *Feature) conditionParameters(ctx context.Context, externals data
 }
 
 // determineInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
-func (instance *Feature) determineInstallerForTarget(target resources.Targetable, action string) (_ Installer, ferr fail.Error) {
-	methods, xerr := target.InstallMethods()
+func (instance *Feature) determineInstallerForTarget(ctx context.Context, target resources.Targetable, action string) (_ Installer, ferr fail.Error) {
+	methods, xerr := target.InstallMethods(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -489,7 +489,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName),
 	)()
 
-	installer, xerr := instance.determineInstallerForTarget(target, "check")
+	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -537,7 +537,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	// FIXME: restore Feature check cache using iaas.ResourceCache
 	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
 
-	return results, target.RegisterFeature(instance, nil, target.TargetType() == featuretargettype.Cluster)
+	return results, target.RegisterFeature(ctx, instance, nil, target.TargetType() == featuretargettype.Cluster)
 }
 
 // Remove uninstalls the Feature from the target
@@ -572,7 +572,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		// installer Installer
 	)
 
-	installer, xerr := instance.determineInstallerForTarget(target, "check")
+	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -601,11 +601,11 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return nil, xerr
 	}
 
-	return results, target.UnregisterFeature(instance.GetName())
+	return results, target.UnregisterFeature(ctx, instance.GetName())
 }
 
 // Dependencies returns a list of features needed as dependencies
-func (instance *Feature) Dependencies() (map[string]struct{}, fail.Error) {
+func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{}, fail.Error) {
 	emptyMap := map[string]struct{}{}
 	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -690,7 +690,7 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 				}
 
 				// Register the needed Feature as a requirement for instance
-				xerr = t.RegisterFeature(needed, instance, targetIsCluster)
+				xerr = t.RegisterFeature(ctx, needed, instance, targetIsCluster)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -723,7 +723,7 @@ func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service, t
 				return xerr
 			}
 
-			xerr = host.RegisterFeature(installed, requiredBy, true)
+			xerr = host.RegisterFeature(ctx, installed, requiredBy, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -755,7 +755,7 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service,
 				return xerr
 			}
 
-			xerr = host.UnregisterFeature(installed.GetName())
+			xerr = host.UnregisterFeature(ctx, installed.GetName())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -766,16 +766,16 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service,
 }
 
 // ToProtocol converts a Feature to *protocol.FeatureResponse
-func (instance Feature) ToProtocol() *protocol.FeatureResponse {
+func (instance Feature) ToProtocol(ctx context.Context) *protocol.FeatureResponse {
 	out := &protocol.FeatureResponse{
 		Name:     instance.GetName(),
-		FileName: instance.GetDisplayFilename(),
+		FileName: instance.GetDisplayFilename(ctx),
 	}
 	return out
 }
 
 // ListParametersWithControl returns a slice of parameter names that have control script
-func (instance Feature) ListParametersWithControl() []string {
+func (instance Feature) ListParametersWithControl(ctx context.Context) []string {
 	out := make([]string, 0, len(instance.file.versionControl))
 	for k := range instance.file.versionControl {
 		out = append(out, k)
@@ -895,7 +895,7 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 			}
 		}
 
-		ok, xerr := entry.Applicable(target)
+		ok, xerr := entry.Applicable(ctx, target)
 		if xerr != nil {
 			return nil, xerr
 		}

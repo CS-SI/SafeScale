@@ -80,7 +80,7 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(svc, name) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -99,7 +99,7 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 	return b, nil
 }
 
-func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	bucketInstance, innerXErr := NewBucket(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -110,12 +110,11 @@ func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if innerXErr = bucketInstance.Read(ref); innerXErr != nil {
+	if innerXErr = bucketInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("bucket with ref '%s' does NOT exist", ref)
 	}
 
@@ -125,6 +124,10 @@ func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 // IsNull tells if the instance corresponds to null value
 func (instance *bucket) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+}
+
+func (instance *bucket) Exists() (bool, fail.Error) {
+	return true, nil
 }
 
 // carry ...
@@ -184,21 +187,19 @@ func (instance *bucket) Browse(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(
-		func(buf []byte) (innerXErr fail.Error) {
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
 
-			ab := abstract.NewObjectStorageBucket()
-			var inErr fail.Error
-			if inErr = ab.Deserialize(buf); inErr != nil {
-				return inErr
-			}
+		ab := abstract.NewObjectStorageBucket()
+		var inErr fail.Error
+		if inErr = ab.Deserialize(buf); inErr != nil {
+			return inErr
+		}
 
-			return callback(ab)
-		},
-	)
+		return callback(ab)
+	})
 }
 
 // GetHost ...
@@ -224,7 +225,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -264,7 +265,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -384,7 +385,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	defer instance.lock.Unlock()
 
 	// -- check Bucket is not still mounted
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -462,7 +463,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -555,7 +556,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- update metadata of Bucket
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -572,7 +573,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- update metadata of Host
-	return hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -626,7 +627,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	var mountPoint string
 	bucketName := instance.GetName()
 
-	mounts, xerr := hostInstance.GetMounts()
+	mounts, xerr := hostInstance.GetMounts(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -662,7 +663,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		}
 	}
 
-	xerr = hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -677,7 +678,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return xerr
 	}
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -697,7 +698,7 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 		Name: instance.GetName(),
 	}
 
-	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {

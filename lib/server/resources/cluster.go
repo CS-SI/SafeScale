@@ -40,6 +40,7 @@ type Cluster interface {
 	Metadata
 	Targetable
 	observer.Observable
+	Consistent
 
 	AddFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) ([]Host, fail.Error) // adds several nodes
@@ -51,13 +52,13 @@ type Cluster interface {
 	Delete(ctx context.Context, force bool) fail.Error                                                                                           // deletes the cluster (Delete is not used to not collision with metadata)
 	FindAvailableMaster(ctx context.Context) (Host, fail.Error)                                                                                  // returns ID of the first master available to execute order
 	FindAvailableNode(ctx context.Context) (Host, fail.Error)                                                                                    // returns node instance of the first node available to execute order
-	GetIdentity() (abstract.ClusterIdentity, fail.Error)                                                                                         // returns Cluster Identity
-	GetFlavor() (clusterflavor.Enum, fail.Error)                                                                                                 // returns the flavor of the cluster
-	GetComplexity() (clustercomplexity.Enum, fail.Error)                                                                                         // returns the complexity of the cluster
-	GetAdminPassword() (string, fail.Error)                                                                                                      // returns the password of the cluster admin account
-	GetKeyPair() (*abstract.KeyPair, fail.Error)                                                                                                 // returns the key pair used in the cluster
-	GetNetworkConfig() (*propertiesv3.ClusterNetwork, fail.Error)                                                                                // returns network configuration of the cluster
-	GetState() (clusterstate.Enum, fail.Error)                                                                                                   // returns the current state of the cluster
+	GetIdentity(ctx context.Context) (abstract.ClusterIdentity, fail.Error)                                                                      // returns Cluster Identity
+	GetFlavor(ctx context.Context) (clusterflavor.Enum, fail.Error)                                                                              // returns the flavor of the cluster
+	GetComplexity(ctx context.Context) (clustercomplexity.Enum, fail.Error)                                                                      // returns the complexity of the cluster
+	GetAdminPassword(ctx context.Context) (string, fail.Error)                                                                                   // returns the password of the cluster admin account
+	GetKeyPair(ctx context.Context) (*abstract.KeyPair, fail.Error)                                                                              // returns the key pair used in the cluster
+	GetNetworkConfig(ctx context.Context) (*propertiesv3.ClusterNetwork, fail.Error)                                                             // returns network configuration of the cluster
+	GetState(ctx context.Context) (clusterstate.Enum, fail.Error)                                                                                // returns the current state of the cluster
 	IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error)                                                           // tells if a feature is installed in Cluster using only metadata
 	ListEligibleFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                            // returns the list of eligible features for the Cluster
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                           // returns the list of installed features on the Cluster
@@ -74,5 +75,5 @@ type Cluster interface {
 	Shrink(ctx context.Context, count uint) ([]*propertiesv3.ClusterNode, fail.Error)                                                            // reduce the size of the cluster of 'count' nodes (the last created)
 	Start(ctx context.Context) fail.Error                                                                                                        // starts the cluster
 	Stop(ctx context.Context) fail.Error                                                                                                         // stops the cluster
-	ToProtocol() (*protocol.ClusterResponse, fail.Error)
+	ToProtocol(ctx context.Context) (*protocol.ClusterResponse, fail.Error)
 }

@@ -71,7 +71,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -86,7 +86,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var innerXErr fail.Error
 		outcomes, innerXErr = feat.Add(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
@@ -100,7 +100,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
 			}
 
-			requires, innerXErr := feat.Dependencies()
+			requires, innerXErr := feat.Dependencies(ctx)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -188,7 +188,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -203,7 +203,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
@@ -241,7 +241,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *Host) InstallMethods() (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}
@@ -258,7 +258,7 @@ func (instance *Host) InstallMethods() (map[uint8]installmethod.Enum, fail.Error
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
+func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -268,7 +268,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -277,7 +277,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 
 			var item *propertiesv1.HostInstalledFeature
 			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.Dependencies()
+				requirements, innerXErr := feat.Dependencies(ctx)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -307,7 +307,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
-func (instance *Host) UnregisterFeature(feat string) (ferr fail.Error) {
+func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -317,7 +317,7 @@ func (instance *Host) UnregisterFeature(feat string) (ferr fail.Error) {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -361,7 +361,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures()
+	list := instance.InstalledFeatures(ctx)
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
 		item, xerr := NewFeature(ctx, instance.Service(), v)
@@ -377,13 +377,13 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 
 // InstalledFeatures returns a slice of installed features
 // satisfies interface resources.Targetable
-func (instance *Host) InstalledFeatures() []string {
+func (instance *Host) InstalledFeatures(ctx context.Context) []string {
 	if instance == nil {
 		return []string{}
 	}
 
 	var out []string
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -418,7 +418,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
 
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -470,7 +470,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		return xerr
 	}
 
-	single, xerr := instance.IsSingle()
+	single, xerr := instance.IsSingle(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -537,7 +537,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 }
 
 // IsFeatureInstalled ...
-func (instance *Host) IsFeatureInstalled(name string) (found bool, ferr fail.Error) {
+func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error) {
 	found = false
 	defer fail.OnPanic(&ferr)
 
@@ -548,7 +548,7 @@ func (instance *Host) IsFeatureInstalled(name string) (found bool, ferr fail.Err
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	return found, instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return found, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {

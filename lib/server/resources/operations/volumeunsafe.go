@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
@@ -29,9 +30,9 @@ import (
 
 // unsafeGetSpeed ...
 // Intended to be used when instance is notoriously not nil
-func (instance *volume) unsafeGetSpeed() (volumespeed.Enum, fail.Error) {
+func (instance *volume) unsafeGetSpeed(ctx context.Context) (volumespeed.Enum, fail.Error) {
 	var speed volumespeed.Enum
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -50,9 +51,9 @@ func (instance *volume) unsafeGetSpeed() (volumespeed.Enum, fail.Error) {
 
 // unsafeGetSize ...
 // Intended to be used when instance is notoriously not nil
-func (instance *volume) unsafeGetSize() (int, fail.Error) {
+func (instance *volume) unsafeGetSize(ctx context.Context) (int, fail.Error) {
 	var size int
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())

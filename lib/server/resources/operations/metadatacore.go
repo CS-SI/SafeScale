@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"sync"
@@ -159,7 +160,7 @@ func (myself *MetadataCore) GetKind() string {
 }
 
 // Inspect protects the data for shared read
-func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Error) {
+func (myself *MetadataCore) Inspect(ctx context.Context, callback resources.Callback) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -216,7 +217,7 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Erro
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error) {
+func (myself *MetadataCore) Review(ctx context.Context, callback resources.Callback) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {
@@ -240,7 +241,7 @@ func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
+func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -409,7 +410,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
+func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -491,7 +492,7 @@ func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (myself *MetadataCore) ReadByID(id string) (ferr fail.Error) {
+func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Note: do not test with .IsNull() here, it may be null value on first read
@@ -702,7 +703,7 @@ func (myself *MetadataCore) write() fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *MetadataCore) Reload() (ferr fail.Error) {
+func (myself *MetadataCore) Reload(ctx context.Context) (ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -807,7 +808,7 @@ func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
 }
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
-func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (ferr fail.Error) {
+func (myself *MetadataCore) BrowseFolder(ctx context.Context, callback func(buf []byte) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {
@@ -945,7 +946,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 	return nil
 }
 
-func (myself *MetadataCore) Sdump() (_ string, ferr fail.Error) {
+func (myself *MetadataCore) Sdump(ctx context.Context) (_ string, ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1008,7 +1009,7 @@ func (myself *MetadataCore) unsafeSerialize() (_ []byte, ferr fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates
-func (myself *MetadataCore) Deserialize(buf []byte) (ferr fail.Error) {
+func (myself *MetadataCore) Deserialize(ctx context.Context, buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {

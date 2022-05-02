@@ -17,6 +17,7 @@
 package outscale
 
 import (
+	"context"
 	"encoding/base64"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
@@ -35,7 +36,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Erro
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var xerr fail.Error
@@ -55,7 +56,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 		return fail.InvalidParameterError("keyair", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcCreateKeypair(keypair.Name, base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)))
@@ -70,7 +71,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadKeypairByName(id)
@@ -91,7 +92,7 @@ func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadKeypairs(nil)
@@ -119,7 +120,7 @@ func (s stack) DeleteKeyPair(name string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcDeleteKeypair(name)

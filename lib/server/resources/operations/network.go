@@ -78,7 +78,7 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -97,7 +97,7 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
-func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onNetworkCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	networkInstance, innerXErr := NewNetwork(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -108,11 +108,11 @@ func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.E
 		return nil, innerXErr
 	}
 
-	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
+	if innerXErr = networkInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(networkInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(networkInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("network with ref '%s' does NOT exist", ref)
 	}
 
@@ -122,6 +122,10 @@ func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.E
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *Network) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+}
+
+func (instance *Network) Exists() (bool, fail.Error) {
+	return true, nil
 }
 
 // Create creates a Network
@@ -368,7 +372,7 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
@@ -400,7 +404,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		networkAbstract, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -423,7 +427,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	timings, xerr := instance.Service().Timings()
@@ -434,7 +438,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -608,7 +612,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (instance *Network) GetCIDR() (cidr string, ferr fail.Error) {
+func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -619,7 +623,7 @@ func (instance *Network) GetCIDR() (cidr string, ferr fail.Error) {
 	// defer instance.lock.RUnlock()
 
 	cidr = ""
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -632,7 +636,7 @@ func (instance *Network) GetCIDR() (cidr string, ferr fail.Error) {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *Network) ToProtocol() (out *protocol.Network, ferr fail.Error) {
+func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -642,7 +646,7 @@ func (instance *Network) ToProtocol() (out *protocol.Network, ferr fail.Error) {
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -723,7 +727,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 		return fail.InvalidRequestError("cannot adopt Subnet '%s' because Network '%s' does not own it", subnet.GetName(), instance.GetName())
 	}
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
@@ -763,7 +767,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
@@ -786,8 +790,8 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 }
 
 // FreeCIDRForSingleHost frees the CIDR index inside the Network 'Network'
-func FreeCIDRForSingleHost(network resources.Network, index uint) fail.Error {
-	return network.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+func FreeCIDRForSingleHost(ctx context.Context, network resources.Network, index uint) fail.Error {
+	return network.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
 			nshV1, ok := clonable.(*propertiesv1.NetworkSingleHosts)
 			if !ok {

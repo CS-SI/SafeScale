@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -391,7 +392,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true, "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true, "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var xerr fail.Error
@@ -572,7 +573,7 @@ func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet

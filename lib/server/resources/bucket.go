@@ -33,6 +33,7 @@ type Bucket interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
+	Consistent
 
 	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
 	Create(ctx context.Context, name string) fail.Error

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -120,6 +121,7 @@ func normalizeError(err error) fail.Error {
 				if _, ok := normalized.(*fail.ErrUnknown); ok {
 					errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
 					if xerr != nil { // we failed using the http return code, so send the normalized error
+						debug.IgnoreError(xerr)
 						return normalized
 					}
 					return errFromHTTP // we got something
@@ -133,6 +135,7 @@ func normalizeError(err error) fail.Error {
 				if _, ok := normalized.(*fail.ErrUnknown); ok {
 					errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
 					if xerr != nil { // we failed using the http return code, so send the normalized error
+						debug.IgnoreError(xerr)
 						return normalized
 					}
 					return errFromHTTP // we got something

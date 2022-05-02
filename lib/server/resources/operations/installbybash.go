@@ -50,10 +50,10 @@ func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resour
 	yamlKey := "feature.install.bash.check"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(ctx), yamlKey)
 	}
 
-	w, xerr := newWorker(f, t, installmethod.Bash, installaction.Check, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.Bash, installaction.Check, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -95,10 +95,10 @@ func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	if !f.(*Feature).Specs().IsSet("feature.install.bash.add") {
 		msg := `syntax error in Feature '%s' specification file (%s):
 				no key 'feature.install.bash.add' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename())
+		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(ctx))
 	}
 
-	w, xerr := newWorker(f, t, installmethod.Bash, installaction.Add, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.Bash, installaction.Add, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -144,10 +144,10 @@ func (i *bashInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	if !f.(*Feature).Specs().IsSet("feature.install.bash.remove") {
 		msg := `syntax error in Feature '%s' specification file (%s):
 				no key 'feature.install.bash.remove' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename())
+		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(ctx))
 	}
 
-	w, xerr := newWorker(f, t, installmethod.Bash, installaction.Remove, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.Bash, installaction.Remove, nil)
 	if xerr != nil {
 		return nil, xerr
 	}

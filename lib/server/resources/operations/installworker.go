@@ -131,7 +131,7 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
+func newWorker(ctx context.Context, f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
 		feature:   f.(*Feature),
 		target:    target,
@@ -163,7 +163,7 @@ func newWorker(f resources.Feature, target resources.Targetable, method installm
 		if !f.(*Feature).Specs().IsSet(w.rootKey) {
 			msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
-			return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
+			return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(ctx), w.rootKey)
 		}
 	}
 
@@ -179,7 +179,7 @@ func (w *worker) ConcernsCluster() bool {
 func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fail.Error {
 	switch w.target.TargetType() {
 	case featuretargettype.Cluster:
-		xerr := w.validateContextForCluster()
+		xerr := w.validateContextForCluster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil && !s.SkipSizingRequirements {
 			xerr = w.validateClusterSizing(ctx)
@@ -425,7 +425,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		w.availableGateway = gw
 	} else {
 		// In cluster context
-		netCfg, xerr := w.cluster.GetNetworkConfig()
+		netCfg, xerr := w.cluster.GetNetworkConfig(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -505,7 +505,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
-		netCfg, xerr = w.cluster.GetNetworkConfig()
+		netCfg, xerr = w.cluster.GetNetworkConfig(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -644,7 +644,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in Feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
+			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey)
 		}
 
 		// Determine list of hosts concerned by the step
@@ -669,7 +669,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 				}
 			} else {
 				msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlTargetsKeyword)
+				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey, yamlTargetsKeyword)
 			}
 
 			hostsList, xerr = w.identifyHosts(task.Context(), stepT)
@@ -889,7 +889,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(task.Context()), p.stepKey, yamlRunKeyword)
 	}
 
 	wallTime := timings.HostLongOperationTimeout()
@@ -1003,8 +1003,8 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // validateContextForCluster checks if the flavor of the cluster is listed in Feature specification
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
-func (w *worker) validateContextForCluster() fail.Error {
-	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
+func (w *worker) validateContextForCluster(ctx context.Context) fail.Error {
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1045,7 +1045,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 }
 
 func (w *worker) validateClusterSizing(ctx context.Context) (ferr fail.Error) {
-	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1146,7 +1146,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	found, xerr := rgw.IsFeatureInstalled("edgeproxy4subnet")
+	found, xerr := rgw.IsFeatureInstalled(ctx, "edgeproxy4subnet")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1155,7 +1155,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return nil
 	}
 
-	netprops, xerr := w.cluster.GetNetworkConfig()
+	netprops, xerr := w.cluster.GetNetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1174,7 +1174,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	}
 
 	var secondaryKongController *KongController
-	if ok, _ := subnetInstance.HasVirtualIP(); ok {
+	if ok, _ := subnetInstance.HasVirtualIP(ctx); ok {
 		secondaryKongController, xerr = NewKongController(ctx, w.service, subnetInstance, false)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1218,7 +1218,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 			primaryGatewayVariables["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
@@ -1293,7 +1293,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 				secondaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain = ""
-				xerr = h.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 						if !ok {
@@ -1562,7 +1562,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	var rs resources.Subnet
 	if w.cluster != nil {
 		var netprops *propertiesv3.ClusterNetwork
-		if netprops, xerr = w.cluster.GetNetworkConfig(); xerr != nil {
+		if netprops, xerr = w.cluster.GetNetworkConfig(ctx); xerr != nil {
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

@@ -34,6 +34,7 @@ type Network interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
+	Consistent
 
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network
 	AdoptSubnet(ctx context.Context, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network
@@ -42,5 +43,5 @@ type Network interface {
 	Delete(ctx context.Context) fail.Error
 	Import(ctx context.Context, ref string) fail.Error
 	InspectSubnet(ctx context.Context, subnetRef string) (Subnet, fail.Error) // returns the Subnet instance corresponding to Subnet reference (ID or name) provided (if Subnet is attached to the Network)
-	ToProtocol() (*protocol.Network, fail.Error)                              // converts the network to protobuf message
+	ToProtocol(ctx context.Context) (*protocol.Network, fail.Error)           // converts the network to protobuf message
 }

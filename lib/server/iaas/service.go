@@ -17,6 +17,7 @@
 package iaas
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -483,7 +484,7 @@ func (instance service) ListTemplatesBySizing(
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true, "").Entering()
+	tracer := debug.NewTracer(context.Background(), true, "").Entering()
 	defer tracer.Exiting()
 
 	allTpls, rerr := instance.ListTemplates(false)

@@ -19,6 +19,7 @@ package objectstorage
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -273,7 +274,7 @@ func (instance location) ListBuckets(prefix string) (_ []string, ferr fail.Error
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", prefix).Entering().Exiting()
 
 	var list []string
 
@@ -310,7 +311,7 @@ func (instance location) FindBucket(bucketName string) (_ bool, ferr fail.Error)
 		return false, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "(%s)", bucketName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "(%s)", bucketName).Entering().Exiting()
 
 	found := false
 
@@ -349,7 +350,7 @@ func (instance location) InspectBucket(bucketName string) (_ abstract.ObjectStor
 		return abstract.ObjectStorageBucket{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -408,7 +409,7 @@ func (instance location) CreateBucket(bucketName string) (aosb abstract.ObjectSt
 		return aosb, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
 
 	c, err := instance.stowLocation.CreateContainer(bucketName)
 	if err != nil {
@@ -431,7 +432,7 @@ func (instance location) DeleteBucket(bucketName string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
 
 	err := instance.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
@@ -458,7 +459,7 @@ func (instance location) InspectObject(bucketName string, objectName string) (ao
 		return aosi, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -496,7 +497,7 @@ func (instance location) DeleteObject(bucketName, objectName string) (ferr fail.
 		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -515,7 +516,7 @@ func (instance location) ListObjects(bucketName string, path, prefix string) (_ 
 		return []string{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -534,7 +535,7 @@ func (instance location) BrowseBucket(bucketName string, path, prefix string, ca
 		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -557,7 +558,7 @@ func (instance location) DownloadBucket(bucketName, decryptionKey string) (_ []b
 	path := ""
 	prefix := ""
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
 	zippedBucket, err := os.CreateTemp("", "bucketcontent.*.zip")
 	if err != nil {
@@ -638,7 +639,7 @@ func (instance location) ClearBucket(bucketName string, path, prefix string) (fe
 		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -659,7 +660,7 @@ func (instance location) ItemEtag(bucketName, objectName string) (_ string, ferr
 		return "", fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -687,7 +688,7 @@ func (instance location) HasObject(bucketName, objectName string) (_ bool, ferr 
 		return false, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	b, xerr := instance.GetBucket(bucketName)
 	if xerr != nil {
@@ -721,7 +722,7 @@ func (instance location) ReadObject(bucketName, objectName string, writer io.Wri
 		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	has, err := instance.HasObject(bucketName, objectName)
 	if err != nil {
@@ -771,7 +772,7 @@ func (instance location) WriteObject(
 		return aosi, fail.InvalidParameterCannotBeNilError("source")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -815,7 +816,7 @@ func (instance location) WriteMultiPartObject(
 		return aosi, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering()
 	defer tracer.Exiting()
 
 	b, err := instance.GetBucket(bucketName)

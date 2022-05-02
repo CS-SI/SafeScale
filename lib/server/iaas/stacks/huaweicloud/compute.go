@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -306,7 +307,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -420,7 +421,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
@@ -848,7 +849,7 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
@@ -950,7 +951,7 @@ func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -990,7 +991,7 @@ func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
@@ -1518,7 +1519,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 	portID, xerr := s.getOpenstackPortID(host)
 	if xerr != nil {
-		return fail.NewError("failed to disable Router Mode on host '%s'", host.Core.Name)
+		return fail.NewErrorWithCause(xerr, "failed to disable Router Mode on host '%s'", host.Core.Name)
 	}
 	if portID == nil {
 		return fail.NewError(

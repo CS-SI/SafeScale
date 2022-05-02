@@ -74,7 +74,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	}
 
 	var present bool
-	installedFeatures := addressedGateway.InstalledFeatures()
+	installedFeatures := addressedGateway.InstalledFeatures(ctx)
 	for _, v := range installedFeatures {
 		if v == "edgeproxy4subnet" || v == "reverseproxy" {
 			present = true
@@ -97,7 +97,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		}
 
 		if results.Successful() {
-			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = addressedGateway.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 					if !ok {
@@ -107,7 +107,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 					item := propertiesv1.NewHostInstalledFeature()
 					item.HostContext = true
 					var innerXErr fail.Error
-					item.Requires, innerXErr = featureInstance.Dependencies()
+					item.Requires, innerXErr = featureInstance.Dependencies(ctx)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -179,7 +179,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	xerr = k.subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = k.subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

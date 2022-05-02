@@ -17,6 +17,8 @@
 package outscale
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -60,7 +62,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	if req.CIDR == "" {
 		req.CIDR = stacks.DefaultNetworkCIDR
 	}
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcCreateNetwork(req.Name, req.CIDR)
@@ -253,7 +255,7 @@ func (s stack) InspectNetwork(id string) (_ *abstract.Network, ferr fail.Error) 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadNetByID(id)
@@ -270,7 +272,7 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, ferr fail
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadNetByName(name)
@@ -288,7 +290,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, ferr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadNets(nil)
@@ -310,7 +312,7 @@ func (s stack) DeleteNetwork(id string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Reads NICs that belong to the subnet
@@ -350,7 +352,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, fe
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Check if CIDR intersects with VPC cidr; if not, error
@@ -402,7 +404,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadSubnetByID(id)
@@ -425,7 +427,7 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 		return nil, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var networkID string
@@ -496,7 +498,7 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, ferr fail.E
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if networkRef == "" {
@@ -570,7 +572,7 @@ func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Reads NIS that belong to the subnet

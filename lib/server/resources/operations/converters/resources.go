@@ -17,6 +17,8 @@
 package converters
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,11 +40,11 @@ func IndexedListOfClusterNodesFromResourceToProtocol(in resources.IndexedListOfC
 	return out, nil
 }
 
-func FeatureSliceFromResourceToProtocol(in []resources.Feature) *protocol.FeatureListResponse {
+func FeatureSliceFromResourceToProtocol(ctx context.Context, in []resources.Feature) *protocol.FeatureListResponse {
 	out := &protocol.FeatureListResponse{}
 	out.Features = make([]*protocol.FeatureResponse, 0, len(in))
 	for _, v := range in {
-		out.Features = append(out.Features, v.ToProtocol())
+		out.Features = append(out.Features, v.ToProtocol(ctx))
 	}
 	return out
 }

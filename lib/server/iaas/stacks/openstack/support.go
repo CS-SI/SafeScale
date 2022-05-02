@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -65,6 +66,7 @@ func reinterpretGophercloudErrorCode(gopherErr error, success []int64, transpare
 	if gopherErr != nil {
 		code, err := GetUnexpectedGophercloudErrorCode(gopherErr)
 		if err != nil {
+			debug.IgnoreError(err)
 			return gopherErr
 		}
 		if code == 0 {

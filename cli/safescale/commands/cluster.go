@@ -25,6 +25,7 @@ import (
 	"time"
 
 	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -103,11 +104,13 @@ var clusterListCommand = cli.Command{
 			// c, _ := value.(api.Cluster)
 			converted, err := convertToMap(value)
 			if err != nil {
+				debug.IgnoreError(err)
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
 			}
 
 			fconfig, err := formatClusterConfig(converted, false)
 			if err != nil {
+				debug.IgnoreError(err)
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
 			}
 			formatted = append(formatted, fconfig)

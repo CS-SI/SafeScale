@@ -439,7 +439,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -464,7 +464,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	if xerr != nil {
 		return nil, xerr
 	}
-	clonedV["CIDR"], xerr = sn.GetCIDR()
+	clonedV["CIDR"], xerr = sn.GetCIDR(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

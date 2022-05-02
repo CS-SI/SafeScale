@@ -160,7 +160,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
-	return networkInstance.ToProtocol()
+	return networkInstance.ToProtocol(ctx)
 }
 
 // List existing networks
@@ -243,7 +243,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	return networkInstance.ToProtocol()
+	return networkInstance.ToProtocol(ctx)
 }
 
 // Delete a network

@@ -37,6 +37,7 @@ type Subnet interface {
 	Metadata
 	data.Identifiable
 	observer.Observable
+	Consistent
 
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                    // unlinks host ID from subnet
 	AttachHost(ctx context.Context, _ Host) fail.Error                                                                           // links Host to the Subnet
@@ -50,9 +51,9 @@ type Subnet interface {
 	GetGatewayPublicIPs(ctx context.Context) ([]string, fail.Error)                                                              // returns the gateway IPs of the Subnet
 	GetDefaultRouteIP(ctx context.Context) (string, fail.Error)                                                                  // returns the private IP of the default route of the Subnet
 	GetEndpointIP(ctx context.Context) (string, fail.Error)                                                                      // returns the public IP to reach the Subnet from Internet
-	GetCIDR() (string, fail.Error)                                                                                               // return the CIDR
-	GetState() (subnetstate.Enum, fail.Error)                                                                                    // gives the current state of the Subnet
-	HasVirtualIP() (bool, fail.Error)                                                                                            // tells if the Subnet is using a VIP as default route
+	GetCIDR(ctx context.Context) (string, fail.Error)                                                                            // return the CIDR
+	GetState(ctx context.Context) (subnetstate.Enum, fail.Error)                                                                 // gives the current state of the Subnet
+	HasVirtualIP(ctx context.Context) (bool, fail.Error)                                                                         // tells if the Subnet is using a VIP as default route
 	InspectGateway(ctx context.Context, primary bool) (Host, fail.Error)                                                         // returns the gateway related to Subnet
 	InspectGatewaySecurityGroup(ctx context.Context) (SecurityGroup, fail.Error)                                                 // returns the SecurityGroup responsible of network security on Gateway
 	InspectInternalSecurityGroup(ctx context.Context) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of internal network security

@@ -87,7 +87,7 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -106,7 +106,7 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
-func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onVolumeCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	volumeInstance, innerXErr := NewVolume(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -117,11 +117,11 @@ func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 		return nil, innerXErr
 	}
 
-	if innerXErr = volumeInstance.Read(ref); innerXErr != nil {
+	if innerXErr = volumeInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(volumeInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(volumeInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("volume with ref '%s' does NOT exist", ref)
 	}
 
@@ -131,6 +131,10 @@ func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 // IsNull tells if the instance is a null value
 func (instance *volume) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+}
+
+func (instance *volume) Exists() (bool, fail.Error) {
+	return true, nil
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache
@@ -158,7 +162,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 }
 
 // GetSpeed ...
-func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
+func (instance *volume) GetSpeed(ctx context.Context) (_ volumespeed.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -168,11 +172,11 @@ func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.unsafeGetSpeed()
+	return instance.unsafeGetSpeed(ctx)
 }
 
 // GetSize ...
-func (instance *volume) GetSize() (_ int, ferr fail.Error) {
+func (instance *volume) GetSize(ctx context.Context) (_ int, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -182,11 +186,11 @@ func (instance *volume) GetSize() (_ int, ferr fail.Error) {
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.unsafeGetSize()
+	return instance.unsafeGetSize(ctx)
 }
 
 // GetAttachments returns where the Volume is attached
-func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
+func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -198,7 +202,7 @@ func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, fer
 	// defer instance.lock.RUnlock()
 
 	var vaV1 *propertiesv1.VolumeAttachments
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
@@ -248,7 +252,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
@@ -295,7 +299,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
@@ -494,7 +498,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	targetName := host.GetName()
 
 	// -- proceed some checks on volume --
-	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -544,7 +548,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	var state hoststate.Enum
-	state, xerr = host.GetState()
+	state, xerr = host.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -554,7 +558,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	// -- proceed some checks on target server --
-	xerr = host.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
@@ -694,7 +698,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	// -- updates target properties --
-	xerr = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) (ferr fail.Error) {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
@@ -802,7 +806,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 				}
 			}
-			derr := host.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := host.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
@@ -843,7 +847,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer task.DisarmAbortSignal()()
 
 	// Updates volume properties
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
@@ -968,7 +972,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	targetName := host.GetName()
 
 	var state hoststate.Enum
-	state, xerr = host.GetState()
+	state, xerr = host.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -978,7 +982,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	}
 
 	// -- retrieves volume data --
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		volume, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -997,7 +1001,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	svc := instance.Service()
 
 	// -- Update target attachments --
-	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var (
 			attachment *propertiesv1.HostVolume
 			mount      *propertiesv1.HostLocalMount
@@ -1170,7 +1174,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		}
 
 		// ... and finish with update of volume property propertiesv1.VolumeAttachments
-		return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 				volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 				if !ok {
@@ -1198,12 +1202,12 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 	out := &protocol.VolumeInspectResponse{
 		Id:          volumeID,
 		Name:        volumeName,
-		Speed:       converters.VolumeSpeedFromAbstractToProtocol(func() volumespeed.Enum { out, _ := instance.unsafeGetSpeed(); return out }()),
-		Size:        func() int32 { out, _ := instance.unsafeGetSize(); return int32(out) }(),
+		Speed:       converters.VolumeSpeedFromAbstractToProtocol(func() volumespeed.Enum { out, _ := instance.unsafeGetSpeed(ctx); return out }()),
+		Size:        func() int32 { out, _ := instance.unsafeGetSize(ctx); return int32(out) }(),
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 
-	attachments, xerr := instance.GetAttachments()
+	attachments, xerr := instance.GetAttachments(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1217,13 +1221,13 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 			return nil, xerr
 		}
 
-		vols, _ := hostInstance.(*Host).unsafeGetVolumes()
+		vols, _ := hostInstance.(*Host).unsafeGetVolumes(ctx)
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 
-		mnts, _ := hostInstance.(*Host).unsafeGetMounts()
+		mnts, _ := hostInstance.(*Host).unsafeGetMounts(ctx)
 		if mnts != nil {
 			path, ok := mnts.LocalMountsByDevice[device]
 			if !ok {

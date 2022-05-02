@@ -18,6 +18,7 @@ package objectstorage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -130,7 +131,7 @@ func (instance *object) Reload() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Item(instance.name)
 	if err != nil {
@@ -170,7 +171,7 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
 
 	var seekTo int64
 	var length int64
@@ -257,7 +258,7 @@ func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
 		return fail.InvalidInstanceContentError("instance.bucket", "cannot be nil")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Put(instance.name, source, sourceSize, instance.metadata)
 	if err != nil {
@@ -276,7 +277,7 @@ func (instance *object) WriteMultiPart(source io.Reader, sourceSize int64, chunk
 		return nil
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
 
 	metadataCopy := instance.metadata.Clone()
 
@@ -329,7 +330,7 @@ func (instance *object) Delete() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	err := instance.bucket.stowContainer.RemoveItem(instance.name)
 	if err != nil {
@@ -345,7 +346,7 @@ func (instance *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemM
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		instance.metadata[k] = v
@@ -359,7 +360,7 @@ func (instance *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetada
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		_, found := instance.metadata[k]
@@ -376,7 +377,7 @@ func (instance *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMe
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	instance.metadata = newMetadata
 	return nil
