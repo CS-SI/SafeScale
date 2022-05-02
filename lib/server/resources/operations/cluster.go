@@ -399,22 +399,20 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	return instance.MetadataCore.BrowseFolder(
-		func(buf []byte) fail.Error {
-			aci := abstract.NewClusterIdentity()
-			xerr := aci.Deserialize(buf)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+		aci := abstract.NewClusterIdentity()
+		xerr := aci.Deserialize(buf)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
 
-			return callback(aci)
-		},
-	)
+		return callback(aci)
+	})
 }
 
 // GetIdentity returns the identity of the Cluster

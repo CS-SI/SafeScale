@@ -752,7 +752,7 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}

@@ -435,21 +435,19 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(
-		func(buf []byte) (innerXErr fail.Error) {
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
 
-			ahc := abstract.NewHostCore()
-			var inErr fail.Error
-			if inErr = ahc.Deserialize(buf); inErr != nil {
-				return inErr
-			}
+		ahc := abstract.NewHostCore()
+		var inErr fail.Error
+		if inErr = ahc.Deserialize(buf); inErr != nil {
+			return inErr
+		}
 
-			return callback(ahc)
-		},
-	)
+		return callback(ahc)
+	})
 }
 
 // ForceGetState returns the current state of the provider Host then alter metadata

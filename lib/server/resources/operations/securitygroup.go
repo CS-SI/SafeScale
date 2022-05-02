@@ -192,7 +192,7 @@ func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstra
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		asg := abstract.NewSecurityGroup()
 		xerr = asg.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)

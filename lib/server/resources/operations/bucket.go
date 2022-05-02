@@ -188,21 +188,19 @@ func (instance *bucket) Browse(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(
-		func(buf []byte) (innerXErr fail.Error) {
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
 
-			ab := abstract.NewObjectStorageBucket()
-			var inErr fail.Error
-			if inErr = ab.Deserialize(buf); inErr != nil {
-				return inErr
-			}
+		ab := abstract.NewObjectStorageBucket()
+		var inErr fail.Error
+		if inErr = ab.Deserialize(buf); inErr != nil {
+			return inErr
+		}
 
-			return callback(ab)
-		},
-	)
+		return callback(ab)
+	})
 }
 
 // GetHost ...

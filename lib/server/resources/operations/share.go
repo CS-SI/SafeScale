@@ -250,7 +250,7 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}

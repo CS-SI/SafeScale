@@ -808,7 +808,7 @@ func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
 }
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
-func (myself *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (ferr fail.Error) {
+func (myself *MetadataCore) BrowseFolder(ctx context.Context, callback func(buf []byte) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {
