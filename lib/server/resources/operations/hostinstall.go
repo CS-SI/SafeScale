@@ -100,7 +100,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
 			}
 
-			requires, innerXErr := feat.Dependencies()
+			requires, innerXErr := feat.Dependencies(ctx)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -241,7 +241,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *Host) InstallMethods() (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Host) InstallMethods(context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}
@@ -258,7 +258,7 @@ func (instance *Host) InstallMethods() (map[uint8]installmethod.Enum, fail.Error
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
+func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -277,7 +277,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 
 			var item *propertiesv1.HostInstalledFeature
 			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.Dependencies()
+				requirements, innerXErr := feat.Dependencies(ctx)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -307,7 +307,7 @@ func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resourc
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
-func (instance *Host) UnregisterFeature(feat string) (ferr fail.Error) {
+func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -361,7 +361,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures()
+	list := instance.InstalledFeatures(nil)
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
 		item, xerr := NewFeature(ctx, instance.Service(), v)
@@ -377,7 +377,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 
 // InstalledFeatures returns a slice of installed features
 // satisfies interface resources.Targetable
-func (instance *Host) InstalledFeatures() []string {
+func (instance *Host) InstalledFeatures(context.Context) []string {
 	if instance == nil {
 		return []string{}
 	}

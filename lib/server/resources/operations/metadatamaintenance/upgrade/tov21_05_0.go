@@ -772,6 +772,8 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 
+	ctx := context.Background()
+
 	logrus.Tracef("Upgrading metadata of Cluster '%s'...", instance.GetName())
 
 	xerr := tv.upgradeClusterNodesPropertyIfNeeded(instance)
@@ -819,14 +821,14 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 						return inErr
 					}
 
-					requires, inErr = feat.Dependencies()
+					requires, inErr = feat.Dependencies(ctx)
 					if inErr != nil {
 						return inErr
 					}
 
 					featuresV1.Installed[featName] = &propertiesv1.ClusterInstalledFeature{
 						Name:     featName,
-						FileName: feat.GetFilename(),
+						FileName: feat.GetFilename(ctx),
 						Requires: requires,
 					}
 					return nil
@@ -908,7 +910,8 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 }
 
 func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Service, hosts data.IndexedListOfStrings) fail.Error {
-	requires, xerr := feat.Dependencies()
+	ctx := context.Background()
+	requires, xerr := feat.Dependencies(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -922,7 +925,7 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 			continue
 		}
 
-		req, xerr := f.Dependencies()
+		req, xerr := f.Dependencies(ctx)
 		if xerr != nil {
 			logrus.Error(xerr.Error())
 			continue

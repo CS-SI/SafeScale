@@ -58,7 +58,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
-func (instance *Cluster) InstallMethods() (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Cluster) InstallMethods(context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -76,7 +76,7 @@ func (instance *Cluster) InstallMethods() (map[uint8]installmethod.Enum, fail.Er
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *Cluster) InstalledFeatures() []string {
+func (instance *Cluster) InstalledFeatures(context.Context) []string {
 	if instance == nil {
 		return []string{}
 	}
@@ -240,7 +240,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (ferr fail.Error) {
+func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -259,14 +259,14 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 
 			var item *propertiesv1.ClusterInstalledFeature
 			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.Dependencies()
+				requirements, innerXErr := feat.Dependencies(ctx)
 				if innerXErr != nil {
 					return innerXErr
 				}
 
 				item = propertiesv1.NewClusterInstalledFeature()
 				item.Name = feat.GetName()
-				item.FileName = feat.GetDisplayFilename()
+				item.FileName = feat.GetDisplayFilename(ctx)
 				item.Requires = requirements
 				featuresV1.Installed[item.Name] = item
 			}
@@ -280,7 +280,7 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *Cluster) UnregisterFeature(feat string) (ferr fail.Error) {
+func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -337,7 +337,7 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 			}
 		}
 
-		ok, xerr := entry.Applicable(instance)
+		ok, xerr := entry.Applicable(ctx, instance)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -361,7 +361,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures()
+	list := instance.InstalledFeatures(nil)
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
 	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {

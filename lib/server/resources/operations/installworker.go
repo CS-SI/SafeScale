@@ -131,7 +131,7 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
+func newWorker(ctx context.Context, f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
 		feature:   f.(*Feature),
 		target:    target,
@@ -163,7 +163,7 @@ func newWorker(f resources.Feature, target resources.Targetable, method installm
 		if !f.(*Feature).Specs().IsSet(w.rootKey) {
 			msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
-			return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
+			return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(ctx), w.rootKey)
 		}
 	}
 
@@ -644,7 +644,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in Feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
+			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(nil), stepKey)
 		}
 
 		// Determine list of hosts concerned by the step
@@ -669,7 +669,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 				}
 			} else {
 				msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlTargetsKeyword)
+				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(nil), stepKey, yamlTargetsKeyword)
 			}
 
 			hostsList, xerr = w.identifyHosts(task.Context(), stepT)
@@ -889,7 +889,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(nil), p.stepKey, yamlRunKeyword)
 	}
 
 	wallTime := timings.HostLongOperationTimeout()

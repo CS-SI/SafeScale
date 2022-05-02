@@ -72,7 +72,7 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	w, xerr := newWorker(f, t, installmethod.None, installaction.Add, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.None, installaction.Add, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -106,7 +106,7 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
-	w, xerr := newWorker(f, t, installmethod.None, installaction.Add, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.None, installaction.Add, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
