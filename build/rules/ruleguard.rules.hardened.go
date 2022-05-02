@@ -23,7 +23,7 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 
 // This is a collection of rules for ruleguard: https://github.com/quasilyte/go-ruleguard
 func repairs1(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match("if xerr != nil { return $b }").
 		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*xerr.*")).
@@ -31,7 +31,7 @@ func repairs1(m dsl.Matcher) {
 }
 
 func repairs1b(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match("if err != nil { return $b }").
 		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*err.*")).
@@ -39,7 +39,7 @@ func repairs1b(m dsl.Matcher) {
 }
 
 func repairs2(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match("if xerr != nil { return nil, $b }").
 		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*xerr.*")).
@@ -47,7 +47,7 @@ func repairs2(m dsl.Matcher) {
 }
 
 func repairs2b(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match("if err != nil { return nil, $b }").
 		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*err.*")).

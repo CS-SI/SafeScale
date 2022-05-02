@@ -130,7 +130,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 			v["Username"] = abstract.DefaultUser
 		}
 	}
-	networkCfg, xerr := instance.GetNetworkConfig(nil)
+	networkCfg, xerr := instance.GetNetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -361,7 +361,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures(nil)
+	list := instance.InstalledFeatures(ctx)
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
 	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -579,7 +579,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	netCfg, xerr := instance.GetNetworkConfig(nil)
+	netCfg, xerr := instance.GetNetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

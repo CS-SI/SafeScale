@@ -361,7 +361,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures(nil)
+	list := instance.InstalledFeatures(ctx)
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
 		item, xerr := NewFeature(ctx, instance.Service(), v)
@@ -470,7 +470,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		return xerr
 	}
 
-	single, xerr := instance.IsSingle(nil)
+	single, xerr := instance.IsSingle(ctx)
 	if xerr != nil {
 		return xerr
 	}

@@ -213,7 +213,7 @@ func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable
 		if !ok {
 			return false, fail.InconsistentError("failed to cast target as '*Cluster'")
 		}
-		flavor, xerr := casted.GetFlavor(nil)
+		flavor, xerr := casted.GetFlavor(ctx)
 		if xerr != nil {
 			return false, fail.Wrap(xerr, "failed to get Cluster Flavor")
 		}
@@ -769,7 +769,7 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service,
 func (instance Feature) ToProtocol(ctx context.Context) *protocol.FeatureResponse {
 	out := &protocol.FeatureResponse{
 		Name:     instance.GetName(),
-		FileName: instance.GetDisplayFilename(nil),
+		FileName: instance.GetDisplayFilename(ctx),
 	}
 	return out
 }

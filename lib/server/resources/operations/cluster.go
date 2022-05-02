@@ -201,7 +201,7 @@ func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (dat
 		return nil, xerr
 	}
 
-	flavor, xerr := clusterInstance.GetFlavor(nil)
+	flavor, xerr := clusterInstance.GetFlavor(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -468,7 +468,7 @@ func (instance *Cluster) GetAdminPassword(ctx context.Context) (adminPassword st
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
-	aci, xerr := instance.GetIdentity(nil)
+	aci, xerr := instance.GetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -484,7 +484,7 @@ func (instance *Cluster) GetKeyPair(ctx context.Context) (keyPair *abstract.KeyP
 		return nil, fail.InvalidInstanceError()
 	}
 
-	aci, xerr := instance.GetIdentity(nil)
+	aci, xerr := instance.GetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

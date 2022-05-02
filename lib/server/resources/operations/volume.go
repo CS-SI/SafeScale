@@ -1207,7 +1207,7 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 
-	attachments, xerr := instance.GetAttachments(nil)
+	attachments, xerr := instance.GetAttachments(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

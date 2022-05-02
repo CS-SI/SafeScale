@@ -425,7 +425,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		w.availableGateway = gw
 	} else {
 		// In cluster context
-		netCfg, xerr := w.cluster.GetNetworkConfig(nil)
+		netCfg, xerr := w.cluster.GetNetworkConfig(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -505,7 +505,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
-		netCfg, xerr = w.cluster.GetNetworkConfig(nil)
+		netCfg, xerr = w.cluster.GetNetworkConfig(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -644,7 +644,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in Feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(nil), stepKey)
+			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey)
 		}
 
 		// Determine list of hosts concerned by the step
@@ -669,7 +669,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 				}
 			} else {
 				msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(nil), stepKey, yamlTargetsKeyword)
+				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey, yamlTargetsKeyword)
 			}
 
 			hostsList, xerr = w.identifyHosts(task.Context(), stepT)
@@ -889,7 +889,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(nil), p.stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(task.Context()), p.stepKey, yamlRunKeyword)
 	}
 
 	wallTime := timings.HostLongOperationTimeout()
@@ -1155,7 +1155,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return nil
 	}
 
-	netprops, xerr := w.cluster.GetNetworkConfig(nil)
+	netprops, xerr := w.cluster.GetNetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1174,7 +1174,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	}
 
 	var secondaryKongController *KongController
-	if ok, _ := subnetInstance.HasVirtualIP(nil); ok {
+	if ok, _ := subnetInstance.HasVirtualIP(ctx); ok {
 		secondaryKongController, xerr = NewKongController(ctx, w.service, subnetInstance, false)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1562,7 +1562,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	var rs resources.Subnet
 	if w.cluster != nil {
 		var netprops *propertiesv3.ClusterNetwork
-		if netprops, xerr = w.cluster.GetNetworkConfig(nil); xerr != nil {
+		if netprops, xerr = w.cluster.GetNetworkConfig(ctx); xerr != nil {
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
