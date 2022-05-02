@@ -150,7 +150,7 @@ func (instance service) GetProviderName() (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
-	svcName, xerr := instance.GetName()
+	svcName, xerr := instance.Provider.GetName()
 	if xerr != nil {
 		return "", xerr
 	}
