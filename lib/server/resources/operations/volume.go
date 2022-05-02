@@ -162,7 +162,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 }
 
 // GetSpeed ...
-func (instance *volume) GetSpeed(context.Context) (_ volumespeed.Enum, ferr fail.Error) {
+func (instance *volume) GetSpeed(ctx context.Context) (_ volumespeed.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -172,11 +172,11 @@ func (instance *volume) GetSpeed(context.Context) (_ volumespeed.Enum, ferr fail
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.unsafeGetSpeed()
+	return instance.unsafeGetSpeed(ctx)
 }
 
 // GetSize ...
-func (instance *volume) GetSize(context.Context) (_ int, ferr fail.Error) {
+func (instance *volume) GetSize(ctx context.Context) (_ int, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -186,11 +186,11 @@ func (instance *volume) GetSize(context.Context) (_ int, ferr fail.Error) {
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.unsafeGetSize()
+	return instance.unsafeGetSize(ctx)
 }
 
 // GetAttachments returns where the Volume is attached
-func (instance *volume) GetAttachments(context.Context) (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
+func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -847,7 +847,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer task.DisarmAbortSignal()()
 
 	// Updates volume properties
-	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
@@ -982,7 +982,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	}
 
 	// -- retrieves volume data --
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		volume, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1174,7 +1174,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		}
 
 		// ... and finish with update of volume property propertiesv1.VolumeAttachments
-		return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 				volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 				if !ok {
@@ -1202,8 +1202,8 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 	out := &protocol.VolumeInspectResponse{
 		Id:          volumeID,
 		Name:        volumeName,
-		Speed:       converters.VolumeSpeedFromAbstractToProtocol(func() volumespeed.Enum { out, _ := instance.unsafeGetSpeed(); return out }()),
-		Size:        func() int32 { out, _ := instance.unsafeGetSize(); return int32(out) }(),
+		Speed:       converters.VolumeSpeedFromAbstractToProtocol(func() volumespeed.Enum { out, _ := instance.unsafeGetSpeed(ctx); return out }()),
+		Size:        func() int32 { out, _ := instance.unsafeGetSize(ctx); return int32(out) }(),
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 

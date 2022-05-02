@@ -138,7 +138,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, innerXErr
 	}
 
-	serialized, xerr := hostInstance.Sdump(nil)
+	serialized, xerr := hostInstance.Sdump(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -152,7 +152,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, xerr
 	}
 
-	afterSerialized, xerr := hostInstance.Sdump(nil)
+	afterSerialized, xerr := hostInstance.Sdump(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -186,7 +186,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 	}
 	ctx := task.Context()
 
-	return instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -271,7 +271,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return xerr
 					}
 				} else {
-					gwErr = gwInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					gwErr = gwInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						gwahc, ok := clonable.(*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -477,7 +477,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -507,22 +507,22 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
-func (instance *Host) Reload(context.Context) (ferr fail.Error) {
+func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	return instance.unsafeReload()
+	return instance.unsafeReload(ctx)
 }
 
 // FIXME: unsafeXXX may need review, should not be needed anymore after lock sanitization
 // unsafeReload reloads Host from metadata and current Host state on provider state
-func (instance *Host) unsafeReload() (ferr fail.Error) {
+func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.MetadataCore.Reload(nil)
+	xerr := instance.MetadataCore.Reload(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -541,7 +541,7 @@ func (instance *Host) unsafeReload() (ferr fail.Error) {
 	}
 
 	// Updates the Host metadata
-	xerr = instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String())
@@ -614,7 +614,7 @@ func (instance *Host) unsafeReload() (ferr fail.Error) {
 }
 
 // GetState returns the last known state of the Host, without forced inspect
-func (instance *Host) GetState(context.Context) (hoststate.Enum, fail.Error) {
+func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error) {
 	state := hoststate.Unknown
 	if instance == nil || valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
@@ -623,7 +623,7 @@ func (instance *Host) GetState(context.Context) (hoststate.Enum, fail.Error) {
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -772,7 +772,7 @@ func (instance *Host) Create(
 			}
 		}()
 
-		xerr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = defaultSubnet.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -825,7 +825,7 @@ func (instance *Host) Create(
 			anon, ok := opts.Get("UseNATService")
 			useNATService := ok && anon.(bool)
 			if hostReq.PublicIP || useNATService {
-				xerr = defaultSubnet.Review(
+				xerr = defaultSubnet.Review(ctx,
 					func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						as, ok := clonable.(*abstract.Subnet)
 						if !ok {
@@ -902,7 +902,7 @@ func (instance *Host) Create(
 		if ferr != nil {
 			if !valid.IsNil(ahf) {
 				if !valid.IsNil(ahf.Core) {
-					derr := instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+					derr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 						ahc, ok := clonable.(*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError(
@@ -921,7 +921,7 @@ func (instance *Host) Create(
 		}
 	}()
 
-	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
 			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
@@ -1033,7 +1033,7 @@ func (instance *Host) Create(
 		}
 	}
 
-	xerr = instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// update Host system property
 		return props.Alter(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
@@ -1093,7 +1093,7 @@ func (instance *Host) Create(
 
 	if !valid.IsNil(ahf) {
 		if !valid.IsNil(ahf.Core) {
-			derr := instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				ahc, ok := clonable.(*abstract.HostCore)
 				if !ok {
 					return fail.InconsistentError(
@@ -1189,7 +1189,7 @@ func (instance *Host) setSecurityGroups(
 		return nil
 	}
 
-	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (finnerXErr fail.Error) {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -1201,7 +1201,7 @@ func (instance *Host) setSecurityGroups(
 				defaultAbstractSubnet *abstract.Subnet
 				defaultSubnetID       string
 			)
-			innerXErr := defaultSubnet.Review(
+			innerXErr := defaultSubnet.Review(ctx,
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					var ok bool
 					defaultAbstractSubnet, ok = clonable.(*abstract.Subnet)
@@ -1301,7 +1301,7 @@ func (instance *Host) setSecurityGroups(
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(func(
+						deeperXErr = subnetInstance.Review(ctx, func(
 							clonable data.Clonable, _ *serialize.JSONProperties,
 						) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
@@ -1346,7 +1346,7 @@ func (instance *Host) setSecurityGroups(
 				}
 
 				var otherAbstractSubnet *abstract.Subnet
-				innerXErr = otherSubnetInstance.Review(func(
+				innerXErr = otherSubnetInstance.Review(ctx, func(
 					clonable data.Clonable, _ *serialize.JSONProperties,
 				) fail.Error {
 					var ok bool
@@ -1396,7 +1396,7 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 	}
 	if *errorPtr != nil && !keepOnFailure {
 		svc := instance.Service()
-		derr := instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(
 				hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (innerXErr fail.Error) {
 					hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -1736,9 +1736,11 @@ func (instance *Host) updateSubnets(task concurrency.Task, req abstract.HostRequ
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	ctx := task.Context()
+
 	// If Host is a gateway or is single, do not add it as Host attached to the Subnet, it's considered as part of the subnet
 	if !req.IsGateway && !req.Single {
-		return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
@@ -1754,7 +1756,7 @@ func (instance *Host) updateSubnets(task concurrency.Task, req abstract.HostRequ
 						return innerXErr
 					}
 
-					innerXErr = rs.Alter(nil, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
+					innerXErr = rs.Alter(ctx, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
 						return properties.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 							subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 							if !ok {
@@ -1786,7 +1788,7 @@ func (instance *Host) undoUpdateSubnets(ctx context.Context, req abstract.HostRe
 		// Without this, 'undo' won't be able to complete in case it's called on an abort...
 		// defer task.DisarmAbortSignal()()
 
-		xerr := instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1901,7 +1903,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	// Update Keypair of the Host with the final one
-	xerr = instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ah, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2171,7 +2173,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			}()
 
 			// Sets the CIDR index in instance metadata
-			xerr = subnetInstance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = subnetInstance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError(
@@ -2372,7 +2374,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		single         bool
 		singleSubnetID string
 	)
-	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// If Host has mounted shares, unmounts them before anything else
 		var mounts []*propertiesv1.HostShare
 		innerXErr := props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
@@ -2729,7 +2731,7 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState(nil)
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -2783,7 +2785,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState(nil)
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -2868,7 +2870,7 @@ func (instance *Host) Push(
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState(nil)
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -2944,7 +2946,7 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 }
 
 // GetVolumes returns information about volumes attached to the Host
-func (instance *Host) GetVolumes(context.Context) (_ *propertiesv1.HostVolumes, ferr fail.Error) {
+func (instance *Host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolumes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -3023,7 +3025,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload()
+	xerr = instance.unsafeReload(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3102,7 +3104,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Now unsafeReload
-	xerr = instance.unsafeReload()
+	xerr = instance.unsafeReload(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3323,7 +3325,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 }
 
 // GetShares returns the information about the shares hosted by the Host
-func (instance *Host) GetShares(context.Context) (shares *propertiesv1.HostShares, ferr fail.Error) {
+func (instance *Host) GetShares(ctx context.Context) (shares *propertiesv1.HostShares, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	shares = &propertiesv1.HostShares{}
@@ -3349,7 +3351,7 @@ func (instance *Host) GetShares(context.Context) (shares *propertiesv1.HostShare
 }
 
 // GetMounts returns the information abouts the mounts of the Host
-func (instance *Host) GetMounts(context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
+func (instance *Host) GetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	mounts = nil
@@ -3364,7 +3366,7 @@ func (instance *Host) GetMounts(context.Context) (mounts *propertiesv1.HostMount
 }
 
 // IsClusterMember returns true if the Host is member of a cluster
-func (instance *Host) IsClusterMember(context.Context) (yes bool, ferr fail.Error) {
+func (instance *Host) IsClusterMember(ctx context.Context) (yes bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	yes = false
@@ -3393,7 +3395,7 @@ func (instance *Host) IsClusterMember(context.Context) (yes bool, ferr fail.Erro
 }
 
 // IsGateway tells if the Host acts as a gateway for a Subnet
-func (instance *Host) IsGateway(context.Context) (_ bool, ferr fail.Error) {
+func (instance *Host) IsGateway(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -3424,7 +3426,7 @@ func (instance *Host) IsGateway(context.Context) (_ bool, ferr fail.Error) {
 }
 
 // IsSingle tells if the Host is single
-func (instance *Host) IsSingle(context.Context) (_ bool, ferr fail.Error) {
+func (instance *Host) IsSingle(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -3496,7 +3498,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState(nil)
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -3628,7 +3630,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 	// instance.Lock()
 	// defer instance.Unlock()
 
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -3704,7 +3706,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 	// instance.Lock()
 	// defer instance.Unlock()
 
-	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -3826,7 +3828,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	// defer instance.Unlock()
 
 	svc := instance.Service()
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -3927,7 +3929,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	// defer instance.Unlock()
 
 	svc := instance.Service()
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -3935,7 +3937,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sgInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr := sgInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())

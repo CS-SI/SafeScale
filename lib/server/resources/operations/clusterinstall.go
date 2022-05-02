@@ -58,7 +58,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
-func (instance *Cluster) InstallMethods(context.Context) (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -76,13 +76,13 @@ func (instance *Cluster) InstallMethods(context.Context) (map[uint8]installmetho
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *Cluster) InstalledFeatures(context.Context) []string {
+func (instance *Cluster) InstalledFeatures(ctx context.Context) []string {
 	if instance == nil {
 		return []string{}
 	}
 
 	var out []string
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -110,7 +110,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 		return fail.InvalidInstanceError()
 	}
 
-	identity, xerr := instance.unsafeGetIdentity()
+	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -185,7 +185,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	v["ClusterMasters"], xerr = instance.unsafeListMasters()
+	v["ClusterMasters"], xerr = instance.unsafeListMasters(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -203,13 +203,13 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterMasterIDs"] = list
 
-	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs()
+	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	v["ClusterNodes"], xerr = instance.unsafeListNodes()
+	v["ClusterNodes"], xerr = instance.unsafeListNodes(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -227,7 +227,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterNodeIDs"] = list
 
-	v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs()
+	v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -250,7 +250,7 @@ func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Fea
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
-	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -290,7 +290,7 @@ func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (fe
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -701,7 +701,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	}
 
 	dnsServers = cfg.GetSliceOfStrings("DNSList")
-	identity, xerr := instance.unsafeGetIdentity()
+	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -709,7 +709,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"], xerr = instance.unsafeListMasterIPs()
+	params["MasterIPs"], xerr = instance.unsafeListMasterIPs(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -742,14 +742,14 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	identity, xerr := instance.unsafeGetIdentity()
+	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	dockerDisabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -770,7 +770,7 @@ func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Ma
 
 	clusterName := identity.Name
 	disabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -819,14 +819,14 @@ func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Ma
 func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	identity, xerr := instance.unsafeGetIdentity()
+	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	dockerDisabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -904,7 +904,7 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.M
 func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	identity, xerr := instance.unsafeGetIdentity()
+	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -990,7 +990,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 	}
 
 	dockerDisabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -1009,7 +1009,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 	}
 
 	disabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -1061,7 +1061,7 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 	}
 
 	dockerDisabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -1081,7 +1081,7 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 	}
 
 	disabled := false
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -1125,7 +1125,7 @@ func (instance *Cluster) installDocker(ctx context.Context, host resources.Host,
 	defer fail.OnPanic(&ferr)
 
 	dockerDisabled := false
-	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {

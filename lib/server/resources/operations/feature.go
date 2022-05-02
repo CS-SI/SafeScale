@@ -153,7 +153,7 @@ func (instance *Feature) GetID() string {
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling
-func (instance *Feature) GetFilename(context.Context) string {
+func (instance *Feature) GetFilename(ctx context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
@@ -162,7 +162,7 @@ func (instance *Feature) GetFilename(context.Context) string {
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
-func (instance *Feature) GetDisplayFilename(context.Context) string {
+func (instance *Feature) GetDisplayFilename(ctx context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
@@ -286,7 +286,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr = castedTarget.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {
@@ -605,7 +605,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 }
 
 // Dependencies returns a list of features needed as dependencies
-func (instance *Feature) Dependencies(context.Context) (map[string]struct{}, fail.Error) {
+func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{}, fail.Error) {
 	emptyMap := map[string]struct{}{}
 	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -766,7 +766,7 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service,
 }
 
 // ToProtocol converts a Feature to *protocol.FeatureResponse
-func (instance Feature) ToProtocol(context.Context) *protocol.FeatureResponse {
+func (instance Feature) ToProtocol(ctx context.Context) *protocol.FeatureResponse {
 	out := &protocol.FeatureResponse{
 		Name:     instance.GetName(),
 		FileName: instance.GetDisplayFilename(nil),
@@ -775,7 +775,7 @@ func (instance Feature) ToProtocol(context.Context) *protocol.FeatureResponse {
 }
 
 // ListParametersWithControl returns a slice of parameter names that have control script
-func (instance Feature) ListParametersWithControl(context.Context) []string {
+func (instance Feature) ListParametersWithControl(ctx context.Context) []string {
 	out := make([]string, 0, len(instance.file.versionControl))
 	for k := range instance.file.versionControl {
 		out = append(out, k)

@@ -66,7 +66,7 @@ type SecurityGroup interface {
 	GetBoundHosts(ctx context.Context) ([]*propertiesv1.SecurityGroupBond, fail.Error)                             // returns a slice of bonds corresponding to hosts bound to the security group
 	GetBoundSubnets(ctx context.Context) ([]*propertiesv1.SecurityGroupBond, fail.Error)                           // returns a slice of bonds corresponding to networks bound to the security group
 	Reset(ctx context.Context) fail.Error                                                                          // resets the rules of the security group from the ones registered in metadata
-	ToProtocol() (*protocol.SecurityGroupResponse, fail.Error)                                                     // converts a SecurityGroup to equivalent gRPC message
+	ToProtocol(ctx context.Context) (*protocol.SecurityGroupResponse, fail.Error)                                  // converts a SecurityGroup to equivalent gRPC message
 	UnbindFromHost(ctx context.Context, _ Host) fail.Error                                                         // unbinds a Security Group from Host
 	UnbindFromHostByReference(ctx context.Context, _ string) fail.Error                                            // unbinds a Security Group from Host
 	UnbindFromSubnet(ctx context.Context, _ Subnet) fail.Error                                                     // unbinds a Security Group from Subnet

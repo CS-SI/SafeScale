@@ -117,7 +117,7 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	config := osc.NewConfiguration()
@@ -232,7 +232,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, _, err := s.client.RegionApi.ReadRegions(s.auth, nil)
@@ -255,7 +255,7 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, ferr fail.Error) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)

@@ -17,6 +17,7 @@
 package outscale
 
 import (
+	"context"
 	"sort"
 	"strings"
 
@@ -40,7 +41,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	subnet, xerr := s.InspectSubnet(subnetID)
@@ -137,7 +138,7 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if xerr := s.rpcDeleteNic(vip.ID); xerr != nil {

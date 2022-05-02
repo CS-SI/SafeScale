@@ -179,7 +179,7 @@ func (w *worker) ConcernsCluster() bool {
 func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fail.Error {
 	switch w.target.TargetType() {
 	case featuretargettype.Cluster:
-		xerr := w.validateContextForCluster()
+		xerr := w.validateContextForCluster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil && !s.SkipSizingRequirements {
 			xerr = w.validateClusterSizing(ctx)
@@ -1003,8 +1003,8 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // validateContextForCluster checks if the flavor of the cluster is listed in Feature specification
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
-func (w *worker) validateContextForCluster() fail.Error {
-	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
+func (w *worker) validateContextForCluster(ctx context.Context) fail.Error {
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1045,7 +1045,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 }
 
 func (w *worker) validateClusterSizing(ctx context.Context) (ferr fail.Error) {
-	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

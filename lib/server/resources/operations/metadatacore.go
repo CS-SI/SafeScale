@@ -217,7 +217,7 @@ func (myself *MetadataCore) Inspect(callback resources.Callback) (ferr fail.Erro
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error) {
+func (myself *MetadataCore) Review(ctx context.Context, callback resources.Callback) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {
@@ -703,7 +703,7 @@ func (myself *MetadataCore) write() fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *MetadataCore) Reload(context.Context) (ferr fail.Error) {
+func (myself *MetadataCore) Reload(ctx context.Context) (ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -946,7 +946,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 	return nil
 }
 
-func (myself *MetadataCore) Sdump(context.Context) (_ string, ferr fail.Error) {
+func (myself *MetadataCore) Sdump(ctx context.Context) (_ string, ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}

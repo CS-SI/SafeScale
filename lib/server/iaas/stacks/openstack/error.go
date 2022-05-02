@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -36,7 +37,7 @@ import (
 func NormalizeError(err error) fail.Error {
 	if err != nil {
 
-		tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), " Normalizing error").Entering()
+		tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), " Normalizing error").Entering()
 		defer tracer.Exiting()
 
 		switch e := err.(type) {
@@ -165,7 +166,7 @@ var errorFuncMap = map[string]func(string) fail.Error{
 func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	fn, ok := errorFuncMap[errorName]

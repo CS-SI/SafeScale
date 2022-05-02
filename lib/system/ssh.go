@@ -162,7 +162,7 @@ func SCPErrorString(retcode int) string {
 
 // Close closes ssh tunnel
 func (stun *SSHTunnel) Close() fail.Error {
-	defer debug.NewTracer(nil, true).Entering().Exiting()
+	defer debug.NewTracer(ctx, true).Entering().Exiting()
 
 	defer func() {
 		if lazyErr := utils.LazyRemove(stun.keyFile.Name()); lazyErr != nil {

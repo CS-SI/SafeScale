@@ -88,7 +88,7 @@ func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, option
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -107,7 +107,7 @@ func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, option
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
-func onSGCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onSGCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	sgInstance, innerXErr := NewSecurityGroup(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -122,7 +122,7 @@ func onSGCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error)
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(sgInstance.Sdump(nil)).(string), fail.IgnoreError(blank.Sdump(nil)).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(sgInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("security group with ref '%s' does NOT exist", ref)
 	}
 
@@ -330,7 +330,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	}()
 
 	if len(rules) == 0 {
-		xerr = instance.unsafeClear()
+		xerr = instance.unsafeClear(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -597,7 +597,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 					}
 				}
 
-				xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				xerr = subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return inspectFunc(props)
 				})
 				if xerr != nil {
@@ -664,7 +664,7 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (ferr fail.Error) {
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.unsafeClear()
+	return instance.unsafeClear(ctx)
 }
 
 // Reset clears a security group and re-adds associated rules as stored in metadata
@@ -707,7 +707,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Removes all rules...
-	xerr = instance.unsafeClear()
+	xerr = instance.unsafeClear(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -715,7 +715,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 
 	// ... then re-adds rules from metadata
 	for _, v := range rules {
-		xerr = instance.unsafeAddRule(v)
+		xerr = instance.unsafeAddRule(ctx, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -745,7 +745,7 @@ func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.Secur
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	return instance.unsafeAddRule(rule)
+	return instance.unsafeAddRule(ctx, rule)
 }
 
 // AddRules adds rules to a Security Group
@@ -775,7 +775,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -835,7 +835,7 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -952,7 +952,7 @@ func (instance *SecurityGroup) CheckConsistency(_ context.Context) fail.Error {
 }
 
 // ToProtocol converts a Security Group to protobuf message
-func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, ferr fail.Error) {
+func (instance *SecurityGroup) ToProtocol(ctx context.Context) (_ *protocol.SecurityGroupResponse, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1024,7 +1024,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -1078,7 +1078,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -1144,7 +1144,7 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = subnetInstance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = subnetInstance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
@@ -1172,7 +1172,7 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 		return xerr
 	}
 
-	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if mark == resources.MarkSecurityGroupAsDefault {
 			asg, ok := clonable.(*abstract.SecurityGroup)
 			if !ok {
@@ -1313,7 +1313,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 	// defer instance.lock.Unlock()
 
 	var subnetHosts *propertiesv1.SubnetHosts
-	xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
@@ -1366,7 +1366,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 	}
 
 	// -- Remove Hosts attached to Subnet referenced in Security Group
-	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -1386,7 +1386,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 	}
 
 	// -- Remove Subnet referenced in Security Group
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
@@ -1439,7 +1439,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {

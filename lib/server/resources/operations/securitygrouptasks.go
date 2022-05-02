@@ -59,6 +59,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 	}
 
 	sgID := instance.GetID()
+	ctx := task.Context()
 
 	// Unbind Security Group from Host on provider side
 	xerr := instance.Service().UnbindSecurityGroupFromHost(sgID, hostInstance.GetID())
@@ -74,7 +75,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 	}
 
 	// Updates host metadata regarding Security Groups
-	xerr = hostInstance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {

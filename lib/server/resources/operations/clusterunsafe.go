@@ -38,10 +38,10 @@ import (
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
-func (instance *Cluster) unsafeGetIdentity() (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
+func (instance *Cluster) unsafeGetIdentity(ctx context.Context) (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -53,10 +53,10 @@ func (instance *Cluster) unsafeGetIdentity() (clusterIdentity abstract.ClusterId
 }
 
 // unsafeGetFlavor returns the flavor of the Cluster
-func (instance *Cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, ferr fail.Error) {
+func (instance *Cluster) unsafeGetFlavor(ctx context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aci, xerr := instance.unsafeGetIdentity()
+	aci, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
@@ -66,10 +66,10 @@ func (instance *Cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, ferr fail
 }
 
 // unsafeGetComplexity returns the complexity of the Cluster
-func (instance *Cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, ferr fail.Error) {
+func (instance *Cluster) unsafeGetComplexity(ctx context.Context) (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aci, xerr := instance.unsafeGetIdentity()
+	aci, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
@@ -80,7 +80,7 @@ func (instance *Cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, ferr f
 
 // unsafeGetState returns the current state of the Cluster
 // Uses the "maker" ForceGetState
-func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Error) {
+func (instance *Cluster) unsafeGetState(ctx context.Context) (state clusterstate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	state = clusterstate.Unknown
@@ -95,7 +95,7 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 			return clusterstate.Unknown, xerr
 		}
 
-		return state, instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return state, instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
 				if !ok {
@@ -111,7 +111,7 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 		})
 	}
 
-	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
@@ -132,12 +132,12 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 
 // unsafeListMasters is the not goroutine-safe equivalent of ListMasters, that does the real work
 // Note: must be used with wisdom
-func (instance *Cluster) unsafeListMasters() (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
+func (instance *Cluster) unsafeListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
 
-	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -167,7 +167,7 @@ func (instance *Cluster) unsafeListMasters() (list resources.IndexedListOfCluste
 func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 
-	xerr := instance.beingRemoved()
+	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
@@ -183,7 +183,7 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -212,18 +212,18 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 }
 
 // unsafeListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-func (instance *Cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, ferr fail.Error) {
+func (instance *Cluster) unsafeListMasterIPs(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
 
-	xerr := instance.beingRemoved()
+	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
 
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -248,11 +248,11 @@ func (instance *Cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, 
 }
 
 // unsafeListNodeIPs lists the IPs of the nodes in the Cluster
-func (instance *Cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, ferr fail.Error) {
+func (instance *Cluster) unsafeListNodeIPs(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -280,7 +280,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 	defer fail.OnPanic(&ferr)
 
 	master = nil
-	masters, xerr := instance.unsafeListMasters()
+	masters, xerr := instance.unsafeListMasters(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -327,11 +327,11 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 
 // unsafeListNodes is the not goroutine-safe version of ListNodes and no parameter validation, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeListNodes() (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
+func (instance *Cluster) unsafeListNodes(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
-	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -359,7 +359,7 @@ func (instance *Cluster) unsafeListNodes() (list resources.IndexedListOfClusterN
 func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 
-	xerr := instance.beingRemoved()
+	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
@@ -375,7 +375,7 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -421,13 +421,13 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = instance.beingRemoved()
+	xerr = instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	list, xerr := instance.unsafeListNodes()
+	list, xerr := instance.unsafeListNodes(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

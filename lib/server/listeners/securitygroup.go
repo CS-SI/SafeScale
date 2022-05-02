@@ -125,7 +125,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, xerr
 	}
 
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // Clear calls the clear method to remove all rules from a security group
@@ -255,7 +255,7 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 		return nil, xerr
 	}
 
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // Delete a host
@@ -350,7 +350,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	}
 
 	tracer.Trace("Rule successfully added to security group %s", sgRefLabel)
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // DeleteRule deletes a rule identified by id from a security group
@@ -399,7 +399,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	}
 
 	tracer.Trace("Rule successfully added to security group %s", refLabel)
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata

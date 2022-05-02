@@ -54,6 +54,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
+	ctx := task.Context()
+
 	castedParams, ok := params.(taskCreateGatewayParameters)
 	if !ok {
 		return nil, fail.InconsistentError("failed to cast params to 'taskCreateGatewayParameters'")
@@ -85,7 +87,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	// Set link to Subnet before testing if Host has been successfully created;
 	// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
 	// be able to delete subnet on later safescale command
-	xerr = instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -135,7 +137,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				}
 				_ = ferr.AddConsequence(derr)
 			} else {
-				xerr = rgw.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = rgw.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -153,7 +155,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	}()
 
 	// Binds gateway to VIP if needed
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -217,7 +219,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	gwname := objgw.GetName()
 
 	// Executes userdata phase2 script to finalize host installation
-	tracer := debug.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), true, "(%s)", gwname).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 	defer temporal.NewStopwatch().OnExitLogInfo(
