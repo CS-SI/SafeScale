@@ -180,7 +180,7 @@ func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 		return nil, innerXErr
 	}
 
-	if innerXErr = shareInstance.Read(ref); innerXErr != nil {
+	if innerXErr = shareInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 

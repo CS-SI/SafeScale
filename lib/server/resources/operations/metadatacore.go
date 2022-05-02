@@ -410,7 +410,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
+func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -492,7 +492,7 @@ func (myself *MetadataCore) Read(ref string) (ferr fail.Error) {
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (myself *MetadataCore) ReadByID(id string) (ferr fail.Error) {
+func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Note: do not test with .IsNull() here, it may be null value on first read

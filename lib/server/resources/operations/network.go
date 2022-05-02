@@ -108,7 +108,7 @@ func onNetworkCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data
 		return nil, innerXErr
 	}
 
-	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
+	if innerXErr = networkInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 

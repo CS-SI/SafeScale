@@ -110,8 +110,7 @@ func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.
 		return nil, innerXErr
 	}
 
-	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if innerXErr = bucketInstance.Read(ref); innerXErr != nil {
+	if innerXErr = bucketInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 

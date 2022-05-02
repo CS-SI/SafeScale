@@ -273,7 +273,7 @@ func onSubnetCacheMiss(ctx context.Context, svc iaas.Service, subnetID string) (
 		return nil, innerXErr
 	}
 
-	if innerXErr = subnetInstance.Read(subnetID); innerXErr != nil {
+	if innerXErr = subnetInstance.Read(ctx, subnetID); innerXErr != nil {
 		return nil, innerXErr
 	}
 

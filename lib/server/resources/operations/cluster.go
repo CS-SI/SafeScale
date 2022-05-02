@@ -197,7 +197,7 @@ func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (dat
 		return nil, xerr
 	}
 
-	if xerr = clusterInstance.Read(name); xerr != nil {
+	if xerr = clusterInstance.Read(ctx, name); xerr != nil {
 		return nil, xerr
 	}
 

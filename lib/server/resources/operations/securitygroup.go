@@ -118,7 +118,7 @@ func onSGCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Iden
 		return nil, innerXerr
 	}
 
-	if innerXErr = sgInstance.Read(ref); innerXErr != nil {
+	if innerXErr = sgInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 

@@ -117,7 +117,7 @@ func onVolumeCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.
 		return nil, innerXErr
 	}
 
-	if innerXErr = volumeInstance.Read(ref); innerXErr != nil {
+	if innerXErr = volumeInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 

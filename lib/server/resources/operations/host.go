@@ -143,7 +143,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, xerr
 	}
 
-	if innerXErr = hostInstance.Read(ref); innerXErr != nil {
+	if innerXErr = hostInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 
