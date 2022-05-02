@@ -1146,7 +1146,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	found, xerr := rgw.IsFeatureInstalled("edgeproxy4subnet")
+	found, xerr := rgw.IsFeatureInstalled(ctx, "edgeproxy4subnet")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

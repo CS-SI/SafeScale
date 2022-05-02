@@ -131,7 +131,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		User:      user,
 	}
 
-	isSingle, xerr := host.IsSingle()
+	isSingle, xerr := host.IsSingle(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

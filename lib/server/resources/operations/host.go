@@ -2950,7 +2950,7 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 }
 
 // GetVolumes returns information about volumes attached to the Host
-func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, ferr fail.Error) {
+func (instance *Host) GetVolumes(context.Context) (_ *propertiesv1.HostVolumes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -3355,7 +3355,7 @@ func (instance *Host) GetShares(context.Context) (shares *propertiesv1.HostShare
 }
 
 // GetMounts returns the information abouts the mounts of the Host
-func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, ferr fail.Error) {
+func (instance *Host) GetMounts(context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	mounts = nil
@@ -3370,7 +3370,7 @@ func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, ferr fail.Er
 }
 
 // IsClusterMember returns true if the Host is member of a cluster
-func (instance *Host) IsClusterMember() (yes bool, ferr fail.Error) {
+func (instance *Host) IsClusterMember(context.Context) (yes bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	yes = false
@@ -3430,7 +3430,7 @@ func (instance *Host) IsGateway() (_ bool, ferr fail.Error) {
 }
 
 // IsSingle tells if the Host is single
-func (instance *Host) IsSingle() (_ bool, ferr fail.Error) {
+func (instance *Host) IsSingle(context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {

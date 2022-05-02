@@ -630,7 +630,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	var mountPoint string
 	bucketName := instance.GetName()
 
-	mounts, xerr := hostInstance.GetMounts()
+	mounts, xerr := hostInstance.GetMounts(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

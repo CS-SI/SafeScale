@@ -1260,7 +1260,7 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 			continue
 		}
 
-		mounts, xerr := h.GetMounts()
+		mounts, xerr := h.GetMounts(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())

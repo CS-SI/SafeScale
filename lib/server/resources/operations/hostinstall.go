@@ -470,7 +470,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		return xerr
 	}
 
-	single, xerr := instance.IsSingle()
+	single, xerr := instance.IsSingle(nil)
 	if xerr != nil {
 		return xerr
 	}
@@ -537,7 +537,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 }
 
 // IsFeatureInstalled ...
-func (instance *Host) IsFeatureInstalled(name string) (found bool, ferr fail.Error) {
+func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error) {
 	found = false
 	defer fail.OnPanic(&ferr)
 
