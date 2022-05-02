@@ -548,7 +548,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	var state hoststate.Enum
-	state, xerr = host.GetState()
+	state, xerr = host.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -972,7 +972,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	targetName := host.GetName()
 
 	var state hoststate.Enum
-	state, xerr = host.GetState()
+	state, xerr = host.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}

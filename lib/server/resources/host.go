@@ -58,11 +58,11 @@ type Host interface {
 	GetShare(ctx context.Context, shareRef string) (*propertiesv1.HostShare, fail.Error)                                                         // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares(ctx context.Context) (*propertiesv1.HostShares, fail.Error)                                                                        // returns the shares hosted on the host
 	GetSSHConfig(ctx context.Context) (*system.SSHConfig, fail.Error)                                                                            // loads SSH configuration for host from metadata
-	GetState() (hoststate.Enum, fail.Error)                                                                                                      // returns the current state of the host, with error handling
+	GetState(ctx context.Context) (hoststate.Enum, fail.Error)                                                                                   // returns the current state of the host, with error handling
 	GetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error)                                                                      // returns the volumes attached to the host
 	IsClusterMember(ctx context.Context) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
 	IsFeatureInstalled(ctx context.Context, name string) (bool, fail.Error)                                                                      // tells if a feature is installed on Host, using only metadata
-	IsGateway() (bool, fail.Error)                                                                                                               // tells of  the host acts as a gateway
+	IsGateway(ctx context.Context) (bool, fail.Error)                                                                                            // tells of  the host acts as a gateway
 	IsSingle(ctx context.Context) (bool, fail.Error)                                                                                             // tells of  the host acts as a gateway
 	ListEligibleFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                            // returns the list of eligible features for the Cluster
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                           // returns the list of installed features on the Cluster

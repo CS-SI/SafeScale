@@ -136,7 +136,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	isGateway, xerr := host.IsGateway()
+	isGateway, xerr := host.IsGateway(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -196,7 +196,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
 		if isGateway {
-			hs, err := host.GetState()
+			hs, err := host.GetState(ctx)
 			if err != nil {
 				return nil, fail.Wrap(err, "cannot retrieve host properties")
 			}

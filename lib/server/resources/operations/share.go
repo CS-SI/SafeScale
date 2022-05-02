@@ -315,7 +315,7 @@ func (instance *Share) Create(
 	targetName := server.GetName()
 
 	var state hoststate.Enum
-	state, xerr = server.GetState()
+	state, xerr = server.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -653,7 +653,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	targetName = target.GetName()
 
 	var state hoststate.Enum
-	state, xerr = target.GetState()
+	state, xerr = target.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -950,7 +950,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	targetName := target.GetName()
 
 	var state hoststate.Enum
-	state, xerr = target.GetState()
+	state, xerr = target.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1128,7 +1128,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	targetName := objserver.GetName()
 
 	var state hoststate.Enum
-	state, xerr = objserver.GetState()
+	state, xerr = objserver.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}

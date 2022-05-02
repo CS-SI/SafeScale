@@ -858,7 +858,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 			}
 		}
 
-		isGateway, innerXErr := host.IsGateway()
+		isGateway, innerXErr := host.IsGateway(ctx)
 		if innerXErr != nil {
 			return innerXErr
 		}

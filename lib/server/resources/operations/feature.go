@@ -313,7 +313,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 
 	switch ata := target.(type) {
 	case resources.Host:
-		state, xerr := ata.GetState()
+		state, xerr := ata.GetState(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}

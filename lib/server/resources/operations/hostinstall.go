@@ -71,7 +71,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -188,7 +188,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(nil)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -673,7 +673,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 	}
 
 	// -- make sure SGs are applied to Host
-	isGateway, xerr := instance.IsGateway()
+	isGateway, xerr := instance.IsGateway(context.Background())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

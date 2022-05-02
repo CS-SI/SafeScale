@@ -614,7 +614,7 @@ func (instance *Host) unsafeReload() (ferr fail.Error) {
 }
 
 // GetState returns the last known state of the Host, without forced inspect
-func (instance *Host) GetState() (hoststate.Enum, fail.Error) {
+func (instance *Host) GetState(context.Context) (hoststate.Enum, fail.Error) {
 	state := hoststate.Unknown
 	if instance == nil || valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
@@ -2735,7 +2735,7 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(nil)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -2789,7 +2789,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(nil)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -2874,7 +2874,7 @@ func (instance *Host) Push(
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(nil)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -3399,7 +3399,7 @@ func (instance *Host) IsClusterMember(context.Context) (yes bool, ferr fail.Erro
 }
 
 // IsGateway tells if the Host acts as a gateway for a Subnet
-func (instance *Host) IsGateway() (_ bool, ferr fail.Error) {
+func (instance *Host) IsGateway(context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -3502,7 +3502,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState()
+	state, xerr = instance.GetState(nil)
 	if xerr != nil {
 		return xerr
 	}
