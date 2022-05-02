@@ -934,7 +934,7 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 		return nil, xerr
 	}
 
-	bonds, xerr := hostInstance.ListSecurityGroups(securitygroupstate.All)
+	bonds, xerr := hostInstance.ListSecurityGroups(job.Context(), securitygroupstate.All)
 	if xerr != nil {
 		return nil, xerr
 	}

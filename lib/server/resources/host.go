@@ -52,11 +52,11 @@ type Host interface {
 	GetAccessIP(ctx context.Context) (string, fail.Error)                                                                                        // returns the IP to reach the host, with error handling
 	GetDefaultSubnet(ctx context.Context) (Subnet, fail.Error)                                                                                   // returns the resources.Subnet instance corresponding to the default subnet of the host, with error handling
 	GetMounts() (*propertiesv1.HostMounts, fail.Error)                                                                                           // returns the mounts on the host
-	GetPrivateIP(ctx context.Context) (ip string, err fail.Error)                                                                                // returns the IP address of the host on the default subnet, with error handling
-	GetPrivateIPOnSubnet(subnetID string) (ip string, err fail.Error)                                                                            // returns the IP address of the host on the requested subnet, with error handling
-	GetPublicIP(ctx context.Context) (ip string, err fail.Error)                                                                                 // returns the public IP address of the host, with error handling
+	GetPrivateIP(ctx context.Context) (string, fail.Error)                                                                                       // returns the IP address of the host on the default subnet, with error handling
+	GetPrivateIPOnSubnet(ctx context.Context, subnetID string) (string, fail.Error)                                                              // returns the IP address of the host on the requested subnet, with error handling
+	GetPublicIP(ctx context.Context) (string, fail.Error)                                                                                        // returns the public IP address of the host, with error handling
 	GetShare(ctx context.Context, shareRef string) (*propertiesv1.HostShare, fail.Error)                                                         // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-	GetShares() (*propertiesv1.HostShares, fail.Error)                                                                                           // returns the shares hosted on the host
+	GetShares(ctx context.Context) (*propertiesv1.HostShares, fail.Error)                                                                        // returns the shares hosted on the host
 	GetSSHConfig(ctx context.Context) (*system.SSHConfig, fail.Error)                                                                            // loads SSH configuration for host from metadata
 	GetState() (hoststate.Enum, fail.Error)                                                                                                      // returns the current state of the host, with error handling
 	GetVolumes() (*propertiesv1.HostVolumes, fail.Error)                                                                                         // returns the volumes attached to the host
@@ -66,7 +66,7 @@ type Host interface {
 	IsSingle() (bool, fail.Error)                                                                                                                // tells of  the host acts as a gateway
 	ListEligibleFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                            // returns the list of eligible features for the Cluster
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                           // returns the list of installed features on the Cluster
-	ListSecurityGroups(state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                            // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
+	ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                       // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(ctx context.Context, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
 	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
 	PushStringToFile(ctx context.Context, content string, filename string) fail.Error                                                            // creates a file 'filename' on remote 'host' with the content 'content'

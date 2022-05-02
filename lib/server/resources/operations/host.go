@@ -3276,10 +3276,10 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 }
 
 // GetPrivateIPOnSubnet returns the private IP of the Host on its default Subnet
-func (instance *Host) GetPrivateIPOnSubnet(subnetID string) (ip string, ferr fail.Error) {
+func (instance *Host) GetPrivateIPOnSubnet(ctx context.Context, subnetID string) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	ip = ""
+	ip := ""
 	if valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
@@ -3329,7 +3329,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 }
 
 // GetShares returns the information about the shares hosted by the Host
-func (instance *Host) GetShares() (shares *propertiesv1.HostShares, ferr fail.Error) {
+func (instance *Host) GetShares(context.Context) (shares *propertiesv1.HostShares, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	shares = &propertiesv1.HostShares{}
@@ -3770,7 +3770,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 }
 
 // ListSecurityGroups returns a slice of security groups bound to Host
-func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []*propertiesv1.SecurityGroupBond
