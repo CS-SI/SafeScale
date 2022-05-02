@@ -703,7 +703,7 @@ func (myself *MetadataCore) write() fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *MetadataCore) Reload() (ferr fail.Error) {
+func (myself *MetadataCore) Reload(context.Context) (ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -946,7 +946,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 	return nil
 }
 
-func (myself *MetadataCore) Sdump() (_ string, ferr fail.Error) {
+func (myself *MetadataCore) Sdump(context.Context) (_ string, ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}

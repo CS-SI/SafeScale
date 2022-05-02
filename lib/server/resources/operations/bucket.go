@@ -80,7 +80,7 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(svc, name) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -99,7 +99,7 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 	return b, nil
 }
 
-func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	bucketInstance, innerXErr := NewBucket(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -115,7 +115,7 @@ func onBucketCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("bucket with ref '%s' does NOT exist", ref)
 	}
 

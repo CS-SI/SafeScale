@@ -87,7 +87,7 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -106,7 +106,7 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
-func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onVolumeCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	volumeInstance, innerXErr := NewVolume(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -121,7 +121,7 @@ func onVolumeCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Er
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(volumeInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(volumeInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("volume with ref '%s' does NOT exist", ref)
 	}
 

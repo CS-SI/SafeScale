@@ -138,7 +138,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, innerXErr
 	}
 
-	serialized, xerr := hostInstance.Sdump()
+	serialized, xerr := hostInstance.Sdump(nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -152,7 +152,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, xerr
 	}
 
-	afterSerialized, xerr := hostInstance.Sdump()
+	afterSerialized, xerr := hostInstance.Sdump(nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -507,7 +507,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
-func (instance *Host) Reload() (ferr fail.Error) {
+func (instance *Host) Reload(context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -522,7 +522,7 @@ func (instance *Host) Reload() (ferr fail.Error) {
 func (instance *Host) unsafeReload() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.MetadataCore.Reload()
+	xerr := instance.MetadataCore.Reload(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {

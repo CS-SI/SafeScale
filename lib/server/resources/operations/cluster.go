@@ -327,14 +327,14 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	return nil
 }
 
-func (instance *Cluster) Sdump() (_ string, ferr fail.Error) {
+func (instance *Cluster) Sdump(context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	dumped, _ := instance.MetadataCore.Sdump()
+	dumped, _ := instance.MetadataCore.Sdump(nil)
 	return dumped, nil
 }
 

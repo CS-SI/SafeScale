@@ -493,7 +493,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 
 	// Data sync
-	xerr = hostInstance.Reload()
+	xerr = hostInstance.Reload(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

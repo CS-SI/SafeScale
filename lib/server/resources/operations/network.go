@@ -78,7 +78,7 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -97,7 +97,7 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
-func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onNetworkCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	networkInstance, innerXErr := NewNetwork(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -112,7 +112,7 @@ func onNetworkCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.E
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(networkInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(networkInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("network with ref '%s' does NOT exist", ref)
 	}
 

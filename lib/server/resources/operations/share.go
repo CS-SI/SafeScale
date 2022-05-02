@@ -150,7 +150,7 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
@@ -169,7 +169,7 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
-func onShareCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
 	shareInstance, innerXErr := NewShare(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -184,7 +184,7 @@ func onShareCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Err
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(shareInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(shareInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("share with ref '%s' does NOT exist", ref)
 	}
 

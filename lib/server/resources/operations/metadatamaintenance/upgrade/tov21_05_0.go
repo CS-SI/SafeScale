@@ -738,7 +738,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 	}
 
 	// We need to update cache information of Host before remotely execute a command, so reload metadata to trigger cache update
-	xerr = instance.Reload()
+	xerr = instance.Reload(nil)
 	if xerr != nil {
 		return xerr
 	}

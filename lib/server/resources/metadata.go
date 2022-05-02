@@ -42,8 +42,8 @@ type Metadata interface {
 	Review(callback Callback) fail.Error                                                        // protects the data for shared read without reloading first (uses in-memory data); use with caution
 	Read(ref string) fail.Error                                                                 // reads the data from Object Storage using ref as id or name
 	ReadByID(id string) fail.Error                                                              // reads the data from Object Storage by id
-	Reload() fail.Error                                                                         // Reloads the metadata from the Object Storage, overriding what is in the object
-	Sdump() (string, fail.Error)
+	Reload(ctx context.Context) fail.Error                                                      // Reloads the metadata from the Object Storage, overriding what is in the object
+	Sdump(ctx context.Context) (string, fail.Error)
 	Service() iaas.Service // returns the iaas.Service used
 }
 

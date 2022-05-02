@@ -122,7 +122,7 @@ func onSGCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error)
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(sgInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(sgInstance.Sdump(nil)).(string), fail.IgnoreError(blank.Sdump(nil)).(string)) == 0 {
 		return nil, fail.NotFoundError("security group with ref '%s' does NOT exist", ref)
 	}
 
