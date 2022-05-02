@@ -830,7 +830,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		return xerr
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		subnetAbstract, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -919,7 +919,7 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (ferr fai
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return instance.unsafeAbandonHost(props, hostID)
 	})
 }
@@ -1211,7 +1211,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1262,7 +1262,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 				return innerXErr
 			}
 
-			innerXErr = FreeCIDRForSingleHost(networkInstance, as.SingleHostCIDRIndex)
+			innerXErr = FreeCIDRForSingleHost(ctx, networkInstance, as.SingleHostCIDRIndex)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1690,7 +1690,7 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resour
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1836,7 +1836,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 	// defer instance.lock.Unlock()
 
 	svc := instance.Service()
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1953,7 +1953,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 	// defer instance.lock.Unlock()
 
 	svc := instance.Service()
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

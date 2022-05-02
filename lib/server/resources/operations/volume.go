@@ -698,7 +698,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	// -- updates target properties --
-	xerr = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) (ferr fail.Error) {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
@@ -806,7 +806,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 				}
 			}
-			derr := host.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := host.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
@@ -847,7 +847,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer task.DisarmAbortSignal()()
 
 	// Updates volume properties
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
@@ -1001,7 +1001,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	svc := instance.Service()
 
 	// -- Update target attachments --
-	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var (
 			attachment *propertiesv1.HostVolume
 			mount      *propertiesv1.HostLocalMount
@@ -1174,7 +1174,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		}
 
 		// ... and finish with update of volume property propertiesv1.VolumeAttachments
-		return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 				volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 				if !ok {

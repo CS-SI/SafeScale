@@ -559,7 +559,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- update metadata of Bucket
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -576,7 +576,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- update metadata of Host
-	return hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -666,7 +666,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		}
 	}
 
-	xerr = hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -681,7 +681,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return xerr
 	}
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {

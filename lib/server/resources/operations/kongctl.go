@@ -97,7 +97,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		}
 
 		if results.Successful() {
-			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = addressedGateway.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 					if !ok {

@@ -392,7 +392,7 @@ func (instance *Share) Create(
 	}
 
 	// Nothing will be changed in instance, but we do not want more than 1 goroutine to install NFS if needed
-	xerr = server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -470,7 +470,7 @@ func (instance *Share) Create(
 
 	// Updates Host Property propertiesv1.HostShares
 	var hostShare *propertiesv1.HostShare
-	xerr = server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -503,7 +503,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -781,7 +781,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}
 
 	// -- Mount the Share on host --
-	xerr = rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -835,7 +835,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := rhServer.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -867,7 +867,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}()
 
 	var mount *propertiesv1.HostRemoteMount
-	xerr = target.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = target.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -1011,7 +1011,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	var mountPath string
 	remotePath := serverPrivateIP + ":" + hostShare.Path
 	targetID := target.GetID()
-	xerr = target.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = target.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -1053,7 +1053,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	}
 
 	// Remove host from client lists of the Share
-	xerr = rhServer.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -1137,7 +1137,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidRequestError(fmt.Sprintf("cannot delete share on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	xerr = objserver.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = objserver.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {

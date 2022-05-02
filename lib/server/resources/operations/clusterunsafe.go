@@ -86,7 +86,7 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 	state = clusterstate.Unknown
 	instance.localCache.RLock()
 	makers := instance.localCache.makers
-	instance.localCache.RUnlock() //nolint
+	instance.localCache.RUnlock() // nolint
 	if makers.GetState != nil {
 		var xerr fail.Error
 		state, xerr = makers.GetState(instance)
@@ -95,7 +95,7 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 			return clusterstate.Unknown, xerr
 		}
 
-		return state, instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return state, instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
 				if !ok {
@@ -105,7 +105,7 @@ func (instance *Cluster) unsafeGetState() (state clusterstate.Enum, ferr fail.Er
 				stateV1.State = state
 				instance.localCache.Lock()
 				instance.localCache.lastStateCollection = time.Now()
-				instance.localCache.Unlock() //nolint
+				instance.localCache.Unlock() // nolint
 				return nil
 			})
 		})

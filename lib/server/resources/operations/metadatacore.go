@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"sync"
@@ -240,7 +241,7 @@ func (myself *MetadataCore) Review(callback resources.Callback) (ferr fail.Error
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
+func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 

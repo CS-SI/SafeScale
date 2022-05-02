@@ -85,7 +85,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	// Set link to Subnet before testing if Host has been successfully created;
 	// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
 	// be able to delete subnet on later safescale command
-	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -135,7 +135,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				}
 				_ = ferr.AddConsequence(derr)
 			} else {
-				xerr = rgw.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = rgw.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())

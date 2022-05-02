@@ -363,7 +363,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 			return xerr
 		}
 
-		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
 		})
 		if xerr != nil {
@@ -775,7 +775,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -835,7 +835,7 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1024,7 +1024,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -1078,7 +1078,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -1172,7 +1172,7 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 		return xerr
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if mark == resources.MarkSecurityGroupAsDefault {
 			asg, ok := clonable.(*abstract.SecurityGroup)
 			if !ok {
@@ -1366,7 +1366,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 	}
 
 	// -- Remove Hosts attached to Subnet referenced in Security Group
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -1386,7 +1386,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 	}
 
 	// -- Remove Subnet referenced in Security Group
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
@@ -1439,7 +1439,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {

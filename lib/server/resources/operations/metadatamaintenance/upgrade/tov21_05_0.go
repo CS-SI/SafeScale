@@ -164,8 +164,10 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	subnetName = currentInstance.GetName()
 	svc := currentInstance.Service()
 
+	ctx := context.Background()
+
 	var somethingMissing bool
-	xerr := currentInstance.Alter(func(clonable data.Clonable, currentNetworkProps *serialize.JSONProperties) (ferr fail.Error) {
+	xerr := currentInstance.Alter(ctx, func(clonable data.Clonable, currentNetworkProps *serialize.JSONProperties) (ferr fail.Error) {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -305,7 +307,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}()
 
 			// -- register security groups in Subnet --
-			innerXErr = subnetInstance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			innerXErr = subnetInstance.Alter(nil, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				abstractSubnet, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -328,7 +330,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
 				}
 
-				return subnetInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return subnetInstance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 						subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 						if !ok {
@@ -356,7 +358,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 					return fail.InconsistentError("'*propertiesv1.NetworkDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				return subnetInstance.Alter(func(_ data.Clonable, subnetProps *serialize.JSONProperties) fail.Error {
+				return subnetInstance.Alter(nil, func(_ data.Clonable, subnetProps *serialize.JSONProperties) fail.Error {
 					return subnetProps.Alter(subnetproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 						subnetDescriptionV1, ok := clonable.(*propertiesv1.SubnetDescription)
 						if !ok {
@@ -391,7 +393,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 
 			// -- fixed owning Network fields if needed --
 			if owningInstance != currentInstance {
-				innerXErr = owningInstance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				innerXErr = owningInstance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					owningAbstractNetwork, ok := clonable.(*abstract.Network)
 					if !ok {
 						return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -424,7 +426,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	if !somethingMissing {
 		// -- add reference to subnet in owning Network properties --
 		if subnetID != "" && subnetName != "" {
-			xerr = owningInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = owningInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 					subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 					if !ok {
@@ -501,7 +503,7 @@ func (tv toV21_05_0) upgradeHosts(svc iaas.Service) fail.Error {
 
 // upgradeHostMetadataIfNeeded upgrades Host properties if needed
 func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail.Error {
-	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if !props.Lookup(hostproperty.NetworkV2) {
 			logrus.Tracef("Upgrading metadata of Host '%s'", instance.GetName())
 
@@ -804,7 +806,7 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 				requires map[string]struct{}
 			)
 
-			altErr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			altErr := instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 					if !ok {
@@ -890,7 +892,7 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 		}
 
 		// Fixed Cluster status if it's stuck to Starting (bug from v20.06?)
-		return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
 				if !ok {
@@ -940,7 +942,7 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 			return xerr
 		}
 
-		xerr = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {
@@ -975,7 +977,7 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 
 // upgradeClusterNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
 func (tv toV21_05_0) upgradeClusterNodesPropertyIfNeeded(instance *operations.Cluster) fail.Error {
-	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.NodesV3) {
 			return nil
 		}
@@ -1115,7 +1117,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 	subnetName := "net-" + clusterName
 
 	var missingSomething bool
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(clusterproperty.NetworkV3) {
 			return fail.AlteredNothingError()
 		}
@@ -1256,7 +1258,7 @@ func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (
 
 // upgradeClusterDefaultsPropertyIfNeeded ...
 func (tv toV21_05_0) upgradeClusterDefaultsPropertyIfNeeded(instance *operations.Cluster) fail.Error {
-	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV2) {
 			return fail.AlteredNothingError()
 		}
@@ -1329,7 +1331,7 @@ func (tv toV21_05_0) cleanupDeprecatedNetworkMetadata(svc iaas.Service) fail.Err
 			return innerXErr
 		}
 
-		return networkInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return networkInstance.Alter(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			abstractNetwork, ok := clonable.(*abstract.Network)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1351,6 +1353,8 @@ func (tv toV21_05_0) cleanupDeprecatedHostMetadata(svc iaas.Service) fail.Error 
 		return xerr
 	}
 
+	ctx := context.Background()
+
 	logrus.Infof("Cleaning up deprecated metadata of Hosts...")
 	return instance.Browse(context.Background(), func(ahc *abstract.HostCore) fail.Error {
 		hostInstance, innerXErr := operations.LoadHost(context.Background(), svc, ahc.ID)
@@ -1359,7 +1363,7 @@ func (tv toV21_05_0) cleanupDeprecatedHostMetadata(svc iaas.Service) fail.Error 
 			return innerXErr
 		}
 
-		return hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if props.Lookup(hostproperty.NetworkV1) {
 				innerXErr = props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 					hostNetworkingV1, ok := clonable.(*propertiesv1.HostNetwork)
@@ -1403,6 +1407,8 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 		return xerr
 	}
 
+	ctx := context.Background()
+
 	logrus.Infof("Cleaning up deprecated metadata of Clusters...")
 	return instance.Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
 		clusterInstance, innerXErr := operations.LoadCluster(context.Background(), svc, aci.Name)
@@ -1411,7 +1417,7 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 			return innerXErr
 		}
 
-		return clusterInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return clusterInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if props.Lookup(clusterproperty.NodesV2) {
 				innerXErr := props.Alter(clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
 					nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)

@@ -438,7 +438,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -727,7 +727,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 		return fail.InvalidRequestError("cannot adopt Subnet '%s' because Network '%s' does not own it", subnet.GetName(), instance.GetName())
 	}
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
@@ -767,7 +767,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
@@ -790,8 +790,8 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 }
 
 // FreeCIDRForSingleHost frees the CIDR index inside the Network 'Network'
-func FreeCIDRForSingleHost(network resources.Network, index uint) fail.Error {
-	return network.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+func FreeCIDRForSingleHost(ctx context.Context, network resources.Network, index uint) fail.Error {
+	return network.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
 			nshV1, ok := clonable.(*propertiesv1.NetworkSingleHosts)
 			if !ok {

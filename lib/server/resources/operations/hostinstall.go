@@ -86,7 +86,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var innerXErr fail.Error
 		outcomes, innerXErr = feat.Add(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
@@ -203,7 +203,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(nil, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
@@ -268,7 +268,7 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -317,7 +317,7 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(nil, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
