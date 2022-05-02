@@ -42,8 +42,8 @@ type Volume interface {
 	Create(ctx context.Context, req abstract.VolumeRequest) fail.Error                                   // creates a volume
 	Delete(ctx context.Context) fail.Error                                                               // deletes a volume
 	Detach(ctx context.Context, host Host) fail.Error                                                    // detaches the volume identified by ref, ref can be the name or the id
-	GetAttachments() (*propertiesv1.VolumeAttachments, fail.Error)                                       // returns the property containing where the volume is attached
-	GetSize() (int, fail.Error)                                                                          // returns the size of volume in GB
-	GetSpeed() (volumespeed.Enum, fail.Error)                                                            // returns the speed of the volume (more or less the type of hardware)
+	GetAttachments(ctx context.Context) (*propertiesv1.VolumeAttachments, fail.Error)                    // returns the property containing where the volume is attached
+	GetSize(ctx context.Context) (int, fail.Error)                                                       // returns the size of volume in GB
+	GetSpeed(ctx context.Context) (volumespeed.Enum, fail.Error)                                         // returns the speed of the volume (more or less the type of hardware)
 	ToProtocol(ctx context.Context) (*protocol.VolumeInspectResponse, fail.Error)                        // converts volume to equivalent protocol message
 }

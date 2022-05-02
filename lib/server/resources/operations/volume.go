@@ -162,7 +162,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 }
 
 // GetSpeed ...
-func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
+func (instance *volume) GetSpeed(context.Context) (_ volumespeed.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -176,7 +176,7 @@ func (instance *volume) GetSpeed() (_ volumespeed.Enum, ferr fail.Error) {
 }
 
 // GetSize ...
-func (instance *volume) GetSize() (_ int, ferr fail.Error) {
+func (instance *volume) GetSize(context.Context) (_ int, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -190,7 +190,7 @@ func (instance *volume) GetSize() (_ int, ferr fail.Error) {
 }
 
 // GetAttachments returns where the Volume is attached
-func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
+func (instance *volume) GetAttachments(context.Context) (_ *propertiesv1.VolumeAttachments, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1207,7 +1207,7 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 
-	attachments, xerr := instance.GetAttachments()
+	attachments, xerr := instance.GetAttachments(nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

@@ -1545,7 +1545,7 @@ func (instance *Subnet) GetEndpointIP(ctx context.Context) (ip string, ferr fail
 }
 
 // HasVirtualIP tells if the Subnet uses a VIP a default route
-func (instance *Subnet) HasVirtualIP() (bool, fail.Error) {
+func (instance *Subnet) HasVirtualIP(context.Context) (bool, fail.Error) {
 	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -1571,7 +1571,7 @@ func (instance *Subnet) GetVirtualIP() (vip *abstract.VirtualIP, ferr fail.Error
 }
 
 // GetCIDR returns the CIDR of the Subnet
-func (instance *Subnet) GetCIDR() (cidr string, ferr fail.Error) {
+func (instance *Subnet) GetCIDR(context.Context) (cidr string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -1585,7 +1585,7 @@ func (instance *Subnet) GetCIDR() (cidr string, ferr fail.Error) {
 }
 
 // GetState returns the current state of the Subnet
-func (instance *Subnet) GetState() (state subnetstate.Enum, ferr fail.Error) {
+func (instance *Subnet) GetState(context.Context) (state subnetstate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {

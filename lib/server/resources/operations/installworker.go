@@ -1174,7 +1174,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	}
 
 	var secondaryKongController *KongController
-	if ok, _ := subnetInstance.HasVirtualIP(); ok {
+	if ok, _ := subnetInstance.HasVirtualIP(nil); ok {
 		secondaryKongController, xerr = NewKongController(ctx, w.service, subnetInstance, false)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

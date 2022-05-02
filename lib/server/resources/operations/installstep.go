@@ -464,7 +464,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	if xerr != nil {
 		return nil, xerr
 	}
-	clonedV["CIDR"], xerr = sn.GetCIDR()
+	clonedV["CIDR"], xerr = sn.GetCIDR(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
