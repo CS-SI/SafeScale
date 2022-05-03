@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (networks || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -121,12 +121,8 @@ func CreateNetworkWithoutSubnet(t *testing.T) {
 	// FIXME: check there is no subnet attached to network
 }
 
-func allNetworkScenarios() {
+func init() {
 	helpers.InSection("networks").
 		AddScenario(CreateNetwork).
 		AddScenario(CreateNetworkWithoutSubnet)
-}
-
-func init() {
-	allNetworkScenarios()
 }

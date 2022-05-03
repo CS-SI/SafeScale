@@ -1,4 +1,4 @@
-//go:build integrationtests && (network || all)
+//go:build integrationtests && !subnets && !all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -16,18 +16,8 @@
  * limitations under the License.
  */
 
-package networks
+package subnets
 
-import (
-	"testing"
-)
-
-func Test_NetworkCreate(t *testing.T) {
-	helpers.InSection("networks").AddScenario(CreateNetwork)
-	helpers.RunScenarios(t)
-}
-
-func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-	helpers.InSection("networks").AddScenario(CreateNetworkWithoutSubnet)
-	helpers.RunScenarios(t)
-}
+// func Test_SubnetStandard(t *testing.T) {
+// 	t.Skip("shares tests disabled")
+// }

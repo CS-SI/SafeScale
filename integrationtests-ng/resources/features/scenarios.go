@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (features || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -300,7 +300,7 @@ func NvidiaDocker(t *testing.T) {
 	// TODO: Implement integration test
 }
 
-func allFeatures() {
+func init() {
 	helpers.InSection("features").
 		AddScenario(Docker).
 		AddScenario(DockerNotGateway).
@@ -309,8 +309,4 @@ func allFeatures() {
 		AddScenario(RemoteDesktopOnSubnetHost).
 		AddScenario(ReverseProxy).
 		AddScenario(NvidiaDocker)
-}
-
-func init() {
-	allFeatures()
 }

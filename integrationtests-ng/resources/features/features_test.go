@@ -22,37 +22,36 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
-	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/providers"
 )
 
 func Test_Docker(t *testing.T) {
 	helpers.InSection("features").AddScenario(Docker)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_DockerNotGateway(t *testing.T) {
 	helpers.InSection("features").AddScenario(DockerNotGateway)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_DockerCompose(t *testing.T) {
 	helpers.InSection("features").AddScenario(DockerCompose)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_RemoteDesktopOnSingleHost(t *testing.T) {
 	helpers.InSection("features").AddScenario(RemoteDesktopOnSingleHost)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_RemoteDesktopOnNormalHost(t *testing.T) {
 	helpers.InSection("features").AddScenario(RemoteDesktopOnSubnetHost)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_ReverseProxy(t *testing.T) {
 	helpers.InSection("features").AddScenario(ReverseProxy)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_NvidiaDocker(t *testing.T) {
