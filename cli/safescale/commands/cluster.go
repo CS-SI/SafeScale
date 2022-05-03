@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -36,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
