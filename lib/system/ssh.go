@@ -121,6 +121,77 @@ func (sconf *SSHConfig) IsNull() bool {
 	return sconf == nil || sconf.IPAddress == ""
 }
 
+func (sconf *SSHConfig) GetUser() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.User, nil
+}
+
+func (sconf *SSHConfig) GetPort() (uint, fail.Error) {
+	if valid.IsNil(sconf) {
+		return 0, fail.InvalidInstanceError()
+	}
+	return uint(sconf.Port), nil
+}
+
+func (sconf *SSHConfig) GetLocalPort() (uint, fail.Error) {
+	if valid.IsNil(sconf) {
+		return 0, fail.InvalidInstanceError()
+	}
+	return uint(sconf.LocalPort), nil
+}
+
+func (sconf *SSHConfig) GetHostname() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.Hostname, nil
+}
+
+func (sconf *SSHConfig) GetIPAddress() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.IPAddress, nil
+}
+
+func (sconf *SSHConfig) GetPrivateKey() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.PrivateKey, nil
+}
+
+func (sconf *SSHConfig) GetPrimaryGatewayConfig() (Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return sconf.GatewayConfig, nil
+}
+
+func (sconf *SSHConfig) GetSecondaryGatewayConfig() (Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return sconf.SecondaryGatewayConfig, nil
+}
+
+func (sconf *SSHConfig) GetGatewayConfig(num uint) (Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	switch num {
+	case 0:
+		return sconf.GatewayConfig, nil
+	case 1:
+		return sconf.SecondaryGatewayConfig, nil
+	default:
+		return nil, fail.InvalidParameterError("num", "only can be 0 or 1")
+	}
+}
+
 // Clone clones the SSHConfig
 func (sconf *SSHConfig) Clone() *SSHConfig {
 	out := &SSHConfig{}
@@ -319,7 +390,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 // If yes, the tunnel is ready, otherwise it failed
 func isTunnelReady(port int) bool {
 	// Try to create a server with the port
-	server, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", LOCALHOST, port))
 	if err != nil {
 		return true
 	}
@@ -347,10 +418,10 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	}
 
 	if scfg.Port == 0 {
-		scfg.Port = 22
+		scfg.Port = SSH_PORT
 	}
 	if scfg.GatewayConfig.Port == 0 {
-		scfg.GatewayConfig.Port = 22
+		scfg.GatewayConfig.Port = SSH_PORT
 	}
 	// VPL: never used
 	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
@@ -359,8 +430,9 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
-		"ssh -i \"%s\" -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
+		"ssh -i \"%s\" -NL %s:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
+		LOCALHOST,
 		localPort,
 		scfg.IPAddress,
 		scfg.Port,
@@ -848,7 +920,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 			if tunnel != nil {
 				gateway := *gwConf
 				gateway.Port = tunnel.port
-				gateway.IPAddress = "127.0.0.1"
+				gateway.IPAddress = LOCALHOST
 				cfg.GatewayConfig = &gateway
 			}
 			failures := 0
@@ -916,7 +988,7 @@ func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail
 
 	if sconf.GatewayConfig != nil {
 		sshConfig.Port = tunnel.port
-		sshConfig.IPAddress = "127.0.0.1"
+		sshConfig.IPAddress = LOCALHOST
 	}
 	return tunnels, &sshConfig, nil
 }
