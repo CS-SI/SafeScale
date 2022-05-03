@@ -1,4 +1,4 @@
-//go:build integrationtests && !network && !all
+//go:build integrationtests && !networks && !all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

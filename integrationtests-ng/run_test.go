@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
 
-	// _ "github.com/CS-SI/SafeScale/v22/integrationtests-ng/resources/buckets"
+	_ "github.com/CS-SI/SafeScale/v22/integrationtests-ng/resources/buckets"
 	_ "github.com/CS-SI/SafeScale/v22/integrationtests-ng/resources/clusters"
 	_ "github.com/CS-SI/SafeScale/v22/integrationtests-ng/resources/features"
 	_ "github.com/CS-SI/SafeScale/v22/integrationtests-ng/resources/hosts"
