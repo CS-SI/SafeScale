@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package system
+package ssh
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/sshtunnel"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"

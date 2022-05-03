@@ -1,9 +1,10 @@
-package system
+package ssh
 
 import (
 	"context"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -20,7 +21,7 @@ type Config interface {
 	GetPrivateKey() (string, fail.Error)
 	GetPrimaryGatewayConfig() (Config, fail.Error)
 	GetSecondaryGatewayConfig() (Config, fail.Error)
-	NewCommand(context.Context, string) (*SSHCommand, fail.Error)
-	NewSudoCommand(context.Context, string) (*SSHCommand, fail.Error)
+	NewCommand(context.Context, string) (*system.SSHCommand, fail.Error)
+	NewSudoCommand(context.Context, string) (*system.SSHCommand, fail.Error)
 	GetGatewayConfig(uint) (Config, fail.Error)
 }
