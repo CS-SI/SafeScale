@@ -29,7 +29,3 @@ func Test_NetworkCreate(t *testing.T) {
 func Test_NetworkCreateWithoutSubnet(t *testing.T) {
 	t.Skip("networks tests disabled")
 }
-
-func Test_NetworkFull(t *testing.T) {
-	t.Skip("networks tests disabled")
-}

@@ -22,25 +22,24 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
-	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/providers/enums/providers"
 )
 
 func Test_BasicPublicHosts(t *testing.T) {
 	helpers.InSection("hosts").AddScenario(BasicPublicHosts)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_BasicNormalHosts(t *testing.T) {
 	helpers.InSection("hosts").AddScenario(BasicNormalHosts)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_ReadyToSSH(t *testing.T) {
 	helpers.InSection("hosts").AddScenario(ReadyToSSH)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_StopStartReadyToSSH(t *testing.T) {
 	helpers.InSection("hosts").AddScenario(StopStart)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }

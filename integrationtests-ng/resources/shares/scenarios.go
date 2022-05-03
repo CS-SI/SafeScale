@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (shares || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -384,15 +384,11 @@ func ShareVolumeMounted(t *testing.T) {
 	*/
 }
 
-func allShareScenarios() {
+func init() {
 	helpers.InSection("shares").
 		AddScenario(Standard).
 		AddScenario(ShareError).
 		AddScenario(SharePartialError).
 		AddScenario(UntilShareCreated).
 		AddScenario(SharePartialError)
-}
-
-func init() {
-	allShareScenarios()
 }

@@ -22,14 +22,6 @@ import (
 	"testing"
 )
 
-func Test_NetworkCreate(t *testing.T) {
-	t.Skip("securitygroups tests disabled")
-}
-
-func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-	t.Skip("securitygroups tests disabled")
-}
-
-func Test_NetworkFull(t *testing.T) {
+func Test_SecurityGroupCreate(t *testing.T) {
 	t.Skip("securitygroups tests disabled")
 }

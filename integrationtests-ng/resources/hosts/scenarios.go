@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (hosts || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -366,14 +366,10 @@ func StopStart(t *testing.T) {
 	require.True(t, strings.Contains(out, " user"))
 }
 
-func allHostsScenarios() {
+func init() {
 	helpers.InSection("hosts").
 		AddScenario(BasicPublicHosts).
 		AddScenario(BasicNormalHosts).
 		AddScenario(ReadyToSSH).
 		AddScenario(StopStart)
-}
-
-func init() {
-	allHostsScenarios()
 }

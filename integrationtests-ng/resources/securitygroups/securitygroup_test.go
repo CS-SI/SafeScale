@@ -20,16 +20,10 @@ package securitygroups
 
 import (
 	"testing"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/providers/enums/providers"
 )
 
-func Test_NetworkCreate(t *testing.T) {
-	helpers.InSection("securitygroups").AddScenario(CreateNetwork)
-	helpers.RunScenarios(t, providers.CurrentProvider)
-}
-
-func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-	helpers.InSection("securitygroups").AddScenario(CreateNetworkWithoutSubnet)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+func Test_SecurityGroupCreate(t *testing.T) {
+	t.Skip("not implemented")
+	// helpers.InSection("securitygroups").AddScenario(CreateNetwork)
+	// helpers.RunScenarios(t)
 }
