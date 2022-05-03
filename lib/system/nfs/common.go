@@ -24,10 +24,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -44,7 +45,7 @@ var nfsScripts embed.FS
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 func executeScript(
-	ctx context.Context, timings temporal.Timings, sshconfig system.SSHConfig, name string,
+	ctx context.Context, timings temporal.Timings, sshconfig ssh2.SSHConfig, name string,
 	data map[string]interface{},
 ) (string, fail.Error) {
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
@@ -109,7 +110,7 @@ func executeScript(
 	}
 
 	// Copy script to remote host with retries if needed
-	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := ssh2.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return "", xerr
 	}

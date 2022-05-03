@@ -20,18 +20,18 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Client defines the structure of a Client object
 type Client struct {
 	// SshConfig contains ssh connection configuration
-	SSHConfig *system.SSHConfig
+	SSHConfig *ssh2.SSHConfig
 }
 
 // NewNFSClient creates a new NFS client instance
-func NewNFSClient(sshconfig *system.SSHConfig) (*Client, fail.Error) {
+func NewNFSClient(sshconfig *ssh2.SSHConfig) (*Client, fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}

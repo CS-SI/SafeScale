@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -31,11 +31,11 @@ import (
 // Server getServer structure
 type Server struct {
 	svc       iaas.Service
-	SSHConfig *system.SSHConfig
+	SSHConfig *ssh2.SSHConfig
 }
 
 // NewServer instantiates a new nfs.getServer struct
-func NewServer(svc iaas.Service, sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
+func NewServer(svc iaas.Service, sshconfig *ssh2.SSHConfig) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}

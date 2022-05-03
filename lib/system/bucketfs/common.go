@@ -24,11 +24,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -45,7 +46,7 @@ var bucketfsScripts embed.FS
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-// func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
+// func executeScript(task concurrency.Task, sshconfig ssh2.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
 	timings, xerr := host.Service().Timings()
 	if xerr != nil {
@@ -178,7 +179,7 @@ func uploadContentToFile(
 	ctx context.Context, content, name, owner, rights string, host resources.Host,
 ) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
-	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := ssh2.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return "", xerr
 	}
