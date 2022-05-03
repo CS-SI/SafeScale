@@ -20,6 +20,8 @@ package securitygroups
 
 import (
 	"testing"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
 )
 
 func SecurityGroupLife(t *testing.T) {
