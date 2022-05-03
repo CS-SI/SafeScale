@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -53,21 +54,92 @@ import (
 
 // SSHConfig helper to manage ssh session
 type SSHConfig struct {
-	User                   string
-	IPAddress              string
-	PrivateKey             string
-	Port                   int
-	LocalPort              int
-	LocalHost              string
-	GatewayConfig          *SSHConfig
-	SecondaryGatewayConfig *SSHConfig
-	Hostname               string
+	User                   string     `json:"user"`
+	IPAddress              string     `json:"ip_address"`
+	PrivateKey             string     `json:"private_key"`
+	Port                   int        `json:"port"`
+	LocalPort              int        `json:"-"`
+	LocalHost              string     `json:"local_host"`
+	GatewayConfig          *SSHConfig `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig *SSHConfig `json:"secondary_gateway_config,omitempty"`
+	Hostname               string     `json:"hostname"`
 }
 
 // SSHTunnel a SSH tunnel
 type SSHTunnel struct {
 	cfg  SSHConfig // nolint
 	port int       // nolint
+}
+
+func (sconf *SSHConfig) GetUser() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.User, nil
+}
+
+func (sconf *SSHConfig) GetHostname() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.Hostname, nil
+}
+
+func (sconf *SSHConfig) GetPort() (uint, fail.Error) {
+	if valid.IsNil(sconf) {
+		return 0, fail.InvalidInstanceError()
+	}
+	return uint(sconf.Port), nil
+}
+
+func (sconf *SSHConfig) GetLocalPort() (uint, fail.Error) {
+	if valid.IsNil(sconf) {
+		return 0, fail.InvalidInstanceError()
+	}
+	return uint(sconf.LocalPort), nil
+}
+
+func (sconf *SSHConfig) GetIPAddress() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.IPAddress, nil
+}
+
+func (sconf *SSHConfig) GetPrivateKey() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.PrivateKey, nil
+}
+
+func (sconf *SSHConfig) GetPrimaryGatewayConfig() (Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return sconf.GatewayConfig, nil
+}
+
+func (sconf *SSHConfig) GetSecondaryGatewayConfig() (Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return sconf.SecondaryGatewayConfig, nil
+}
+
+func (sconf *SSHConfig) GetGatewayConfig(num uint) (Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	switch num {
+	case 0:
+		return sconf.GatewayConfig, nil
+	case 1:
+		return sconf.SecondaryGatewayConfig, nil
+	default:
+		return nil, fail.InvalidParameterError("num", "only can be 0 or 1")
+	}
 }
 
 // CreateTempFileFromString creates a temporary file containing 'content'
@@ -455,10 +527,10 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
-		sc.LocalHost = "127.0.0.1" // TODO Remove hardcoded string
+		sc.LocalHost = LOCALHOST
 	}
 
-	internalPort := 22 // all machines use port 22... // TODO Remove magic number
+	internalPort := SSH_PORT // all machines use port 22...
 	var gateway *sshtunnel.Endpoint
 	var altgateway *sshtunnel.Endpoint
 	var remote bool
@@ -684,7 +756,7 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 	go func() {
 		defer close(rCh)
 
-		ac, ao, ae, err := sc.Copy(currentCtx, remotePath, localPath, isUpload)
+		ac, ao, ae, err := sc.copy(currentCtx, remotePath, localPath, isUpload)
 		rCh <- result{
 			code:   ac,
 			stdout: ao,
@@ -714,9 +786,7 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 }
 
 // Copy copies a file/directory from/to local to/from remote
-func (sc *SSHConfig) Copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
-	// FIXME: Use ctx if it can be handled at lower levels, if not, remove it as a parameter
-
+func (sc *SSHConfig) copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
 	tu, sshConfig, err := sc.CreateTunneling()
 	if err != nil {
 		return -1, "", "", fail.NewError("unable to create tunnels : %s", err.Error())
@@ -892,13 +962,13 @@ func (sc *SSHConfig) Copy(ctx context.Context, remotePath string, localPath stri
 }
 
 // Enter runs interactive shell
-func (sc *SSHConfig) Enter(username, shell string) (err error) {
+func (sc *SSHConfig) Enter(username, shell string) (ferr fail.Error) {
 	userPass := ""
 	if username != "" && username != sc.User {
 		fmt.Printf("Password: ")
 		up, err := terminal.ReadPassword(0)
 		if err != nil {
-			return err
+			return fail.ConvertError(err)
 		}
 		userPass = string(up)
 	}
@@ -910,7 +980,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 
 	tu, sshConfig, err := sc.CreateTunneling()
 	if err != nil {
-		return fmt.Errorf("unable to create tunnels : %s", err.Error())
+		return fail.ConvertError(fmt.Errorf("unable to create tunnels : %s", err.Error()))
 	}
 	defer func() {
 		if tu != nil {
@@ -920,7 +990,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 
 	pk, err := sshtunnel.AuthMethodFromPrivateKey([]byte(sshConfig.PrivateKey), nil)
 	if err != nil {
-		return err
+		return fail.ConvertError(err)
 	}
 
 	config := &ssh.ClientConfig{
@@ -935,7 +1005,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 	hostport := fmt.Sprintf("%s:%d", "localhost", tu.GetLocalEndpoint().Port())
 	conn, err := ssh.Dial("tcp", hostport, config)
 	if err != nil {
-		return fmt.Errorf("cannot connect %v: %w", hostport, err)
+		return fail.ConvertError(fmt.Errorf("cannot connect %v: %w", hostport, err))
 	}
 	defer func() {
 		_ = conn.Close()
@@ -943,7 +1013,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 
 	session, err := conn.NewSession()
 	if err != nil {
-		return fmt.Errorf("cannot open new session: %w", err)
+		return fail.ConvertError(fmt.Errorf("cannot open new session: %w", err))
 	}
 	defer func() {
 		_ = session.Close()
@@ -952,7 +1022,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 	fd := int(os.Stdin.Fd())
 	state, err := terminal.MakeRaw(fd)
 	if err != nil {
-		return fmt.Errorf("terminal make raw: %s", err)
+		return fail.ConvertError(fmt.Errorf("terminal make raw: %s", err))
 	}
 	defer func() {
 		_ = terminal.Restore(fd, state)
@@ -960,7 +1030,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 
 	w, h, err := terminal.GetSize(fd)
 	if err != nil {
-		return fmt.Errorf("terminal get size: %s", err)
+		return fail.ConvertError(fmt.Errorf("terminal get size: %s", err))
 	}
 
 	modes := ssh.TerminalModes{
@@ -974,7 +1044,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 		term = "xterm-256color"
 	}
 	if err := session.RequestPty(term, h, w, modes); err != nil {
-		return fmt.Errorf("session xterm: %s", err)
+		return fail.ConvertError(fmt.Errorf("session xterm: %s", err))
 	}
 
 	session.Stdout = os.Stdout
@@ -994,7 +1064,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 	}
 
 	if err := session.Shell(); err != nil {
-		return fmt.Errorf("session shell: %s", err)
+		return fail.ConvertError(fmt.Errorf("session shell: %s", err))
 	}
 
 	if err := session.Wait(); err != nil {
@@ -1004,7 +1074,7 @@ func (sc *SSHConfig) Enter(username, shell string) (err error) {
 				return nil
 			}
 		}
-		return fmt.Errorf("sc: %s", err)
+		return fail.ConvertError(fmt.Errorf("sc: %s", err))
 	}
 
 	return nil
