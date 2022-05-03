@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package system
+package ssh
 
 import (
 	"context"
@@ -214,6 +214,8 @@ type SSHTunnel struct {
 }
 
 type SSHTunnels []*SSHTunnel
+
+type Tunnels []*SSHTunnel // alias for UT
 
 // SSHErrorString returns if possible the string corresponding to SSH execution
 func SSHErrorString(retcode int) string {

@@ -31,7 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/stretchr/testify/require"
 )
 
@@ -468,7 +468,7 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gw_scfg := system.SSHConfig{
+	gw_scfg := ssh2.SSHConfig{
 		Hostname:               "SSHConfig GW Hostname",
 		IPAddress:              "SSHConfig GW Hostname",
 		Port:                   42,
@@ -478,7 +478,7 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	gw2_scfg := system.SSHConfig{
+	gw2_scfg := ssh2.SSHConfig{
 		Hostname:               "SSHConfig GW2 Hostname",
 		IPAddress:              "SSHConfig GW2 Hostname",
 		Port:                   0,
@@ -488,7 +488,7 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	scfg := system.SSHConfig{
+	scfg := ssh2.SSHConfig{
 		Hostname:               "SSHConfig Hostname",
 		IPAddress:              "SSHConfig Hostname",
 		Port:                   46,

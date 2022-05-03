@@ -29,20 +29,20 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
-	var pgw, sgw *system.SSHConfig
+// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a ssh2.SSHConfig
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *ssh2.SSHConfig {
+	var pgw, sgw *ssh2.SSHConfig
 	if from.Gateway != nil {
 		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
 	}
 	if from.SecondaryGateway != nil {
 		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
-	return &system.SSHConfig{
+	return &ssh2.SSHConfig{
 		User:                   from.User,
 		Hostname:               from.HostName,
 		IPAddress:              from.Host,

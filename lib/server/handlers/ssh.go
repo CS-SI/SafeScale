@@ -37,7 +37,7 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system"
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -58,7 +58,7 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (*system.SSHConfig, fail.Error)
+	GetConfig(stacks.HostParameter) (*ssh2.SSHConfig, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -74,7 +74,7 @@ func NewSSHHandler(job server.Job) SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, ferr fail.Error) {
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *ssh2.SSHConfig, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -124,7 +124,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	sshConfig = &system.SSHConfig{
+	sshConfig = &ssh2.SSHConfig{
 		Port:      22, // will be overwritten later
 		IPAddress: ip,
 		Hostname:  host.GetName(),
@@ -236,12 +236,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			var gwcfg *system.SSHConfig
+			var gwcfg *ssh2.SSHConfig
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			GatewayConfig := system.SSHConfig{
+			GatewayConfig := ssh2.SSHConfig{
 				PrivateKey: gwahc.PrivateKey,
 				Port:       gwcfg.Port,
 				IPAddress:  ip,
@@ -280,12 +280,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			var gwcfg *system.SSHConfig
+			var gwcfg *ssh2.SSHConfig
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			GatewayConfig := system.SSHConfig{
+			GatewayConfig := ssh2.SSHConfig{
 				PrivateKey: gwahc.PrivateKey,
 				Port:       gwcfg.Port,
 				IPAddress:  ip,
@@ -409,7 +409,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh *ssh2.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
 	// Create the command
