@@ -20,29 +20,31 @@ package shares
 
 import (
 	"testing"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
 )
 
 func Test_ShareStandard(t *testing.T) {
-	helpers.InSectoion("shares").AddScenario(Standard)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.InSection("shares").AddScenario(Standard)
+	helpers.RunScenarios(t)
 }
 
 func Test_ShareError(t *testing.T) {
 	helpers.InSection("shares").AddScenario(ShareError)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_SharePartialError(t *testing.T) {
 	helpers.InSection("shares").AddScenario(SharePartialError)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_UntilShare(t *testing.T) {
 	helpers.InSection("shares").AddScenario(UntilShareCreated)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_ShareVolumeMounted(t *testing.T) {
 	helpers.InSection("shares").AddScenario(SharePartialError)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }

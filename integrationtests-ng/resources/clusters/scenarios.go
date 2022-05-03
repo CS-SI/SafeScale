@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (clusters || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -63,7 +63,7 @@ func Kubectl(t *testing.T) {
 	// TODO: Implement integration test
 }
 
-func allClusterScenarios() {
+func init() {
 	helpers.InSection("clusters").
 		AddScenario(ClusterK8S).
 		AddScenario(Helm).

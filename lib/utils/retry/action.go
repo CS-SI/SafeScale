@@ -641,13 +641,11 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 		}
 
 		if a.Timeout != 0 {
-			if !all {
-				if ferr != nil {
-					switch ferr.(type) {
-					case *fail.ErrAborted:
-						return
-					default:
-					}
+			if !all && ferr != nil {
+				switch ferr.(type) {
+				case *fail.ErrAborted:
+					return
+				default:
 				}
 			}
 
@@ -675,7 +673,6 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 						)
 						logrus.Warnf(msg)
 					}
-
 				}
 			}
 		}
