@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (securitygroups || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -20,8 +20,6 @@ package securitygroups
 
 import (
 	"testing"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
 )
 
 func SecurityGroupLife(t *testing.T) {
@@ -31,12 +29,9 @@ func SecurityGroupLife(t *testing.T) {
 func AddRuleToExistingSecurityGroup(t *testing.T) {
 	// FIXME: implement this test
 }
-func allSecurityGroupScenarios() {
+
+func init() {
 	helpers.InSection("securitygroups").
 		AddScenario(SecurityGroupLife).
 		AddScenario(AddRuleToExistingSecurityGroup)
-}
-
-func init() {
-	allSecurityGroupScenarios()
 }

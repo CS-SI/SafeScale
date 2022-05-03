@@ -20,15 +20,10 @@ package buckets
 
 // func Test_NetworkCreate(t *testing.T) {
 // 	helpers.AddScenario(CreateNetwork)
-// 	helpers.RunScenarii(t, providers.CurrentProvider)
+// 	helpers.RunScenarii(t)
 // }
 //
 // func Test_NetworkCreateWithoutSubnet(t *testing.T) {
 // 	helpers.AddScenario(CreateNetworkWithoutSubnet)
-// 	helpers.RunScenarii(t, providers.CurrentProvider)
-// }
-//
-// func Test_NetworkFull(t *testing.T) {
-// 	allNetworkScenarii()
-// 	helpers.RunScenarii(t, providers.CurrentProvider)
+// 	helpers.RunScenarii(t)
 // }

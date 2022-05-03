@@ -1,3 +1,5 @@
+//go:build integrationtests && (subnets || all)
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *

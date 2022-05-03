@@ -1,4 +1,4 @@
-//go:build integrationtests
+//go:build integrationtests && (volumes || all)
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -323,13 +323,9 @@ func UntilVolumeCreated(t *testing.T) {
 	require.True(t, strings.Contains(out, names.Volumes[0]))
 }
 
-func allVolumeScenarios() {
+func init() {
 	helpers.InSection("volumes").
 		AddScenario(VolumeError).
 		AddScenario(DeleteVolumeMounted).
 		AddScenario(UntilVolumeCreated)
-}
-
-func init() {
-	allVolumeScenarios()
 }

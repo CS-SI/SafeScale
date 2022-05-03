@@ -20,32 +20,19 @@ package volumes
 
 import (
 	"testing"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests/enums/providers"
 )
 
 func Test_VolumeError(t *testing.T) {
 	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_DeleteVolumeMounted(t *testing.T) {
 	helpers.InSection("volumes") / AddScenario(VolumeError)
-	helpers.RunScenarios(t, providers.CurrentProvider)
+	helpers.RunScenarios(t)
 }
 
 func Test_UntilVolume(t *testing.T) {
 	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t, providers.CurrentProvider)
-}
-
-func allScenarii() {
-	helpers.InSection("volumes").
-		AddScenario(VolumeError).
-		AddScenario(DeleteVolumeMounted).
-		AddScenario(UntilVolume)
-}
-
-func init() {
-	allScenarii()
+	helpers.RunScenarios(t)
 }
