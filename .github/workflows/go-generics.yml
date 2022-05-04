@@ -6,7 +6,6 @@ on:
       - master
       - develop
       - hotfixes
-      - 'feature/**'
       - 'release/**'
       - 'review/**'
   pull_request:
@@ -25,7 +24,7 @@ jobs:
     strategy:
       matrix:
         go: [ 1.18, 1.18.1 ]
-        tags: [ releasetags, debug, tunnel ]
+        tags: [ releasetags, debug, tunnel, generics ]
 
     runs-on: ubuntu-latest
 

@@ -5,8 +5,6 @@ on:
     branches:
       - master
       - develop
-      - hotfixes
-      - 'feature/**'
       - 'release/**'
   pull_request:
     branches:
