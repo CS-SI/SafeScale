@@ -6,7 +6,6 @@ on:
       - master
       - develop
       - hotfixes
-      - 'feature/**'
       - 'release/**'
       - 'review/**'
   pull_request:
