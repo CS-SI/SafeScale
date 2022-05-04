@@ -136,7 +136,7 @@ func TestJsonPropertyRealReplace(t *testing.T) {
 	allbad, _ := NewJSONProperties("clusters")
 	assert.NotNil(t, allbad)
 
-	// @TODO fix JsonProperty::Replace, clonable.(*jsonProperty) casting makes panic
+	// @TODO fix JdonProperty::Replace, clonable.(*jsonProperty) casting makes panic
 	//d := &SomeClonable{value: "any"}
 	//jp = &jsonProperty{}
 	//result = jp.Replace(d)
