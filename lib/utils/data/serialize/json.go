@@ -102,6 +102,30 @@ func (x *JSONProperties) Lookup(key string) bool {
 	return ok && !valid.IsNil(p)
 }
 
+func (x *JSONProperties) Clone() (*JSONProperties, error) {
+
+	if x == nil {
+		return x, nil
+	}
+
+	x.RLock()
+	defer x.RUnlock()
+	newP := &JSONProperties{
+		module:     x.module,
+		Properties: map[string]*jsonProperty{},
+	}
+	if len(x.Properties) > 0 {
+		for k, v := range x.Properties {
+			b, err := v.Clone()
+			if err == nil {
+				newP.Properties[k], _ = b.(*jsonProperty) // nolint
+			}
+		}
+	}
+	return newP, nil
+
+}
+
 func (x *JSONProperties) hasKey(key string) (*jsonProperty, bool) {
 	x.RLock()
 	defer x.RUnlock()
@@ -178,7 +202,7 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 
 	x.RLock()
 	clone, err := item.Clone()
-	x.RUnlock() //nolint
+	x.RUnlock() // nolint
 	if err != nil {
 		return fail.Wrap(err)
 	}

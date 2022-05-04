@@ -658,11 +658,15 @@ func TestSizingToken_Validate(t *testing.T) {
 			if min != test.expectMin || max != test.expectMax {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s], expect [%s, %s]", min, max, test.expectMin, test.expectMax))
 			}
+		} else {
+			require.EqualValues(t, strings.Contains(err.Error(), test.errorExpected), true)
 		}
 		if test.errorExpected != "" {
 			if min != test.expectMin || max != test.expectMax || !strings.Contains(err.Error(), test.errorExpected) {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s, %s], expect [%s, %s, %s]", min, max, err.Error(), test.expectMin, test.expectMax, test.errorExpected))
 			}
+		} else {
+			require.EqualValues(t, err, nil)
 		}
 	}
 
@@ -722,9 +726,6 @@ func TestRequest_parseSizingString(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		result, err := parseSizingString(test.request)
-
-		fmt.Println(test.request, "____", result["ram"], err)
-
 		if test.errorExpected == "" && err != nil {
 			t.Error(err)
 		}

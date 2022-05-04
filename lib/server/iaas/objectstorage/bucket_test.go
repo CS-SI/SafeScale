@@ -70,8 +70,11 @@ func minioIsRunning() (bool, error) {
 
 func Test_NewLocation(t *testing.T) {
 	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
 	require.Nil(t, err)
-	require.True(t, good)
 
 	cfg := Config{
 		Type:         "s3",
@@ -83,15 +86,18 @@ func Test_NewLocation(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
 	require.EqualValues(t, err, nil)
 
 }
 
 func TestLocation_IsNull(t *testing.T) {
 	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
 	require.Nil(t, err)
-	require.True(t, good)
 
 	var nilLoc *location = nil
 	require.EqualValues(t, nilLoc.IsNull(), true)
@@ -106,14 +112,17 @@ func TestLocation_IsNull(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
 	require.EqualValues(t, err, nil)
 }
 
 func TestLocation_Connect(t *testing.T) {
 	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
 	require.Nil(t, err)
-	require.True(t, good)
 
 	var nilLoc *location = nil
 	err = nilLoc.connect()
@@ -129,14 +138,17 @@ func TestLocation_Connect(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
 	require.EqualValues(t, err, nil)
 }
 
 func TestLocation_Protocol(t *testing.T) {
 	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
 	require.Nil(t, err)
-	require.True(t, good)
 
 	cfg := Config{
 		Type:         "s3",
@@ -148,7 +160,7 @@ func TestLocation_Protocol(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
 	require.EqualValues(t, err, nil)
 
 	c, err := loc.Protocol()
@@ -159,8 +171,11 @@ func TestLocation_Protocol(t *testing.T) {
 
 func TestLocation_CreateBucket(t *testing.T) {
 	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
 	require.Nil(t, err)
-	require.True(t, good)
 
 	cfg := Config{
 		Type:         "s3",
