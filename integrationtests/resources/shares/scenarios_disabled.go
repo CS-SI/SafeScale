@@ -1,5 +1,5 @@
-//go:build integrationtests && !securitygroups && !all
-// +build integrationtests,!securitygroups,!all
+//go:build integrationtests && !shares && !allintegration
+// +build integrationtests,!shares,!allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,12 +17,4 @@
  * limitations under the License.
  */
 
-package securitygroups
-
-import (
-	"testing"
-)
-
-func Test_SecurityGroupCreate(t *testing.T) {
-	t.Skip("securitygroups tests disabled")
-}
+package shares
