@@ -82,7 +82,7 @@ func Test_IsNil(t *testing.T) {
 	require.EqualValues(t, IsNil(Nillable{isnil: false}), false)
 	require.EqualValues(t, IsNil(&Nillable{isnil: false}), false)
 	require.EqualValues(t, IsNil("test"), false)
-	require.EqualValues(t, IsNil(struct{}{}), false)
+	require.EqualValues(t, IsNil(struct{}{}), true)
 	require.EqualValues(t, IsNil(&struct {
 		Price  float64
 		Symbol string
@@ -115,7 +115,7 @@ func Test_IsNull(t *testing.T) {
 	require.EqualValues(t, IsNull(Nillable{isnil: false}), false)
 	require.EqualValues(t, IsNull(&Nillable{isnil: false}), false)
 	require.EqualValues(t, IsNull("test"), false)
-	require.EqualValues(t, IsNull(struct{}{}), false)
+	require.EqualValues(t, IsNull(struct{}{}), true)
 	require.EqualValues(t, IsNull(&struct {
 		Price  float64
 		Symbol string
