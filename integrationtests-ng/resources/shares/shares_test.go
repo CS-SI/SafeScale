@@ -1,4 +1,6 @@
 //go:build integrationtests && (shares || all)
+// +build integrationtests
+// +build shares all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

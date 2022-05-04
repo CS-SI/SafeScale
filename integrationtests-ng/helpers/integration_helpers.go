@@ -1,4 +1,5 @@
 //go:build integrationtests
+// +build integrationtests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

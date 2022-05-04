@@ -1,4 +1,5 @@
 //go:build integrationtests && !clusters && !all
+// +build integrationtests,!clusters,!all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

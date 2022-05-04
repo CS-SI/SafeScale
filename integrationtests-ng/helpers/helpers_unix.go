@@ -1,4 +1,5 @@
 //go:build integrationtests && !windows
+// +build integrationtests,!windows
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

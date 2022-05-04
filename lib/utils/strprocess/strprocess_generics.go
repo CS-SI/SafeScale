@@ -1,5 +1,5 @@
-//go:build generic
-// +build generic
+//go:build generics
+// +build generics
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
