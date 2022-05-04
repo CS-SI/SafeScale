@@ -1,4 +1,5 @@
 //go:build integrationtests
+// +build integrationtests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -19,7 +20,6 @@
 package integrationtests_ng
 
 import (
-	"flag"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests-ng/helpers"
@@ -35,9 +35,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/v22/integrationtests-ng/resources/volumes"
 )
 
-const timeout = "4h0s"
-
-func Test_All(t *testing.T) {
-	flag.Set("test.timeout", timeout)
+func TestAll(t *testing.T) {
 	helpers.RunScenarios(t)
 }
