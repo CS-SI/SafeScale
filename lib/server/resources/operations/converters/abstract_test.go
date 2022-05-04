@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
@@ -31,8 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/stretchr/testify/require"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func Test_HostTemplateToHostEffectiveSizing(t *testing.T) {
@@ -468,7 +469,7 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gw_scfg := ssh2.SSHConfig{
+	gw_scfg := ssh.SSHConfig{
 		Hostname:               "SSHConfig GW Hostname",
 		IPAddress:              "SSHConfig GW Hostname",
 		Port:                   42,
@@ -478,7 +479,7 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	gw2_scfg := ssh2.SSHConfig{
+	gw2_scfg := ssh.SSHConfig{
 		Hostname:               "SSHConfig GW2 Hostname",
 		IPAddress:              "SSHConfig GW2 Hostname",
 		Port:                   0,
@@ -488,7 +489,7 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	scfg := ssh2.SSHConfig{
+	scfg := ssh.SSHConfig{
 		Hostname:               "SSHConfig Hostname",
 		IPAddress:              "SSHConfig Hostname",
 		Port:                   46,

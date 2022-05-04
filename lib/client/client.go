@@ -43,7 +43,7 @@ type Session struct {
 	Network       network
 	SecurityGroup securityGroup
 	Share         share
-	SSH           sshClient
+	SSH           ssh
 	Subnet        subnet
 	Template      template
 	Tenant        tenant
@@ -119,7 +119,7 @@ func New(server string) (_ *Session, ferr fail.Error) {
 	s.JobManager = jobManager{session: s}
 	s.SecurityGroup = securityGroup{session: s}
 	s.Share = share{session: s}
-	s.SSH = sshClient{session: s}
+	s.SSH = ssh{session: s}
 	s.Template = template{session: s}
 	s.Tenant = tenant{session: s}
 	s.Volume = volume{session: s}

@@ -56,13 +56,13 @@ func Test_SSHConfigFromProtocolToSystem(t *testing.T) {
 		HostName: "HostName",
 	}
 
-	ssc, xerr := SSHConfigFromProtocolToSystem(sc)
-	require.Nil(t, xerr)
-	require.EqualValues(t, sc.User, ssc.User())
-	require.EqualValues(t, sc.HostName, ssc.Hostname())
-	require.EqualValues(t, sc.Host, ssc.IPAddress())
-	require.EqualValues(t, sc.PrivateKey, ssc.PrivateKey())
-	require.EqualValues(t, 22, ssc.Port()) // When submitted port is 0, it's forced to 22 by SSHConfigFromProtocolToSystem()
+	ssc := SSHConfigFromProtocolToSystem(sc)
+
+	require.EqualValues(t, sc.User, ssc.User)
+	require.EqualValues(t, sc.HostName, ssc.Hostname)
+	require.EqualValues(t, sc.Host, ssc.IPAddress)
+	require.EqualValues(t, sc.PrivateKey, ssc.PrivateKey)
+	require.EqualValues(t, sc.Port, ssc.Port)
 
 }
 

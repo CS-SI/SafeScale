@@ -20,11 +20,11 @@ package converters
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
-// SSHConfigFromSystemToProtocol converts a ssh2.SSHConfig into a SshConfig
-func SSHConfigFromSystemToProtocol(from *ssh2.SSHConfig) *protocol.SshConfig {
+// SSHConfigFromSystemToProtocol converts a ssh.SSHConfig into a protocol.SshConfig
+func SSHConfigFromSystemToProtocol(from *ssh.SSHConfig) *protocol.SshConfig {
 	var gw *protocol.SshConfig
 	if from.GatewayConfig != nil {
 		gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)

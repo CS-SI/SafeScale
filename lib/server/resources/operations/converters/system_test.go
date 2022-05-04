@@ -19,21 +19,22 @@ package converters
 import (
 	"testing"
 
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func Test_SSHConfigFromSystemToProtocol(t *testing.T) {
 
-	in := &ssh2.SSHConfig{
+	in := &ssh.SSHConfig{
 		Hostname:               "Hostname",
 		IPAddress:              "IPAddress",
 		Port:                   22,
 		User:                   "User",
 		PrivateKey:             "PrivateKey",
 		LocalPort:              22,
-		GatewayConfig:          &ssh2.SSHConfig{},
-		SecondaryGatewayConfig: &ssh2.SSHConfig{},
+		GatewayConfig:          &ssh.SSHConfig{},
+		SecondaryGatewayConfig: &ssh.SSHConfig{},
 	}
 	out := SSHConfigFromSystemToProtocol(in)
 
