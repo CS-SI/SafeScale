@@ -169,6 +169,10 @@ tunnel:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'tunnel' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "tunnel,$(BUILD_TAGS)")
 
+generics:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'generics' flag$(NO_COLOR)\n";
+	$(eval BUILD_TAGS = "generics,$(BUILD_TAGS)")
+
 alltests:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "alltests,$(BUILD_TAGS)")
