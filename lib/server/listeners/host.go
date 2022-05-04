@@ -645,7 +645,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 
 	tracer.Trace("SSH config of host %s successfully loaded: %s", refLabel, spew.Sdump(sshConfig))
-	return converters.SSHConfigFromAbstractToProtocol(sshConfig)
+	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
 }
 
 // BindSecurityGroup attaches a Security Group to a host
