@@ -169,12 +169,6 @@ func TestOriginalAbsPathify(t *testing.T) {
 	}
 }
 
-func Test_UserConfirmed(t *testing.T) {
-	result := UserConfirmed("Do you confirm")
-	//os.Stdin.Write([]byte("y"))
-	require.EqualValues(t, result, false)
-}
-
 func Test_ExtractRetCode(t *testing.T) {
 
 	var cmd *exec.Cmd

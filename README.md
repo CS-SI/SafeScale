@@ -8,7 +8,7 @@
 ![Forks](https://img.shields.io/github/forks/CS-SI/SafeScale?style=flat)
 ![Stars](https://img.shields.io/github/stars/CS-SI/SafeScale)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/CS-SI/SafeScale/v21)](https://goreportcard.com/report/github.com/CS-SI/SafeScale/v21)
+[![Go Report Card](https://goreportcard.com/badge/github.com/CS-SI/SafeScale/v22)](https://goreportcard.com/report/github.com/CS-SI/SafeScale/v22)
 ![Go Versions](https://img.shields.io/badge/go-1.16%2C1.17-brightgreen)
 ![CodeSizeInBytes](https://img.shields.io/github/languages/code-size/CS-SI/SafeScale)
 

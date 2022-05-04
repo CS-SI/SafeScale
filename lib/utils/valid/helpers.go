@@ -48,6 +48,17 @@ func hasFieldWithNameAndIsNil(iface interface{}, name string) (bool, error) {
 	return false, nil
 }
 
+func IsEmpty(something interface{}) bool {
+	if reflect.ValueOf(something).IsZero() && !reflect.ValueOf(&something).Elem().IsZero() {
+		return true
+	}
+	return false
+}
+
+func IsNotInitialized(something interface{}) bool {
+	return IsNil(something) || IsEmpty(something)
+}
+
 func IsNil(something interface{}) bool {
 	if something == nil {
 		return true
@@ -93,6 +104,10 @@ func IsNil(something interface{}) bool {
 			return casted.IsNull()
 		}
 	} else if theKind == reflect.Struct {
+		if IsEmpty(something) {
+			return true
+		}
+
 		res, err := hasFieldWithNameAndIsNil(something, EmbeddedErrorStructName) // FIXME: this is an implementation detail tied to our fail.Error design, it should NOT be hardcoded, it should be here through codegen (importing results in cyclic dependency error)
 		if err != nil {
 			panic(err) // It should never happen in production code if we test this right.

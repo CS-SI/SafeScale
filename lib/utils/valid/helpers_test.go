@@ -77,6 +77,50 @@ func TestIsNull(t *testing.T) {
 	}
 }
 
+func TestIsNotInitialized(t *testing.T) {
+	var err error
+	var ptrerr *error
+	var dblptrerr **error
+
+	var ourErr fail.Error
+	var ptrOurErr *fail.Error
+	var dblptrOurErr **fail.Error
+
+	var ourConcreteErr fail.ErrNotFound
+	var ptrOurConcreteErr *fail.ErrNotFound
+	var dlbPtrOurConcreteErr **fail.ErrNotFound
+
+	// TODO: also test fail.ErrorList{}, being a list we might have surprises
+
+	type args struct {
+		something interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"nil", args{nil}, true},
+		{"raw errors 1", args{err}, true},
+		{"raw errors 2", args{ptrerr}, true},
+		{"raw errors 3", args{dblptrerr}, true},
+		{"our errors 1", args{ourErr}, true},
+		{"our errors 2", args{ptrOurErr}, true},
+		{"our errors 3", args{dblptrOurErr}, true},
+		{"our concrete errors 1", args{ourConcreteErr}, true},
+		{"our concrete errors 2", args{ptrOurConcreteErr}, true},
+		{"our concrete errors 3", args{dlbPtrOurConcreteErr}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := valid.IsNotInitialized(tt.args.something); got != tt.want {
+				t.Errorf("IsNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNotNulls(t *testing.T) {
 	var err error = fmt.Errorf("")
 	var ptrerr *error = &err
@@ -108,7 +152,7 @@ func TestNotNulls(t *testing.T) {
 		{"array of string", args{[]string{"whatever"}}, false},
 		{"array of string empty", args{[]string{}}, false},
 		{"array of string empty not initialized", args{emptyStrArray}, false},
-		{"struct", args{brand{}}, false}, // an empty struct is not nil, it's empty, so -> isnil -> false
+		{"struct", args{brand{}}, true},
 		{"ptr struct", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},
@@ -124,6 +168,59 @@ func TestNotNulls(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := valid.IsNull(tt.args.something); got != tt.want {
+				t.Errorf("%s: IsNull() = %v, want %v", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestInitialized(t *testing.T) {
+	var err error = fmt.Errorf("")
+	var ptrerr *error = &err
+	var dblptrerr **error = &ptrerr
+
+	var ourErr fail.Error = fail.NewError("")
+	var ptrOurErr *fail.Error = &ourErr
+	var dblptrOurErr **fail.Error = &ptrOurErr
+
+	var ptrOurConcreteErr *fail.ErrNotFound = fail.NotFoundError("")
+	var ourConcreteErr fail.ErrNotFound = *ptrOurConcreteErr
+	var dlbPtrOurConcreteErr **fail.ErrNotFound = &ptrOurConcreteErr
+
+	var emptyStrArray []string
+
+	type brand struct {
+		content string
+	}
+
+	type args struct {
+		something interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"string", args{"whatever"}, false},
+		{"array of string", args{[]string{"whatever"}}, false},
+		{"array of string empty", args{[]string{}}, false},
+		{"array of string empty not initialized", args{emptyStrArray}, true},
+		{"struct", args{brand{}}, true},
+		{"ptr struct", args{&brand{}}, false},
+		{"raw errors 1", args{err}, false},
+		{"raw errors 2", args{ptrerr}, false},
+		{"raw errors 3", args{dblptrerr}, false},
+		{"our errors 1", args{ourErr}, false},
+		{"our errors 2", args{ptrOurErr}, false},
+		{"our errors 3", args{dblptrOurErr}, false},
+		{"our concrete errors 1", args{ourConcreteErr}, false},
+		{"our concrete errors 2", args{ptrOurConcreteErr}, false},
+		{"our concrete errors 3", args{dlbPtrOurConcreteErr}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := valid.IsNotInitialized(tt.args.something); got != tt.want {
 				t.Errorf("%s: IsNull() = %v, want %v", tt.name, got, tt.want)
 			}
 		})

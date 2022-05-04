@@ -62,6 +62,8 @@ func TestNotNulls(t *testing.T) {
 	var ourConcreteErr ErrNotFound = *ptrOurConcreteErr
 	var dlbPtrOurConcreteErr **ErrNotFound = &ptrOurConcreteErr
 
+	var emptyStrArray []string
+
 	type brand struct {
 		content string
 	}
@@ -75,7 +77,10 @@ func TestNotNulls(t *testing.T) {
 		want bool
 	}{
 		{"string", args{"whatever"}, false},
-		{"struct", args{brand{}}, false},
+		{"array of string", args{[]string{"whatever"}}, false},
+		{"array of string empty", args{[]string{}}, false},
+		{"array of string empty not initialized", args{emptyStrArray}, false},
+		{"struct", args{brand{}}, true},
 		{"ptr struct", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},
