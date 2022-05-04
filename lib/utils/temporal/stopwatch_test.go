@@ -122,6 +122,7 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	if !(strings.Contains(res, "0.03") || strings.Contains(res, "0.04")) {
 		t.Errorf("This should be near 30 ms and it isn't: %s", res)
 	}
+
 }
 
 func TestStartStopDurationWithPauseDefaultFormatting(t *testing.T) {

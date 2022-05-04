@@ -137,6 +137,7 @@ func TestJsonPropertyRealReplace(t *testing.T) {
 	assert.NotNil(t, allbad)
 
 	// @TODO fix JsonProperty::Replace, clonable.(*jsonProperty) casting makes panic
+
 	//d := &SomeClonable{value: "any"}
 	//jp = &jsonProperty{}
 	//result = jp.Replace(d)
@@ -213,6 +214,7 @@ func TestJSONProperties_Count(t *testing.T) {
 }
 
 func TestLockForReadDoesNotChange(t *testing.T) {
+
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 
