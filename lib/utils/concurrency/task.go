@@ -218,6 +218,10 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 // returns:
 //    - Task, nil: Task found in 'ctx' or VoidTask() is returned
 func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
 	nctx, err := TaskFromContext(ctx)
 	if err != nil {
 		return VoidTask()

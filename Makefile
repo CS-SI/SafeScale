@@ -17,6 +17,7 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 STRINGER := golang.org/x/tools/cmd/stringer
 PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
+PROTOVER := v1.28.0
 
 # Build tools
 CONVEY := github.com/smartystreets/goconvey
@@ -49,6 +50,8 @@ export TEST_COVERAGE_ARGS
 all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs md5sum 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs md5sum 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
@@ -66,6 +69,8 @@ allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet s
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs md5sum 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs md5sum 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled-cover 2>/dev/null >> sums.log || true
@@ -77,12 +82,16 @@ version:
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs md5sum 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs md5sum 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs md5sum 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs md5sum 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
@@ -112,6 +121,8 @@ ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@(cd cli && $(MAKE) all)
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs md5sum 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs md5sum 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 else
@@ -135,10 +146,10 @@ mod:
 		sleep 4 ; \
 	done
 	@($(GO) mod tidy || true)
-	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.28.0 || true)
-	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.28.0 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.28.0 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.28.0 || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@$(PROTOVER) || true)
 	@sleep 4
 	@while [ $(ps -ef | grep "mod download") ] ; do \
 		sleep 4 ; \
@@ -513,7 +524,7 @@ ctxcheck: begin
 	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
 ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) ctxcheck_results.log || true
-	@contextcheck ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) ctxcheck_results.log
+	@contextcheck ./lib/server/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
 	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
