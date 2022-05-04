@@ -99,6 +99,14 @@ releasetags:
 	@echo "settings go build tags for release"
 	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
 
+integrationtests:
+	@echo "settings go build tags for integrationtests"
+	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
+
+allintegration:
+	@echo "settings go build tags for allintegration"
+	@$(eval BUILD_TAGS = "allintegration,$(BUILD_TAGS)")
+
 ifeq ($(OS),Windows_NT)
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
