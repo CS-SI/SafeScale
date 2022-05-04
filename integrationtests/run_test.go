@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package integrationtests_ng
+package integrationtests
 
 import (
 	"testing"
