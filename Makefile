@@ -17,6 +17,7 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 STRINGER := golang.org/x/tools/cmd/stringer
 PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
+PROTOVER := v1.28.0
 
 # Build tools
 CONVEY := github.com/smartystreets/goconvey
@@ -145,10 +146,10 @@ mod:
 		sleep 4 ; \
 	done
 	@($(GO) mod tidy || true)
-	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.28.0 || true)
-	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.28.0 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.28.0 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.28.0 || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@$(PROTOVER) || true)
 	@sleep 4
 	@while [ $(ps -ef | grep "mod download") ] ; do \
 		sleep 4 ; \
