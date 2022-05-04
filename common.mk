@@ -55,6 +55,7 @@ GOFMT?=gofmt
 CP?=cp
 RM?=rm
 MV?=mv
+MD5=md5sum
 BROWSER?=firefox
 GREP?=grep
 EGREP?=egrep
