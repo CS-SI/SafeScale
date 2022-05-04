@@ -1,4 +1,6 @@
 //go:build integrationtests && (securitygroups || all)
+// +build integrationtests
+// +build securitygroups all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

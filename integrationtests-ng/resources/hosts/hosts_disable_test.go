@@ -1,4 +1,5 @@
 //go:build integrationtests && !hosts && !all
+// +build integrationtests,!hosts,!all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
