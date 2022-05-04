@@ -1,5 +1,5 @@
-//go:build integrationtests && !networks && !all
-// +build integrationtests,!networks,!all
+//go:build integrationtests && !subnets && !allintegration
+// +build integrationtests,!subnets,!allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,4 +17,4 @@
  * limitations under the License.
  */
 
-package networks
+package subnets

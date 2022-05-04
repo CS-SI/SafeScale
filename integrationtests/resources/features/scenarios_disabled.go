@@ -1,5 +1,5 @@
-//go:build integrationtests && !windows
-// +build integrationtests,!windows
+//go:build integrationtests && !features && !allintegration
+// +build integrationtests,!features,!allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,10 +17,4 @@
  * limitations under the License.
  */
 
-package helpers
-
-import "syscall"
-
-func getSyscallAttrs() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{Setpgid: true}
-}
+package features

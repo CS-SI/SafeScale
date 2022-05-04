@@ -1,6 +1,5 @@
-//go:build integrationtests && (volumes || all)
-// +build integrationtests
-// +build volumes all
+//go:build integrationtests && !hosts && !allintegration
+// +build integrationtests,!hosts,!allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -18,23 +17,4 @@
  * limitations under the License.
  */
 
-package volumes
-
-import (
-	"testing"
-)
-
-func Test_VolumeError(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t)
-}
-
-func Test_DeleteVolumeMounted(t *testing.T) {
-	helpers.InSection("volumes") / AddScenario(VolumeError)
-	helpers.RunScenarios(t)
-}
-
-func Test_UntilVolume(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t)
-}
+package hosts

@@ -1,6 +1,5 @@
-//go:build integrationtests && (networks || all)
-// +build integrationtests
-// +build networks all
+//go:build integrationtests && !buckets && !allintegration
+// +build integrationtests,!buckets,!allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -18,18 +17,4 @@
  * limitations under the License.
  */
 
-package networks
-
-import (
-	"testing"
-)
-
-func Test_NetworkCreate(t *testing.T) {
-	helpers.InSection("networks").AddScenario(CreateNetwork)
-	helpers.RunScenarios(t)
-}
-
-func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-	helpers.InSection("networks").AddScenario(CreateNetworkWithoutSubnet)
-	helpers.RunScenarios(t)
-}
+package buckets

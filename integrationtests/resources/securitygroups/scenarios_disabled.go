@@ -1,5 +1,5 @@
-//go:build integrationtests && !clusters && !all
-// +build integrationtests,!clusters,!all
+//go:build integrationtests && !securitygroups && !allintegration
+// +build integrationtests,!securitygroups,!allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,20 +17,4 @@
  * limitations under the License.
  */
 
-package clusters
-
-import (
-	"testing"
-)
-
-func Test_ClusterK8S(t *testing.T) {
-	t.Skip("clusters tests disabled")
-}
-
-func Test_Helm(t *testing.T) {
-	t.Skip("clusters tests disabled")
-}
-
-func Test_Kubernetes(t *testing.T) {
-	t.Skip("clusters tests disabled")
-}
+package securitygroups
