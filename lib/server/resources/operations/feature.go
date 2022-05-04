@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -264,16 +263,10 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	featureName := instance.GetName()
 	targetName := target.GetName()
 	targetType := strings.ToLower(target.TargetType().String())
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -286,7 +279,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr = castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {
@@ -346,7 +339,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	logrus.Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(task.Context(), v, target)
+	myV, xerr := instance.prepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -358,7 +351,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	// 	return nil, xerr
 	// }
 	//
-	r, xerr := installer.Check(task.Context(), instance, target, myV, s)
+	r, xerr := installer.Check(ctx, instance, target, myV, s)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -471,17 +464,11 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	featureName := instance.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -496,13 +483,13 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	}
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(task.Context(), v, target)
+	myV, xerr := instance.prepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	if !s.AddUnconditionally {
-		results, xerr := instance.Check(task.Context(), target, v, s)
+		results, xerr := instance.Check(ctx, target, v, s)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check Feature '%s'", featureName)
@@ -515,20 +502,20 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	}
 
 	if !s.SkipFeatureRequirements {
-		xerr = instance.installRequirements(task.Context(), target, v, s)
+		xerr = instance.installRequirements(ctx, target, v, s)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to install dependencies")
 		}
 	}
 
-	results, xerr := installer.Add(task.Context(), instance, target, myV, s)
+	results, xerr := installer.Add(ctx, instance, target, myV, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = registerOnSuccessfulHostsInCluster(task.Context(), instance.svc, target, instance, nil, results)
+	xerr = registerOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, nil, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -554,16 +541,10 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	featureName := instance.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -584,18 +565,18 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	)()
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(task.Context(), v, target)
+	myV, xerr := instance.prepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	results, xerr = installer.Remove(task.Context(), instance, target, myV, s)
+	results, xerr = installer.Remove(ctx, instance, target, myV, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return results, xerr
 	}
 
-	xerr = unregisterOnSuccessfulHostsInCluster(task.Context(), instance.svc, target, instance, results)
+	xerr = unregisterOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

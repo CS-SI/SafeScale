@@ -180,15 +180,9 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 		"UUID": volumeUUID,
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		stdout, xerr := executeScript(task.Context(), timings, *s.SSHConfig, "block_device_unmount.sh", data)
+		stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")

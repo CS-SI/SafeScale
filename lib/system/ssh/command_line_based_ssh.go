@@ -644,21 +644,11 @@ func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, time
 		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
 	defer tracer.Exiting()
 
-	subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
+	subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -1065,23 +1055,9 @@ func (sconf *Profile) newCommand(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("runCmdString")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "unable to create SSH tunnel")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	sshCmdString, keyFile, err := createSSHCommand(sshConfig, cmdString, "", "", withTty, withSudo)
@@ -1115,23 +1091,9 @@ func (sconf *Profile) newCopyCommand(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("localPath")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	sshCmdString, keyFile, xerr := createSCPCommand(sshConfig, localPath, remotePath, isUpload)
@@ -1184,19 +1146,9 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		return "", fail.InvalidInstanceContentError("sconf.IPAddress", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
-	}
-
-	defer debug.NewTracer(task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
 	defer fail.OnExitTraceError(
-		&xerr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname,
+		&ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname,
 		temporal.FormatDuration(timeout),
 	)
 
@@ -1321,15 +1273,6 @@ func (sconf *Profile) copy(
 	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
-	}
 
 	sshCommand, xerr := sconf.newCopyCommand(ctx, localPath, remotePath, isUpload)
 	if xerr != nil {

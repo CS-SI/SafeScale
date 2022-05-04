@@ -38,7 +38,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -235,37 +234,15 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
 		av := abstract.NewVolume()
-		xerr = av.Deserialize(buf)
+		xerr := av.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
-		}
-
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
 		}
 
 		return callback(av)
@@ -283,23 +260,13 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
@@ -311,10 +278,6 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 			if nbAttach > 0 {
 				list := make([]string, 0, len(volumeAttachmentsV1.Hosts))
 				for _, v := range volumeAttachmentsV1.Hosts {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					list = append(list, v)
 				}
 				return fail.NotAvailableError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
@@ -374,25 +337,12 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		return fail.InvalidParameterError("req.Size", "must be an integer > 0")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
 	defer tracer.Exiting()
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.Service()
-	_, xerr = LoadVolume(ctx, svc, req.Name)
+	_, xerr := LoadVolume(ctx, svc, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -419,10 +369,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		return fail.DuplicateError("found an existing Volume named '%s' (but not managed by SafeScale)", req.Name)
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	av, xerr := svc.CreateVolume(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -438,10 +384,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 			}
 		}
 	}()
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 
 	// Sets err to possibly trigger defer calls
 	return instance.carry(ctx, av)
@@ -472,17 +414,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		return xerr
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
 	defer tracer.Exiting()
 
 	// instance.lock.Lock()
@@ -525,10 +457,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			// For now, allows only one attachment...
 			if len(volumeAttachedV1.Hosts) > 0 {
 				for id := range volumeAttachedV1.Hosts {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					if id != targetID {
 						return fail.NotAvailableError("volume '%s' is already attached", volumeName)
 					}
@@ -541,10 +469,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	var state hoststate.Enum
@@ -589,10 +513,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				if !doNotMount {
 					// Check if there is no other device mounted in the path (or in subpath)
 					for _, i := range hostMountsV1.LocalMountsByPath {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
 						if mountPoint != "" {
 							if strings.Index(i.Path, mountPoint) == 0 {
 								return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
@@ -600,10 +520,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 						}
 					}
 					for _, i := range hostMountsV1.RemoteMountsByPath {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
 						if mountPoint != "" {
 							if strings.Index(i.Path, mountPoint) == 0 {
 								return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
@@ -620,10 +536,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		return xerr
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	// -- Get list of disks before attachment --
 	// Note: some providers are not able to tell the real device name the volume
 	//       will have on the host, so we have to use a way that can work everywhere
@@ -631,10 +543,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	// -- creates volume attachment --
@@ -657,10 +565,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			}
 		}
 	}()
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 
 	// -- acknowledge the volume is really attached to host --
 	var newDisk mapset.Set
@@ -693,10 +597,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		}
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	// -- updates target properties --
 	xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) (ferr fail.Error) {
@@ -709,22 +609,14 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
 
 			// Create mount point
-			sshConfig, deeperXErr := host.GetSSHConfig(task.Context())
+			sshConfig, deeperXErr := host.GetSSHConfig(ctx)
 			if deeperXErr != nil {
 				return deeperXErr
-			}
-
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
 			}
 
 			nfsServer, deeperXErr = nfs.NewServer(svc, sshConfig)
 			if deeperXErr != nil {
 				return deeperXErr
-			}
-
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
 			}
 
 			if !doNotMount {
@@ -735,9 +627,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 				defer func() {
 					if ferr != nil {
-						// Disable abort signal during the cleanup
-						defer task.DisarmAbortSignal()()
-
 						if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
 						}
@@ -762,10 +651,8 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		defer func() {
 			if innerXErr != nil {
 				// Disable abort signal during the cleanup
-				defer task.DisarmAbortSignal()()
-
 				if !doNotMount {
-					if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+					if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
 					}
 				}
@@ -839,13 +726,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		}
 	}()
 
-	// last chance to abort ...
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	defer task.DisarmAbortSignal()()
-
 	// Updates volume properties
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
@@ -873,12 +753,6 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 		stdout, stderr string
 	)
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	svc := host.Service()
 
 	timings, xerr := svc.Timings()
@@ -890,10 +764,6 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			if task.Aborted() {
-				return retry.StopRetryError(fmt.Errorf("aborted"))
-			}
-
 			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -947,18 +817,8 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	targetID := host.GetID()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
 	defer tracer.Exiting()
 
 	// instance.lock.Lock()
@@ -971,8 +831,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 	targetName := host.GetName()
 
-	var state hoststate.Enum
-	state, xerr = host.GetState(ctx)
+	state, xerr := host.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1026,10 +885,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 			return innerXErr
 		}
 
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
 		// Obtain mounts information
 		notMounted := false
 		innerXErr = props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
@@ -1051,10 +906,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 				// Check if volume has other mount(s) inside it
 				for p, i := range hostMountsV1.LocalMountsByPath {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					if i.Device == device {
 						continue
 					}
@@ -1063,10 +914,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 					}
 				}
 				for p := range hostMountsV1.RemoteMountsByPath {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					if strings.Index(p+"/", mount.Path+"/") == 0 {
 						return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
 					}
@@ -1078,10 +925,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 			return innerXErr
 		}
 
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
 		// Check if volume (or a subdir in volume) is shared
 		if !notMounted {
 			innerXErr = props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -1091,10 +934,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 				}
 
 				for _, v := range hostSharesV1.ByID {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					if strings.Index(v.Path, mount.Path) == 0 {
 						return fail.InvalidRequestError("cannot detach volume '%s' from '%s': mounted in '%s' and shared", volumeName, targetName, mount.Path)
 					}
@@ -1106,13 +945,9 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 			}
 
 			// -- Unmount the Block Device ...
-			sshConfig, innerXErr := host.GetSSHConfig(task.Context())
+			sshConfig, innerXErr := host.GetSSHConfig(ctx)
 			if innerXErr != nil {
 				return innerXErr
-			}
-
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
 			}
 
 			// Create NFS Server instance
@@ -1121,15 +956,8 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 				return innerXErr
 			}
 
-			// Last chance to abort...
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
-
-			defer task.DisarmAbortSignal()()
-
 			// Unmount block device ...
-			if innerXErr = nfsServer.UnmountBlockDevice(ctx, attachment.Device); innerXErr != nil {
+			if innerXErr = nfsServer.UnmountBlockDevice(context.Background(), attachment.Device); innerXErr != nil {
 				return innerXErr
 			}
 		}

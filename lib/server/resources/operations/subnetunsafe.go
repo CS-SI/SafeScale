@@ -248,21 +248,10 @@ func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkI
 
 // createGWSecurityGroup creates a Security Group that will be applied to gateways of the Subnet
 func (instance *Subnet) createGWSecurityGroup(ctx context.Context, networkID, networkName string, keepOnFailure bool, defaultSSHPort int32) (_ resources.SecurityGroup, ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, instance.GetName(), networkName)
 
-	var sg resources.SecurityGroup
-	sg, xerr = NewSecurityGroup(instance.Service())
+	sg, xerr := NewSecurityGroup(instance.Service())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -704,13 +693,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 }
 
 func (instance *Subnet) unsafeUpdateSubnetStatus(ctx context.Context, target subnetstate.Enum) fail.Error {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -724,7 +707,7 @@ func (instance *Subnet) unsafeUpdateSubnetStatus(ctx context.Context, target sub
 		return xerr
 	}
 
-	return instance.updateCachedInformation(task.Context())
+	return instance.updateCachedInformation(ctx)
 }
 
 func (instance *Subnet) unsafeFinalizeSubnetCreation(ctx context.Context) fail.Error {
@@ -1178,21 +1161,11 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 func (instance *Subnet) unsafeUnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sgInstance.GetID()).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "(%s)", sgInstance.GetID()).Entering()
 	defer tracer.Exiting()
 
 	// -- Unbind Security Group from Subnet and attached Hosts
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool

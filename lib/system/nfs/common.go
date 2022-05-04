@@ -30,8 +30,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
@@ -48,16 +46,6 @@ func executeScript(
 	ctx context.Context, timings temporal.Timings, sshconfig ssh.Profile, name string,
 	data map[string]interface{},
 ) (string, fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
-	}
-
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
@@ -124,7 +112,7 @@ func executeScript(
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(task.Context(), filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}

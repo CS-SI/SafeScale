@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -67,17 +66,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	iterations := 0

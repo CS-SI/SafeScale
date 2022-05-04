@@ -40,7 +40,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -473,13 +472,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -525,7 +518,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 
 	// Uploads the script into remote file
 	rfcItem := Item{Remote: path}
-	xerr = rfcItem.UploadString(task.Context(), script, host)
+	xerr = rfcItem.UploadString(ctx, script, host)
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -547,7 +540,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	// If is 126, try again 6 times, if not return the error
 	rounds := 10
 	for {
-		rc, stdout, stderr, err := host.Run(task.Context(), cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
+		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
 		if rc == 126 {
 			logrus.Debugf("Text busy happened")
 		}
