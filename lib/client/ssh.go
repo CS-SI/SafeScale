@@ -28,30 +28,30 @@ import (
 	"strings"
 	"time"
 
-	utils2 "github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // ssh is the part of the safescale client that handles SSH stuff
-type ssh struct {
+type sshConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
 // Run executes the command
-func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
 	var (
 		retcode        int
@@ -70,7 +70,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		connectionTimeout = executionTimeout + temporal.ContextTimeout()
 	}
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := srvutils.GetContext(true)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -83,7 +83,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				return innerXErr
 			}
 
-			defer func(cmd *ssh2.SSHCommand) {
+			defer func(cmd *ssh.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerErr != nil {
@@ -146,7 +146,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	return retcode, stdout, stderr, nil
 }
 
-func (s ssh) getHostSSHConfig(hostname string) (*ssh2.SSHConfig, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Profile, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -201,7 +201,7 @@ func getMD5Hash(text string) string {
 }
 
 // Copy ...
-func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
 	if from == "" {
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
@@ -425,11 +425,11 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 }
 
 // getSSHConfigFromName ...
-func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*ssh2.SSHConfig, fail.Error) {
+func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Profile, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := srvutils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -444,7 +444,7 @@ func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*ssh2.SSHConfig
 }
 
 // Connect is the "safescale ssh connect"
-func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) error {
+func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Duration) error {
 	sshCfg, xerr := s.getSSHConfigFromName(hostname, timeout) // timeout is ignored here
 	if xerr != nil {
 		return xerr
@@ -469,14 +469,14 @@ func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) er
 	)
 }
 
-func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
+func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
 	sshCfg, xerr := s.getSSHConfigFromName(name, timeout)
 	if xerr != nil {
 		return xerr
 	}
 
 	if sshCfg.GatewayConfig == nil {
-		sshCfg.GatewayConfig = &ssh2.SSHConfig{
+		sshCfg.GatewayConfig = &ssh.Profile{
 			User:          sshCfg.User,
 			IPAddress:     sshCfg.IPAddress,
 			Hostname:      sshCfg.Hostname,
@@ -509,14 +509,14 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 }
 
 // CloseTunnels closes a tunnel created in the machine 'name'
-func (s ssh) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
+func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
 	sshCfg, xerr := s.getSSHConfigFromName(name, timeout)
 	if xerr != nil {
 		return xerr
 	}
 
 	if sshCfg.GatewayConfig == nil {
-		sshCfg.GatewayConfig = &ssh2.SSHConfig{
+		sshCfg.GatewayConfig = &ssh.Profile{
 			User:          sshCfg.User,
 			IPAddress:     sshCfg.IPAddress,
 			Hostname:      sshCfg.Hostname,
@@ -534,7 +534,7 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err != nil {
-		_, code, problem := utils2.ExtractRetCode(err)
+		_, code, problem := utils.ExtractRetCode(err)
 		if problem != nil {
 			return fail.Wrap(err, "unable to close tunnel, running pgrep")
 		}

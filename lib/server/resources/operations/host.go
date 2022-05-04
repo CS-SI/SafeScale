@@ -49,7 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -80,7 +80,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    *ssh2.SSHConfig
+		sshProfile                    *ssh.Profile
 	}
 }
 
@@ -192,7 +192,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig *ssh2.SSHConfig
+		var primaryGatewayConfig, secondaryGatewayConfig *ssh.Profile
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -246,7 +246,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return xerr
 					}
 
-					primaryGatewayConfig = &ssh2.SSHConfig{
+					primaryGatewayConfig = &ssh.Profile{
 						PrivateKey: gwahc.PrivateKey,
 						Port:       int(gwahc.SSHPort),
 						IPAddress:  ip,
@@ -287,7 +287,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 							return xerr
 						}
 
-						secondaryGatewayConfig = &ssh2.SSHConfig{
+						secondaryGatewayConfig = &ssh.Profile{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       int(gwahc.SSHPort),
 							IPAddress:  ip,
@@ -307,7 +307,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return innerXErr
 		}
 
-		instance.localCache.sshProfile = &ssh2.SSHConfig{
+		instance.localCache.sshProfile = &ssh.Profile{
 			Port:                   int(ahc.SSHPort),
 			IPAddress:              instance.localCache.accessIP,
 			Hostname:               instance.GetName(),
@@ -2667,7 +2667,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh2.SSHConfig, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh.Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {

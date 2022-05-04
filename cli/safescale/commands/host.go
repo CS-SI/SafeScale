@@ -453,7 +453,7 @@ var hostSSH = cli.Command{
 	},
 }
 
-func formatSSHConfig(in ssh.SSHConfig) (map[string]interface{}, fail.Error) {
+func formatSSHConfig(in ssh.Profile) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
 		return nil, fail.ConvertError(err)

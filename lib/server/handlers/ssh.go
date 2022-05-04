@@ -25,19 +25,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/server"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -46,6 +43,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 const protocolSeparator = ":"
@@ -58,7 +57,7 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (*ssh2.SSHConfig, fail.Error)
+	GetConfig(stacks.HostParameter) (*ssh.Profile, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -73,8 +72,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
-// GetConfig creates SSHConfig to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *ssh2.SSHConfig, ferr fail.Error) {
+// GetConfig creates Profile to connect to a host
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *ssh.Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -124,7 +123,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	sshConfig = &ssh2.SSHConfig{
+	sshConfig = &ssh.Profile{
 		Port:      22, // will be overwritten later
 		IPAddress: ip,
 		Hostname:  host.GetName(),
@@ -236,12 +235,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			var gwcfg *ssh2.SSHConfig
+			var gwcfg *ssh.Profile
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			GatewayConfig := ssh2.SSHConfig{
+			GatewayConfig := ssh.Profile{
 				PrivateKey: gwahc.PrivateKey,
 				Port:       gwcfg.Port,
 				IPAddress:  ip,
@@ -280,12 +279,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			var gwcfg *ssh2.SSHConfig
+			var gwcfg *ssh.Profile
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			GatewayConfig := ssh2.SSHConfig{
+			GatewayConfig := ssh.Profile{
 				PrivateKey: gwahc.PrivateKey,
 				Port:       gwcfg.Port,
 				IPAddress:  ip,
@@ -409,7 +408,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh *ssh2.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh *ssh.Profile, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
 	// Create the command
