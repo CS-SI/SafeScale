@@ -35,6 +35,7 @@ jobs:
       run: |
         brew update
         brew install protoc-gen-go
+        brew install md5sha1sum
 
     - run: make ${{ matrix.tags }} rawci with-coverage
     - uses: actions/upload-artifact@v2
