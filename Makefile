@@ -172,6 +172,7 @@ tunnel:
 generics:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'generics' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "generics,$(BUILD_TAGS)")
+	@cp ./gogen.mod ./go.mod > /dev/null || true
 
 alltests:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
