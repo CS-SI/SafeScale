@@ -1,5 +1,5 @@
-//go:build debug && !darwin
-// +build debug,!darwin
+//go:build debug && darwin
+// +build debug,darwin
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -19,23 +19,9 @@
 
 package main
 
-import (
-	"runtime"
-
-	"github.com/nakabonne/gosivy/agent"
-	"github.com/sirupsen/logrus"
-)
-
 func startTrack() {
-	runtime.SetMutexProfileFraction(5)
-	runtime.SetBlockProfileRate(5)
-
-	// Track goroutines with gosivy
-	if err := agent.Listen(agent.Options{}); err != nil {
-		logrus.Fatal(err)
-	}
+	// TODO: Think about a cli alternative
 }
 
 func endTrack() {
-	defer agent.Close()
 }
