@@ -13,7 +13,6 @@ require (
 	github.com/eko/gocache/v2 v2.3.0
 	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
 	github.com/felixge/fgprof v0.9.2
-	github.com/fzipp/gocyclo v0.5.1 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
@@ -33,6 +32,7 @@ require (
 	github.com/ovh/go-ovh v1.1.0
 	github.com/pelletier/go-toml/v2 v2.0.0
 	github.com/pkg/sftp v1.13.4
+	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/sanity-io/litter v1.5.5
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
