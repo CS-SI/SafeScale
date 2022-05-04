@@ -339,7 +339,7 @@ var (
 func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -543,7 +543,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -567,7 +567,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -622,7 +622,7 @@ func (instance *Network) InspectSubnet(ctx context.Context, ref string) (_ resou
 func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -662,7 +662,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

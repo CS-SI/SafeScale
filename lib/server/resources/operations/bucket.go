@@ -189,7 +189,7 @@ func (instance *bucket) Browse(
 
 // GetHost ...
 func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -219,7 +219,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 
 // GetMountPoint ...
 func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -322,7 +322,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 // Delete a bucket
 func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -374,7 +374,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -529,7 +529,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

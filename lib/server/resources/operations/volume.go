@@ -393,7 +393,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat, doNotMount bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -807,7 +807,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

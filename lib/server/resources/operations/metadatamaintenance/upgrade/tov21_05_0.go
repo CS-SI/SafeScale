@@ -770,7 +770,7 @@ func (tv toV21_05_0) upgradeClusters(svc iaas.Service) fail.Error {
 }
 
 func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster) (ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 

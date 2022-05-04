@@ -489,7 +489,7 @@ func (instance *Share) Create(
 func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -844,7 +844,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -990,7 +990,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1111,7 +1111,7 @@ func sanitize(in string) (string, fail.Error) {
 func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

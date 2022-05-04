@@ -330,7 +330,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 func (instance *Cluster) Sdump(ctx context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -466,7 +466,7 @@ func (instance *Cluster) GetAdminPassword(ctx context.Context) (adminPassword st
 func (instance *Cluster) GetKeyPair(ctx context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -483,7 +483,7 @@ func (instance *Cluster) GetKeyPair(ctx context.Context) (keyPair *abstract.KeyP
 func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -774,7 +774,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -987,7 +987,7 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 	defer fail.OnPanic(&ferr)
 
 	state = clusterstate.Unknown
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
 
@@ -1002,7 +1002,7 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1254,7 +1254,7 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1327,7 +1327,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
 func (instance *Cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	emptyList := resources.IndexedListOfClusterNodes{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1348,7 +1348,7 @@ func (instance *Cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1390,7 +1390,7 @@ func (instance *Cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1409,7 +1409,7 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1425,7 +1425,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 	defer fail.OnPanic(&ferr)
 
 	master = nil
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1450,7 +1450,7 @@ func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 	defer fail.OnPanic(&ferr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1486,7 +1486,7 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1528,7 +1528,7 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1543,7 +1543,7 @@ func (instance *Cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	defer fail.OnPanic(&ferr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1563,7 +1563,7 @@ func (instance *Cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1580,7 +1580,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1622,7 +1622,7 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 func (instance *Cluster) CountNodes(ctx context.Context) (count uint, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1658,7 +1658,7 @@ func (instance *Cluster) CountNodes(ctx context.Context) (count uint, ferr fail.
 func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostInstance resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1706,7 +1706,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 
 // deleteMaster deletes the master specified by its ID
 func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) (ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1902,7 +1902,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1929,7 +1929,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 
 	var cleaningErrors []error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -2417,7 +2417,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -2826,7 +2826,7 @@ func (instance *Cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 
 // ToProtocol converts instance to protocol.ClusterResponse message
 func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterResponse, ferr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -2971,7 +2971,7 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 // Shrink reduces cluster size by 'count' nodes
 func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3116,7 +3116,7 @@ func (instance *Cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 	defer fail.OnPanic(&ferr)
 
 	found = false
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if ctx == nil {

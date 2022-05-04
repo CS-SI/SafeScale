@@ -441,7 +441,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	defer fail.OnPanic(&ferr)
 
 	state = hoststate.Unknown
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -484,7 +484,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -591,7 +591,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 // GetState returns the last known state of the Host, without forced inspect
 func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error) {
 	state := hoststate.Unknown
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
 
@@ -1968,7 +1968,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2163,7 +2163,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2575,7 +2575,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh.Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -2637,7 +2637,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2723,7 +2723,7 @@ func (instance *Host) Push(
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2754,7 +2754,7 @@ func (instance *Host) Push(
 func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propertiesv1.HostShare, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -2815,7 +2815,7 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 func (instance *Host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolumes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -2829,7 +2829,7 @@ func (instance *Host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolum
 func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -2890,7 +2890,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3004,7 +3004,7 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3034,7 +3034,7 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3151,7 +3151,7 @@ func (instance *Host) GetShares(ctx context.Context) (shares *propertiesv1.HostS
 	defer fail.OnPanic(&ferr)
 
 	shares = &propertiesv1.HostShares{}
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return shares, fail.InvalidInstanceError()
 	}
 
@@ -3177,7 +3177,7 @@ func (instance *Host) GetMounts(ctx context.Context) (mounts *propertiesv1.HostM
 	defer fail.OnPanic(&ferr)
 
 	mounts = nil
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return mounts, fail.InvalidInstanceError()
 	}
 
@@ -3192,7 +3192,7 @@ func (instance *Host) IsClusterMember(ctx context.Context) (yes bool, ferr fail.
 	defer fail.OnPanic(&ferr)
 
 	yes = false
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return yes, fail.InvalidInstanceError()
 	}
 
@@ -3220,7 +3220,7 @@ func (instance *Host) IsClusterMember(ctx context.Context) (yes bool, ferr fail.
 func (instance *Host) IsGateway(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -3251,7 +3251,7 @@ func (instance *Host) IsGateway(ctx context.Context) (_ bool, ferr fail.Error) {
 func (instance *Host) IsSingle(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -3288,7 +3288,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3325,7 +3325,7 @@ func (instance *Host) PushStringToFileWithOwnership(
 func (instance *Host) GetDefaultSubnet(ctx context.Context) (subnetInstance resources.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -3339,7 +3339,7 @@ func (instance *Host) GetDefaultSubnet(ctx context.Context) (subnetInstance reso
 func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -3415,7 +3415,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup, enable resources.SecurityGroupActivation) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3480,7 +3480,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3557,7 +3557,7 @@ func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygrou
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []*propertiesv1.SecurityGroupBond
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -3587,7 +3587,7 @@ func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygrou
 func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -3674,7 +3674,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

@@ -233,7 +233,7 @@ func (instance *SecurityGroup) unsafeAddRule(ctx context.Context, rule *abstract
 func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -288,7 +288,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
