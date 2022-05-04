@@ -1,4 +1,5 @@
 //go:build integrationtests
+// +build integrationtests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -23,6 +24,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type (
@@ -90,7 +93,9 @@ func NewScenarios() Scenarios {
 
 // Run ...
 func (s Scenarios) Run(t *testing.T) {
-	t.Run("setup", func(t *testing.T) { Setup(t) })
+	ok := t.Run("setup", func(t *testing.T) { Setup(t) })
+	require.True(t, ok)
+
 	for _, section := range s.sectionsOrder {
 		if len(scenarios.scenariosOrder[section]) > 0 {
 			t.Run(string(section), func(t *testing.T) {

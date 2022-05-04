@@ -1,4 +1,6 @@
 //go:build integrationtests && (networks || all)
+// +build integrationtests
+// +build networks all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

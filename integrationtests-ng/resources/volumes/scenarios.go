@@ -1,4 +1,6 @@
 //go:build integrationtests && (volumes || all)
+// +build integrationtests
+// +build volumes all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
