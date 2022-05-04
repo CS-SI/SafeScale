@@ -53,3 +53,5 @@ require (
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
+
+replace github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19 => github.com/mitchellh/go-ps v1.0.0
