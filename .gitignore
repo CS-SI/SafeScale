@@ -111,13 +111,8 @@ lib/server/iaas/userdata/version.go
 .run/
 
 .DS_Store
-
 *.pprof
-
 *.tar.gz
-
-helpers/
-
 *.swp
 
 git-hooks-env
