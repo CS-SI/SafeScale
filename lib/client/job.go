@@ -26,14 +26,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
-// bucket is the part of the safescale client handling buckets
-type jobManager struct {
+// jobConsumer is the part of the safescale client handling jobs
+type jobConsumer struct {
 	// session is not used currently.
 	session *Session
 }
 
 // List ...
-func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
+func (c jobConsumer) List(timeout time.Duration) (*protocol.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -55,7 +55,7 @@ func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 }
 
 // Stop sends a signal to the server to stop a running job
-func (c jobManager) Stop(uuid string, timeout time.Duration) error {
+func (c jobConsumer) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 

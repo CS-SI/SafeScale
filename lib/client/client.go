@@ -35,19 +35,19 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-	Bucket        bucket
-	Cluster       cluster
-	Host          host
-	Image         image
-	JobManager    jobManager
-	Network       network
-	SecurityGroup securityGroup
-	Share         share
-	SSH           ssh
-	Subnet        subnet
-	Template      template
-	Tenant        tenant
-	Volume        volume
+	Bucket        bucket  // FIXME: rename to bucketConsumer
+	Cluster       cluster // FIXME: rename to clusterConsumer
+	Host          host    // FIXME: rename to hostConsumer
+	Image         image   // FIXME: rename to imageConsumer
+	JobManager    jobConsumer
+	Network       network       // FIXME: rename to networkConsumer
+	SecurityGroup securityGroup // FIXME: rename to securityGroupConsumer
+	Share         share         // FIXME: rename to shareConsumer
+	SSH           sshConsumer
+	Subnet        subnet   // FIXME/ rename to subnetConsumer
+	Template      template // FIXME: rename to templateConsumer
+	Tenant        tenant   // FIXME: rename to tenantConsumer
+	Volume        volume   // FIXME: rename to volumeConsumer
 
 	server     string
 	connection *grpc.ClientConn
@@ -116,10 +116,10 @@ func New(server string) (_ *Session, ferr fail.Error) {
 	s.Image = image{session: s}
 	s.Network = network{session: s}
 	s.Subnet = subnet{session: s}
-	s.JobManager = jobManager{session: s}
+	s.JobManager = jobConsumer{session: s}
 	s.SecurityGroup = securityGroup{session: s}
 	s.Share = share{session: s}
-	s.SSH = ssh{session: s}
+	s.SSH = sshConsumer{session: s}
 	s.Template = template{session: s}
 	s.Tenant = tenant{session: s}
 	s.Volume = volume{session: s}

@@ -33,16 +33,16 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a ssh.SSHConfig
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *ssh.SSHConfig {
-	var pgw, sgw *ssh.SSHConfig
+// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a ssh.Profile
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *ssh.Profile {
+	var pgw, sgw *ssh.Profile
 	if from.Gateway != nil {
 		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
 	}
 	if from.SecondaryGateway != nil {
 		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
-	return &ssh.SSHConfig{
+	return &ssh.Profile{
 		User:                   from.User,
 		Hostname:               from.HostName,
 		IPAddress:              from.Host,

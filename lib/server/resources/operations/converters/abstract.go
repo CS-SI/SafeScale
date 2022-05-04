@@ -259,7 +259,7 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 }
 
 // SSHConfigFromAbstractToProtocol ...
-func SSHConfigFromAbstractToProtocol(in ssh.SSHConfig) *protocol.SshConfig {
+func SSHConfigFromAbstractToProtocol(in ssh.Profile) *protocol.SshConfig {
 	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
 	if in.GatewayConfig != nil {
 		pbPrimaryGateway = SSHConfigFromAbstractToProtocol(*in.GatewayConfig)

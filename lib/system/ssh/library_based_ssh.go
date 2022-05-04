@@ -52,82 +52,82 @@ import (
 	"github.com/pkg/sftp"
 )
 
-// SSHConfig helper to manage ssh session
-type SSHConfig struct {
-	User                   string     `json:"user"`
-	IPAddress              string     `json:"ip_address"`
-	PrivateKey             string     `json:"private_key"`
-	Port                   int        `json:"port"`
-	LocalPort              int        `json:"-"`
-	LocalHost              string     `json:"local_host"`
-	GatewayConfig          *SSHConfig `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig *SSHConfig `json:"secondary_gateway_config,omitempty"`
-	Hostname               string     `json:"hostname"`
+// Profile helper to manage ssh session
+type Profile struct {
+	User                   string   `json:"user"`
+	IPAddress              string   `json:"ip_address"`
+	PrivateKey             string   `json:"private_key"`
+	Port                   int      `json:"port"`
+	LocalPort              int      `json:"-"`
+	LocalHost              string   `json:"local_host"`
+	GatewayConfig          *Profile `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig *Profile `json:"secondary_gateway_config,omitempty"`
+	Hostname               string   `json:"hostname"`
 }
 
-// SSHTunnel a SSH tunnel
-type SSHTunnel struct {
-	cfg  SSHConfig // nolint
-	port int       // nolint
+// Tunnel a SSH tunnel
+type Tunnel struct {
+	cfg  Profile // nolint
+	port int     // nolint
 }
 
-func (sconf *SSHConfig) GetUser() (string, fail.Error) {
+func (sconf *Profile) GetUser() (string, fail.Error) {
 	if valid.IsNil(sconf) {
 		return "", fail.InvalidInstanceError()
 	}
 	return sconf.User, nil
 }
 
-func (sconf *SSHConfig) GetHostname() (string, fail.Error) {
+func (sconf *Profile) GetHostname() (string, fail.Error) {
 	if valid.IsNil(sconf) {
 		return "", fail.InvalidInstanceError()
 	}
 	return sconf.Hostname, nil
 }
 
-func (sconf *SSHConfig) GetPort() (uint, fail.Error) {
+func (sconf *Profile) GetPort() (uint, fail.Error) {
 	if valid.IsNil(sconf) {
 		return 0, fail.InvalidInstanceError()
 	}
 	return uint(sconf.Port), nil
 }
 
-func (sconf *SSHConfig) GetLocalPort() (uint, fail.Error) {
+func (sconf *Profile) GetLocalPort() (uint, fail.Error) {
 	if valid.IsNil(sconf) {
 		return 0, fail.InvalidInstanceError()
 	}
 	return uint(sconf.LocalPort), nil
 }
 
-func (sconf *SSHConfig) GetIPAddress() (string, fail.Error) {
+func (sconf *Profile) GetIPAddress() (string, fail.Error) {
 	if valid.IsNil(sconf) {
 		return "", fail.InvalidInstanceError()
 	}
 	return sconf.IPAddress, nil
 }
 
-func (sconf *SSHConfig) GetPrivateKey() (string, fail.Error) {
+func (sconf *Profile) GetPrivateKey() (string, fail.Error) {
 	if valid.IsNil(sconf) {
 		return "", fail.InvalidInstanceError()
 	}
 	return sconf.PrivateKey, nil
 }
 
-func (sconf *SSHConfig) GetPrimaryGatewayConfig() (Config, fail.Error) {
+func (sconf *Profile) GetPrimaryGatewayConfig() (Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf *SSHConfig) GetSecondaryGatewayConfig() (Config, fail.Error) {
+func (sconf *Profile) GetSecondaryGatewayConfig() (Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf *SSHConfig) GetGatewayConfig(num uint) (Config, fail.Error) {
+func (sconf *Profile) GetGatewayConfig(num uint) (Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -168,16 +168,16 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 	return f, nil
 }
 
-// SSHCommand defines a SSH command
-type SSHCommand struct {
+// Command defines a SSH command
+type Command struct {
 	withSudo bool
 	username string
-	cfg      *SSHConfig
+	cfg      *Profile
 	cmd      *exec.Cmd
 	tunnels  *sshtunnel.SSHTunnel
 }
 
-func (sc *SSHCommand) closeTunneling() error {
+func (sc *Command) closeTunneling() error {
 	logrus.Debugf("Closing tunnels")
 
 	if sc.tunnels != nil {
@@ -190,7 +190,7 @@ func (sc *SSHCommand) closeTunneling() error {
 // Output runs the command and returns its standard output.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
-func (sc *SSHCommand) Output() (_ []byte, ferr error) {
+func (sc *Command) Output() (_ []byte, ferr error) {
 	if sc.cmd.Stdout != nil {
 		return []byte(""), nil
 	}
@@ -212,12 +212,12 @@ func (sc *SSHCommand) Output() (_ []byte, ferr error) {
 }
 
 // Display ...
-func (sc *SSHCommand) Display() string {
+func (sc *Command) Display() string {
 	return strings.Join(sc.cmd.Args, " ")
 }
 
 // RunWithTimeout ...
-func (sc *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (sc *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	var rc int
 	var rout string
 	var rerr string
@@ -267,7 +267,7 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 }
 
 // NewRunWithTimeout ...
-func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -507,7 +507,7 @@ func (sc *SSHCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 	return res.errorcode, res.stdout, res.stderr, nil
 }
 
-func (sc *SSHCommand) cleanup() error {
+func (sc *Command) cleanup() error {
 	err1 := sc.closeTunneling()
 	if err1 != nil {
 		logrus.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
@@ -518,19 +518,19 @@ func (sc *SSHCommand) cleanup() error {
 }
 
 // Close this function exists only to provide compatibility with previous SSH api
-func (sc *SSHCommand) Close() fail.Error {
+func (sc *Command) Close() fail.Error {
 	return nil
 }
 
 // CreateTunneling ...
-func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error) {
+func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
-		sc.LocalHost = LOCALHOST
+		sc.LocalHost = LocalHost
 	}
 
-	internalPort := SSH_PORT // all machines use port 22...
+	internalPort := SSHPort // all machines use port 22...
 	var gateway *sshtunnel.Endpoint
 	var altgateway *sshtunnel.Endpoint
 	var remote bool
@@ -611,28 +611,28 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 }
 
 // Command returns the cmd struct to execute cmdString remotely
-func (sc *SSHConfig) Command(cmdString string) (*SSHCommand, fail.Error) {
+func (sc *Profile) Command(cmdString string) (*Command, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
 // NewCommand returns the cmd struct to execute cmdString remotely
-func (sc *SSHConfig) NewCommand(_ context.Context, cmdString string) (*SSHCommand, fail.Error) {
+func (sc *Profile) NewCommand(_ context.Context, cmdString string) (*Command, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, fail.Error) {
+func (sc *Profile) SudoCommand(cmdString string) (*Command, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
 // NewSudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *SSHConfig) NewSudoCommand(_ context.Context, cmdString string) (*SSHCommand, fail.Error) {
+func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (*Command, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
-func (sc *SSHConfig) command(cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
+func (sc *Profile) command(cmdString string, withTty, withSudo bool) (*Command, fail.Error) {
 	cmd := exec.Command(cmdString)
-	sshCommand := SSHCommand{
+	sshCommand := Command{
 		withSudo: withSudo,
 		username: "",
 		cfg:      sc,
@@ -643,7 +643,7 @@ func (sc *SSHConfig) command(cmdString string, withTty, withSudo bool) (*SSHComm
 
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
-func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, err fail.Error) {
+func (sc *Profile) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, err fail.Error) {
 	if sc == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -733,7 +733,7 @@ func (sc *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout 
 }
 
 // CopyWithTimeout ...
-func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, timeout time.Duration) (int, string, string, fail.Error) {
+func (sc *Profile) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, timeout time.Duration) (int, string, string, fail.Error) {
 	if ctx == nil {
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -786,7 +786,7 @@ func (sc *SSHConfig) CopyWithTimeout(ctx context.Context, remotePath string, loc
 }
 
 // Copy copies a file/directory from/to local to/from remote
-func (sc *SSHConfig) copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
+func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
 	tu, sshConfig, err := sc.CreateTunneling()
 	if err != nil {
 		return -1, "", "", fail.NewError("unable to create tunnels : %s", err.Error())
@@ -962,7 +962,7 @@ func (sc *SSHConfig) copy(ctx context.Context, remotePath string, localPath stri
 }
 
 // Enter runs interactive shell
-func (sc *SSHConfig) Enter(username, shell string) (ferr fail.Error) {
+func (sc *Profile) Enter(username, shell string) (ferr fail.Error) {
 	userPass := ""
 	if username != "" && username != sc.User {
 		fmt.Printf("Password: ")

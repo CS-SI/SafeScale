@@ -26,15 +26,15 @@ import (
 
 func Test_SSHConfigFromSystemToProtocol(t *testing.T) {
 
-	in := &ssh.SSHConfig{
+	in := &ssh.Profile{
 		Hostname:               "Hostname",
 		IPAddress:              "IPAddress",
 		Port:                   22,
 		User:                   "User",
 		PrivateKey:             "PrivateKey",
 		LocalPort:              22,
-		GatewayConfig:          &ssh.SSHConfig{},
-		SecondaryGatewayConfig: &ssh.SSHConfig{},
+		GatewayConfig:          &ssh.Profile{},
+		SecondaryGatewayConfig: &ssh.Profile{},
 	}
 	out := SSHConfigFromSystemToProtocol(in)
 

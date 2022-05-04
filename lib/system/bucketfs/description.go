@@ -22,7 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -118,7 +118,7 @@ func (desc Description) createConfigurationFile() (*os.File, fail.Error) {
 	}
 
 	// build temporary file
-	f, xerr := ssh2.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return nil, xerr
 	}

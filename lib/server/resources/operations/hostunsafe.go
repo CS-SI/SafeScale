@@ -109,7 +109,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile *ssh.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile *ssh.Profile, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
@@ -130,7 +130,7 @@ func run(ctx context.Context, sshProfile *ssh.SSHConfig, cmd string, outs output
 			}
 
 			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(cmd *ssh.SSHCommand) {
+			defer func(cmd *ssh.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerXErr != nil {

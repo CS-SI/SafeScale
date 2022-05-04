@@ -23,8 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
-// SSHConfigFromSystemToProtocol converts a ssh.SSHConfig into a protocol.SshConfig
-func SSHConfigFromSystemToProtocol(from *ssh.SSHConfig) *protocol.SshConfig {
+// SSHConfigFromSystemToProtocol converts a ssh.Profile into a protocol.SshConfig
+func SSHConfigFromSystemToProtocol(from *ssh.Profile) *protocol.SshConfig {
 	var gw *protocol.SshConfig
 	if from.GatewayConfig != nil {
 		gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)

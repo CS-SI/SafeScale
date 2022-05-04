@@ -57,7 +57,7 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (*ssh.SSHConfig, fail.Error)
+	GetConfig(stacks.HostParameter) (*ssh.Profile, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -72,8 +72,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
-// GetConfig creates SSHConfig to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *ssh.SSHConfig, ferr fail.Error) {
+// GetConfig creates Profile to connect to a host
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *ssh.Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -123,7 +123,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	sshConfig = &ssh.SSHConfig{
+	sshConfig = &ssh.Profile{
 		Port:      22, // will be overwritten later
 		IPAddress: ip,
 		Hostname:  host.GetName(),
@@ -235,12 +235,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			var gwcfg *ssh.SSHConfig
+			var gwcfg *ssh.Profile
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			GatewayConfig := ssh.SSHConfig{
+			GatewayConfig := ssh.Profile{
 				PrivateKey: gwahc.PrivateKey,
 				Port:       gwcfg.Port,
 				IPAddress:  ip,
@@ -279,12 +279,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil, xerr
 			}
 
-			var gwcfg *ssh.SSHConfig
+			var gwcfg *ssh.Profile
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			GatewayConfig := ssh.SSHConfig{
+			GatewayConfig := ssh.Profile{
 				PrivateKey: gwahc.PrivateKey,
 				Port:       gwcfg.Port,
 				IPAddress:  ip,
@@ -408,7 +408,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh *ssh.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh *ssh.Profile, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
 	// Create the command

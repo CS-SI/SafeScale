@@ -20,7 +20,7 @@ type Config interface {
 	GetPrivateKey() (string, fail.Error)
 	GetPrimaryGatewayConfig() (Config, fail.Error)
 	GetSecondaryGatewayConfig() (Config, fail.Error)
-	NewCommand(context.Context, string) (*SSHCommand, fail.Error)
-	NewSudoCommand(context.Context, string) (*SSHCommand, fail.Error)
+	NewCommand(context.Context, string) (*Command, fail.Error)
+	NewSudoCommand(context.Context, string) (*Command, fail.Error)
 	GetGatewayConfig(uint) (Config, fail.Error)
 }

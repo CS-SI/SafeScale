@@ -1,4 +1,6 @@
 //go:build integrationtests && (subnets || all)
+// +build integrationtests
+// +build subnets all
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

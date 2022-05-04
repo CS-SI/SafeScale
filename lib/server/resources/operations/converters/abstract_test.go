@@ -469,32 +469,32 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gw_scfg := ssh.SSHConfig{
-		Hostname:               "SSHConfig GW Hostname",
-		IPAddress:              "SSHConfig GW Hostname",
+	gw_scfg := ssh.Profile{
+		Hostname:               "Profile GW Hostname",
+		IPAddress:              "Profile GW Hostname",
 		Port:                   42,
-		User:                   "SSHConfig GW Hostname",
-		PrivateKey:             "SSHConfig GW Hostname",
+		User:                   "Profile GW Hostname",
+		PrivateKey:             "Profile GW Hostname",
 		LocalPort:              43,
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	gw2_scfg := ssh.SSHConfig{
-		Hostname:               "SSHConfig GW2 Hostname",
-		IPAddress:              "SSHConfig GW2 Hostname",
+	gw2_scfg := ssh.Profile{
+		Hostname:               "Profile GW2 Hostname",
+		IPAddress:              "Profile GW2 Hostname",
 		Port:                   0,
-		User:                   "SSHConfig GW2 Hostname",
-		PrivateKey:             "SSHConfig GW2 Hostname",
+		User:                   "Profile GW2 Hostname",
+		PrivateKey:             "Profile GW2 Hostname",
 		LocalPort:              45,
 		GatewayConfig:          nil,
 		SecondaryGatewayConfig: nil,
 	}
-	scfg := ssh.SSHConfig{
-		Hostname:               "SSHConfig Hostname",
-		IPAddress:              "SSHConfig Hostname",
+	scfg := ssh.Profile{
+		Hostname:               "Profile Hostname",
+		IPAddress:              "Profile Hostname",
 		Port:                   46,
-		User:                   "SSHConfig Hostname",
-		PrivateKey:             "SSHConfig Hostname",
+		User:                   "Profile Hostname",
+		PrivateKey:             "Profile Hostname",
 		LocalPort:              47,
 		GatewayConfig:          &gw_scfg,
 		SecondaryGatewayConfig: &gw2_scfg,
