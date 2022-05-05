@@ -5,6 +5,10 @@
 // // +build integrationtests,buckets allintegration
 
 /*
+go:build (integrationtests && buckets) || allintegration
+ +build integrationtests,buckets allintegration
+*/
+/*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

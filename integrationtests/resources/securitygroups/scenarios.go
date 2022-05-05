@@ -5,6 +5,10 @@
 // // +build integrationtests,securitygroups allintegration
 
 /*
+go:build (integrationtests && securitygroups) || allintegration
+ +build integrationtests,securitygroups allintegration
+*/
+/*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

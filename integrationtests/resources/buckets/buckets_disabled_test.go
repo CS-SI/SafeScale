@@ -2,8 +2,8 @@
 // +build disabled
 
 /*
-go:build integrationtests && !subnets && !allintegration
- +build integrationtests,!subnets,!allintegration
+go:build (integrationtests && buckets) || allintegration
+ +build integrationtests,buckets allintegration
 */
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -21,4 +21,14 @@ go:build integrationtests && !subnets && !allintegration
  * limitations under the License.
  */
 
-package subnets
+package buckets
+
+// func Test_NetworkCreate(t *testing.T) {
+// 	helpers.AddScenario(CreateNetwork)
+// 	helpers.RunScenarii(t)
+// }
+//
+// func Test_NetworkCreateWithoutSubnet(t *testing.T) {
+// 	helpers.AddScenario(CreateNetworkWithoutSubnet)
+// 	helpers.RunScenarii(t)
+// }

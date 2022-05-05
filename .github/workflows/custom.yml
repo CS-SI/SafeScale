@@ -33,7 +33,7 @@ jobs:
         sudo chmod a+r -R /opt/protoc
         sudo chmod a+xr /opt/protoc/bin/protoc
         sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
-    - run: make ${{ matrix.tags }} ci with-coverage mintest
+    - run: make ${{ matrix.tags }} ci with-coverage validtest
     - uses: actions/upload-artifact@v2
       if: failure()
       with:

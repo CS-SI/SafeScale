@@ -1,6 +1,10 @@
-//go:build integrationtests && !shares && !allintegration
-// +build integrationtests,!shares,!allintegration
+//go:build disabled
+// +build disabled
 
+/*
+go:build integrationtests && !shares && !allintegration
+ +build integrationtests,!shares,!allintegration
+*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
