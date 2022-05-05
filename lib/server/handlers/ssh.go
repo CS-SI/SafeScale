@@ -57,7 +57,8 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (ssh.Config, fail.Error)
+	// Config(stacks.HostParameter) (ssh.Config, fail.Error)
+	GetConfig(stacks.HostParameter) (*ssh.Profile, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -73,7 +74,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 }
 
 // GetConfig creates Config to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig ssh.Config, ferr fail.Error) {
+// func (handler *sshHandler) Config(hostParam stacks.HostParameter) (sshConfig ssh.Config, ferr fail.Error) {
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *ssh.Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -123,7 +125,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	isSingle, xerr := host.IsSingle()
+	isSingle, xerr := host.IsSingle(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -337,8 +339,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 
 	task := handler.job.Task()
 	ctx := handler.job.Context()
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.sshProfile"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 

@@ -113,7 +113,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 				}
 			}
 
-			if retcode == 255 { // sshClient connection drop
+			if retcode == 255 { // ssh connection drop
 				return fail.NotAvailableError(
 					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
 				)
@@ -146,13 +146,12 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshClient) getHostSSHConfig(hostname string) (ssh.Config, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Profile, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
-
 	return cfg, nil
 }
 
@@ -425,7 +424,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 }
 
 // getSSHConfigFromName ...
-func (s sshClient) getSSHConfigFromName(name string, _ time.Duration) (ssh.Config, fail.Error) {
+func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Profile, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -440,7 +439,7 @@ func (s sshClient) getSSHConfigFromName(name string, _ time.Duration) (ssh.Confi
 		return nil, fail.ConvertError(err)
 	}
 
-	return converters.SSHConfigFromProtocolToSystem(sshConfig)
+	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
 }
 
 // Connect is the "safescale ssh connect"
@@ -476,19 +475,26 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 	}
 
 	if sshCfg.GatewayConfig == nil {
-		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+		sshCfg.GatewayConfig = &ssh.Profile{
+			User:          sshCfg.User,
+			IPAddress:     sshCfg.IPAddress,
+			Hostname:      sshCfg.Hostname,
+			PrivateKey:    sshCfg.PrivateKey,
+			Port:          sshCfg.Port,
+			GatewayConfig: nil,
+		}
+		/*sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
 		if xerr != nil {
 			return xerr
-		}
-		sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
-		if xerr != nil {
-			return xerr
-		}
+		}*/
 	}
-	sshCfg.SetIPAddress("127.0.0.1")
+	sshCfg.IPAddress = "127.0.0.1"
+	sshCfg.Port = remotePort
+	sshCfg.LocalPort = localPort
+	/*sshCfg.SetIPAddress("127.0.0.1")
 	sshCfg.SetPort(uint(remotePort))
 	sshCfg.SetLocalPort(uint(localPort))
-
+	*/
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			_, _, innerErr := sshCfg.CreateTunneling()
@@ -516,16 +522,30 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	}
 
 	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
-		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+		sshCfg.GatewayConfig = &ssh.Profile{
+			User:          sshCfg.User,
+			IPAddress:     sshCfg.IPAddress,
+			Hostname:      sshCfg.Hostname,
+			PrivateKey:    sshCfg.PrivateKey,
+			Port:          sshCfg.Port,
+			GatewayConfig: nil,
+		}
+		sshCfg.IPAddress = "127.0.0.1"
+		/*gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
 
 		sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
 		sshCfg.SetIPAddress("127.0.0.1")
+		*/
 	}
 
-	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
+	cmdString := fmt.Sprintf(
+		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig.User,
+		sshCfg.GatewayConfig.IPAddress,
+	)
+	// cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err != nil {

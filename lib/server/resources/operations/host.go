@@ -80,7 +80,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    ssh.Config
+		sshProfile                    *ssh.Config
 	}
 }
 
@@ -192,7 +192,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig ssh.Config
+		var primaryGatewayConfig, secondaryGatewayConfig *ssh.Profile
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -241,9 +241,9 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 					}
 
-					ip, inXErr := castedGW.GetAccessIP(ctx)
-					if inXErr != nil {
-						return inXErr
+					ip, xerr := castedGW.GetAccessIP(ctx)
+					if xerr != nil {
+						return xerr
 					}
 
 					primaryGatewayConfig, inXErr = ssh.NewConfig(gwahc.Name, ip, uint(gwahc.SSHPort), opUser, gwahc.PrivateKey)
@@ -299,6 +299,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
+
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
@@ -805,21 +806,17 @@ func (instance *Host) Create(
 			anon, ok := opts.Get("UseNATService")
 			useNATService := ok && anon.(bool)
 			if hostReq.PublicIP || useNATService {
-				xerr = defaultSubnet.Review(ctx,
-					func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-						as, ok := clonable.(*abstract.Subnet)
-						if !ok {
-							return fail.InconsistentError(
-								"*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-							)
-						}
+				xerr = defaultSubnet.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.Subnet)
+					if !ok {
+						return fail.InconsistentError("*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
 
-						if as.PublicIPSecurityGroupID != "" {
-							hostReq.SecurityGroupIDs[as.PublicIPSecurityGroupID] = struct{}{}
-						}
-						return nil
-					},
-				)
+					if as.PublicIPSecurityGroupID != "" {
+						hostReq.SecurityGroupIDs[as.PublicIPSecurityGroupID] = struct{}{}
+					}
+					return nil
+				})
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
@@ -1181,18 +1178,16 @@ func (instance *Host) setSecurityGroups(
 				defaultAbstractSubnet *abstract.Subnet
 				defaultSubnetID       string
 			)
-			innerXErr := defaultSubnet.Review(ctx,
-				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-					var ok bool
-					defaultAbstractSubnet, ok = clonable.(*abstract.Subnet)
-					if !ok {
-						return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
+			innerXErr := defaultSubnet.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var ok bool
+				defaultAbstractSubnet, ok = clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
 
-					defaultSubnetID = defaultAbstractSubnet.ID
-					return nil
-				},
-			)
+				defaultSubnetID = defaultAbstractSubnet.ID
+				return nil
+			})
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1281,9 +1276,7 @@ func (instance *Host) setSecurityGroups(
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(ctx, func(
-							clonable data.Clonable, _ *serialize.JSONProperties,
-						) fail.Error {
+						deeperXErr = subnetInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
 							if !ok {
 								return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1326,9 +1319,7 @@ func (instance *Host) setSecurityGroups(
 				}
 
 				var otherAbstractSubnet *abstract.Subnet
-				innerXErr = otherSubnetInstance.Review(ctx, func(
-					clonable data.Clonable, _ *serialize.JSONProperties,
-				) fail.Error {
+				innerXErr = otherSubnetInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					var ok bool
 					otherAbstractSubnet, ok = clonable.(*abstract.Subnet)
 					if !ok {
@@ -1377,40 +1368,35 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 	if *errorPtr != nil && !keepOnFailure {
 		svc := instance.Service()
 		derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (innerXErr fail.Error) {
-					hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostSecurityGroups' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
+			return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
 
-					var (
-						opXErr fail.Error
-						sg     resources.SecurityGroup
-						errors []error
-					)
+				var (
+					opXErr fail.Error
+					sg     resources.SecurityGroup
+					errors []error
+				)
 
-					// unbind security groups
-					for _, v := range hsgV1.ByName {
-						if sg, opXErr = LoadSecurityGroup(ctx, svc, v); opXErr != nil {
+				// unbind security groups
+				for _, v := range hsgV1.ByName {
+					if sg, opXErr = LoadSecurityGroup(ctx, svc, v); opXErr != nil {
+						errors = append(errors, opXErr)
+					} else {
+						opXErr = sg.UnbindFromHost(ctx, instance)
+						if opXErr != nil {
 							errors = append(errors, opXErr)
-						} else {
-							opXErr = sg.UnbindFromHost(ctx, instance)
-							if opXErr != nil {
-								errors = append(errors, opXErr)
-							}
 						}
 					}
-					if len(errors) > 0 {
-						return fail.Wrap(fail.NewErrorList(errors), "cleaning up on %s, failed to unbind Security Groups from Host", ActionFromError(*errorPtr))
-					}
+				}
+				if len(errors) > 0 {
+					return fail.Wrap(fail.NewErrorList(errors), "cleaning up on %s, failed to unbind Security Groups from Host", ActionFromError(*errorPtr))
+				}
 
-					return nil
-				},
-			)
+				return nil
+			})
 		})
 		if derr != nil {
 			_ = (*errorPtr).AddConsequence(
@@ -1775,54 +1761,42 @@ func (instance *Host) undoUpdateSubnets(ctx context.Context, req abstract.HostRe
 				return xerr
 			}
 
-			return props.Alter(
-				hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-					hsV1, ok := clonable.(*propertiesv2.HostNetworking)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.HostNetworking' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
+			return props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				hsV1, ok := clonable.(*propertiesv2.HostNetworking)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				hostID := instance.GetID()
+				hostName := instance.GetName()
+				svc := instance.Service()
+				for _, as := range req.Subnets {
+					subnetInstance, innerXErr := LoadSubnet(task.Context(), svc, "", as.ID)
+					if innerXErr != nil {
+						return innerXErr
 					}
 
-					hostID := instance.GetID()
-					hostName := instance.GetName()
-					svc := instance.Service()
-					for _, as := range req.Subnets {
-						subnetInstance, innerXErr := LoadSubnet(task.Context(), svc, "", as.ID)
-						if innerXErr != nil {
-							return innerXErr
-						}
+					innerXErr = subnetInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+						return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+							subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
+							if !ok {
+								return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							}
 
-						innerXErr = subnetInstance.Alter(ctx,
-							func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-								return props.Alter(
-									subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-										subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
-										if !ok {
-											return fail.InconsistentError(
-												"'*propertiesv1.SubnetHosts' expected, '%s' provided",
-												reflect.TypeOf(clonable).String(),
-											)
-										}
-
-										delete(subnetHostsV1.ByID, hostID)
-										delete(subnetHostsV1.ByName, hostName)
-										return nil
-									},
-								)
-							},
-						)
-						if innerXErr != nil {
-							return innerXErr
-						}
-
-						delete(hsV1.SubnetsByID, as.ID)
-						delete(hsV1.SubnetsByName, as.ID)
+							delete(subnetHostsV1.ByID, hostID)
+							delete(subnetHostsV1.ByName, hostName)
+							return nil
+						})
+					})
+					if innerXErr != nil {
+						return innerXErr
 					}
-					return nil
-				},
-			)
+
+					delete(hsV1.SubnetsByID, as.ID)
+					delete(hsV1.SubnetsByName, as.ID)
+				}
+				return nil
+			})
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -2649,7 +2623,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ ssh.Config, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh.Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -2878,42 +2852,42 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 		// ok        bool
 	)
 	err := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(
-			hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
-				sharesV1, ok := clonable.(*propertiesv1.HostShares)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
+		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+			sharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if item, ok := sharesV1.ByID[shareRef]; ok {
+				cloned, cerr := item.Clone()
+				if cerr != nil {
+					return fail.Wrap(cerr)
 				}
 
-				if item, ok := sharesV1.ByID[shareRef]; ok {
-					cloned, cerr := item.Clone()
-					if cerr != nil {
-						return fail.Wrap(cerr)
-					}
-					hostShare, ok = cloned.(*propertiesv1.HostShare)
-					if !ok {
-						return fail.InconsistentError("item should be a *propertiesv1.HostShare")
-					}
-					return nil
+				hostShare, ok = cloned.(*propertiesv1.HostShare)
+				if !ok {
+					return fail.InconsistentError("item should be a *propertiesv1.HostShare")
 				}
-				if item, ok := sharesV1.ByName[shareRef]; ok {
-					cloned, cerr := sharesV1.ByID[item].Clone()
-					if cerr != nil {
-						return fail.Wrap(cerr)
-					}
-					hostShare, ok = cloned.(*propertiesv1.HostShare)
-					if !ok {
-						return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
-					}
-					return nil
+
+				return nil
+			}
+
+			if item, ok := sharesV1.ByName[shareRef]; ok {
+				cloned, cerr := sharesV1.ByID[item].Clone()
+				if cerr != nil {
+					return fail.Wrap(cerr)
 				}
-				return fail.NotFoundError(
-					"share '%s' not found in server '%s' metadata", shareRef, instance.GetName(),
-				)
-			},
-		)
+
+				hostShare, ok = cloned.(*propertiesv1.HostShare)
+				if !ok {
+					return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
+				}
+
+				return nil
+			}
+
+			return fail.NotFoundError("share '%s' not found in server '%s' metadata", shareRef, instance.GetName())
+		})
 	})
 	err = debug.InjectPlannedFail(err)
 	if err != nil {

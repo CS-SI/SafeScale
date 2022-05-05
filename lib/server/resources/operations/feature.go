@@ -153,6 +153,7 @@ func (instance *Feature) GetID() string {
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling
+// VPL: what benefit do we have here with a ctx?
 func (instance *Feature) GetFilename(ctx context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
@@ -162,6 +163,7 @@ func (instance *Feature) GetFilename(ctx context.Context) string {
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
+// VPL: what benefit do we have here with a ctx?
 func (instance *Feature) GetDisplayFilename(ctx context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
@@ -903,7 +905,5 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 			out = append(out, entry)
 		}
 	}
-
 	return out, nil
-
 }
