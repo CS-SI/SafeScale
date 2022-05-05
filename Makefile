@@ -439,8 +439,8 @@ validtest:
 	@cd integrationtests && $(GO) test -v -tags integrationtests,volumetests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && $(GO) test -v -tags integrationtests,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@mv ./integrationtests/integration_results.log .
-	@if [ -s ./integration_results.log ] && grep malformed ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
-	@if [ -s ./integration_results.log ] && grep FAIL ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e FAIL -e PASS ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
 
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
