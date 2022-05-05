@@ -66,9 +66,6 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
 	}
-	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout + temporal.ContextTimeout()
-	}
 
 	ctx, xerr := srvutils.GetContext(true)
 	if xerr != nil {
