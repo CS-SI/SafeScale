@@ -1,5 +1,8 @@
-//go:build (integrationtests && clusters) || allintegration
-// +build integrationtests,clusters allintegration
+//go:build disabled
+// +build disabled
+
+// //go:build (integrationtests && clusters) || allintegration
+// // +build integrationtests,clusters allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

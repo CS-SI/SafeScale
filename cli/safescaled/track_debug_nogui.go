@@ -1,5 +1,5 @@
-//go:build integrationtests && !securitygroups && !allintegration
-// +build integrationtests,!securitygroups,!allintegration
+//go:build debug && darwin
+// +build debug,darwin
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,4 +17,11 @@
  * limitations under the License.
  */
 
-package securitygroups
+package main
+
+func startTrack() {
+	// TODO: Think about a cli alternative
+}
+
+func endTrack() {
+}

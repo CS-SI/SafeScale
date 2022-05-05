@@ -7,6 +7,11 @@ on:
       - master
       - develop
       - 'review/**'
+  pull_request:
+    branches:
+      - master
+      - develop
+      - 'release/**'
 
 env:
   GOVERSION: '1.16.8' # The Go version to download (if necessary) and use.

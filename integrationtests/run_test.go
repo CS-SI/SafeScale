@@ -1,5 +1,8 @@
-//go:build integrationtests || allintegration
-// +build integrationtests allintegration
+//go:build disabled
+// +build disabled
+
+// //go:build integrationtests || allintegration
+// // +build integrationtests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,7 +20,7 @@
  * limitations under the License.
  */
 
-package integrationtests_ng
+package integrationtests
 
 import (
 	"testing"
