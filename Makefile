@@ -401,6 +401,17 @@ generate: sdk
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
+validtest:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(RM) ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@mv ./integrationtests/integration_results.log .
+	@if [ -s ./integration_results.log ] && grep malformed ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep FAIL ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
