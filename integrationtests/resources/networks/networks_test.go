@@ -1,5 +1,8 @@
-//go:build (integrationtests && networks) || allintegration
-// +build integrationtests,networks allintegration
+//go:build disabled
+// +build disabled
+
+// //go:build (integrationtests && networks) || allintegration
+// // +build integrationtests,networks allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -21,6 +24,8 @@ package networks
 
 import (
 	"testing"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
 func Test_NetworkCreate(t *testing.T) {
