@@ -32,13 +32,12 @@ require (
 	github.com/ovh/go-ovh v1.1.0
 	github.com/pelletier/go-toml/v2 v2.0.0
 	github.com/pkg/sftp v1.13.4
-	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/sanity-io/litter v1.5.5
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.7.1
-	github.com/urfave/cli v1.22.8
+	github.com/urfave/cli v1.22.9
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
