@@ -2209,27 +2209,18 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(
-					clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-						stateV1, ok := clonable.(*propertiesv1.ClusterState)
-						if !ok {
-							return fail.InconsistentError(
-								"'*propertiesv1.ClusterState' expected, '%s' provided",
-								reflect.TypeOf(clonable).String(),
-							)
-						}
+				return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+					stateV1, ok := clonable.(*propertiesv1.ClusterState)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
 
-						stateV1.State = clusterstate.Degraded
-						return nil
-					},
-				)
+					stateV1.State = clusterstate.Degraded
+					return nil
+				})
 			})
 			if derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on %s, failed to set Cluster state to DEGRADED", ActionFromError(ferr),
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to set Cluster state to DEGRADED", ActionFromError(ferr)))
 			}
 		}
 	}()
@@ -2241,19 +2232,15 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 	// Mark the Cluster as Removed and get nodes from properties
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Updates Cluster state to mark Cluster as Removing
-		innerXErr := props.Alter(
-			clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-				stateV1, ok := clonable.(*propertiesv1.ClusterState)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
-				}
+		innerXErr := props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-				stateV1.State = clusterstate.Removed
-				return nil
-			},
-		)
+			stateV1.State = clusterstate.Removed
+			return nil
+		})
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -3066,25 +3053,22 @@ func (instance *Cluster) buildHostname(ctx context.Context, core string, nodeTyp
 
 	var index int
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(
-			clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
-				}
-				switch nodeType {
-				case clusternodetype.Node:
-					nodesV3.PrivateLastIndex++
-					index = nodesV3.PrivateLastIndex
-				case clusternodetype.Master:
-					nodesV3.MasterLastIndex++
-					index = nodesV3.MasterLastIndex
-				}
-				return nil
-			},
-		)
+		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			switch nodeType {
+			case clusternodetype.Node:
+				nodesV3.PrivateLastIndex++
+				index = nodesV3.PrivateLastIndex
+			case clusternodetype.Master:
+				nodesV3.MasterLastIndex++
+				index = nodesV3.MasterLastIndex
+			}
+			return nil
+		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3311,37 +3295,30 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		toRemove     []uint
 	)
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(
-			clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
-				}
+		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-				length := uint(len(nodesV3.PrivateNodes))
-				if length < count {
-					return fail.InvalidRequestError(
-						"cannot shrink by %d node%s, only %d node%s available", count, strprocess.Plural(count),
-						length, strprocess.Plural(length),
-					)
-				}
+			length := uint(len(nodesV3.PrivateNodes))
+			if length < count {
+				return fail.InvalidRequestError("cannot shrink by %d node%s, only %d node%s available", count, strprocess.Plural(count), length, strprocess.Plural(length))
+			}
 
-				first := length - count
-				toRemove = nodesV3.PrivateNodes[first:]
-				nodesV3.PrivateNodes = nodesV3.PrivateNodes[:first]
-				for _, v := range toRemove {
-					if node, ok := nodesV3.ByNumericalID[v]; ok {
-						removedNodes = append(removedNodes, node)
-						delete(nodesV3.ByNumericalID, v)
-						delete(nodesV3.PrivateNodeByID, node.ID)
-						delete(nodesV3.PrivateNodeByName, node.Name)
-					}
+			first := length - count
+			toRemove = nodesV3.PrivateNodes[first:]
+			nodesV3.PrivateNodes = nodesV3.PrivateNodes[:first]
+			for _, v := range toRemove {
+				if node, ok := nodesV3.ByNumericalID[v]; ok {
+					removedNodes = append(removedNodes, node)
+					delete(nodesV3.ByNumericalID, v)
+					delete(nodesV3.PrivateNodeByID, node.ID)
+					delete(nodesV3.PrivateNodeByName, node.Name)
 				}
-				return nil
-			},
-		)
+			}
+			return nil
+		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3352,32 +3329,23 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(
-					clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-						nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-						if !ok {
-							return fail.InconsistentError(
-								"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-								reflect.TypeOf(clonable).String(),
-							)
-						}
+				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
 
-						nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, toRemove...)
-						for _, v := range removedNodes {
-							nodesV3.ByNumericalID[v.NumericalID] = v
-							nodesV3.PrivateNodeByName[v.Name] = v.NumericalID
-							nodesV3.PrivateNodeByID[v.ID] = v.NumericalID
-						}
-						return nil
-					},
-				)
+					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, toRemove...)
+					for _, v := range removedNodes {
+						nodesV3.ByNumericalID[v.NumericalID] = v
+						nodesV3.PrivateNodeByName[v.Name] = v.NumericalID
+						nodesV3.PrivateNodeByID[v.ID] = v.NumericalID
+					}
+					return nil
+				})
 			})
 			if derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on %s, failed to restore Cluster nodes metadata", ActionFromError(ferr),
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore Cluster nodes metadata", ActionFromError(ferr)))
 			}
 		}
 	}()

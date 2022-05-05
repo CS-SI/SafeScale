@@ -244,7 +244,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h host) SSHConfig(name string) (ssh.Config, error) {
+func (h host) SSHConfig(name string) (*ssh.Profile, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -259,7 +259,9 @@ func (h host) SSHConfig(name string) (ssh.Config, error) {
 		return nil, err
 	}
 
-	return converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
+	sshCfg := converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
+
+	return sshCfg, err
 }
 
 // Resize ...
