@@ -254,9 +254,9 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 					}
 
-					ip, inXErr := castedGW.GetAccessIP(ctx)
-					if inXErr != nil {
-						return inXErr
+					ip, xerr := castedGW.GetAccessIP(ctx)
+					if xerr != nil {
+						return xerr
 					}
 
 					primaryGatewayConfig, inXErr = ssh.NewConfig(gwahc.Name, ip, uint(gwahc.SSHPort), opUser, gwahc.PrivateKey)
@@ -312,6 +312,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
+
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)

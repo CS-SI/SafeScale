@@ -198,11 +198,11 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) (fer
 		"UUID": volumeUUID,
 	}
 
-	// task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
 
 	sshConn, xerr := sshfactory.NewConnector(s.SSHConfig)
 	if xerr != nil {

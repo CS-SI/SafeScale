@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
@@ -32,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/stretchr/testify/require"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 

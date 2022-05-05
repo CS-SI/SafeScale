@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 )
 

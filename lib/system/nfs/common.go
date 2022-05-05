@@ -110,7 +110,7 @@ func executeScript(
 	}
 
 	// Copy script to remote host with retries if needed
-	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return "", xerr
 	}
