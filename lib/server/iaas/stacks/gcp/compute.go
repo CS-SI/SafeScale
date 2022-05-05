@@ -26,8 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"google.golang.org/api/compute/v1"
-
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"

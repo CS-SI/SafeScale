@@ -46,7 +46,7 @@ type Tunnels []*Tunnel
 
 // Close closes ssh tunnel
 func (stun *Tunnel) Close() fail.Error {
-	defer debug.NewTracer(nil, true).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), true).Entering().Exiting()
 
 	defer func() {
 		if lazyErr := utils.LazyRemove(stun.keyFile.Name()); lazyErr != nil {

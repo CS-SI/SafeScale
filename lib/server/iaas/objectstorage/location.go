@@ -44,7 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Location
+//go:generate minimock -o mocks/mock_location.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
 // FIXME: Make this easy to validate, what is optional ?, what is mandatory ?
