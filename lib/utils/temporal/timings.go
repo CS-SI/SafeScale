@@ -52,10 +52,10 @@ const (
 	defaultWaitAfterReboot = 45 * time.Second
 
 	// defaultSSHConnectionTimeout is the default ssh timeout connection
-	defaultSSHConnectionTimeout = 3 * time.Minute
+	defaultSSHConnectionTimeout = 2 * time.Minute
 
 	// defaultConnectionTimeout is the default connection timeout
-	defaultConnectionTimeout = 1 * time.Minute
+	defaultConnectionTimeout = 2 * time.Minute
 
 	// defaultExecutionTimeout is the default linux command operation timeout
 	defaultExecutionTimeout = 8 * time.Minute
