@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.6
+	github.com/aws/aws-sdk-go v1.44.7
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -32,7 +32,6 @@ require (
 	github.com/ovh/go-ovh v1.1.0
 	github.com/pelletier/go-toml/v2 v2.0.0
 	github.com/pkg/sftp v1.13.4
-	github.com/quasilyte/go-ruleguard/dsl v0.3.17 // indirect
 	github.com/sanity-io/litter v1.5.5
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
