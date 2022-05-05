@@ -101,11 +101,35 @@ releasetags:
 
 integrationtests:
 	@echo "settings go build tags for integrationtests"
-	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
+	@$(eval BUILD_TAGS = "integrationtests,$(BUILD_TAGS)")
 
 allintegration:
 	@echo "settings go build tags for allintegration"
 	@$(eval BUILD_TAGS = "allintegration,$(BUILD_TAGS)")
+
+clustertests:
+	@echo "settings go build tags for clustertests"
+	@$(eval BUILD_TAGS = "clustertests,$(BUILD_TAGS)")
+
+networktests:
+	@echo "settings go build tags for networktests"
+	@$(eval BUILD_TAGS = "networktests,$(BUILD_TAGS)")
+
+subnettests:
+	@echo "settings go build tags for subnettests"
+	@$(eval BUILD_TAGS = "subnettests,$(BUILD_TAGS)")
+
+hosttests:
+	@echo "settings go build tags for hosttests"
+	@$(eval BUILD_TAGS = "hosttests,$(BUILD_TAGS)")
+
+volumetests:
+	@echo "settings go build tags for volumetests"
+	@$(eval BUILD_TAGS = "volumetests,$(BUILD_TAGS)")
+
+securitygrouptests:
+	@echo "settings go build tags for securitygrouptests"
+	@$(eval BUILD_TAGS = "securitygrouptests,$(BUILD_TAGS)")
 
 ifeq ($(OS),Windows_NT)
 releasearchive:
@@ -408,6 +432,12 @@ validtest:
 	@cd integrationtests && $(GO) test -v -tags integrationtests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && $(GO) test -v -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && $(GO) test -v -tags integrationtests,allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,clustertests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,networktests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,subnettests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,hosttests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,volumetests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integrationtests,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@mv ./integrationtests/integration_results.log .
 	@if [ -s ./integration_results.log ] && grep malformed ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep FAIL ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
