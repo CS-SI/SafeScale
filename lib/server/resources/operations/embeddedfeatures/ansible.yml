@@ -76,6 +76,7 @@ feature:
                                     apt-add-repository --yes --update ppa:ansible/ansible
                                     sfRetry "sfApt update"
                                     sfRetry "sfApt install -y ansible"
+                                    sfRetry "sfApt install -y git"
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
@@ -84,19 +85,24 @@ feature:
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
                                     sfRetry "sfApt update"
                                     sfRetry "sfApt install -y ansible"
+                                    sfRetry "sfApt install -y git"
                                     ;;
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         sfRetryEx 3m 5 "dnf install --enablerepo=epel -y ansible" || sfFail 192
+                                        sfRetryEx 3m 5 "dnf install -y git" || sfFail 192
                                     else
                                         yum install -y ansible || sfFail 192
+                                        yum install -y git || sfFail 192
                                     fi
                                     ;;
                                 fedora)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf install -y ansible || sfFail 192
+                                        dnf install -y git || sfFail 192
                                     else
                                         yum install -y ansible || sfFail 192
+                                        yum install -y git || sfFail 192
                                     fi
                                     ;;
                                 *)
