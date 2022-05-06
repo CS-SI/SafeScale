@@ -204,7 +204,7 @@ tunnel:
 generics:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'generics' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "generics,$(BUILD_TAGS)")
-	@cp ./gogen.mod ./go.mod > /dev/null || true
+	@$(SED) -i '3s/.*/go 1.18/' go.mod || true
 
 alltests:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
@@ -425,7 +425,23 @@ generate: sdk
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
-validtest:
+vettest:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(RM) ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,clustertests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,networktests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,subnettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,hosttests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integrationtests,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@mv ./integrationtests/integration_vet_results.log .
+	@if [ -s ./integration_vet_results.log ] && grep -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_vet_results.log $(NO_COLOR)\n";fi;
+
+validtest: vettest
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./integration_results.log || true
 	@cd integrationtests && $(GO) test -v ./... 2>&1 | $(TEE) -a ./integration_results.log || true
