@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -525,9 +524,7 @@ var clusterCreateCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
 		}
 
-		if !appwide.Debug {
-			delete(formatted, "defaults")
-		}
+		delete(formatted, "defaults")
 		return clitools.SuccessResponse(formatted)
 	},
 }
@@ -867,7 +864,12 @@ var clusterKubectlCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		return executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -969,7 +971,12 @@ var clusterHelmCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		return executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -995,24 +1002,20 @@ func executeCommand(clientSession *client.Session, command string, files *client
 	logrus.Debugf("command=[%s]", command)
 	master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 	if err != nil {
-		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
-		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		return fmt.Errorf("no masters found available for the cluster '%s': %w", clusterName, err)
 	}
 
 	if files != nil && files.Count() > 0 {
-		if !appwide.Debug {
-			defer files.Cleanup(clientSession, master.GetId())
-		}
+		defer files.Cleanup(clientSession, master.GetId())
 		xerr := files.Upload(clientSession, master.GetId())
 		if xerr != nil {
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, xerr.Error())
+			return xerr
 		}
 	}
 
 	retcode, _, _, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), 0)
 	if xerr != nil {
-		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
-		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		return fmt.Errorf("failed to execute command on master '%s' of cluster '%s': %w", master.GetName(), clusterName, xerr)
 	}
 	if retcode != 0 {
 		return cli.NewExitError("" /*msg*/, retcode)
@@ -1803,9 +1806,9 @@ var clusterAnsibleInventoryCommands = cli.Command{
 		}
 
 		// Check for feature
-		values := map[string]string{}
+		values := map[string]string{} // FIXME feature is now "ansible-for-cluster" ?
 		settings := protocol.FeatureSettings{}
-		if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+		if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible-for-cluster", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -1861,7 +1864,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 		if retcode != 0 {
 			return cli.NewExitError(stderr, retcode)
 		}
-		return nil
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -1954,7 +1957,7 @@ var clusterAnsibleRunCommands = cli.Command{
 		if retcode != 0 {
 			return cli.NewExitError(stderr, retcode)
 		}
-		return nil
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -2012,22 +2015,22 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 
 		// Format arguments
 		args := c.Args().Tail()
-		var captureInventory bool = false
-		var capturePlaybookFile bool = true
-		var captureVaultFile bool = false
-		var askForHelp bool = false
-		var askForVault bool = false
+		var captureInventory = false
+		var capturePlaybookFile = true
+		var captureVaultFile = false
+		var askForHelp = false
+		var askForVault = false
 		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
 		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
 		// find no configuration for playbook defaut directory, must be absolute (arg: local file, mapped to remote)
-		var ansibleDir string = fmt.Sprintf("%s/ansible/", utils.EtcFolder)
-		var inventoryPath string = fmt.Sprintf("%sinventory/inventory.py", ansibleDir)
-		var playbookFile string = ""
-		var vaultFile string = ""
+		var ansibleDir = fmt.Sprintf("%s/ansible/", utils.EtcFolder)
+		var inventoryPath = fmt.Sprintf("%sinventory/inventory.py", ansibleDir)
+		var playbookFile = ""
+		var vaultFile = ""
 		var filteredArgs []string
 		var isParam bool
 		for _, arg := range args {
-			isParam = (string([]rune(arg))[0] == '-')
+			isParam = arg[0] == '-'
 			if isParam {
 				capturePlaybookFile = false
 			}
@@ -2171,17 +2174,6 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 			return nil
 		}
 
-		var treeStruct []string = []string{
-			"group_vars",
-			"hosts_vars",
-			"vars",
-			"library",
-			"module_utils",
-			"filter_plugins",
-			"tasks",
-			"roles",
-		}
-
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err = extractClusterName(c)
 		if err != nil {
@@ -2203,104 +2195,147 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
-		// Must set playbook file
-		if playbookFile == "" {
-			msg := fmt.Sprintf("Expect a playbook file for cluster '%s'", clusterName)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-		}
-
-		// Check local file exists
-		stat, err := os.Stat(playbookFile)
-		if os.IsNotExist(err) {
-			msg := fmt.Sprintf("Playbook file not found for cluster '%s'", clusterName)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-		}
-		if !stat.Mode().IsRegular() {
-			msg := fmt.Sprintf("Playbook is not regular file, for cluster '%s'", clusterName)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-		}
-
-		// Check extension
-		var playbookExtension string = ""
-		pos := strings.LastIndex(playbookFile, ".")
-		if pos >= 0 {
-			playbookExtension = strings.ToLower(playbookFile[pos+1:])
-		}
-
-		// Temporary working directory
-		tmpDirectory := "/tmp/safescale-ansible-playbook/"
-		_ = os.RemoveAll(tmpDirectory)
-		_ = os.Mkdir(tmpDirectory, 0755)
-
-		var list []string = []string{}
-		switch playbookExtension {
-		case "yml":
-
-			// Copy to tmp workdir
-			err = func(playbookFile string, tmpDirectory string) (err error) {
-				source, err := os.Open(playbookFile)
-				if err != nil {
-					return err
-				}
-				defer source.Close()
-				destination, err := os.Create(fmt.Sprintf("%s/playbook.yml", tmpDirectory))
-				if err != nil {
-					return err
-				}
-				defer destination.Close()
-				_, err = io.Copy(destination, source)
-				if err != nil {
-					return err
-				}
-				return nil
-
-			}(playbookFile, tmpDirectory)
-
-			if err != nil {
-				msg := fmt.Sprintf("Playbook copy to working directory fail for cluster '%s': %s", clusterName, err)
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		err = playAnsible(c, clientSession, playbookFile, askForVault, vaultFile, ansibleDir, inventoryPath, filteredArgs)
+		if err != nil {
+			switch err.(type) {
+			case *cli.ExitError:
+				return clitools.FailureResponse(err)
+			default:
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
+		}
 
-			list = []string{"playbook.yml"}
+		return clitools.SuccessResponse(nil)
+	},
+}
 
-			break
-		case "zip":
-			// Check archive content
-			err, list = func(archivePath string, tmpDirectory string) (err error, list []string) {
-				archive, err := zip.OpenReader(playbookFile)
+func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile string, askForVault bool, vaultFile string, ansibleDir string, inventoryPath string, filteredArgs []string) error {
+	var treeStruct = []string{
+		"group_vars",
+		"hosts_vars",
+		"vars",
+		"library",
+		"module_utils",
+		"filter_plugins",
+		"tasks",
+		"roles",
+	}
+
+	// Must set playbook file
+	if playbookFile == "" {
+		return fmt.Errorf("expect a playbook file for cluster '%s'", clusterName)
+	}
+
+	// Check local file exists
+	stat, err := os.Stat(playbookFile)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("playbook file not found for cluster '%s'", clusterName)
+	}
+	if !stat.Mode().IsRegular() {
+		return fmt.Errorf("playbook is not regular file, for cluster '%s'", clusterName)
+	}
+
+	// Check extension
+	var playbookExtension = ""
+	pos := strings.LastIndex(playbookFile, ".")
+	if pos >= 0 {
+		playbookExtension = strings.ToLower(playbookFile[pos+1:])
+	}
+
+	// Temporary working directory
+	tmpDirectory := fmt.Sprintf("%s/safescale-ansible-playbook/", os.TempDir())
+	err = os.RemoveAll(tmpDirectory)
+	if err != nil {
+		return err
+	}
+	err = os.Mkdir(tmpDirectory, 0755)
+	if err != nil {
+		return err
+	}
+
+	var list []string
+	switch playbookExtension {
+	case "yml":
+		// Copy to tmp workdir
+		err = func(playbookFile string, tmpDirectory string) (err error) {
+			source, err := os.Open(playbookFile)
+			if err != nil {
+				return err
+			}
+			defer func(source *os.File) {
+				err := source.Close()
 				if err != nil {
-					return err, nil
+					logrus.Debugf(err.Error())
 				}
-				defer archive.Close()
+			}(source)
+			destination, err := os.Create(fmt.Sprintf("%s/playbook.yml", tmpDirectory))
+			if err != nil {
+				return err
+			}
+			defer func(destination *os.File) {
+				err := destination.Close()
+				if err != nil {
+					logrus.Debugf(err.Error())
+				}
+			}(destination)
+			_, err = io.Copy(destination, source)
+			if err != nil {
+				return err
+			}
+			return nil
 
-				list = []string{}
+		}(playbookFile, tmpDirectory)
 
-				var foundPlaybook bool = false
-				for _, f := range archive.File {
-					if !f.FileInfo().IsDir() {
+		if err != nil {
+			return fmt.Errorf("playbook copy to working directory fail for cluster '%s': %w", clusterName, err)
+		}
 
-						// Chech if file path is allow in ansible tree struct (ignore empty directories)
-						err := func(path string, allowDirs []string) error {
-							pos := strings.Index(path, "/")
-							if pos >= 0 {
-								fileBaseDir := path[:pos]
-								found := false
-								for _, v := range allowDirs {
-									if v == fileBaseDir {
-										found = true
-										break
-									}
-								}
-								if !found {
-									return fmt.Errorf(fmt.Sprintf("file path '%s' not allow in ansible tree struct", path))
+		list = []string{"playbook.yml"}
+
+		break
+	case "zip":
+		// Check archive content
+		list, err = func(archivePath string, tmpDirectory string) ([]string, error) {
+			archive, err := zip.OpenReader(playbookFile)
+			if err != nil {
+				return nil, err
+			}
+			defer func(archive *zip.ReadCloser) {
+				err := archive.Close()
+				if err != nil {
+					logrus.Debugf(err.Error())
+				}
+			}(archive)
+
+			list = []string{}
+
+			var foundPlaybook = false
+			for _, f := range archive.File {
+				if !f.FileInfo().IsDir() {
+
+					// Chech if file path is allow in ansible tree struct (ignore empty directories)
+					err := func(path string, allowDirs []string) error {
+						pos := strings.Index(path, "/")
+						if pos >= 0 {
+							fileBaseDir := path[:pos]
+							found := false
+							for _, v := range allowDirs {
+								if v == fileBaseDir {
+									found = true
+									break
 								}
 							}
-							return nil
-						}(f.Name, treeStruct)
-						if err != nil {
-							return err, nil
+							if !found {
+								return fmt.Errorf(fmt.Sprintf("file path '%s' not allow in ansible tree struct", path))
+							}
 						}
+						return nil
+					}(f.Name, treeStruct)
+					if err != nil {
+						return nil, err
+					}
 
+					nerr := func() error {
 						// Playbook
 						if f.Name == "playbook.yml" {
 							foundPlaybook = true
@@ -2309,198 +2344,240 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 						// Unzip contain to temporary location
 						path := fmt.Sprintf("%s%s", tmpDirectory, f.Name)
 						err = os.MkdirAll(filepath.Dir(path), os.ModePerm)
-
 						if err != nil {
-							return err, nil
+							return err
 						}
+
 						dstFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-						defer dstFile.Close()
+						defer func(afi *os.File) {
+							err := afi.Close()
+							if err != nil {
+								logrus.Debugf(err.Error())
+							}
+						}(dstFile)
 						if err != nil {
-							return err, nil
+							return err
 						}
 						fileInArchive, err := f.Open()
-						defer fileInArchive.Close()
+						defer func(afi *io.ReadCloser) {
+							err := (*afi).Close()
+							if err != nil {
+								logrus.Debugf(err.Error())
+							}
+						}(&fileInArchive)
+
 						if err != nil {
-							return err, nil
+							return err
 						}
 						_, err = io.Copy(dstFile, fileInArchive)
 						if err != nil {
-							return err, nil
+							return err
 						}
 
 						// Add filepath to valid files in archives
 						list = append(list, f.Name)
+						return nil
+					}()
 
+					if nerr != nil {
+						return nil, nerr
 					}
 				}
-				if !foundPlaybook {
-					return fmt.Errorf("archive has no playbook file \"playbook.yml\" on it's root"), nil
-				}
-
-				return nil, list
-			}(playbookFile, tmpDirectory)
-			if err != nil {
-				msg := fmt.Sprintf("Playbook archive invalid '%s': %s", clusterName, err)
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 			}
-			break
-		default:
-			msg := fmt.Sprintf("Playbook file extention expect .yml or .zip, (unexpected %s) for cluster '%s'", playbookExtension, clusterName)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-		}
+			if !foundPlaybook {
+				return nil, fmt.Errorf("archive has no playbook file \"playbook.yml\" on it's root")
+			}
 
-		// Ask for vault password ? (map it to vault-file)
-		if askForVault {
-			err = func(tmpDirectory string) error {
-				fmt.Print("> Prompt vault password : ")
-				reader := bufio.NewReader(os.Stdin)
-				vaultPassword, err := reader.ReadString('\n')
+			return list, nil
+		}(playbookFile, tmpDirectory)
+		if err != nil {
+			return fmt.Errorf("playbook archive invalid '%s': %w", clusterName, err)
+		}
+		break
+	default:
+		return fmt.Errorf("playbook file extention expect .yml or .zip, (unexpected %s) for cluster '%s'", playbookExtension, clusterName)
+	}
+
+	// Ask for vault password ? (map it to vault-file)
+	if askForVault {
+		err = func(tmpDirectory string) error {
+			fmt.Print("> Prompt vault password : ")
+			reader := bufio.NewReader(os.Stdin)
+			vaultPassword, err := reader.ReadString('\n')
+			if err != nil {
+				return err
+			}
+			vaultPassword = strings.TrimSpace(vaultPassword)
+			destination, err := os.Create(fmt.Sprintf("%s/.vault", tmpDirectory))
+			if err != nil {
+				return err
+			}
+			defer func(destination *os.File) {
+				err := destination.Close()
+				if err != nil {
+					logrus.Debugf(err.Error())
+				}
+			}(destination)
+			_, err = destination.WriteString(vaultPassword)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(tmpDirectory)
+
+		if err != nil {
+			return fmt.Errorf("fail to read vault password for cluster '%s'", clusterName)
+		}
+		list = append(list, ".vault")
+	} else {
+		// Check for vault file
+		if vaultFile != "" {
+			stat, err := os.Stat(vaultFile)
+			if os.IsNotExist(err) {
+				return fmt.Errorf("playbook vault file not found for cluster '%s'", clusterName)
+			}
+			if !stat.Mode().IsRegular() {
+				return fmt.Errorf("playbook vault file is not regular file, for cluster '%s'", clusterName)
+			}
+			// Copy to tmp workdir
+			err = func(vaultFile string, tmpDirectory string) (err error) {
+				source, err := os.Open(vaultFile)
 				if err != nil {
 					return err
 				}
-				vaultPassword = strings.TrimSpace(vaultPassword)
+				defer func(source *os.File) {
+					err := source.Close()
+					if err != nil {
+						logrus.Debugf(err.Error())
+					}
+				}(source)
 				destination, err := os.Create(fmt.Sprintf("%s/.vault", tmpDirectory))
 				if err != nil {
 					return err
 				}
-				defer destination.Close()
-				_, err = destination.WriteString(vaultPassword)
+				defer func(destination *os.File) {
+					err := destination.Close()
+					if err != nil {
+						logrus.Debugf(err.Error())
+					}
+				}(destination)
+				_, err = io.Copy(destination, source)
 				if err != nil {
 					return err
 				}
 				return nil
-			}(tmpDirectory)
 
+			}(vaultFile, tmpDirectory)
 			if err != nil {
-				msg := fmt.Sprintf("Fail to read vault password for cluster '%s'", clusterName)
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-			} else {
-				list = append(list, ".vault")
+				return fmt.Errorf("playbook vault file copy failed for cluster '%s': %w", clusterName, err)
 			}
-		} else {
-			// Check for vault file
-			if vaultFile != "" {
-				stat, err := os.Stat(vaultFile)
-				if os.IsNotExist(err) {
-					msg := fmt.Sprintf("Playbook vault file not found for cluster '%s'", clusterName)
-					return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-				}
-				if !stat.Mode().IsRegular() {
-					msg := fmt.Sprintf("Playbook vault file is not regular file, for cluster '%s'", clusterName)
-					return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-				}
-				// Copy to tmp workdir
-				err = func(vaultFile string, tmpDirectory string) (err error) {
-					source, err := os.Open(vaultFile)
-					if err != nil {
-						return err
-					}
-					defer source.Close()
-					destination, err := os.Create(fmt.Sprintf("%s/.vault", tmpDirectory))
-					if err != nil {
-						return err
-					}
-					defer destination.Close()
-					_, err = io.Copy(destination, source)
-					if err != nil {
-						return err
-					}
-					return nil
-
-				}(vaultFile, tmpDirectory)
-				if err != nil {
-					msg := fmt.Sprintf("Playbook vault file copy fail for cluster '%s'", clusterName)
-					return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-				} else {
-					list = append(list, ".vault")
-				}
-			}
+			list = append(list, ".vault")
 		}
+	}
 
-		// Make cleaned archive
-		err = func(tmpDirectory string, list []string, playBookArchivePath string) (err error) {
-
-			archive, err := os.Create(playBookArchivePath)
+	// Make cleaned archive
+	err = func(tmpDirectory string, list []string, playBookArchivePath string) (err error) {
+		archive, err := os.Create(playBookArchivePath)
+		if err != nil {
+			return fmt.Errorf("fail to create cleaned playbook archive for cluster '%s': %w", clusterName, err)
+		}
+		defer func(afi *os.File) {
+			err := afi.Close()
 			if err != nil {
-				msg := fmt.Sprintf("Fail to create cleaned playbook archive for cluster '%s': %s", clusterName, err)
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+				logrus.Debugf(err.Error())
 			}
-			defer archive.Close()
+		}(archive)
 
-			zipWriter := zip.NewWriter(archive)
-			defer zipWriter.Close()
-
-			for _, path := range list {
-				fpFrom, err := os.Open(fmt.Sprintf("%s%s", tmpDirectory, path))
-				if err != nil {
-					return err
-				}
-				defer fpFrom.Close()
-				fpTo, err := zipWriter.Create(path)
-				if err != nil {
-					return err
-				}
-				if _, err := io.Copy(fpTo, fpFrom); err != nil {
-					return err
-				}
+		zipWriter := zip.NewWriter(archive)
+		defer func(zipWriter *zip.Writer) {
+			err := zipWriter.Close()
+			if err != nil {
+				logrus.Debugf(err.Error())
 			}
-			return nil
+		}(zipWriter)
 
-		}(tmpDirectory, list, fmt.Sprintf("%splaybook.zip", tmpDirectory))
+		for _, path := range list {
+			path := path
+			fpFrom, err := os.Open(fmt.Sprintf("%s%s", tmpDirectory, path))
+			if err != nil {
+				return err
+			}
 
-		if err != nil {
-			msg := fmt.Sprintf("Fail to make cleaned playbook archive for cluster '%s': %s", clusterName, err)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
-		}
+			//goland:noinspection ALL
+			defer func(afi *os.File) { // nolint
+				err := afi.Close()
+				if err != nil {
+					logrus.Debugf(err.Error())
+				}
+			}(fpFrom)
 
-		// Upload playbook archive
-		valuesOnRemote := &client.RemoteFilesHandler{}
-		rfc := client.RemoteFileItem{
-			Local:  fmt.Sprintf("%splaybook.zip", tmpDirectory),
-			Remote: fmt.Sprintf("%s/ansible_playbook.zip", utils.TempFolder),
-		}
-		valuesOnRemote.Add(&rfc)
-
-		// If vault file, set it to absolute
-		if vaultFile != "" || askForVault {
-			vaultFile = fmt.Sprintf(" --vault-password-file %s.vault", ansibleDir)
-		}
-
-		// Unzip archive to final destination and run playbook
-		cmdStr := fmt.Sprintf(
-			"sudo chown cladm:root %s && sudo chmod 0774 %s && sudo -u cladm unzip -o %s -d %s && ([ -f %srequirements.yml ] && sudo -u cladm -i ansible-galaxy install -r %srequirements.yml || true) && sudo -u cladm -i ansible-playbook %splaybook.yml -i %s%s %s",
-			rfc.Remote,
-			rfc.Remote,
-			rfc.Remote,
-			ansibleDir,
-			ansibleDir,
-			ansibleDir,
-			ansibleDir,
-			inventoryPath,
-			vaultFile,
-			strings.Join(filteredArgs, " "),
-		)
-
-		// Run playbook
-		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
-
-		// Even if command fail, must delete remote files as possible
-		cmdStr = ""
-		for _, v := range list {
-			cmdStr = fmt.Sprintf("%s sudo -u cladm rm -f %s%s &&", cmdStr, ansibleDir, v)
-		}
-		cmdStr = fmt.Sprintf("%s sudo -u cladm rm -f %splaybook.zip", cmdStr, tmpDirectory)
-
-		_ = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
-
-		// Clean temporaries (local)
-		_ = os.RemoveAll(tmpDirectory)
-
-		if err != nil {
-			msg := fmt.Sprintf("Fail to run playbook for cluster '%s': %s", clusterName, err)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+			var fpTo io.Writer
+			fpTo, err = zipWriter.Create(path)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(fpTo, fpFrom); err != nil {
+				return err
+			}
 		}
 		return nil
 
-	},
+	}(tmpDirectory, list, fmt.Sprintf("%splaybook.zip", tmpDirectory))
+
+	if err != nil {
+		return fmt.Errorf("failed to make cleaned playbook archive for cluster '%s': %w", clusterName, err)
+	}
+
+	// Upload playbook archive
+	valuesOnRemote := &client.RemoteFilesHandler{}
+	rfc := client.RemoteFileItem{
+		Local:  fmt.Sprintf("%splaybook.zip", tmpDirectory),
+		Remote: fmt.Sprintf("%s/ansible_playbook.zip", utils.TempFolder),
+	}
+	valuesOnRemote.Add(&rfc)
+
+	// If vault file, set it to absolute
+	if vaultFile != "" || askForVault {
+		vaultFile = fmt.Sprintf(" --vault-password-file %s.vault", ansibleDir)
+	}
+
+	// Unzip archive to final destination and run playbook
+	cmdStr := fmt.Sprintf(
+		"sudo chown cladm:root %s && sudo chmod 0774 %s && sudo -u cladm unzip -o %s -d %s && ([ -f %srequirements.yml ] && sudo -u cladm -i ansible-galaxy install -r %srequirements.yml || true) && sudo -u cladm -i ansible-playbook %splaybook.yml -i %s%s %s",
+		rfc.Remote,
+		rfc.Remote,
+		rfc.Remote,
+		ansibleDir,
+		ansibleDir,
+		ansibleDir,
+		ansibleDir,
+		inventoryPath,
+		vaultFile,
+		strings.Join(filteredArgs, " "),
+	)
+
+	// Run playbook
+	err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+	if err != nil {
+		return err
+	}
+
+	// Even if command fail, must delete remote files as possible
+	cmdStr = ""
+	for _, v := range list {
+		cmdStr = fmt.Sprintf("%s sudo -u cladm rm -f %s%s &&", cmdStr, ansibleDir, v)
+	}
+	cmdStr = fmt.Sprintf("%s sudo -u cladm rm -f %splaybook.zip", cmdStr, tmpDirectory)
+
+	err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+	if err != nil {
+		return err
+	}
+
+	// Clean temporaries (local)
+	err = os.RemoveAll(tmpDirectory)
+	if err != nil {
+		return fmt.Errorf("failed to run playbook for cluster '%s': %w", clusterName, err)
+	}
+	return nil
 }

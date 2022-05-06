@@ -3022,7 +3022,7 @@ type taskUpdateClusterInventoryMasterParameters struct {
 	inventoryData string
 }
 
-// taskUpdateClusterInventoryMaster task to updates a Host (master) ansible inventory
+// taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory
 func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 
 	defer fail.OnPanic(&ferr)
@@ -3052,7 +3052,7 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	rfcItem := Item{
 		Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
-		RemoteOwner:  "safescale:safescale",
+		RemoteOwner:  "cladm:cladm",
 		RemoteRights: "ou+rx-w,g+rwx",
 	}
 
@@ -3085,10 +3085,10 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 	}
 	if retcode != 0 {
 		xerr := fail.NewError("%sfail to clean previous temporaries", prerr)
-		_ = xerr.Annotate("cmd", cmd)
-		_ = xerr.Annotate("stdout", stdout)
-		_ = xerr.Annotate("stderr", stderr)
-		_ = xerr.Annotate("retcode", retcode)
+		xerr.Annotate("cmd", cmd)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode)
 		return xerr
 	}
 
@@ -3099,7 +3099,8 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 	}
 
 	// Run update commands
-	for i, cmd := range commands {
+	for a, acmd := range commands {
+		i, cmd := a, acmd
 		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, connTimeout, delay)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -3107,10 +3108,10 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 		}
 		if retcode != 0 {
 			xerr := fail.NewError(errmsg[i])
-			_ = xerr.Annotate("cmd", cmd)
-			_ = xerr.Annotate("stdout", stdout)
-			_ = xerr.Annotate("stderr", stderr)
-			_ = xerr.Annotate("retcode", retcode)
+			xerr.Annotate("cmd", cmd)
+			xerr.Annotate("stdout", stdout)
+			xerr.Annotate("stderr", stderr)
+			xerr.Annotate("retcode", retcode)
 			return xerr
 		}
 	}
