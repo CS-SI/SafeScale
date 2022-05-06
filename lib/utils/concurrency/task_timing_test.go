@@ -22,15 +22,84 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	bg := context.Background()
+	bgt, cancelBgt := context.WithTimeout(bg, time.Duration(30)*time.Millisecond)
+	defer cancelBgt()
+
+	single, xerr := NewTaskWithContext(bgt)
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	single, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			for {
+				time.Sleep(time.Duration(10) * time.Millisecond)
+				status, xerr := t.Status()
+				if xerr != nil {
+					return "Big failure...", nil
+				}
+				if status == ABORTED || status == TIMEOUT {
+					break
+				}
+
+				fmt.Println("Forever young...")
+			}
+			return "I want to be forever young", nil
+		}, nil, time.Duration(200)*time.Millisecond,
+	)
+	if xerr != nil {
+		t.Errorf("This shouldn't happen")
+	}
+	require.Nil(t, xerr)
+
+	time.Sleep(time.Duration(300) * time.Millisecond)
+	// by now single should have finished with timeouts, so...
+
+	stat, err := single.Status()
+	if err != nil {
+		t.Errorf("Problem retrieving status ?")
+	}
+
+	if stat != TIMEOUT {
+		t.Errorf("Where is the timeout ??, that's the textbook definition")
+	}
+
+	_, xerr = single.Wait()
+	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrTimeout); !ok { // This exception come from ctx, but it's the wrong type -> ErrAborted, and it should be an ErrTimeout
+			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
+		}
+	}
+	if xerr == nil {
+		t.Errorf("It should have finished with errors !")
+		require.NotNil(t, xerr)
+	}
+
+	// Nothing wrong should happen after this point...
+	time.Sleep(time.Duration(100) * time.Millisecond)
+
+	_ = w.Close()
+	_, _ = ioutil.ReadAll(r)
+	os.Stdout = rescueStdout
+}
 
 func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	funk := func(ind int, timeout int, sleep int, trigger int, errorExpected bool) {
