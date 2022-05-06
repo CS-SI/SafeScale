@@ -25,7 +25,7 @@ fi
 
 stamp=`date +"%s"`
 
-[ -z "$GOVERSION" ] && GOVERSION=1.16.8
+[ -z "$GOVERSION" ] && GOVERSION=1.16.15
 [ -z "$PROTOVERSION" ] && PROTOVERSION=3.17.3
 
 BRANCH_NAME=$VERNAME PROTOVERSION=$PROTOVERSION GOVERSION=$GOVERSION envsubst <Dockerfile.cover.local > Dockerfile.$stamp
