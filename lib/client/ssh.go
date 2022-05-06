@@ -100,7 +100,6 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
 					return innerXErr
-					// ready = false
 				case *fail.ErrTimeout:
 					return innerXErr
 				default:
@@ -254,14 +253,11 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		return invalid, "", "", xerr
 	}
 
-	if executionTimeout < temporal.HostOperationTimeout() {
+	if executionTimeout < temporal.HostOperationTimeout() && executionTimeout != 0 {
 		executionTimeout = temporal.HostOperationTimeout()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
-	}
-	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout
 	}
 
 	task, xerr := s.session.GetTask()
@@ -274,6 +270,11 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		stdout, stderr string
 	)
 
+	extendedTimeout := connectionTimeout + 2*executionTimeout
+	if executionTimeout == 0 {
+		extendedTimeout = connectionTimeout + 2*temporal.HostOperationTimeout()
+	}
+
 	retcode := -1
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -282,6 +283,10 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 			)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				if strings.Contains(xerr.Error(), "permission denied") {
+					return retry.StopRetryError(xerr, "permission denied trying to copy '%s' to '%s'", localPath, remotePath)
+				}
+
 				return xerr
 			}
 
@@ -408,7 +413,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 			return nil
 		},
 		temporal.MinDelay(),
-		connectionTimeout+2*executionTimeout,
+		extendedTimeout,
 	)
 	if retryErr != nil {
 		switch cErr := retryErr.(type) { // nolint
