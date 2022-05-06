@@ -21,8 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
