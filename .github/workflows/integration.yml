@@ -5,7 +5,6 @@ on:
     branches:
       - master
       - develop
-      - hotfixes
       - 'release/**'
       - 'review/**'
   pull_request:
@@ -13,6 +12,7 @@ on:
       - master
       - develop
       - 'release/**'
+      - 'review/**'
 
 env:
   PROTOCVERSION: 3.17.3
@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         go: [ 1.17.8 ]
-        tags: [ releaserc, integrationtests, allintegration, clustertests, networktests, subnettests, hosttests, volumetests, securitygrouptests ]
+        tags: [ releasetags, integrationtests, allintegration, clustertests, networktests, subnettests, hosttests, volumetests, securitygrouptests ]
 
     runs-on: ubuntu-latest
 
