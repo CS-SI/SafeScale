@@ -1998,12 +1998,6 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		// Set client session
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		// Check for feature
 		values := map[string]string{}
 		settings := protocol.FeatureSettings{}
@@ -2057,13 +2051,10 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 				[-i INVENTORY]
 				*/
 				captureInventory = true // extract given inventory (overload default inventoryPath)
-				break
 			case "--vault-password-file":
 				captureVaultFile = true
-				break
 			case "--ask-vault-pass":
 				askForVault = true
-				break
 			case "-h":
 			case "--help":
 				askForHelp = true
@@ -2084,10 +2075,9 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 				[-a MODULE_ARGS] [-m MODULE_NAME]
 				*/
 				filteredArgs = append(filteredArgs, arg)
-				break
 			}
 
-			if !isParam && capturePlaybookFile == false {
+			if !isParam && !capturePlaybookFile {
 				capturePlaybookFile = true
 			}
 		}
@@ -2181,7 +2171,7 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 		}
 
 		// Set client session
-		clientSession, xerr = client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
@@ -2291,8 +2281,6 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 		}
 
 		list = []string{"playbook.yml"}
-
-		break
 	case "zip":
 		// Check archive content
 		list, err = func(archivePath string, tmpDirectory string) ([]string, error) {
@@ -2393,7 +2381,6 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 		if err != nil {
 			return fmt.Errorf("playbook archive invalid '%s': %w", clusterName, err)
 		}
-		break
 	default:
 		return fmt.Errorf("playbook file extention expect .yml or .zip, (unexpected %s) for cluster '%s'", playbookExtension, clusterName)
 	}
@@ -2426,7 +2413,7 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 		}(tmpDirectory)
 
 		if err != nil {
-			return fmt.Errorf("fail to read vault password for cluster '%s'", clusterName)
+			return fmt.Errorf("fail to read vault password for cluster '%s': %w", clusterName, err)
 		}
 		list = append(list, ".vault")
 	} else {
