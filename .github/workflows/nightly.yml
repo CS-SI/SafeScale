@@ -30,4 +30,4 @@ jobs:
           file: ./Dockerfile.current
           push: true
           tags: |
-            ghcr.io/CS-SI/safescale:nightly
+            ghcr.io/cs-si/safescale:nightly
