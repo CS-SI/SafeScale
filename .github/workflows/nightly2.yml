@@ -1,12 +1,13 @@
-name: "Nightly Build"
+name: "Nightly Build Test"
 
 on:
-  schedule:
-    - cron: '0 0 * * *'
+  push:
+    branches:
+      - hotfixes
 
 jobs:
   nightly:
-    name: Build Docker Image Nightly
+    name: Build Docker Image Hotfixes
     runs-on: ubuntu-20.04
 
     steps:
@@ -30,4 +31,4 @@ jobs:
           file: ./Dockerfile.current
           push: true
           tags: |
-            ghcr.io/cs-si/safescale:nightly
+            ghcr.io/cs-si/safescale:hotfixes
