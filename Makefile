@@ -99,9 +99,9 @@ releasetags:
 	@echo "settings go build tags for release"
 	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
 
-integrationtests:
-	@echo "settings go build tags for integrationtests"
-	@$(eval BUILD_TAGS = "integrationtests,$(BUILD_TAGS)")
+integration:
+	@echo "settings go build tags for integration"
+	@$(eval BUILD_TAGS = "integration,$(BUILD_TAGS)")
 
 allintegration:
 	@echo "settings go build tags for allintegration"
@@ -429,33 +429,33 @@ vettest:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,clustertests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,networktests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,subnettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,hosttests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
-	@cd integrationtests && $(GO) vet -tags integrationtests,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,clustertests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,networktests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,subnettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,hosttests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@mv ./integrationtests/integration_vet_results.log .
-	@if [ -s ./integration_vet_results.log ] && grep -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_vet_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_vet_results.log $(NO_COLOR)\n";fi;
 
 validtest: vettest
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./integration_results.log || true
 	@cd integrationtests && $(GO) test -v ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && $(GO) test -v -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,clustertests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,networktests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,subnettests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,hosttests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,volumetests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && $(GO) test -v -tags integrationtests,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,clustertests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,networktests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,subnettests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,hosttests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,volumetests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && $(GO) test -v -tags integration,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
 	@mv ./integrationtests/integration_results.log .
-	@if [ -s ./integration_results.log ] && grep -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep -e FAIL -e PASS ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
 
 mintest: begin
