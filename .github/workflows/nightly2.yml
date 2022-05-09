@@ -7,7 +7,7 @@ on:
 
 jobs:
   nightly:
-    name: Build Docker Image Nightly Bugfix
+    name: Build Docker Image Hotfixes
     runs-on: ubuntu-20.04
 
     steps:
@@ -31,4 +31,4 @@ jobs:
           file: ./Dockerfile.current
           push: true
           tags: |
-            ghcr.io/cs-si/safescale:nightly
+            ghcr.io/cs-si/safescale:hotfixes

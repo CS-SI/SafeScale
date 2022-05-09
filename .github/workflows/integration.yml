@@ -24,7 +24,7 @@ jobs:
     strategy:
       matrix:
         go: [ 1.17.8 ]
-        tags: [ releasetags, integrationtests, allintegration, clustertests, networktests, subnettests, hosttests, volumetests, securitygrouptests ]
+        tags: [ releasetags, integration, allintegration ]
 
     runs-on: ubuntu-latest
 
