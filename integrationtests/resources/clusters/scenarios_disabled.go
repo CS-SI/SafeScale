@@ -1,10 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && clustertests))
+// +build !allintegration
+// +build !integration !clustertests
 
-/*
-go:build integrationtests && !clusters && !allintegration
- +build integrationtests,!clusters,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *

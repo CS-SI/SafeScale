@@ -1,13 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && subnettests))
+// +build !allintegration
+// +build !integration !subnettests
 
-// //go:build integrationtests && !subnets && !allintegration
-// // +build integrationtests,!subnets,!allintegration
-
-/*
-go:build integrationtests && !subnets && !allintegration
- +build integrationtests,!subnets,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -26,6 +20,10 @@ go:build integrationtests && !subnets && !allintegration
 
 package subnets
 
-// func Test_SubnetStandard(t *testing.T) {
-// 	t.Skip("shares tests disabled")
-// }
+import (
+	"testing"
+)
+
+func Test_Nop(t *testing.T) {
+	t.Skip("subnet tests disabled")
+}

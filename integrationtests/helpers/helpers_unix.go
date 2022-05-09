@@ -1,8 +1,6 @@
-//go:build disabled
-// +build disabled
-
-// //go:build integrationtests && !windows
-// // +build integrationtests,!windows
+//go:build (allintegration || integration) && !windows
+// +build allintegration integration
+// +build !windows
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
