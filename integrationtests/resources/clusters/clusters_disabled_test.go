@@ -1,13 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && clustertests))
+// +build !allintegration
+// +build !integration !clustertests
 
-// //go:build integrationtests && !clusters && !allintegration
-// // +build integrationtests,!clusters,!allintegration
-
-/*
-go:build integrationtests && !clusters && !allintegration
- +build integrationtests,!clusters,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -30,14 +24,6 @@ import (
 	"testing"
 )
 
-func Test_ClusterK8S(t *testing.T) {
-	t.Skip("clusters tests disabled")
-}
-
-func Test_Helm(t *testing.T) {
-	t.Skip("clusters tests disabled")
-}
-
-func Test_Kubernetes(t *testing.T) {
-	t.Skip("clusters tests disabled")
+func Test_Nop(t *testing.T) {
+	t.Skip("cluster tests disabled")
 }

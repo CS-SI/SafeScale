@@ -1,13 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && hosttests))
+// +build !allintegration
+// +build !integration !hosttests
 
-// //go:build integrationtests && !hosts && !allintegration
-// // +build integrationtests,!hosts,!allintegration
-
-/*
-go:build integrationtests && !hosts && !allintegration
- +build integrationtests,!hosts,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -30,18 +24,6 @@ import (
 	"testing"
 )
 
-func Test_BasicPublicHosts(t *testing.T) {
-	t.Skip("hosts tests disabled")
-}
-
-func Test_BasicNormalHosts(t *testing.T) {
-	t.Skip("hosts tests disabled")
-}
-
-func Test_ReadyToSSH(t *testing.T) {
-	t.Skip("hosts tests disabled")
-}
-
-func Test_StopStartReadyToSSH(t *testing.T) {
-	t.Skip("hosts tests disabled")
+func Test_Nop(t *testing.T) {
+	t.Skip("host tests disabled")
 }

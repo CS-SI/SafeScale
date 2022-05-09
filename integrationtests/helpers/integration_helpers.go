@@ -1,8 +1,5 @@
-//go:build disabled
-// +build disabled
-
-// //go:build integrationtests
-// // +build integrationtests
+//go:build allintegration || integration
+// +build allintegration integration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -27,10 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/providers"
 )
@@ -57,6 +51,7 @@ func IsSafescaledLaunched() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return strings.Contains(string(out), "safescaled"), nil
 }
 
@@ -69,6 +64,7 @@ func CanBeRun(command string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return strings.Contains(string(out), command), nil
 }
 
@@ -111,40 +107,61 @@ func RunOnlyInIntegrationTest(key string) error {
 	return nil
 }
 
-func Setup(t *testing.T) {
+func Setup() bool {
 	safescaledLaunched, err := IsSafescaledLaunched()
+	if err != nil {
+		fmt.Println("safescaled is not running")
+		return false
+	}
 	if !safescaledLaunched {
 		fmt.Println("This requires that you launch safescaled in background and set the tenant")
+		return false
 	}
-	require.True(t, safescaledLaunched)
-	require.Nil(t, err)
 
-	inPath, err := CanBeRun("safescale")
-	require.Nil(t, err)
-
-	require.True(t, safescaledLaunched)
-	require.True(t, inPath)
+	_, err = CanBeRun("safescale")
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
 
 	// Check if tenant set corresponds to the content of the corresponding environment variable
 	listStr, err := GetOutput("safescale tenant list")
-	require.Nil(t, err)
-	require.True(t, len(listStr) > 0)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	if len(listStr) <= 0 {
+		fmt.Println("No tenant found.")
+		return false
+	}
 
 	providerOfCurrentTenant, err := GetOutput("safescale tenant get | jq -r .result.provider")
 	if err != nil {
-		fmt.Println("This requires that you set the right tenant before launching the tests")
+		fmt.Println(err)
+		return false
 	}
-	require.Nil(t, err)
-	require.True(t, len(providerOfCurrentTenant) > 0)
+	if len(providerOfCurrentTenant) <= 0 {
+		fmt.Println("No tenant set")
+		return false
+	}
 
 	providers.CurrentProvider, err = providers.FromString(strings.Trim(providerOfCurrentTenant, "\n"))
-	require.Nil(t, err)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
 
 	key := providers.CurrentProvider.Key()
-	require.NotEmpty(t, key)
+	if key == "" {
+		fmt.Printf("Environment variable '%s' not found\n", key)
+		return false
+	}
 
 	err = RunOnlyInIntegrationTest(key)
 	if err != nil {
-		t.Skip(err)
+		fmt.Println(err)
+		return false
 	}
+
+	return true
 }

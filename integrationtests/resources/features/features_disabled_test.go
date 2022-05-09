@@ -1,13 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && featuretests))
+// +build !allintegration
+// +build !integration !featuretests
 
-// //go:build integrationtests && !features && !allintegration
-// // +build integrationtests,!features,!allintegration
-
-/*
-go:build integrationtests && !features && !allintegration
- +build integrationtests,!features,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -30,30 +24,6 @@ import (
 	"testing"
 )
 
-func Test_Docker(t *testing.T) {
-	t.Skip("features tests disabled")
-}
-
-func Test_DockerNotGateway(t *testing.T) {
-	t.Skip("features tests disabled")
-}
-
-func Test_DockerCompose(t *testing.T) {
-	t.Skip("features tests disabled")
-}
-
-func Test_RemoteDesktopOnSingleHost(t *testing.T) {
-	t.Skip("features tests disabled")
-}
-
-func Test_RemoteDesktopOnNormalHost(t *testing.T) {
-	t.Skip("features tests disabled")
-}
-
-func Test_ReverseProxy(t *testing.T) {
-	t.Skip("features tests disabled")
-}
-
-func Test_NvidiaDocker(t *testing.T) {
-	t.Skip("features tests disabled")
+func Test_Nop(t *testing.T) {
+	t.Skip("feature tests disabled")
 }

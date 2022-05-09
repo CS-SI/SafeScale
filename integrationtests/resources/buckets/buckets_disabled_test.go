@@ -1,10 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && buckettests))
+// +build !allintegration
+// +build !integration !buckettests
 
-/*
-go:build (integrationtests && buckets) || allintegration
- +build integrationtests,buckets allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -23,12 +20,10 @@ go:build (integrationtests && buckets) || allintegration
 
 package buckets
 
-// func Test_NetworkCreate(t *testing.T) {
-// 	helpers.AddScenario(CreateNetwork)
-// 	helpers.RunScenarii(t)
-// }
-//
-// func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-// 	helpers.AddScenario(CreateNetworkWithoutSubnet)
-// 	helpers.RunScenarii(t)
-// }
+import (
+	"testing"
+)
+
+func Test_Nop(t *testing.T) {
+	t.Skip("bucket tests disabled")
+}

@@ -1,13 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && volumetests))
+// +build !allintegration
+// +build !integration !volumetests
 
-// //go:build integrationtests && !volumes && !allintegration
-// // +build integrationtests,!volumes,!allintegration
-
-/*
-go:build integrationtests && !volumes && !allintegration
- +build integrationtests,!volumes,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -30,14 +24,6 @@ import (
 	"testing"
 )
 
-func Test_VolumeError(t *testing.T) {
-	t.Skip("volumes tests disabled")
-}
-
-func Test_DeleteVolumeMounted(t *testing.T) {
-	t.Skip("volumes tests disabled")
-}
-
-func Test_UntilVolume(t *testing.T) {
-	t.Skip("volumes tests disabled")
+func Test_Nop(t *testing.T) {
+	t.Skip("volume tests disabled")
 }

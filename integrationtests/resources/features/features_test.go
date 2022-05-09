@@ -1,13 +1,6 @@
-//go:build disabled
-// +build disabled
+//go:build (integration && featuretests) || allintegration
+// +build integration,featuretests allintegration
 
-// //go:build (integrationtests && features) || allintegration
-// // +build integrationtests,features allintegration
-
-/*
-go:build (integrationtests && features) || allintegration
- +build integrationtests,features allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *

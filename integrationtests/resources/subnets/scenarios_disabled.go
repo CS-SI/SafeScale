@@ -1,10 +1,7 @@
-//go:build disabled
-// +build disabled
+//go:build !(allintegration || (integration && subnettests))
+// +build !allintegration
+// +build !integration !subnettests
 
-/*
-go:build integrationtests && !subnets && !allintegration
- +build integrationtests,!subnets,!allintegration
-*/
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
