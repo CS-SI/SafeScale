@@ -3,14 +3,15 @@ name: licenses
 on:
   push:
     branches:
-      - hotfixes
       - master
       - develop
       - 'review/**'
+      - 'release/**'
   pull_request:
     branches:
       - master
       - develop
+      - 'review/**'
       - 'release/**'
 
 env:

@@ -1,5 +1,7 @@
-//go:build !(allintegration || integration)
-// +build !allintegration,!integration
+/*
+  //go:build !(allintegration || integration)
+  // +build !allintegration,!integration
+*/
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

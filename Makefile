@@ -99,9 +99,9 @@ releasetags:
 	@echo "settings go build tags for release"
 	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
 
-integrationtests:
-	@echo "settings go build tags for integrationtests"
-	@$(eval BUILD_TAGS = "integrationtests,$(BUILD_TAGS)")
+integration:
+	@echo "settings go build tags for integration"
+	@$(eval BUILD_TAGS = "integration,$(BUILD_TAGS)")
 
 allintegration:
 	@echo "settings go build tags for allintegration"
