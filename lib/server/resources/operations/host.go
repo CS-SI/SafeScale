@@ -254,9 +254,9 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 					}
 
-					ip, xerr := castedGW.GetAccessIP(ctx)
-					if xerr != nil {
-						return xerr
+					ip, inXErr := castedGW.GetAccessIP(ctx)
+					if inXErr != nil {
+						return inXErr
 					}
 
 					primaryGatewayConfig, inXErr = ssh.NewConfig(gwahc.Name, ip, uint(gwahc.SSHPort), opUser, gwahc.PrivateKey)

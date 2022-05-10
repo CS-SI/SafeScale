@@ -117,7 +117,7 @@ func (desc Description) createConfigurationFile() (*os.File, fail.Error) {
 	}
 
 	// build temporary file
-	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return nil, xerr
 	}

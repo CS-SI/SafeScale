@@ -137,7 +137,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Profile, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -435,7 +435,7 @@ func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Co
 		return nil, fail.ConvertError(err)
 	}
 
-	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
+	return converters.SSHConfigFromProtocolToSystem(sshConfig)
 }
 
 // Connect is the "safescale ssh connect"
@@ -491,7 +491,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
 		if xerr != nil {
 			return xerr
-		}*/
+		}
 	}
 	xerr = sshCfg.SetIPAddress(ssh.Loopback)
 	if xerr != nil {
@@ -545,16 +545,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	}
 
 	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
-		sshCfg.GatewayConfig = &ssh.Profile{
-			User:          sshCfg.User,
-			IPAddress:     sshCfg.IPAddress,
-			Hostname:      sshCfg.Hostname,
-			PrivateKey:    sshCfg.PrivateKey,
-			Port:          sshCfg.Port,
-			GatewayConfig: nil,
-		}
-		sshCfg.IPAddress = "127.0.0.1"
-		/*gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
@@ -571,8 +562,8 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	}
 
 	cmdString := fmt.Sprintf(
-		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig.User,
-		sshCfg.GatewayConfig.IPAddress,
+		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(),
+		sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress(),
 	)
 	// cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
 
