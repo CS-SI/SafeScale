@@ -442,6 +442,7 @@ vettest:
 	@cd integrationtests && $(GO) vet -tags integration,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@mv ./integrationtests/integration_vet_results.log .
 	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_vet_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then exit 1;fi;
 
 validtest: vettest
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -460,7 +461,9 @@ validtest: vettest
 	@cd integrationtests && (echo "tags:integration,securitygrouptests:" && $(GO) test -v -tags integration,securitygrouptests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@mv ./integrationtests/integration_results.log .
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
-	@if [ -s ./integration_results.log ] && grep -e FAIL -e PASS ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
+	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
 
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -649,7 +652,6 @@ help: with_git
 	@echo '  test         - Runs all unit tests'
 	@echo '  convey       - Runs goconvey in lib/utils dir'
 	@echo '  show-cov     - Displays coverage info in firefox'
-	@echo '  checkforpr   - Runs build and check everything os ok for Pull Request'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
