@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
@@ -72,30 +73,26 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		return invalid, "", "", xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+	defer func() {
+		derr := sshConn.Close()
+		if derr != nil {
+			logrus.Warn(fail.Wrap(derr, "failed to close SSH connection").Error())
+		}
+	}()
+
 	// Create the command
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() (innerErr error) {
-			sshCmd, innerXErr := sshCfg.NewCommand(ctx, command)
+			sshCmd, innerXErr := sshConn.NewCommand(ctx, command)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			defer func(cmd *ssh.Command) {
-				derr := cmd.Close()
-				if derr != nil {
-					if innerErr != nil {
-						innerXErr = fail.ConvertError(innerErr)
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-						innerErr = innerXErr
-						return
-					}
-					innerErr = derr
-				}
-			}(sshCmd)
-
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(
-				ctx, outs, executionTimeout,
-			)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -110,9 +107,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 			}
 
 			if retcode == 255 { // ssh connection drop
-				return fail.NotAvailableError(
-					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
-				)
+				return fail.NotAvailableError("Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname)
 			}
 
 			return nil
@@ -142,7 +137,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Profile, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -275,12 +270,15 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		extendedTimeout = connectionTimeout + 2*temporal.HostOperationTimeout()
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	retcode := -1
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, xerr := sshCfg.CopyWithTimeout(
-				ctx, remotePath, localPath, upload, executionTimeout,
-			)
+			iretcode, istdout, istderr, xerr := sshConn.CopyWithTimeout(ctx, remotePath, localPath, upload, executionTimeout)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				if strings.Contains(xerr.Error(), "permission denied") {
@@ -297,14 +295,12 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 					defer cancelCrc()
 
 					if upload {
-						crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
+						crcCmd, finnerXerr := sshConn.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
 						if finnerXerr != nil {
 							return finnerXerr
 						}
 
-						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-							crcCtx, outputs.COLLECT, executionTimeout,
-						)
+						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
 						finnerXerr = debug.InjectPlannedFail(finnerXerr)
 						if finnerXerr != nil {
 							finnerXerr.Annotate("retcode", fretcode)
@@ -365,14 +361,12 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
 					defer cancelCrc()
 
-					crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
+					crcCmd, finnerXerr := sshConn.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
 					if finnerXerr != nil {
 						return fail.WarningError(finnerXerr, "failure creating md5 command")
 					}
 
-					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-						crcCtx, outputs.COLLECT, executionTimeout,
-					)
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
 						finnerXerr.Annotate("retcode", fretcode)
@@ -426,7 +420,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 }
 
 // getSSHConfigFromName ...
-func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Profile, fail.Error) {
+func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Config, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -441,7 +435,7 @@ func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Pr
 		return nil, fail.ConvertError(err)
 	}
 
-	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
+	return converters.SSHConfigFromProtocolToSystem(sshConfig)
 }
 
 // Connect is the "safescale ssh connect"
@@ -451,9 +445,21 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 		return xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	if xerr != nil {
+		return xerr
+	}
+
+	defer func() {
+		derr := sshConn.Close()
+		if derr != nil {
+			logrus.Warn(fail.Wrap(derr).Error())
+		}
+	}()
+
 	return retry.WhileUnsuccessfulWithAggregator(
 		func() error {
-			return sshCfg.Enter(username, shell)
+			return sshConn.Enter(username, shell)
 		},
 		temporal.DefaultDelay(),
 		temporal.SSHConnectionTimeout(),
@@ -476,31 +482,46 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		return xerr
 	}
 
-	if sshCfg.GatewayConfig == nil {
-		sshCfg.GatewayConfig = &ssh.Profile{
-			User:          sshCfg.User,
-			IPAddress:     sshCfg.IPAddress,
-			Hostname:      sshCfg.Hostname,
-			PrivateKey:    sshCfg.PrivateKey,
-			Port:          sshCfg.Port,
-			GatewayConfig: nil,
-		}
-		/*sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
+		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
-		}*/
+		}
+
+		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+		if xerr != nil {
+			return xerr
+		}
 	}
-	sshCfg.IPAddress = "127.0.0.1"
-	sshCfg.Port = remotePort
-	sshCfg.LocalPort = localPort
+	xerr = sshCfg.SetIPAddress(ssh.Loopback)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = sshCfg.SetPort(uint(remotePort))
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = sshCfg.SetLocalPort(uint(localPort))
+	if xerr != nil {
+		return xerr
+	}
+
+	// to establish a tunnel from safescale, we NEED to use ssh cli; as soon as safescale ends, a tunnel establish by lib will vanish
+	sshConn, xerr := ssh.NewCliConnector(*sshCfg)
+	if xerr != nil {
+		return xerr
+	}
+
 	/*sshCfg.SetIPAddress("127.0.0.1")
 	sshCfg.SetPort(uint(remotePort))
 	sshCfg.SetLocalPort(uint(localPort))
 	*/
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			_, _, innerErr := sshCfg.CreateTunneling()
-			return innerErr
+			_, _, innerXErr := sshConn.CreateTunneling()
+			return innerXErr
 		},
 		temporal.DefaultDelay(),
 		temporal.SSHConnectionTimeout(),
@@ -524,28 +545,25 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	}
 
 	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
-		sshCfg.GatewayConfig = &ssh.Profile{
-			User:          sshCfg.User,
-			IPAddress:     sshCfg.IPAddress,
-			Hostname:      sshCfg.Hostname,
-			PrivateKey:    sshCfg.PrivateKey,
-			Port:          sshCfg.Port,
-			GatewayConfig: nil,
-		}
-		sshCfg.IPAddress = "127.0.0.1"
-		/*gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
 
-		sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
-		sshCfg.SetIPAddress("127.0.0.1")
-		*/
+		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+		if xerr != nil {
+			return xerr
+		}
+
+		xerr = sshCfg.SetIPAddress(ssh.Loopback)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	cmdString := fmt.Sprintf(
-		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig.User,
-		sshCfg.GatewayConfig.IPAddress,
+		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(),
+		sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress(),
 	)
 	// cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
 

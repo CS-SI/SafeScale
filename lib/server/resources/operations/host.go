@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -45,6 +46,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetproperty"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/consts"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
@@ -80,7 +82,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    *ssh.Config
+		sshProfile                    sshapi.Config
 	}
 }
 
@@ -203,7 +205,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig *ssh.Profile
+		var primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -252,9 +254,9 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 					}
 
-					ip, xerr := castedGW.GetAccessIP(ctx)
-					if xerr != nil {
-						return xerr
+					ip, inXErr := castedGW.GetAccessIP(ctx)
+					if inXErr != nil {
+						return inXErr
 					}
 
 					primaryGatewayConfig, inXErr = ssh.NewConfig(gwahc.Name, ip, uint(gwahc.SSHPort), opUser, gwahc.PrivateKey)
@@ -1611,7 +1613,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	return nil
 }
 
-func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase, timeout time.Duration) (string, fail.Error) {
+func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase, timeout time.Duration) (_ string, ferr fail.Error) {
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()),
 		fmt.Sprintf("Finish Waiting install phase %s on '%s'...", phase, instance.GetName()),
@@ -1645,7 +1647,13 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 		return "", xerr
 	}
 
-	status, xerr := sshProfile.WaitServerReady(ctx, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
+	sshConn, xerr := sshfactory.NewConnector(sshProfile)
+	if xerr != nil {
+		return "", xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
+	status, xerr := sshConn.WaitServerReady(ctx, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2639,7 +2647,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh.Profile, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Config, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -2771,9 +2779,15 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		return retcode, stdout, stderr, xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(sshProfile)
+	if xerr != nil {
+		return retcode, stdout, stderr, xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(task.Context(), target, source, false, timeout)
+			iretcode, istdout, istderr, innerXErr := sshConn.CopyWithTimeout(task.Context(), target, source, false, timeout)
 			if innerXErr != nil {
 				return innerXErr
 			}

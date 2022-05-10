@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package ssh
+package bycli
 
 import (
 	"context"
@@ -26,28 +26,23 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
-	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-)
-
-type WhatGateway uint
-
-const (
-	PrimaryGateway   WhatGateway = 0
-	SecondaryGateway WhatGateway = 1
 )
 
 const (
@@ -58,256 +53,32 @@ const (
 	sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 )
 
-// Config helper to manage ssh session
-type Config interface {
-	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
-	CreateTunneling() (Tunnels, Config, fail.Error)
-	Enter(string, string) fail.Error
-	GatewayConfig(gwIndex WhatGateway) Config
-	Hostname() string
-	IPAddress() string
-	LocalPort() uint
-	NewCommand(context.Context, string) (*Command, fail.Error)
-	NewSudoCommand(context.Context, string) (*Command, fail.Error)
-	Port() uint
-	PrivateKey() string
-	SetGatewayConfig(gwIndex WhatGateway, sshConfig Config) fail.Error
-	SetHostname(hostname string) fail.Error
-	SetIPAddress(ipAddress string) fail.Error
-	SetLocalPort(port uint) fail.Error
-	SetPort(port uint) fail.Error
-	SetPrivateKey(privateKey string) fail.Error
-	SetUser(user string) fail.Error
-	User() string
-	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)
+// Connector implementation using SSH commands
+type Connector struct {
+	Lock          *sync.RWMutex
+	TargetConfig  *internal.ConfigProperties // contains the Config of the remote server
+	tunnels       Tunnels                    // Contains all the step to reach the remote server
+	targetKeyFile *os.File                   // Contains the file used as key file
+	finalConfig   *internal.ConfigProperties // contains the Config to used to reach the remote server after tunnels habe been set
 }
 
-// sshConfig helper to manage ssh session
-type sshConfig struct {
-	_private sshConfigInternal
-}
-
-// sshConfigInternal describes the internal content of sshConfig
-type sshConfigInternal struct {
-	User                   string             `json:"user"`
-	IPAddress              string             `json:"ip_address"`
-	PrivateKey             string             `json:"private_key"`
-	Hostname               string             `json:"hostname"`
-	GatewayConfig          *sshConfigInternal `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig *sshConfigInternal `json:"secondary_gateway_config,omitempty"`
-	Port                   uint               `json:"port"`
-	LocalPort              uint               `json:"-"`
-}
-
-// Clone makes a clone of instance
-func (sci *sshConfigInternal) Clone() *sshConfigInternal {
-	if sci == nil {
-		return nil
+// NewConnector ...
+func NewConnector(conf api.Config) (*Connector, fail.Error) {
+	casted, ok := conf.(*internal.Config)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast 'conf' to '*internal.Config'")
 	}
 
-	out := *sci
-	if sci.GatewayConfig != nil {
-		out.GatewayConfig = sci.GatewayConfig.Clone()
+	out := Connector{
+		Lock:         new(sync.RWMutex),
+		TargetConfig: casted.Properties(),
 	}
-	if sci.SecondaryGatewayConfig != nil {
-		out.SecondaryGatewayConfig = sci.SecondaryGatewayConfig.Clone()
-	}
-	return &out
-}
-
-// NewEmptyConfig instanciates a sshConfig instance
-func NewEmptyConfig() Config {
-	out := &sshConfig{
-		_private: sshConfigInternal{
-			GatewayConfig:          nil,
-			SecondaryGatewayConfig: nil,
-		},
-	}
-	return out
-}
-
-// NewConfig ...
-func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, gws ...Config) (Config, fail.Error) {
-	if hostname == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostname")
-	}
-	if ipAddress == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ipAddress")
-	}
-	if privateKey == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("privateKey")
-	}
-	if port == 0 {
-		port = 22
-	}
-
-	out := NewEmptyConfig()
-	out.SetUser(user)
-	out.SetHostname(hostname)
-	out.SetIPAddress(ipAddress)
-	out.SetPort(port)
-	out.SetPrivateKey(privateKey)
-
-	if len(gws) > 0 {
-		gw := gws[PrimaryGateway]
-		if gw != nil {
-			xerr := out.SetGatewayConfig(PrimaryGateway, gw)
-			if xerr != nil {
-				return nil, xerr
-			}
-		}
-	}
-
-	if len(gws) > 1 {
-		gw := gws[SecondaryGateway]
-		if gw != nil {
-			xerr := out.SetGatewayConfig(SecondaryGateway, gw)
-			if xerr != nil {
-				return nil, xerr
-			}
-		}
-	}
-
-	return out, nil
-}
-
-// Clone ...
-
-// SetHostname ...
-func (sconf *sshConfig) SetHostname(hostname string) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if hostname == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("hostname")
-	}
-
-	sconf._private.Hostname = hostname
-	return nil
-}
-
-// SetIPAddress ...
-func (sconf *sshConfig) SetIPAddress(ipAddress string) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if ipAddress == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("ipAddress")
-	}
-
-	sconf._private.IPAddress = ipAddress
-	return nil
-}
-
-// SetPort ...
-func (sconf *sshConfig) SetPort(port uint) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if port == 0 {
-		port = 22
-	}
-	sconf._private.Port = port
-	return nil
-}
-
-// SetLocalPort ...
-func (sconf *sshConfig) SetLocalPort(port uint) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if port == 0 {
-		port = 22
-	}
-	sconf._private.LocalPort = port
-	return nil
-}
-
-// SetPrivateKey ...
-func (sconf *sshConfig) SetPrivateKey(privateKey string) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if privateKey == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("privateKey")
-	}
-
-	sconf._private.PrivateKey = privateKey
-	return nil
-}
-
-// SetUser ...
-func (sconf *sshConfig) SetUser(user string) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if user == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("user")
-	}
-
-	sconf._private.User = user
-	return nil
-}
-
-// SetGatewayConfig ...
-func (sconf *sshConfig) SetGatewayConfig(idx WhatGateway, gwConfig Config) fail.Error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-	if idx > 1 {
-		return fail.InvalidParameterError("idx", "must be 0 for mprimary gateway or 1 for secondary gateway")
-	}
-
-	conf := sshConfigInternal{
-		User:       gwConfig.User(),
-		IPAddress:  gwConfig.IPAddress(),
-		PrivateKey: gwConfig.PrivateKey(),
-		Hostname:   gwConfig.Hostname(),
-		Port:       gwConfig.Port(),
-		LocalPort:  gwConfig.LocalPort(),
-	}
-	switch idx {
-	case PrimaryGateway:
-		sconf._private.GatewayConfig = &conf
-	case SecondaryGateway:
-		sconf._private.SecondaryGatewayConfig = &conf
-	}
-
-	return nil
-}
-
-func (sconf sshConfig) MarshalJSON() ([]byte, error) {
-	jsoned, err := json.Marshal(sconf._private)
-	if err != nil {
-		return nil, err
-	}
-	return jsoned, nil
-}
-
-func (sconf *sshConfig) UnmarshalJSON(in []byte) error {
-	// Do not use valid.IsNil() here, the instance may be null value when calling this method
-	if sconf == nil {
-		return fail.InvalidInstanceError()
-	}
-
-	err := json.Unmarshal(in, &sconf._private)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return &out, nil
 }
 
 // IsNull tells if the instance is a null value
-func (sconf *sshConfig) IsNull() bool {
-	return sconf == nil || sconf._private.IPAddress == ""
+func (cc *Connector) IsNull() bool {
+	return cc == nil || valid.IsNull(cc.TargetConfig)
 }
 
 // GetFreePort finds a free port on the system
@@ -349,11 +120,12 @@ func isTunnelReady(port uint) bool {
 
 // buildTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's automatically chosen
-func buildTunnel(scfg *sshConfigInternal) (*Tunnel, fail.Error) {
+func buildTunnel(scfg *internal.ConfigProperties) (*Tunnel, fail.Error) {
 	f, err := utils.CreateTempFileFromString(scfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
 	}
+	// FIXME: temporary file os not removed on failure
 
 	localPort := scfg.LocalPort
 	if localPort == 0 {
@@ -391,7 +163,7 @@ func buildTunnel(scfg *sshConfigInternal) (*Tunnel, fail.Error) {
 	logrus.Debugf("Creating SSH tunnel with '%s'", cmdString)
 
 	cmd := exec.Command("bash", "-c", cmdString)
-	cmd.SysProcAttr = getSyscallAttrs()
+	cmd.SysProcAttr = internal.GetSyscallAttrs()
 	cerr := cmd.Start()
 	if cerr != nil {
 		return nil, fail.ConvertError(cerr)
@@ -404,7 +176,7 @@ func buildTunnel(scfg *sshConfigInternal) (*Tunnel, fail.Error) {
 
 	if !isTunnelReady(localPort) {
 		xerr := fail.NotAvailableError("the tunnel is not ready")
-		derr := killProcess(cmd.Process)
+		derr := internal.KillProcess(cmd.Process)
 		if derr != nil {
 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to kill SSH process"))
 		}
@@ -420,7 +192,7 @@ func buildTunnel(scfg *sshConfigInternal) (*Tunnel, fail.Error) {
 }
 
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
-func createConsecutiveTunnels(sci *sshConfigInternal, tunnels *Tunnels) (*Tunnel, fail.Error) {
+func createConsecutiveTunnels(sci *internal.ConfigProperties, tunnels *Tunnels) (*Tunnel, fail.Error) {
 	// var (
 	// 	tunnel *Tunnel
 	// 	xerr fail.Error
@@ -477,7 +249,7 @@ func createConsecutiveTunnels(sci *sshConfigInternal, tunnels *Tunnels) (*Tunnel
 	// }
 	if sci != nil {
 		// determine what gateway to use
-		var gwConf *sshConfigInternal
+		var gwConf *internal.ConfigProperties
 		if !valid.IsNil(sci.GatewayConfig) {
 			gwConf = sci.GatewayConfig
 			if !netutils.CheckRemoteTCP(gwConf.IPAddress, int(gwConf.Port)) {
@@ -554,45 +326,61 @@ func createConsecutiveTunnels(sci *sshConfigInternal, tunnels *Tunnels) (*Tunnel
 	return nil, nil
 }
 
-// CreateTunneling ...
-func (sconf *sshConfig) CreateTunneling() (_ Tunnels, _ Config, ferr fail.Error) {
+// createTunneling ...
+// func (cc *Connector) createTunneling() (_ Tunnels, _ Config, ferr fail.Error) {
+func (cc *Connector) createTunneling() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+
+	if valid.IsNull(cc) {
+		// return nil, internalConfig{}, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
+	}
+
+	cc.Lock.Lock()
+	defer cc.Lock.Unlock()
 
 	var tunnels Tunnels
 	defer func() {
 		if ferr != nil {
-			derr := tunnels.Close()
+			derr := cc.deleteTunnels()
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to close SSH tunnels"))
 			}
 		}
 	}()
 
-	tunnel, xerr := createConsecutiveTunnels(&sconf._private, &tunnels)
+	tunnel, xerr := createConsecutiveTunnels(cc.TargetConfig, &tunnels)
 	if xerr != nil {
-		return nil, nil, fail.Wrap(xerr, "failed to create SSH Tunnels")
+		return fail.Wrap(xerr, "failed to create SSH Tunnels")
 	}
 
-	newConf := *sconf
+	newConf := cc.TargetConfig.Clone()
 	if tunnel == nil {
-		return nil, &newConf, nil
+		cc.finalConfig = newConf
+		return nil
 	}
 
-	if sconf._private.GatewayConfig != nil {
-		newConf._private.Port = tunnel.port
-		newConf._private.IPAddress = "127.0.0.1"
+	cc.tunnels = tunnels
+	if cc.TargetConfig.GatewayConfig != nil {
+		newConf.Port = tunnel.port
+		newConf.IPAddress = internal.Loopback
+		if xerr != nil {
+			return xerr
+		}
 	}
-	return tunnels, &newConf, nil
+	cc.finalConfig = newConf
+	return nil
 }
 
-func createSSHCommand(sconf *sshConfig, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, fail.Error) {
-	f, err := utils.CreateTempFileFromString(sconf._private.PrivateKey, 0400)
-	if err != nil {
-		return "", nil, fail.Wrap(err, "unable to create temporary key file")
-	}
+// func buildSSHCommand(sconf Config, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, fail.Error) {
+func (cc *Connector) buildSSHCommand(cmdString, username, shell string, withTty, withSudo bool) (string, fail.Error) {
+	// f, err := utils.CreateTempFileFromString(sconf._private.PrivateKey, 0400)
+	// if err != nil {
+	// 	return "", nil, fail.Wrap(err, "unable to create temporary key file")
+	// }
 
-	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname())
-	sshCmdString := fmt.Sprintf("ssh -i \"%s\" %s -p %d %s@%s", f.Name(), options, sconf.Port(), sconf.User(), sconf.IPAddress())
+	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", cc.finalConfig.Hostname)
+	sshCmdString := fmt.Sprintf("ssh -i \"%s\" %s -p %d %s@%s", cc.targetKeyFile.Name(), options, cc.finalConfig.Port, cc.finalConfig.User, cc.finalConfig.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
@@ -631,21 +419,21 @@ func createSSHCommand(sconf *sshConfig, cmdString, username, shell string, withT
 
 	logrus.Debugf("Created SSH command '%s'", sshCmdString)
 
-	return sshCmdString, f, nil
+	return sshCmdString, nil
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
-func (sconf *sshConfig) NewCommand(ctx context.Context, cmdString string) (*Command, fail.Error) {
-	return sconf.newCommand(ctx, cmdString, false, false)
+func (cc *Connector) NewCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
+	return cc.newCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
-func (sconf *sshConfig) NewSudoCommand(ctx context.Context, cmdString string) (*Command, fail.Error) {
-	return sconf.newCommand(ctx, cmdString, false, true)
+func (cc *Connector) NewSudoCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
+	return cc.newCommand(ctx, cmdString, false, true)
 }
 
-func (sconf *sshConfig) newCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (*Command, fail.Error) {
-	if sconf == nil {
+func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (_ *Command, ferr fail.Error) {
+	if valid.IsNull(cc) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -665,37 +453,72 @@ func (sconf *sshConfig) newCommand(ctx context.Context, cmdString string, withTt
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tunnels, tunnelConf, xerr := sconf.CreateTunneling()
+	xerr = cc.createTunneling()
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "unable to create SSH tunnel")
 	}
+
+	defer func() {
+		if ferr != nil {
+			derr := cc.deleteTunnels()
+			if derr != nil {
+				_ = ferr.AddConsequence(derr)
+			}
+		}
+	}()
 
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tunnelConfig, ok := tunnelConf.(*sshConfig)
-	if !ok {
-		return nil, fail.InconsistentError("failed to cast tunnelConf to '*sshConfig'")
+	xerr = cc.createTargetKeyfile()
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	sshCmdString, keyFile, err := createSSHCommand(tunnelConfig, cmdString, "", "", withTty, withSudo)
-	if err != nil {
-		return nil, fail.Wrap(err, "unable to create command")
+	defer func() {
+		if ferr != nil {
+			derr := cc.deleteKeyfile()
+			if derr != nil {
+				_ = ferr.AddConsequence(derr)
+			}
+		}
+	}()
+
+	// sshCmdString, keyFile, err := buildSSHCommand(tunnelingConfig, cmdString, "", "", withTty, withSudo)
+	sshCmdString, xerr := cc.buildSSHCommand(cmdString, "", "", withTty, withSudo)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "unable to create command")
 	}
 
 	sshCommand := Command{
-		hostname:     sconf._private.Hostname,
+		// conn:         cc,
+		hostname:     cc.TargetConfig.Hostname,
 		runCmdString: sshCmdString,
-		tunnels:      tunnels,
-		keyFile:      keyFile,
 	}
 	return &sshCommand, nil
 }
 
+// createTargetKeyFile creates a temporary file containing key to authenticate the remote (if not already created)
+func (cc *Connector) createTargetKeyfile() fail.Error {
+	// If key file is not created yet, do it
+	if valid.IsNull(cc.finalConfig) {
+		cc.Lock.Lock()
+		defer cc.Lock.Unlock()
+
+		keyFile, xerr := utils.CreateTempFileFromString(cc.TargetConfig.PrivateKey, 0400)
+		if xerr != nil {
+			return xerr
+		}
+		cc.targetKeyFile = keyFile
+	}
+
+	return nil
+}
+
 // newCopyCommand does the same thing as newCommand for SCP actions
-func (sconf *sshConfig) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*Command, fail.Error) {
-	if sconf == nil {
+func (cc *Connector) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*Command, fail.Error) {
+	if valid.IsNull(cc) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -718,7 +541,7 @@ func (sconf *sshConfig) newCopyCommand(ctx context.Context, localPath, remotePat
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tunnels, tunnelConf, xerr := sconf.CreateTunneling()
+	xerr = cc.createTunneling()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -727,48 +550,47 @@ func (sconf *sshConfig) newCopyCommand(ctx context.Context, localPath, remotePat
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tunnelConfig, ok := tunnelConf.(*sshConfig)
-	if !ok {
-		return nil, fail.InconsistentError("failed to cast tunnelConfig to '*sshConfig'")
-	}
-	sshCmdString, keyFile, xerr := createSCPCommand(tunnelConfig, localPath, remotePath, isUpload)
+	// sshCmdString, keyFile, xerr := buildSCPCommand(tunnelConfig, localPath, remotePath, isUpload)
+	sshCmdString, xerr := cc.buildSCPCommand(localPath, remotePath, isUpload)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	sshCommand := Command{
-		hostname:     sconf._private.Hostname,
+		// conn:         cc,
+		hostname:     cc.TargetConfig.Hostname,
 		runCmdString: sshCmdString,
-		tunnels:      tunnels,
-		keyFile:      keyFile,
+		// keyFile:      keyFile,
 	}
 	return &sshCommand, nil
 }
 
-// createSCPCommand Creates the scp command to do the copy
-func createSCPCommand(sconf *sshConfig, localPath, remotePath string, isUpload bool) (string, *os.File, fail.Error) {
-	f, err := utils.CreateTempFileFromString(sconf._private.PrivateKey, 0400)
-	if err != nil {
-		return "", nil, fail.Wrap(err, "unable to create temporary key file")
-	}
+// buildSCPCommand Creates the scp command to do the copy
+// func buildSCPCommand(sconf Config, localPath, remotePath string, isUpload bool) (string, *os.File, fail.Error) {
+func (cc *Connector) buildSCPCommand(localPath, remotePath string, isUpload bool) (string, fail.Error) {
+	// f, err := utils.CreateTempFileFromString(sconf._private.PrivateKey, 0400)
+	// if err != nil {
+	// 	return "", nil, fail.Wrap(err, "unable to create temporary key file")
+	// }
 
-	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname())
+	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", cc.finalConfig.Hostname)
 
-	sshCmdString := fmt.Sprintf("scp -i \"%s\" %s -P %d ", f.Name(), options, sconf.Port())
+	sshCmdString := fmt.Sprintf("scp -i \"%s\" %s -P %d ", cc.targetKeyFile, options, cc.finalConfig.Port)
 	if isUpload {
-		sshCmdString += fmt.Sprintf("\"%s\" %s@%s:%s", localPath, sconf.User(), sconf.IPAddress(), remotePath)
+		sshCmdString += fmt.Sprintf("\"%s\" %s@%s:%s", localPath, cc.finalConfig.User, cc.finalConfig.IPAddress, remotePath)
 	} else {
-		sshCmdString += fmt.Sprintf("%s@%s:%s \"%s\"", sconf.User(), sconf.IPAddress(), remotePath, localPath)
+		sshCmdString += fmt.Sprintf("%s@%s:%s \"%s\"", cc.finalConfig.User, cc.finalConfig.IPAddress, remotePath, localPath)
 	}
 
-	return sshCmdString, f, nil
+	// return sshCmdString, f, nil
+	return sshCmdString, nil
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, ferr fail.Error) {
+func (cc *Connector) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if sconf == nil {
+	if valid.IsNull(cc) {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -777,8 +599,8 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	if phase == "" {
 		return "", fail.InvalidParameterError("phase", "cannot be empty string")
 	}
-	if sconf._private.IPAddress == "" {
-		return "", fail.InvalidInstanceContentError("sconf._private.IPAddress", "cannot be empty string")
+	if cc.TargetConfig.IPAddress == "" {
+		return "", fail.InvalidInstanceContentError("cc.conf", "ssh targetConfig does not contain valid IP Address for remote")
 	}
 
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
@@ -793,9 +615,14 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 
 	defer debug.NewTracer(task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
 	defer fail.OnExitTraceError(
-		&xerr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname(),
+		&xerr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, cc.TargetConfig.Hostname,
 		temporal.FormatDuration(timeout),
 	)
+
+	xerr = cc.createTargetKeyfile()
+	if xerr != nil {
+		return "", fail.Wrap(xerr, "unable to create private key file")
+	}
 
 	originalPhase := phase
 	if phase == "ready" {
@@ -806,16 +633,14 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		stdout, stderr string
 	)
 
-	cmdCloseFunc := func(cmd *Command, deferErr *fail.Error) {
-		derr := cmd.Close()
-		if derr != nil {
-			if deferErr != nil {
-				if *deferErr != nil {
-					*deferErr = fail.ConvertError(*deferErr)
-					_ = (*deferErr).AddConsequence(derr)
-				} else {
-					*deferErr = derr
-				}
+	closeTunnelsFunc := func(deferErr *fail.Error) {
+		derr := cc.deleteTunnels()
+		if derr != nil && deferErr != nil {
+			if *deferErr != nil {
+				*deferErr = fail.Wrap(*deferErr)
+				_ = (*deferErr).AddConsequence(derr)
+			} else {
+				*deferErr = derr
 			}
 		}
 	}
@@ -828,13 +653,18 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			iterations++
 
 			// -- Try to see if 'phase' file exists... --
-			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
+			sshCmd, innerXErr := cc.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd *Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+			innerXErr = cc.createTunneling()
+			if xerr != nil {
+				return fail.Wrap(xerr, "unable to create tunnels")
+			}
+
+			// in case of failure, maybe tunnels was badly built, delete it to rebuild
+			defer closeTunnelsFunc(&innerXErr)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
@@ -844,13 +674,14 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 				switch phase {
 				case "final":
 					// Before v21.05.0, final provisioning state is stored in user_data.phase2.done file, so try to see if legacy file exists...
-					sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.phase2.done", utils.VarFolder))
+					sshCmd, innerXErr = cc.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.phase2.done", utils.VarFolder))
 					if innerXErr != nil {
 						return innerXErr
 					}
 
-					// Do not forget to close command, ie close SSH tunnel
-					defer func(cmd *Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+					// VPL: there is nothing to close from Command anymore
+					// // Do not forget to close command, ie close SSH tunnels
+					// defer func(cmd Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {
@@ -861,10 +692,10 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			}
 			if retcode != 0 {
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
+				fe.Annotate("operation", sshCmd.String())
 				fe.Annotate("retcode", retcode)
 				fe.Annotate("stdout", stdout)
 				fe.Annotate("stderr", stderr)
-				fe.Annotate("operation", sshCmd.runCmdString)
 				fe.Annotate("iterations", iterations)
 				return fe
 			}
@@ -885,16 +716,16 @@ func (sconf *sshConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		}
 	}
 
-	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname(), originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
+	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", cc.TargetConfig.Hostname, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
 // CopyWithTimeout copies a file/directory from/to local to/from remote, and fails after 'timeout'
-func (sconf *sshConfig) CopyWithTimeout(ctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (cc *Connector) CopyWithTimeout(ctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
-	if valid.IsNil(sconf) {
+	if valid.IsNull(cc) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 
@@ -908,79 +739,90 @@ func (sconf *sshConfig) CopyWithTimeout(ctx context.Context, remotePath, localPa
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	sshCommand, xerr := sconf.newCopyCommand(ctx, localPath, remotePath, isUpload)
+	sshCommand, xerr := cc.newCopyCommand(ctx, localPath, remotePath, isUpload)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to create copy command")
 	}
 
-	// Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
-	defer func() {
-		derr := sshCommand.Close()
-		if derr != nil {
-			if ferr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-			} else {
-				ferr = derr
-			}
-		}
-	}()
+	// VPL: do not want to close tunnel, .Close() has the duty for that (this should allow to reuse a connector for successive uses)
+	// // Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
+	// defer func() {
+	// 	derr := sshCommand.Close()
+	// 	if derr != nil {
+	// 		if ferr != nil {
+	// 			_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+	// 		} else {
+	// 			ferr = derr
+	// 		}
+	// 	}
+	// }()
+
+	xerr = cc.createTargetKeyfile()
+	if xerr != nil {
+		return invalid, "", "", fail.Wrap(xerr, "unable to create private key file")
+	}
+
+	xerr = cc.createTunneling()
+	if xerr != nil {
+		return invalid, "", "", fail.Wrap(xerr, "unable to create tunnels")
+	}
 
 	return sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 }
 
 // Enter to interactive shell, aka 'safescale ssh connect'
-func (sconf *sshConfig) Enter(username, shell string) (ferr fail.Error) {
+func (cc *Connector) Enter(username, shell string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	tunnels, tunnelConf, xerr := sconf.CreateTunneling()
+	if valid.IsNull(cc) {
+		return fail.InvalidInstanceError()
+	}
+
+	xerr := cc.createTargetKeyfile()
 	if xerr != nil {
-		if len(tunnels) > 0 {
-			derr := tunnels.Close()
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
-			}
-		}
+		return fail.Wrap(xerr, "unable to create private key file")
+	}
+
+	xerr = cc.createTunneling()
+	if xerr != nil {
 		return fail.Wrap(xerr, "unable to create tunnels")
 	}
 
-	// Do not forget to close tunnels...
-	defer func() {
-		derr := tunnels.Close()
-		if derr != nil {
-			if ferr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
-			} else {
-				ferr = derr
-			}
-		}
-	}()
+	// VPL: moved to Connector.Close()
+	// // Do not forget to close tunnels...
+	// defer func() {
+	// 	derr := cc.tunnels.Close()
+	// 	if derr != nil {
+	// 		if ferr != nil {
+	// 			_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+	// 		} else {
+	// 			ferr = derr
+	// 		}
+	// 	}
+	// }()
 
-	tunnelConfig, ok := tunnelConf.(*sshConfig)
-	if !ok {
-		return fail.InconsistentError("failed to cast tunnelConf to *sshConfig")
-	}
-
-	sshCmdString, keyFile, xerr := createSSHCommand(tunnelConfig, "", username, shell, true, false)
+	// sshCmdString, keyFile, xerr := buildSSHCommand(tunnelConfig, "", username, shell, true, false)
+	sshCmdString, xerr := cc.buildSSHCommand("", username, shell, true, false)
 	if xerr != nil {
-		for _, t := range tunnels {
-			if nerr := t.Close(); nerr != nil {
-				logrus.Warnf("Error closing SSH tunnel: %v", nerr)
-			}
-		}
-		if keyFile != nil {
-			if nerr := utils.LazyRemove(keyFile.Name()); nerr != nil {
-				logrus.Warnf("Error removing file %v", nerr)
-			}
-		}
+		// for _, t := range tunnels {
+		// 	if nerr := t.Close(); nerr != nil {
+		// 		logrus.Warnf("Error closing SSH tunnel: %v", nerr)
+		// 	}
+		// }
+		// if keyFile != nil {
+		// 	if nerr := utils.LazyRemove(keyFile.Name()); nerr != nil {
+		// 		logrus.Warnf("Error removing file %v", nerr)
+		// 	}
+		// }
 		return fail.Wrap(xerr, "unable to create command")
 	}
 
-	defer func() {
-		derr := utils.LazyRemove(keyFile.Name())
-		if derr != nil {
-			logrus.Warnf("Error removing temporary file: %v", derr)
-		}
-	}()
+	// defer func() {
+	// 	derr := utils.LazyRemove(keyFile.Name())
+	// 	if derr != nil {
+	// 		logrus.Warnf("Error removing temporary file: %v", derr)
+	// 	}
+	// }()
 
 	proc := exec.Command("bash", "-c", sshCmdString)
 	// proc.SysProcAttr = getSyscallAttrs()
@@ -995,65 +837,75 @@ func (sconf *sshConfig) Enter(username, shell string) (ferr fail.Error) {
 	return nil
 }
 
-// PrivateKey ...
-func (sconf sshConfig) PrivateKey() string {
-	return sconf._private.PrivateKey
-}
-
-// User ...
-func (sconf sshConfig) User() string {
-	return sconf._private.User
-}
-
-// Hostname ...
-func (sconf sshConfig) Hostname() string {
-	return sconf._private.Hostname
-}
-
-// IPAddress ...
-func (sconf sshConfig) IPAddress() string {
-	return sconf._private.IPAddress
-}
-
-// GatewayConfig ...
-func (sconf sshConfig) GatewayConfig(idx WhatGateway) Config {
-	if idx > 1 {
-		return nil
+// Close cleans up the resources created by the connector (keyfile, tunnels, ...)
+func (cc *Connector) Close() fail.Error {
+	if valid.IsNull(cc) {
+		return fail.InvalidInstanceError()
 	}
 
-	var newConf *sshConfigInternal
-	switch idx {
-	case PrimaryGateway:
-		newConf = sconf._private.GatewayConfig.Clone()
-	case SecondaryGateway:
-		newConf = sconf._private.SecondaryGatewayConfig.Clone()
-	default:
-		return nil
+	var errors []error
+
+	// Close tunnels if there are some
+	xerr := cc.deleteTunnels()
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+	cc.finalConfig = nil
+
+	// Delete key file if there is one
+	xerr = cc.deleteKeyfile()
+	if xerr != nil {
+		errors = append(errors, xerr)
 	}
 
-	if newConf == nil {
-		return NewEmptyConfig()
+	if len(errors) > 0 {
+		return fail.Wrap(fail.NewErrorList(errors), "failed to close SSH Connector properly")
 	}
 
-	return &sshConfig{*newConf}
+	return nil
 }
 
-// PrimaryGatewayConfig ...
-func (sconf sshConfig) PrimaryGatewayConfig() Config {
-	return sconf.GatewayConfig(0)
+// deleteTunnels closes the tunnel (if there are some)
+func (cc *Connector) deleteTunnels() fail.Error {
+	if len(cc.tunnels) > 0 {
+		xerr := cc.tunnels.Close()
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to close SSH tunnels")
+		}
+		cc.tunnels = nil
+	}
+
+	return nil
 }
 
-// SecondaryGatewayConfig ...
-func (sconf sshConfig) SecondaryGatewayConfig() Config {
-	return sconf.GatewayConfig(1)
+// deleteKeyfile removes the temporary file containig key file (if there is one)
+func (cc *Connector) deleteKeyfile() fail.Error {
+	if cc.targetKeyFile != nil {
+		name := cc.targetKeyFile.Name()
+		err := cc.targetKeyFile.Close()
+		var derr fail.Error
+		if err != nil {
+			derr = fail.NewError("failed to close key file '%s'", name)
+		}
+		cc.targetKeyFile = nil
+
+		xerr := utils.LazyRemove(name)
+		if xerr != nil {
+			if derr != nil {
+				_ = derr.AddConsequence(xerr)
+				return derr
+			}
+			return xerr
+		}
+
+		if derr != nil {
+			return derr
+		}
+	}
+
+	return nil
 }
 
-// Port ...
-func (sconf sshConfig) Port() uint {
-	return sconf._private.Port
-}
-
-// LocalPort ...
-func (sconf sshConfig) LocalPort() uint {
-	return sconf._private.LocalPort
+func (cc Connector) Config() api.Config {
+	return internal.ConvertInternalToApiConfig(*cc.TargetConfig)
 }

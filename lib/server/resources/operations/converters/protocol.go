@@ -30,13 +30,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.Config
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) (ssh.Config, fail.Error) {
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) (sshapi.Config, fail.Error) {
 	var (
-		pgw, sgw ssh.Config
+		pgw, sgw sshapi.Config
 		xerr     fail.Error
 	)
 	if from.Gateway != nil {

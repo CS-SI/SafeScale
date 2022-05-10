@@ -20,18 +20,18 @@ package converters
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // SSHConfigFromSystemToProtocol converts a system.Config into a SshConfig
-func SSHConfigFromSystemToProtocol(from ssh.Config) (*protocol.SshConfig, fail.Error) {
+func SSHConfigFromSystemToProtocol(from sshapi.Config) (*protocol.SshConfig, fail.Error) {
 	var (
 		pgw, sgw *protocol.SshConfig
 		xerr     fail.Error
 	)
-	pgwConf := from.GatewayConfig(ssh.PrimaryGateway)
+	pgwConf := from.GatewayConfig(sshapi.PrimaryGateway)
 	if !valid.IsNil(pgwConf) {
 		pgw, xerr = SSHConfigFromSystemToProtocol(pgwConf)
 	}
@@ -39,7 +39,7 @@ func SSHConfigFromSystemToProtocol(from ssh.Config) (*protocol.SshConfig, fail.E
 		return nil, xerr
 	}
 
-	sgwConf := from.GatewayConfig(ssh.SecondaryGateway)
+	sgwConf := from.GatewayConfig(sshapi.SecondaryGateway)
 	if !valid.IsNil(sgwConf) {
 		sgw, xerr = SSHConfigFromSystemToProtocol(sgwConf)
 	}

@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -261,7 +261,7 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 }
 
 // SSHConfigFromAbstractToProtocol ...
-func SSHConfigFromAbstractToProtocol(in ssh.Config) (*protocol.SshConfig, fail.Error) {
+func SSHConfigFromAbstractToProtocol(in sshapi.Config) (*protocol.SshConfig, fail.Error) {
 	if valid.IsNil(in) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -270,14 +270,14 @@ func SSHConfigFromAbstractToProtocol(in ssh.Config) (*protocol.SshConfig, fail.E
 		pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
 		xerr                                 fail.Error
 	)
-	gwSSHConf := in.GatewayConfig(ssh.PrimaryGateway)
+	gwSSHConf := in.GatewayConfig(sshapi.PrimaryGateway)
 	if !valid.IsNil(gwSSHConf) {
 		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
-	gwSSHConf = in.GatewayConfig(ssh.SecondaryGateway)
+	gwSSHConf = in.GatewayConfig(sshapi.SecondaryGateway)
 	if !valid.IsNil(gwSSHConf) {
 		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {

@@ -20,7 +20,9 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -31,11 +33,11 @@ import (
 // Server getServer structure
 type Server struct {
 	svc       iaas.Service
-	SSHConfig *ssh.Profile
+	SSHConfig sshapi.Config
 }
 
 // NewServer instantiates a new nfs.getServer struct
-func NewServer(svc iaas.Service, sshconfig *ssh.Profile) (srv *Server, err fail.Error) {
+func NewServer(svc iaas.Service, sshconfig sshapi.Config) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
@@ -48,7 +50,7 @@ func NewServer(svc iaas.Service, sshconfig *ssh.Profile) (srv *Server, err fail.
 }
 
 // Install installs and configure NFS service on the remote host
-func (s *Server) Install(ctx context.Context) fail.Error {
+func (s *Server) Install(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -58,7 +60,13 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 		return xerr
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	sshConn, xerr := sshfactory.NewConnector(s.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
+	stdout, xerr := executeScript(ctx, timings, sshConn, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install nfs server")
@@ -116,17 +124,23 @@ func (s *Server) AddShare(
 }
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
-func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
+func (s *Server) RemoveShare(ctx context.Context, path string) (ferr fail.Error) {
 	timings, xerr := s.svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(s.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
 	data := map[string]interface{}{
 		"Path": path,
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	stdout, xerr := executeScript(ctx, timings, sshConn, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
@@ -135,9 +149,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(
-	ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool,
-) (string, fail.Error) {
+func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool) (_ string, ferr fail.Error) {
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
@@ -150,10 +162,16 @@ func (s *Server) MountBlockDevice(
 		return "", xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(s.SSHConfig)
+	if xerr != nil {
+		return "", xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		istdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "block_device_mount.sh", data)
+		istdout, xerr := executeScript(ctx, timings, sshConn, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
 			return fail.Wrap(xerr, "error executing script to mount block device")
@@ -170,7 +188,7 @@ func (s *Server) MountBlockDevice(
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
-func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail.Error {
+func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) (ferr fail.Error) {
 	timings, xerr := s.svc.Timings()
 	if xerr != nil {
 		return xerr
@@ -186,9 +204,15 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 		return xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(s.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		stdout, xerr := executeScript(task.Context(), timings, *s.SSHConfig, "block_device_unmount.sh", data)
+		stdout, xerr := executeScript(task.Context(), timings, sshConn, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")

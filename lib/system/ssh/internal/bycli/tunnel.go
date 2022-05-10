@@ -17,9 +17,10 @@
  * limitations under the License.
  */
 
-package ssh
+package bycli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -54,7 +56,7 @@ func (stun *Tunnel) Close() fail.Error {
 		}
 	}()
 
-	xerr := killProcess(stun.cmd.Process)
+	xerr := internal.KillProcess(stun.cmd.Process)
 	if xerr != nil {
 		return xerr
 	}
@@ -74,7 +76,7 @@ func (stun *Tunnel) Close() fail.Error {
 			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
 			return nil
 		}
-		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
+		return fail.Wrap(err, "unable to close tunnel, unexpected error code running pgrep: %d", code)
 	}
 
 	portStr := strings.Trim(string(bytesCmd), "\n")
