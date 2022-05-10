@@ -37,7 +37,6 @@ import (
 
 var (
 	allProviders = map[string]Service{}
-	allTenants   = map[string]string{}
 )
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
@@ -54,8 +53,8 @@ func Register(name string, provider providers.Provider) {
 
 // GetTenantNames returns all known tenants names
 func GetTenantNames() (map[string]string, fail.Error) {
-	err := loadConfig()
-	return allTenants, err
+	out, err := loadConfig()
+	return out, err
 }
 
 // GetTenants returns all known tenants
@@ -704,10 +703,13 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	return config, nil
 }
 
-func loadConfig() fail.Error {
+// loadConfig loads the configuration from tenants file
+// FIXME: use an approach allowing to refresh tenant list from file on file change, not at each call
+func loadConfig() (map[string]string, fail.Error) {
+	out := map[string]string{}
 	tenantsCfg, v, err := getTenantsFromCfg()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, tenant := range tenantsCfg {
 		name, ok := tenant["name"].(string)
@@ -720,15 +722,15 @@ func loadConfig() fail.Error {
 				provider, ok = tenant["Client"].(string)
 			}
 			if ok {
-				allTenants[name] = provider
+				out[name] = provider
 			} else {
-				return fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
+				return nil, fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}
 		} else {
-			return fail.SyntaxError("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
+			return nil, fail.SyntaxError("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
 		}
 	}
-	return nil
+	return out, nil
 }
 
 func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
