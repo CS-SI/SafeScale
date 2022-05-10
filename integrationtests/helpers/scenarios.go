@@ -99,23 +99,26 @@ func (s Scenarios) Len() int {
 
 // Run ...
 func (s Scenarios) Run(t *testing.T) {
-	if s.Len() > 0 {
-		ok := Setup()
-		if !ok {
-			t.Skip("environment is not set properly to continue integration tests")
-			//require.False(t, ok)  // To exit properly
-		} else {
-			for _, section := range s.sectionsOrder {
-				if len(scenarios.scenariosOrder[section]) > 0 {
-					t.Run(string(section), func(t *testing.T) {
-						for _, name := range scenarios.scenariosOrder[section] {
-							t.Run(name, func(t *testing.T) {
-								scenarios.scenarios[section][name](t)
-							})
-						}
+	if s.Len() == 0 {
+		t.Skip()
+		return
+	}
+
+	ok := Setup()
+	if !ok {
+		t.Skip("environment is not set properly to continue integration tests")
+		return
+	}
+
+	for _, section := range s.sectionsOrder {
+		if len(scenarios.scenariosOrder[section]) > 0 {
+			t.Run(string(section), func(t *testing.T) {
+				for _, name := range scenarios.scenariosOrder[section] {
+					t.Run(name, func(t *testing.T) {
+						scenarios.scenarios[section][name](t)
 					})
 				}
-			}
+			})
 		}
 	}
 }
