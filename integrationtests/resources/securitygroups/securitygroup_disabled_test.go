@@ -1,8 +1,6 @@
-//go:build disabled
-// +build disabled
-
-// //go:build integrationtests && !securitygroups && !allintegration
-// // +build integrationtests,!securitygroups,!allintegration
+//go:build !(allintegration || (integration && securitygrouptests))
+// +build !allintegration
+// +build !integration !securitygrouptests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -26,6 +24,6 @@ import (
 	"testing"
 )
 
-func Test_SecurityGroupCreate(t *testing.T) {
-	t.Skip("securitygroups tests disabled")
+func Test_Nop(t *testing.T) {
+	t.Skip("securitygroup tests disabled")
 }

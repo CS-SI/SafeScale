@@ -1,8 +1,5 @@
-//go:build disabled
-// +build disabled
-
-// //go:build (integrationtests && features) || allintegration
-// // +build integrationtests,features allintegration
+//go:build (integration && featuretests) || allintegration
+// +build integration,featuretests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -59,5 +56,6 @@ func Test_ReverseProxy(t *testing.T) {
 }
 
 func Test_NvidiaDocker(t *testing.T) {
+	t.Skip("Test_NvidiaDocker not implemented")
 	// TODO: Implement integration test
 }

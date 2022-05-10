@@ -1,5 +1,5 @@
-//go:build (integration && clustertests) || allintegration
-// +build integration,clustertests allintegration
+//go:build (integration && subnettests) || allintegration
+// +build integration,subnettests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,25 +17,12 @@
  * limitations under the License.
  */
 
-package clusters
+package subnets
 
 import (
 	"testing"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
-func Test_ClusterK8S(t *testing.T) {
-	helpers.InSection("clusters").AddScenario(ClusterK8S)
-	helpers.RunScenarios(t)
-}
-
-func Test_Helm(t *testing.T) {
-	helpers.InSection("clusters").AddScenario(Helm)
-	helpers.RunScenarios(t)
-}
-
-func Test_Kubernetes(t *testing.T) {
-	helpers.InSection("clusters").AddScenario(Kubectl)
-	helpers.RunScenarios(t)
+func Test_Nop(t *testing.T) {
+	t.Skip("subnets not implemented")
 }

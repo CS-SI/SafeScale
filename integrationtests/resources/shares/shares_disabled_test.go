@@ -1,8 +1,6 @@
-//go:build disabled
-// +build disabled
-
-// //go:build integrationtests && !shares && !allintegration
-// // +build integrationtests,!shares,!allintegration
+//go:build !(allintegration || (integration && sharetests))
+// +build !allintegration
+// +build !integration !sharetests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -26,22 +24,6 @@ import (
 	"testing"
 )
 
-func Test_ShareStandard(t *testing.T) {
-	t.Skip("shares tests disabled")
-}
-
-func Test_ShareError(t *testing.T) {
-	t.Skip("shares tests disabled")
-}
-
-func Test_SharePartialError(t *testing.T) {
-	t.Skip("shares tests disabled")
-}
-
-func Test_UntilShare(t *testing.T) {
-	t.Skip("shares tests disabled")
-}
-
-func Test_ShareVolumeMounted(t *testing.T) {
-	t.Skip("shares tests disabled")
+func Test_Nop(t *testing.T) {
+	t.Skip("share tests disabled")
 }

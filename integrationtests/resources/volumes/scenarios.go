@@ -1,8 +1,5 @@
-//go:build disabled
-// +build disabled
-
-// //go:build (integrationtests && volumes) || allintegration
-// // +build integrationtests,volumes allintegration
+//go:build (integration && volumetests) || allintegration
+// +build integration,volumetests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

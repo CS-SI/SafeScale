@@ -1,8 +1,5 @@
-//go:build disabled
-// +build disabled
-
-// //go:build (integrationtests && volumes) || allintegration
-// // +build integrationtests,volumes allintegration
+//go:build (integration && volumetests) || allintegration
+// +build integration,volumetests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -34,7 +31,7 @@ func Test_VolumeError(t *testing.T) {
 }
 
 func Test_DeleteVolumeMounted(t *testing.T) {
-	helpers.InSection("volumes") / AddScenario(VolumeError)
+	helpers.InSection("volumes").AddScenario(VolumeError)
 	helpers.RunScenarios(t)
 }
 

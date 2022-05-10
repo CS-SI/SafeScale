@@ -1,8 +1,5 @@
-//go:build disabled
-// +build disabled
-
-// //go:build (integrationtests && buckets) || allintegration
-// // +build integrationtests,buckets allintegration
+//go:build (buckettests && integration) || allintegration
+// +build buckettests,integration allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

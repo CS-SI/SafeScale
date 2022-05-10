@@ -1,8 +1,5 @@
-//go:build disabled
-// +build disabled
-
-// //go:build integrationtests
-// // +build integrationtests
+//go:build allintegration || integration
+// +build allintegration integration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -27,8 +24,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 type (
@@ -43,14 +38,14 @@ type (
 	}
 )
 
-var (
-	scenarios = NewScenarios()
-)
+var scenarios = NewScenarios()
 
 func InSection(label string) section {
 	return section(label)
 }
 
+// AddScenario allows to add a scenario to run
+// Name of the scenario is extracted from the parameter
 func (section section) AddScenario(scenario ScenarioFunc) section {
 	if _, ok := scenarios.scenarios[section]; !ok {
 		scenarios.scenarios[section] = make(map[string]ScenarioFunc)
@@ -85,6 +80,14 @@ func NewScenarios() Scenarios {
 	return out
 }
 
+func (s Scenarios) Len() int {
+	var count int
+	for _, v := range s.scenarios {
+		count += len(v)
+	}
+	return count
+}
+
 // // AddScenario adds a scenario to the list of scenarii to play
 // func AddScenario(label, name string, scenario ScenarioFunc) {
 // 	if _, ok := scenarios[label]; !ok {
@@ -96,8 +99,16 @@ func NewScenarios() Scenarios {
 
 // Run ...
 func (s Scenarios) Run(t *testing.T) {
-	ok := t.Run("setup", func(t *testing.T) { Setup(t) })
-	require.True(t, ok)
+	if s.Len() == 0 {
+		t.Skip()
+		return
+	}
+
+	ok := Setup()
+	if !ok {
+		t.Skip("environment is not set properly to continue integration tests")
+		return
+	}
 
 	for _, section := range s.sectionsOrder {
 		if len(scenarios.scenariosOrder[section]) > 0 {
