@@ -488,7 +488,7 @@ validtest: vettest
 	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
 
-validpr: testclean validtest
+checkforpr: testclean validtest
 
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
