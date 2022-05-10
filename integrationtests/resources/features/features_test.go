@@ -56,5 +56,6 @@ func Test_ReverseProxy(t *testing.T) {
 }
 
 func Test_NvidiaDocker(t *testing.T) {
+	t.Skip("Test_NvidiaDocker not implemented")
 	// TODO: Implement integration test
 }

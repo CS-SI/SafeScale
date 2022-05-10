@@ -446,18 +446,18 @@ vettest:
 validtest: vettest
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./integration_results.log || true
-	@cd integrationtests && echo "no tag" && $(GO) test -v ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration" && $(GO) test -v -tags integration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:allintegration" && $(GO) test -v -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,buckettests" && $(GO) test -v -tags integration,buckettests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,clustertests" && $(GO) test -v -tags integration,clustertests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,networktests" && $(GO) test -v -tags integration,networktests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,subnettests" && $(GO) test -v -tags integration,subnettests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,hosttests" && $(GO) test -v -tags integration,hosttests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,featuretests" && $(GO) test -v -tags integration,featuretests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,volumetests" && $(GO) test -v -tags integration,volumetests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,sharetests" && $(GO) test -v -tags integration,sharetests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
-	@cd integrationtests && echo "tag:integration,securitygrouptests" && $(GO) test -v -tags integration,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "no tag:" && $(GO) test -v ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration:" && $(GO) test -v -tags integration ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:allintegration:" && $(GO) test -v -tags allintegration ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,buckettests:" && $(GO) test -v -tags integration,buckettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,clustertests:" && $(GO) test -v -tags integration,clustertests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,networktests:" && $(GO) test -v -tags integration,networktests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,subnettests:" && $(GO) test -v -tags integration,subnettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,hosttests:" && $(GO) test -v -tags integration,hosttests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,featuretests:" && $(GO) test -v -tags integration,featuretests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,volumetests:" && $(GO) test -v -tags integration,volumetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,sharetests:" && $(GO) test -v -tags integration,sharetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags:integration,securitygrouptests:" && $(GO) test -v -tags integration,securitygrouptests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@mv ./integrationtests/integration_results.log .
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep -e FAIL -e PASS ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
@@ -649,6 +649,7 @@ help: with_git
 	@echo '  test         - Runs all unit tests'
 	@echo '  convey       - Runs goconvey in lib/utils dir'
 	@echo '  show-cov     - Displays coverage info in firefox'
+	@echo '  checkforpr   - Runs build and check everything os ok for Pull Request'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";

@@ -24,4 +24,5 @@ import (
 )
 
 func Test_Nop(t *testing.T) {
+	t.Skip("subnets not implemented")
 }
