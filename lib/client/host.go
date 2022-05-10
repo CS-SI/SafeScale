@@ -244,7 +244,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h host) SSHConfig(name string) (*ssh.Profile, error) {
+func (h host) SSHConfig(name string) (*ssh.Config, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 

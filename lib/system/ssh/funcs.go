@@ -19,6 +19,12 @@
 
 package ssh
 
+import (
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+)
+
 var (
 	sshErrorMap = map[int]string{
 		1:  "Malformed configuration or invalid cli options",
@@ -80,4 +86,20 @@ func SCPErrorString(retcode int) string {
 		return msg
 	}
 	return "Unqualified error"
+}
+
+// CloseConnector is an helper function to close a connector (useable directly with defer)
+func CloseConnector(conn api.Connector, err *fail.Error) {
+	if valid.IsNull(conn) {
+		return
+	}
+
+	derr := conn.Close()
+	if err != nil {
+		if *err != nil {
+			_ = (*err).AddConsequence(fail.Wrap(derr, "failed to close tunnels"))
+		} else {
+			*err = derr
+		}
+	}
 }

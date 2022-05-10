@@ -20,18 +20,20 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Client defines the structure of a Client object
 type Client struct {
 	// SshConfig contains ssh connection configuration
-	SSHConfig *ssh.Profile
+	SSHConfig sshapi.Config
 }
 
 // NewNFSClient creates a new NFS client instance
-func NewNFSClient(sshconfig *ssh.Profile) (*Client, fail.Error) {
+func NewNFSClient(sshconfig sshapi.Config) (*Client, fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
@@ -40,13 +42,19 @@ func NewNFSClient(sshconfig *ssh.Profile) (*Client, fail.Error) {
 }
 
 // Install installs NFS client on remote host
-func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
+func (c *Client) Install(ctx context.Context, svc iaas.Service) (ferr fail.Error) {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+	sshConn, xerr := sshfactory.NewConnector(c.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
+	stdout, xerr := executeScript(ctx, timings, sshConn, "nfs_client_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install NFS client on remote host")
@@ -55,20 +63,24 @@ func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(
-	ctx context.Context, svc iaas.Service, export string, mountPoint string, withCache bool,
-) fail.Error {
+func (c *Client) Mount(ctx context.Context, svc iaas.Service, export string, mountPoint string, withCache bool) (ferr fail.Error) {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
+
+	sshConn, xerr := sshfactory.NewConnector(c.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
 
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
-	stdout, xerr := executeScript(ctx, timings, *c.SSHConfig, "nfs_client_share_mount.sh", data)
+	stdout, xerr := executeScript(ctx, timings, sshConn, "nfs_client_share_mount.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to mount remote NFS share")
@@ -77,14 +89,20 @@ func (c *Client) Mount(
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(ctx context.Context, svc iaas.Service, export string) fail.Error {
+func (c *Client) Unmount(ctx context.Context, svc iaas.Service, export string) (ferr fail.Error) {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
+	sshConn, xerr := sshfactory.NewConnector(c.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
+
 	data := map[string]interface{}{"Export": export}
-	stdout, xerr := executeScript(ctx, timings, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
+	stdout, xerr := executeScript(ctx, timings, sshConn, "nfs_client_share_unmount.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unmount remote NFS share")

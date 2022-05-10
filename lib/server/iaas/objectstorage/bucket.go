@@ -22,13 +22,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"gomodules.xyz/stow"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 //go:generate minimock -o mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Bucket

@@ -21,7 +21,9 @@ import (
 	"path/filepath"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -75,11 +77,17 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 }
 
 // Add configures and exports the share
-func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
+func (s *Share) Add(ctx context.Context, svc iaas.Service) (ferr fail.Error) {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
+
+	sshConn, xerr := sshfactory.NewConnector(s.Server.SSHConfig)
+	if xerr != nil {
+		return xerr
+	}
+	defer ssh.CloseConnector(sshConn, &ferr)
 
 	data := map[string]interface{}{
 		"Path": s.Path,
@@ -87,7 +95,7 @@ func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
 		"Options": s.Options,
 	}
 
-	if _, xerr := executeScript(ctx, timings, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
+	if _, xerr := executeScript(ctx, timings, sshConn, "nfs_server_path_export.sh", data); xerr != nil {
 		return fail.Wrap(xerr, "failed to export a shared directory")
 	}
 	return nil
