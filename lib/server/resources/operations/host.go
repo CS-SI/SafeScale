@@ -547,7 +547,8 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 
 		changed := false
 		if ahc.LastState != ahf.CurrentState {
-			ahc.LastState = ahf.CurrentState
+			logrus.Warningf("Owerwriting current state %s with last state %s", ahf.CurrentState.String(), ahc.LastState.String())
+			ahf.CurrentState = ahc.LastState
 			changed = true
 		}
 
@@ -898,8 +899,10 @@ func (instance *Host) Create(
 
 	defer func() {
 		if ferr != nil {
+			logrus.Warningf("Trying to mark instance as FAILED")
 			if !valid.IsNil(ahf) {
 				if !valid.IsNil(ahf.Core) {
+					logrus.Warningf("Marking instance as FAILED")
 					derr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 						ahc, ok := clonable.(*abstract.HostCore)
 						if !ok {
@@ -909,10 +912,13 @@ func (instance *Host) Create(
 						}
 
 						ahc.LastState = hoststate.Failed
+						ahc.ProvisioningState = hoststate.Failed
 						return nil
 					})
 					if derr != nil {
 						_ = ferr.AddConsequence(derr)
+					} else {
+						logrus.Warningf("Instance now should be in FAILED state")
 					}
 				}
 			}
