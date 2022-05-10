@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
 func Test_HostTemplateToHostEffectiveSizing(t *testing.T) {
@@ -511,14 +512,14 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 	require.EqualValues(t, hostConf.Port(), phostcfg.Port)
 	require.EqualValues(t, hostConf.PrivateKey(), phostcfg.PrivateKey)
 
-	gwConf = hostConf.GatewayConfig(ssh.PrimaryGateway)
+	gwConf = hostConf.GatewayConfig(sshapi.PrimaryGateway)
 	require.NotNil(t, gwConf)
 	pgwcfg, xerr = SSHConfigFromAbstractToProtocol(gwConf)
 	require.Nil(t, xerr)
 	require.NotNil(t, pgwcfg)
 	require.EqualValues(t, pgwcfg, phostcfg.Gateway)
 
-	gw2Conf = hostConf.GatewayConfig(ssh.SecondaryGateway)
+	gw2Conf = hostConf.GatewayConfig(sshapi.SecondaryGateway)
 	require.NotNil(t, gw2Conf)
 	pgw2cfg, xerr = SSHConfigFromAbstractToProtocol(gw2Conf)
 	require.Nil(t, xerr)

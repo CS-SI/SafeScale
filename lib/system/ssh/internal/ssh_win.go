@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build windows
+// +build windows
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,10 +17,11 @@
  * limitations under the License.
  */
 
-package ssh
+package internal
 
 import "syscall"
 
-func getSyscallAttrs() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{Setpgid: true}
+// GetSyscallAttrs ...
+func GetSyscallAttrs() *syscall.SysProcAttr { // nolint
+	return &syscall.SysProcAttr{}
 }

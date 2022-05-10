@@ -635,7 +635,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	sshHandler := handlers.NewSSHHandler(job)
-	sshConfig, xerr := sshHandler.GetConfig(ref)
+	sshConfig, xerr := sshHandler.Config(ref)
 	if xerr != nil {
 		return nil, xerr
 	}

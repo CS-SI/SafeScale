@@ -17,23 +17,20 @@
  * limitations under the License.
  */
 
-package ssh
+package bycli
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"os/exec"
-	"reflect"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -42,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
@@ -49,59 +47,13 @@ import (
 //      use the same port for all access to a same host (not the case currently)
 //      May not be used for interactive ssh connection...
 
-// killProcess sends a kill signal to the process passed as parameter and Wait() for it to release resources (and
-// prevent zombie...)
-func killProcess(proc *os.Process) fail.Error {
-	err := proc.Kill()
-	if err != nil {
-		switch cerr := err.(type) {
-		case syscall.Errno:
-			switch cerr {
-			case syscall.ESRCH:
-				// process not found, continue
-				debug.IgnoreError(err)
-			default:
-				logrus.Errorf("proc.Kill() failed: %s", cerr.Error())
-				return fail.Wrap(err, "unable to send kill signal to process")
-			}
-		default:
-			switch err.Error() {
-			case "os: process already finished":
-				debug.IgnoreError(err)
-			default:
-				logrus.Errorf("proc.Kill() failed: %s", err.Error())
-				return fail.Wrap(err, "unable to send kill signal to process")
-			}
-		}
-	}
-
-	_, err = proc.Wait()
-	if err != nil {
-		switch cerr := err.(type) {
-		case *os.SyscallError:
-			err = cerr.Err
-		default:
-		}
-		switch err {
-		case syscall.ESRCH, syscall.ECHILD:
-			// process not found or has no child, continue
-			debug.IgnoreError(err)
-		default:
-			logrus.Error(err.Error())
-			return fail.Wrap(err, "unable to wait on SSH tunnel process")
-		}
-	}
-
-	return nil
-}
-
 // Command defines a SSH command
 type Command struct {
+	// conn         *Connector
 	hostname     string
 	runCmdString string
 	cmd          *exec.Cmd
-	tunnels      Tunnels
-	keyFile      *os.File
+	// keyFile      *os.File
 }
 
 // Wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
@@ -111,22 +63,25 @@ type Command struct {
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
 // Wait does not release resources associated with the cmd; Command.Close() must be called for that.
 // !!!WARNING!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
-func (scmd *Command) Wait() error {
-	if scmd == nil {
+func (scmd *Command) Wait() fail.Error {
+	if valid.IsNull(scmd) {
 		return fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
 		return fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
 	}
 
-	return scmd.cmd.Wait()
+	return fail.Wrap(scmd.cmd.Wait())
 }
 
 // Kill kills Command process.
 func (scmd *Command) Kill() fail.Error {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return fail.InvalidInstanceError()
 	}
+	// if valid.IsNull(scmd.conn) {
+	// 	return fail.InvalidInstanceContentError("scmd.conn", "cannot be null value of 'ssh.Connector'")
+	// }
 	if scmd.cmd == nil {
 		return fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
 	}
@@ -134,7 +89,7 @@ func (scmd *Command) Kill() fail.Error {
 		return fail.InvalidInstanceContentError("scmd.cmd.Process", "cannot be nil")
 	}
 
-	return killProcess(scmd.cmd.Process)
+	return internal.KillProcess(scmd.cmd.Process)
 }
 
 // getStdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
@@ -142,7 +97,7 @@ func (scmd *Command) Kill() fail.Error {
 // an implication is that it is incorrect to call Wait before all reads from the pipe have been completed.
 // For the same reason, it is incorrect to call Run when using getStdoutPipe.
 func (scmd *Command) getStdoutPipe() (io.ReadCloser, fail.Error) {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
@@ -161,7 +116,7 @@ func (scmd *Command) getStdoutPipe() (io.ReadCloser, fail.Error) {
 // an implication is that it is incorrect to call Wait before all reads from the pipe have completed. For the same reason,
 // it is incorrect to use Run when using getStderrPipe.
 func (scmd *Command) getStderrPipe() (io.ReadCloser, fail.Error) {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
@@ -180,7 +135,7 @@ func (scmd *Command) getStderrPipe() (io.ReadCloser, fail.Error) {
 // A caller need only call Close to force the pipe to close sooner.
 // For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
 func (scmd *Command) getStdinPipe() (io.WriteCloser, fail.Error) {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
@@ -198,7 +153,7 @@ func (scmd *Command) getStdinPipe() (io.WriteCloser, fail.Error) {
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
 func (scmd *Command) Output() ([]byte, fail.Error) {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
@@ -215,7 +170,7 @@ func (scmd *Command) Output() ([]byte, fail.Error) {
 // CombinedOutput returns the combined standard of command started
 // output and standard error.
 func (scmd *Command) CombinedOutput() ([]byte, fail.Error) {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
@@ -232,7 +187,7 @@ func (scmd *Command) CombinedOutput() ([]byte, fail.Error) {
 // Start starts the specified command but does not wait for it to complete.
 // The Wait method will wait for completion and return the exit code.
 func (scmd *Command) Start() fail.Error {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return fail.InvalidInstanceError()
 	}
 	if scmd.cmd == nil {
@@ -258,11 +213,14 @@ func (scmd *Command) Start() fail.Error {
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
 func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if scmd == nil {
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("scmd")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -290,7 +248,10 @@ func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, time
 		timeout = 1200 * time.Second // nothing should take more than 20 min
 	}
 
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
+	params := taskExecuteParameters{
+		collectOutputs: outs != outputs.DISPLAY,
+	}
+	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, params, timeout); xerr != nil {
 		return invalid, "", "", xerr
 	}
 
@@ -326,14 +287,14 @@ func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, time
 }
 
 type taskExecuteParameters struct {
-	// stdout, stderr io.ReadCloser
 	collectOutputs bool
 }
 
 func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	if scmd == nil {
+	if valid.IsNull(scmd) {
 		return nil, fail.InvalidInstanceError()
 	}
+
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
@@ -364,7 +325,7 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 
 	// Prepare command
 	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
-	scmd.cmd.SysProcAttr = getSyscallAttrs()
+	scmd.cmd.SysProcAttr = internal.GetSyscallAttrs()
 
 	// Set up the outputs (std and err)
 	stdoutPipe, xerr := scmd.getStdoutPipe()
@@ -420,19 +381,20 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 		xerr = fail.ExecutionError(runErr)
 		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
 		var (
-			rc     int
-			note   data.Annotation
 			stderr string
-			ok     bool
 		)
-		if note, ok = xerr.Annotation("retcode"); !ok {
+		note, ok := xerr.Annotation("retcode")
+		if !ok {
 			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)
 				}
 			}
 			return result, xerr
-		} else if rc, ok = note.(int); ok && rc == -1 {
+		}
+
+		rc, ok := note.(int)
+		if ok && rc == -1 {
 			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -475,27 +437,40 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 	return result, nil
 }
 
+// VPL: moved to Connector.Close()
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
-func (scmd *Command) Close() fail.Error {
-	var err1 error
+// func (scmd *cliCommand) Close() fail.Error {
+// 	if valid.IsNull(scmd) {
+// 		return fail.InvalidInstanceError()
+// 	}
+//
+// 	var err1 error
+// 	if len(scmd.conn.tunnels) > 0 {
+// 		err1 = scmd.conn.tunnels.Close()
+// 	}
+// 	if err1 != nil {
+// 		logrus.Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
+// 		defer func() { // lazy removal
+// 			ierr := utils.LazyRemove(scmd.keyFile.Name())
+// 			if ierr != nil {
+// 				debug.IgnoreError(ierr)
+// 			}
+// 		}()
+// 		return fail.Wrap(err1, "failed to close SSH tunnels")
+// 	}
+//
+// 	err2 := utils.LazyRemove(scmd.keyFile.Name())
+// 	if err2 != nil {
+// 		return fail.Wrap(err2, "failed to close SSH tunnels")
+// 	}
+// 	return nil
+// }
 
-	if len(scmd.tunnels) > 0 {
-		err1 = scmd.tunnels.Close()
-	}
-	if err1 != nil {
-		logrus.Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
-		defer func() { // lazy removal
-			ierr := utils.LazyRemove(scmd.keyFile.Name())
-			if ierr != nil {
-				debug.IgnoreError(ierr)
-			}
-		}()
-		return fail.Wrap(err1, "failed to close SSH tunnels")
+// String implements interface fmt.Stringer
+func (scmd *Command) String() string {
+	if valid.IsNull(scmd) {
+		return ""
 	}
 
-	err2 := utils.LazyRemove(scmd.keyFile.Name())
-	if err2 != nil {
-		return fail.Wrap(err2, "failed to close SSH tunnels")
-	}
-	return nil
+	return scmd.runCmdString
 }
