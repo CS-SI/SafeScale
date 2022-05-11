@@ -55,7 +55,8 @@ var imageList = cli.Command{
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			pb := progressbar.Default(-1, "Listing images")
+			description := "Listing images"
+			pb := progressbar.Default(-1, description)
 			go func() {
 				for {
 					if pb.IsFinished() {
