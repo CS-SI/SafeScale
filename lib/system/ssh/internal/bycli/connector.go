@@ -326,9 +326,9 @@ func createConsecutiveTunnels(sci *internal.ConfigProperties, tunnels *Tunnels) 
 	return nil, nil
 }
 
-// createTunneling ...
-// func (cc *Connector) createTunneling() (_ Tunnels, _ Config, ferr fail.Error) {
-func (cc *Connector) createTunneling() (ferr fail.Error) {
+// CreatePersistentTunnel is used to create SSH tunnel that will not be closed on .Close() (unlike createNonPersistentTunnel)
+// Used to create persistent tunnel locally with 'safescale tunnel create'
+func (cc *Connector) CreatePersistentTunnel() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNull(cc) {
@@ -339,6 +339,16 @@ func (cc *Connector) createTunneling() (ferr fail.Error) {
 	cc.Lock.Lock()
 	defer cc.Lock.Unlock()
 
+	_, _, xerr := cc.createTunnel()
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// createTunnel build tunnels to reach target carried by Connector
+func (cc Connector) createTunnel() (_ *internal.ConfigProperties, _ Tunnels, ferr fail.Error) {
 	var tunnels Tunnels
 	defer func() {
 		if ferr != nil {
@@ -351,24 +361,46 @@ func (cc *Connector) createTunneling() (ferr fail.Error) {
 
 	tunnel, xerr := createConsecutiveTunnels(cc.TargetConfig, &tunnels)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to create SSH Tunnels")
+		return nil, nil, fail.Wrap(xerr, "failed to create SSH Tunnels")
 	}
 
 	newConf := cc.TargetConfig.Clone()
 	if tunnel == nil {
-		cc.finalConfig = newConf
-		return nil
+		return newConf, tunnels, nil
 	}
 
-	cc.tunnels = tunnels
 	if cc.TargetConfig.GatewayConfig != nil {
 		newConf.Port = tunnel.port
 		newConf.IPAddress = internal.Loopback
 		if xerr != nil {
-			return xerr
+			return nil, nil, xerr
 		}
 	}
-	cc.finalConfig = newConf
+	return newConf, tunnels, nil
+}
+
+// createNonPersistentTunnel creates a tunnel that will end with Connector instance (ie non persistent)
+func (cc *Connector) createNonPersistentTunnel() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNull(cc) {
+		// return nil, internalConfig{}, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
+	}
+
+	if len(cc.tunnels) == 0 {
+		cc.Lock.Lock()
+		defer cc.Lock.Unlock()
+
+		newConf, tunnels, xerr := cc.createTunnel()
+		if xerr != nil {
+			return xerr
+		}
+
+		// Keep track of tunnel in Connector
+		cc.finalConfig = newConf
+		cc.tunnels = tunnels
+	}
 	return nil
 }
 
@@ -453,19 +485,10 @@ func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, 
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = cc.createTunneling()
+	xerr = cc.createNonPersistentTunnel()
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "unable to create SSH tunnel")
 	}
-
-	defer func() {
-		if ferr != nil {
-			derr := cc.deleteTunnels()
-			if derr != nil {
-				_ = ferr.AddConsequence(derr)
-			}
-		}
-	}()
 
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
@@ -476,15 +499,6 @@ func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, 
 		return nil, xerr
 	}
 
-	defer func() {
-		if ferr != nil {
-			derr := cc.deleteKeyfile()
-			if derr != nil {
-				_ = ferr.AddConsequence(derr)
-			}
-		}
-	}()
-
 	// sshCmdString, keyFile, err := buildSSHCommand(tunnelingConfig, cmdString, "", "", withTty, withSudo)
 	sshCmdString, xerr := cc.buildSSHCommand(cmdString, "", "", withTty, withSudo)
 	if xerr != nil {
@@ -492,7 +506,7 @@ func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, 
 	}
 
 	sshCommand := Command{
-		// conn:         cc,
+		conn:         cc,
 		hostname:     cc.TargetConfig.Hostname,
 		runCmdString: sshCmdString,
 	}
@@ -501,15 +515,16 @@ func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, 
 
 // createTargetKeyFile creates a temporary file containing key to authenticate the remote (if not already created)
 func (cc *Connector) createTargetKeyfile() fail.Error {
-	// If key file is not created yet, do it
-	if valid.IsNull(cc.finalConfig) {
-		cc.Lock.Lock()
-		defer cc.Lock.Unlock()
+	cc.Lock.Lock()
+	defer cc.Lock.Unlock()
 
+	// If key file is not created yet, do it
+	if cc.targetKeyFile == nil {
 		keyFile, xerr := utils.CreateTempFileFromString(cc.TargetConfig.PrivateKey, 0400)
 		if xerr != nil {
 			return xerr
 		}
+
 		cc.targetKeyFile = keyFile
 	}
 
@@ -541,15 +556,6 @@ func (cc *Connector) newCopyCommand(ctx context.Context, localPath, remotePath s
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = cc.createTunneling()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	// sshCmdString, keyFile, xerr := buildSCPCommand(tunnelConfig, localPath, remotePath, isUpload)
 	sshCmdString, xerr := cc.buildSCPCommand(localPath, remotePath, isUpload)
 	if xerr != nil {
@@ -557,10 +563,9 @@ func (cc *Connector) newCopyCommand(ctx context.Context, localPath, remotePath s
 	}
 
 	sshCommand := Command{
-		// conn:         cc,
+		conn:         cc,
 		hostname:     cc.TargetConfig.Hostname,
 		runCmdString: sshCmdString,
-		// keyFile:      keyFile,
 	}
 	return &sshCommand, nil
 }
@@ -575,7 +580,7 @@ func (cc *Connector) buildSCPCommand(localPath, remotePath string, isUpload bool
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", cc.finalConfig.Hostname)
 
-	sshCmdString := fmt.Sprintf("scp -i \"%s\" %s -P %d ", cc.targetKeyFile, options, cc.finalConfig.Port)
+	sshCmdString := fmt.Sprintf("scp -i \"%s\" %s -P %d ", cc.targetKeyFile.Name(), options, cc.finalConfig.Port)
 	if isUpload {
 		sshCmdString += fmt.Sprintf("\"%s\" %s@%s:%s", localPath, cc.finalConfig.User, cc.finalConfig.IPAddress, remotePath)
 	} else {
@@ -619,6 +624,11 @@ func (cc *Connector) WaitServerReady(ctx context.Context, phase string, timeout 
 		temporal.FormatDuration(timeout),
 	)
 
+	xerr = cc.createNonPersistentTunnel()
+	if xerr != nil {
+		return "", fail.Wrap(xerr, "unable to create private key file")
+	}
+
 	xerr = cc.createTargetKeyfile()
 	if xerr != nil {
 		return "", fail.Wrap(xerr, "unable to create private key file")
@@ -658,7 +668,7 @@ func (cc *Connector) WaitServerReady(ctx context.Context, phase string, timeout 
 				return innerXErr
 			}
 
-			innerXErr = cc.createTunneling()
+			innerXErr = cc.createNonPersistentTunnel()
 			if xerr != nil {
 				return fail.Wrap(xerr, "unable to create tunnels")
 			}
@@ -739,32 +749,27 @@ func (cc *Connector) CopyWithTimeout(ctx context.Context, remotePath, localPath 
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	sshCommand, xerr := cc.newCopyCommand(ctx, localPath, remotePath, isUpload)
+	xerr = cc.createNonPersistentTunnel()
 	if xerr != nil {
-		return invalid, "", "", fail.Wrap(xerr, "failed to create copy command")
+		return invalid, "", "", fail.Wrap(xerr, "unable to create tunnels")
 	}
 
-	// VPL: do not want to close tunnel, .Close() has the duty for that (this should allow to reuse a connector for successive uses)
-	// // Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
-	// defer func() {
-	// 	derr := sshCommand.Close()
-	// 	if derr != nil {
-	// 		if ferr != nil {
-	// 			_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-	// 		} else {
-	// 			ferr = derr
-	// 		}
-	// 	}
-	// }()
+	if task.Aborted() {
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
+	}
 
 	xerr = cc.createTargetKeyfile()
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "unable to create private key file")
 	}
 
-	xerr = cc.createTunneling()
+	sshCommand, xerr := cc.newCopyCommand(ctx, localPath, remotePath, isUpload)
 	if xerr != nil {
-		return invalid, "", "", fail.Wrap(xerr, "unable to create tunnels")
+		return invalid, "", "", fail.Wrap(xerr, "failed to create copy command")
+	}
+
+	if task.Aborted() {
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	return sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
@@ -783,7 +788,7 @@ func (cc *Connector) Enter(username, shell string) (ferr fail.Error) {
 		return fail.Wrap(xerr, "unable to create private key file")
 	}
 
-	xerr = cc.createTunneling()
+	xerr = cc.createNonPersistentTunnel()
 	if xerr != nil {
 		return fail.Wrap(xerr, "unable to create tunnels")
 	}
@@ -882,24 +887,11 @@ func (cc *Connector) deleteTunnels() fail.Error {
 func (cc *Connector) deleteKeyfile() fail.Error {
 	if cc.targetKeyFile != nil {
 		name := cc.targetKeyFile.Name()
-		err := cc.targetKeyFile.Close()
-		var derr fail.Error
-		if err != nil {
-			derr = fail.NewError("failed to close key file '%s'", name)
-		}
 		cc.targetKeyFile = nil
 
 		xerr := utils.LazyRemove(name)
 		if xerr != nil {
-			if derr != nil {
-				_ = derr.AddConsequence(xerr)
-				return derr
-			}
 			return xerr
-		}
-
-		if derr != nil {
-			return derr
 		}
 	}
 

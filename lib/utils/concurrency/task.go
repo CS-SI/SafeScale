@@ -1237,26 +1237,25 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, fer
 			if xerr != nil {
 				return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
 			}
+
 			var result TaskResult
-			_, xerr = waiterTask.Start(
-				func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
-					var done bool
-					for !t.Aborted() && !done {
-						done, result, innerXErr = instance.TryWait()
-						if innerXErr != nil {
-							logrus.Warnf("ignoring internal error: %v", innerXErr)
-						}
-						if !done {
-							time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
-						}
+			_, xerr = waiterTask.Start(func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
+				var done bool
+				for !t.Aborted() && !done {
+					done, result, innerXErr = instance.TryWait()
+					if innerXErr != nil {
+						logrus.Warnf("ignoring internal error: %v", innerXErr)
 					}
-					if done {
-						doneWaitingCh <- struct{}{}
-						return nil, nil
+					if !done {
+						time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 					}
-					return nil, fail.AbortedError(nil)
-				}, nil,
-			)
+				}
+				if done {
+					doneWaitingCh <- struct{}{}
+					return nil, nil
+				}
+				return nil, fail.AbortedError(nil)
+			}, nil)
 			if xerr != nil {
 				return false, result, xerr
 			}

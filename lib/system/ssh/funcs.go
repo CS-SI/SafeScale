@@ -73,7 +73,7 @@ var (
 )
 
 // SSHErrorString returns if possible the string corresponding to SSH execution
-func SSHErrorString(retcode int) string {
+func SSHErrorString(retcode int) string { // nolint
 	if msg, ok := sshErrorMap[retcode]; ok {
 		return msg
 	}

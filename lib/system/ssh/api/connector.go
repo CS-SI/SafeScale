@@ -31,6 +31,7 @@ type Connector interface {
 	Config() Config
 	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
 	Close() fail.Error
+	CreatePersistentTunnel() fail.Error
 	Enter(string, string) fail.Error
 	NewCommand(context.Context, string) (Command, fail.Error)
 	NewSudoCommand(context.Context, string) (Command, fail.Error)

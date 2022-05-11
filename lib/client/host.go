@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -244,7 +244,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h host) SSHConfig(name string) (*ssh.Config, error) {
+func (h host) SSHConfig(name string) (sshapi.Config, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -259,9 +259,7 @@ func (h host) SSHConfig(name string) (*ssh.Config, error) {
 		return nil, err
 	}
 
-	sshCfg := converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
-
-	return sshCfg, err
+	return converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
 }
 
 // Resize ...
