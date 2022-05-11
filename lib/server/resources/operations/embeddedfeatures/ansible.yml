@@ -158,7 +158,11 @@ feature:
                             primary_gateway_private_ip: "{{ .PrimaryGatewayIP }}"
                             primary_gateway_public_ip: "{{ .PrimaryPublicIP }}"
                             endpoint_ip: "{{ .EndpointIP }}"
+                            {{- if .DefaultRouteIP }}
                             default_route_ip: "{{ .DefaultRouteIP }}"
+                            {{- else }}
+                            default_route_ip: "{{ .PrimaryGatewayIP }}"
+                            {{- end }}
                             {{ if .SecondaryGatewayIP }}secondary_gateway_private_ip: "{{ .SecondaryGatewayIP }}"{{ end }}
                             {{ if .SecondaryPublicIP }}secondary_gateway_public_ip: "{{ .SecondaryPublicIP }}"{{ end }}
                             EOF
