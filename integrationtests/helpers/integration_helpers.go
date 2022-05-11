@@ -20,6 +20,7 @@
 package helpers
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/providers"
+	"github.com/itchyny/gojq"
 )
 
 // HostInfo ...
@@ -107,10 +109,34 @@ func RunOnlyInIntegrationTest(key string) error {
 	return nil
 }
 
+func RunJq(input string, query string) (string, error) {
+	jqQuery, err := gojq.Parse(".result.provider")
+	if err != nil {
+		return "", err
+	}
+	var thing map[string]interface{}
+	err = json.Unmarshal([]byte(input), &thing)
+	if err != nil {
+		return "", err
+	}
+	iter := jqQuery.Run(thing)
+	for {
+		v, ok := iter.Next()
+		if !ok {
+			break
+		}
+		if err, ok := v.(error); ok {
+			return "", err
+		}
+		return v.(string), nil
+	}
+	return "", fmt.Errorf("no match")
+}
+
 func Setup() bool {
 	safescaledLaunched, err := IsSafescaledLaunched()
 	if err != nil {
-		fmt.Println("safescaled is not running")
+		fmt.Printf("safescaled is not running: %v\n", err)
 		return false
 	}
 	if !safescaledLaunched {
@@ -120,14 +146,14 @@ func Setup() bool {
 
 	_, err = CanBeRun("safescale")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Cannot run safescale: %v\n", err)
 		return false
 	}
 
 	// Check if tenant set corresponds to the content of the corresponding environment variable
 	listStr, err := GetOutput("safescale tenant list")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Cannot run safescale tenant list: %v\n", err)
 		return false
 	}
 	if len(listStr) <= 0 {
@@ -144,6 +170,8 @@ func Setup() bool {
 		fmt.Println("No tenant set")
 		return false
 	}
+
+	fmt.Printf("Looking for %s\n", providerOfCurrentTenant)
 
 	providers.CurrentProvider, err = providers.FromString(strings.Trim(providerOfCurrentTenant, "\n"))
 	if err != nil {

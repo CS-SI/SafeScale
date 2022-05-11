@@ -1,0 +1,9 @@
+---
+- hosts: nodes
+  tasks:
+    - name: Install golang
+      become: yes
+      apt:
+        pkg:
+          - golang
+          - bison

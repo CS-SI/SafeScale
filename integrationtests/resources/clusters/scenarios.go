@@ -57,10 +57,12 @@ func ClusterK8S(t *testing.T) {
 }
 
 func Helm(t *testing.T) {
+	t.Skip("Test_Helm not implemented")
 	// TODO: Implement integration test
 }
 
 func Kubectl(t *testing.T) {
+	t.Skip("Test_Kubectl not implemented")
 	// TODO: Implement integration test
 }
 

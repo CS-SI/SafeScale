@@ -415,6 +415,11 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		return fail.InvalidParameterCannotBeNilError("v")
 	}
 
+	// FIXME: Bug mitigation
+	if _, ok := v["DefaultRouteIP"]; !ok { // FIXME: Hardcoded stuff everywhere !!
+		v["DefaultRouteIP"] = ""
+	}
+
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
 
