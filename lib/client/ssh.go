@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -73,7 +74,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		return invalid, "", "", xerr
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -137,7 +138,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (sshapi.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -270,7 +271,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		extendedTimeout = connectionTimeout + 2*temporal.HostOperationTimeout()
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -420,7 +421,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 }
 
 // getSSHConfigFromName ...
-func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Config, fail.Error) {
+func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (sshapi.Config, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -445,7 +446,7 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 		return xerr
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return xerr
 	}
@@ -476,19 +477,32 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 	)
 }
 
-func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
+func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) (ferr error) {
+	var fXErr fail.Error
+	defer func() {
+		if ferr == nil {
+			if fXErr != nil {
+				ferr = fXErr
+			}
+		} else if fXErr != nil {
+			newErr := fail.Wrap(ferr)
+			_ = newErr.AddConsequence(fXErr)
+			ferr = newErr
+		}
+	}()
+
 	sshCfg, xerr := s.getSSHConfigFromName(name, timeout)
 	if xerr != nil {
 		return xerr
 	}
 
-	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
+	if sshCfg.GatewayConfig(sshapi.PrimaryGateway) == nil {
 		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
 
-		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+		xerr = sshCfg.SetGatewayConfig(sshapi.PrimaryGateway, gwCfg)
 		if xerr != nil {
 			return xerr
 		}
@@ -509,10 +523,11 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 	}
 
 	// to establish a tunnel from safescale, we NEED to use ssh cli; as soon as safescale ends, a tunnel establish by lib will vanish
-	sshConn, xerr := ssh.NewCliConnector(*sshCfg)
+	sshConn, xerr := ssh.NewCliConnector(sshCfg)
 	if xerr != nil {
 		return xerr
 	}
+	defer ssh.CloseConnector(sshConn, &fXErr)
 
 	/*sshCfg.SetIPAddress("127.0.0.1")
 	sshCfg.SetPort(uint(remotePort))
@@ -520,8 +535,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 	*/
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			_, _, innerXErr := sshConn.CreateTunneling()
-			return innerXErr
+			return sshConn.CreatePersistentTunnel()
 		},
 		temporal.DefaultDelay(),
 		temporal.SSHConnectionTimeout(),
@@ -544,13 +558,14 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 		return xerr
 	}
 
-	if sshCfg.GatewayConfig(ssh.PrimaryGateway) == nil {
+	// FIXME: I do not understand the point here...
+	if sshCfg.GatewayConfig(sshapi.PrimaryGateway) == nil {
 		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
 
-		xerr = sshCfg.SetGatewayConfig(ssh.PrimaryGateway, gwCfg)
+		xerr = sshCfg.SetGatewayConfig(sshapi.PrimaryGateway, gwCfg)
 		if xerr != nil {
 			return xerr
 		}
@@ -560,31 +575,46 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 			return xerr
 		}
 	}
+	// ENDFIXME
 
-	cmdString := fmt.Sprintf(
-		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(),
-		sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress(),
-	)
-	// cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.GatewayConfig(ssh.PrimaryGateway).User(), sshCfg.GatewayConfig(ssh.PrimaryGateway).IPAddress())
-
-	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
+	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.PrimaryGatewayConfig().User(), sshCfg.PrimaryGatewayConfig().IPAddress())
+	output, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err != nil {
 		_, code, problem := utils.ExtractRetCode(err)
 		if problem != nil {
 			return fail.Wrap(err, "unable to close tunnel, running pgrep")
 		}
-		if code == 1 { // no process found
-			debug.IgnoreError(err)
-			return nil
-		}
+
 		if code == 127 { // pgrep not installed
 			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
 			return nil
 		}
-		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
+
+		if code == 1 {
+			// no process found, maybe we used secondary gateway?
+			if sshCfg.SecondaryGatewayConfig() != nil {
+				cmdString = fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.SecondaryGatewayConfig().User(), sshCfg.SecondaryGatewayConfig().IPAddress())
+				output, err = exec.Command("pgrep", "-f", cmdString).Output() // nolint
+
+				_, code, problem := utils.ExtractRetCode(err)
+				if problem != nil {
+					return fail.Wrap(err, "unable to close tunnel, running pgrep")
+				}
+
+				if code == 1 {
+					debug.IgnoreError(err)
+					return nil
+				}
+			} else {
+				debug.IgnoreError(err)
+				return nil
+			}
+		}
+
+		return fail.Wrap(err, "unable to close tunnel, unexpected error code running pgrep: %d", code)
 	}
 
-	portStrs := strings.Split(strings.Trim(string(bytes), "\n"), "\n")
+	portStrs := strings.Split(strings.Trim(string(output), "\n"), "\n")
 	for _, portStr := range portStrs {
 		_, err = strconv.Atoi(portStr)
 		if err != nil {

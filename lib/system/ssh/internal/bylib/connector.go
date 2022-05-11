@@ -536,6 +536,7 @@ func (sc *Connector) Enter(username, shell string) (ferr fail.Error) {
 			switch e.ExitStatus() {
 			case 130:
 				return nil
+			default:
 			}
 		}
 		return fail.NewError("sc: %s", err)
@@ -544,6 +545,7 @@ func (sc *Connector) Enter(username, shell string) (ferr fail.Error) {
 	return nil
 }
 
+// createExecutionSession ...
 func (sc *Connector) createExecutionSession() (*libssh.Session, fail.Error) {
 	sc.Lock.Lock()
 	defer sc.Lock.Unlock()
@@ -564,6 +566,7 @@ func (sc *Connector) createExecutionSession() (*libssh.Session, fail.Error) {
 	return session, nil
 }
 
+// createTransferClient ...
 func (sc *Connector) createTransferClient() (*sftp.Client, fail.Error) {
 	sc.Lock.Lock()
 	defer sc.Lock.Unlock()
@@ -584,6 +587,7 @@ func (sc *Connector) createTransferClient() (*sftp.Client, fail.Error) {
 	return session, nil
 }
 
+// dial establishes connection with remote
 func (sc *Connector) dial() (*libssh.Client, fail.Error) {
 	pk, err := sshtunnel.AuthMethodFromPrivateKey([]byte(sc.TargetConfig.PrivateKey), nil)
 	if err != nil {
@@ -608,6 +612,12 @@ func (sc *Connector) dial() (*libssh.Client, fail.Error) {
 }
 
 // Config returns an api.Config corresponding to the one belonging to the connector
-func (cc Connector) Config() api.Config {
-	return internal.ConvertInternalToApiConfig(*cc.TargetConfig)
+func (sc Connector) Config() api.Config {
+	return internal.ConvertInternalToApiConfig(*sc.TargetConfig)
+}
+
+// CreatePersistentTunnel is used to create SSH tunnel that will not be closed on .Close() (unlike createNonPersistentTunnel)
+// Used to create persistent tunnel locally with 'safescale tunnel create'
+func (sc *Connector) CreatePersistentTunnel() (ferr fail.Error) {
+	return fail.InconsistentError("'bylib/Connector' is not able to create persistent SSH tunnel. Use 'bycli/Connector' instead.")
 }

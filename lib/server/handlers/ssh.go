@@ -204,11 +204,6 @@ func (handler *sshHandler) Config(hostParam stacks.HostParameter) (sshConfig ssh
 			}
 		}
 
-		var (
-			gwahc *abstract.HostCore
-			ok    bool
-		)
-
 		// gets primary gateway information
 		gw, xerr := subnetInstance.InspectGateway(handler.job.Context(), true)
 		if xerr != nil {
@@ -220,22 +215,6 @@ func (handler *sshHandler) Config(hostParam stacks.HostParameter) (sshConfig ssh
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				if gwahc, ok = clonable.(*abstract.HostCore); !ok {
-					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				return nil
-			})
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			// ip, xerr = gw.GetAccessIP(ctx)
-			// if xerr != nil {
-			// 	return nil, xerr
-			// }
-
 			primaryGatewayConf, xerr = gw.GetSSHConfig(ctx)
 			if xerr != nil {
 				return nil, xerr
@@ -256,23 +235,6 @@ func (handler *sshHandler) Config(hostParam stacks.HostParameter) (sshConfig ssh
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				gwahc, ok = clonable.(*abstract.HostCore)
-				if !ok {
-					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				return nil
-			})
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			// ip, xerr = gw.GetAccessIP(ctx)
-			// if xerr != nil {
-			// 	return nil, xerr
-			// }
-
 			secondaryGatewayConf, xerr = gw.GetSSHConfig(ctx)
 			if xerr != nil {
 				return nil, xerr

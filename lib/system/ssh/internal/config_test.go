@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
 func TestSSH_ConfigClone(t *testing.T) {
@@ -85,7 +87,7 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.EqualValues(t, third.PrivateKey(), "privatekey3")
 	require.NotNil(t, third.PrimaryGatewayConfig())
 	require.NotNil(t, third.SecondaryGatewayConfig())
-	require.EqualValues(t, third.GatewayConfig(PrimaryGateway).Hostname(), "host2")
-	require.EqualValues(t, third.GatewayConfig(SecondaryGateway).Hostname(), "host3")
+	require.EqualValues(t, third.GatewayConfig(sshapi.PrimaryGateway).Hostname(), "host2")
+	require.EqualValues(t, third.GatewayConfig(sshapi.SecondaryGateway).Hostname(), "host3")
 
 }

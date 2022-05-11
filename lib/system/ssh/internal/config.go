@@ -362,6 +362,6 @@ func ConvertInternalToApiConfig(conf ConfigProperties) *Config {
 }
 
 // Properties ...
-func (c Config) Properties() *ConfigProperties {
-	return c._private.Clone()
+func (conf Config) Properties() *ConfigProperties {
+	return conf._private.Clone()
 }

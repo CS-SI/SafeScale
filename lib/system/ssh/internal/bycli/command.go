@@ -49,11 +49,10 @@ import (
 
 // Command defines a SSH command
 type Command struct {
-	// conn         *Connector
+	conn         *Connector
 	hostname     string
 	runCmdString string
 	cmd          *exec.Cmd
-	// keyFile      *os.File
 }
 
 // Wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
@@ -210,7 +209,6 @@ func (scmd *Command) Start() fail.Error {
 //   . *fail.ErrTimeout if 'timeout' is reached
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
-// FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
 func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
 	if valid.IsNull(scmd) {
