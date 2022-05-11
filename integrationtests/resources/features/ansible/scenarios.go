@@ -20,14 +20,44 @@
 package ansible
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
+	"github.com/stretchr/testify/require"
 )
 
 func Ansible(t *testing.T) {
-	t.Skip("Test_Ansible not implemented")
-	// TODO: Implement integration test
+	name := "boomer"
+
+	out, err := helpers.GetOutput(fmt.Sprintf("safescale network create --cidr 192.168.51.0/24 %s", name))
+	require.Nil(t, err)
+
+	defer func() {
+		_, err := helpers.GetOutput(fmt.Sprintf("safescale network delete -f %s", name))
+		require.Nil(t, err)
+	}()
+
+	// check for success and name
+	var res string
+	res, err = helpers.RunJq(out, "-r .status")
+	require.Nil(t, err)
+	require.Equal(t, "success", res)
+
+	res, err = helpers.RunJq(out, "-r .result.name")
+	require.Nil(t, err)
+	require.Equal(t, name, res)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale host add-feature gw-%s ansible", name))
+	require.Nil(t, err)
+	res, err = helpers.RunJq(out, "-r .status")
+	require.Nil(t, err)
+	require.Equal(t, "success", res)
+
+	out, err = helpers.GetOutput(fmt.Sprintf(`safescale ssh run -c "ansible --version" gw-%s`, name))
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "ansible python module"))
 }
 
 func init() {
