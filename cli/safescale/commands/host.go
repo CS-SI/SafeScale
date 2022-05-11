@@ -338,7 +338,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating host"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -422,7 +422,7 @@ var hostResize = cli.Command{ // nolint
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Resizing host"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -468,7 +468,7 @@ var hostDelete = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Deleting host"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -509,7 +509,7 @@ var hostSSH = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Getting SSH config"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -679,7 +679,7 @@ var hostSecurityGroupAddCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Binding security group"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -722,7 +722,7 @@ var hostSecurityGroupRemoveCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Unbinding security group"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -781,7 +781,7 @@ var hostSecurityGroupListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing security groups"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -844,7 +844,7 @@ var hostSecurityGroupEnableCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Enabling security groups"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -887,7 +887,7 @@ var hostSecurityGroupDisableCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Disabling security group"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -959,7 +959,7 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Listing host features"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1020,7 +1020,7 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Inspecting host features"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1085,7 +1085,7 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Exporting host features"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {

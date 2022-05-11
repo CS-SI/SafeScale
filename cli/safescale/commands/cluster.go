@@ -98,7 +98,7 @@ var clusterListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing clusters"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -228,7 +228,7 @@ var clusterInspectCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting cluster"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -550,7 +550,7 @@ var clusterCreateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating cluster"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -696,7 +696,7 @@ var clusterStateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Getting cluster state"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -799,7 +799,7 @@ var clusterExpandCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Expanding cluster"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1261,7 +1261,7 @@ var clusterNodeListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing cluster nodes"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1316,7 +1316,7 @@ var clusterNodeInspectCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting cluster node"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1474,7 +1474,7 @@ var clusterNodeStateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Getting node state"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1544,7 +1544,7 @@ var clusterMasterListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing masters"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1600,7 +1600,7 @@ var clusterMasterInspectCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting nodes"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1704,7 +1704,7 @@ var clusterMasterStateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Checking master state"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1783,7 +1783,7 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Listing features"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1845,7 +1845,7 @@ func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Inspecting features"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1912,7 +1912,7 @@ func clusterFeatureExportAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Exporting feature"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1983,7 +1983,7 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Adding feature"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -2055,7 +2055,7 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Checking cluster feature"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -2119,7 +2119,7 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Remove cluster feature"
-		pb := progressbar.Default(-1, description)
+		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -2180,7 +2180,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Finding available master"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -2276,7 +2276,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Running ansible-inventory"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -2332,7 +2332,7 @@ var clusterAnsibleRunCommands = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Running cluster command"
-			pb := progressbar.Default(-1, description)
+			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
