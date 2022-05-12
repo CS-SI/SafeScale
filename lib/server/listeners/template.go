@@ -119,20 +119,6 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 				RamFreq:         acpu.RAMFreq,
 				Gpu:             int64(acpu.GPU),
 				GpuModel:        acpu.GPUModel,
-				// DiskSizeGb:           acpu.DiskSize,
-				// MainDiskType:         acpu.MainDiskType,
-				// MainDiskSpeedMbps:    acpu.MainDiskSpeed,
-				// SampleNetSpeedKbps:   acpu.SampleNetSpeed,
-				// EphDiskSize_Gb:       acpu.EphDiskSize,
-				// PriceInDollarsSecond: acpu.PricePerSecond,
-				// PriceInDollarsHour:   acpu.PricePerHour,
-				// Not yet implemented, FIXME: Implement this
-				// Prices: []*protocol.PriceInfo{{
-				// 	Currency:      "euro-fake",
-				// 	DurationLabel: "perMonth",
-				// 	Duration:      1,
-				// 	Price:         30,
-				// }},
 			}
 		}
 		finalList = append(finalList, entry)
@@ -266,20 +252,6 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 			RamFreq:         acpu.RAMFreq,
 			Gpu:             int64(acpu.GPU),
 			GpuModel:        acpu.GPUModel,
-			// DiskSizeGb:           acpu.DiskSize,
-			// MainDiskType:         acpu.MainDiskType,
-			// MainDiskSpeedMbps:    acpu.MainDiskSpeed,
-			// SampleNetSpeedKbps:   acpu.SampleNetSpeed,
-			// EphDiskSize_Gb:       acpu.EphDiskSize,
-			// PriceInDollarsSecond: acpu.PricePerSecond,
-			// PriceInDollarsHour:   acpu.PricePerHour,
-			// Not yet implemented, FIXME: Implement this
-			// Prices: []*protocol.PriceInfo{{
-			// 	Currency:      "euro-fake",
-			// 	DurationLabel: "perMonth",
-			// 	Duration:      1,
-			// 	Price:         30,
-			// }},
 		}
 	}
 

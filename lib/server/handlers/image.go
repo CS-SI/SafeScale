@@ -69,12 +69,12 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 func (handler *imageHandler) Select(osname string) (image *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented")
+	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented") // FIXME: Technical debt
 }
 
 // Filter filters the images that do not fit osname
 func (handler *imageHandler) Filter(osname string) (image []abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented")
+	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented") // FIXME: Technical debt
 }

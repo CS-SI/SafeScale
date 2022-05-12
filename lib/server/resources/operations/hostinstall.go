@@ -342,10 +342,6 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	// FIXME: 'allWithEmbedded' should be passed as parameter...
 	return filterEligibleFeatures(ctx, instance, allWithEmbedded)
 }
 

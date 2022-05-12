@@ -221,7 +221,8 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return asg, fail.InvalidParameterError("sgParam", "must be consistent")
 	}
 
-	return asg, fail.NotImplementedError("no real Security Group resource proposed by gcp")
+	// FIXME: This is a mistake
+	return asg, fail.NotImplementedError("no real Security Group resource proposed by gcp") // FIXME: Technical debt
 }
 
 // ClearSecurityGroup removes all rules but keep group
@@ -322,7 +323,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return nil, fail.NotImplementedError()
+	return nil, fail.NotImplementedError() // FIXME: Technical debt
 }
 
 // DisableSecurityGroup disables the rules of a Security Group

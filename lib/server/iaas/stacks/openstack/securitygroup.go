@@ -204,7 +204,6 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 			case asg.ID != "":
 				id = asg.ID
 			case asg.Name != "":
-				// FIXME: returning *groups.secgroup may be more convenient; currently, we read twice the same record
 				id, innerErr = getSGIDFromName(s.NetworkClient, asg.Name)
 				if innerErr != nil {
 					return innerErr

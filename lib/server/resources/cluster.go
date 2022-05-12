@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -39,7 +38,6 @@ type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
 type Cluster interface {
 	Metadata
 	Targetable
-	observer.Observable
 	Consistent
 
 	AddFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster

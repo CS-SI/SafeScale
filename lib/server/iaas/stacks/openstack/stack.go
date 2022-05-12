@@ -92,7 +92,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		cfgOpts:  cfg,
 	}
 
-	// FIXME: detect versions instead of statically declare them
+	// TODO: detect versions instead of statically declare them
 	s.versions = map[string]string{
 		"compute": "v2",
 		"volume":  "v2",
@@ -212,7 +212,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		}
 	}
 
-	// FIXME: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
+	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
 	validAvailabilityZones, xerr := s.ListAvailabilityZones()
 	if xerr != nil {
 		switch xerr.(type) {

@@ -72,7 +72,7 @@ var networkList = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing networks"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -127,7 +127,7 @@ var networkDelete = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Deleting networks"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -170,7 +170,7 @@ var networkInspect = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting networks"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -210,7 +210,7 @@ var networkInspect = cli.Command{
 			if network.Subnets[0] == network.Name {
 				if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 					description := "Inspecting subnetworks"
-					pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+					pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 					go func() {
 						for {
 							if pb.IsFinished() {
@@ -416,7 +416,7 @@ var networkCreate = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating network"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -501,7 +501,7 @@ var networkSecurityGroupList = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -572,7 +572,7 @@ var networkSecurityGroupInspect = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -688,7 +688,7 @@ var networkSecurityGroupCreate = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -746,7 +746,7 @@ var networkSecurityGroupClear = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Clearing security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -808,7 +808,7 @@ var networkSecurityGroupDelete = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Deleting security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -873,7 +873,7 @@ var networkSecurityGroupBonds = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Binding security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1035,7 +1035,7 @@ var networkSecurityGroupRuleAdd = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Adding rules to security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1149,7 +1149,7 @@ var networkSecurityGroupRuleDelete = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Deleting rule from security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1227,7 +1227,7 @@ var subnetList = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing subnets"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1315,7 +1315,7 @@ var subnetDelete = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Deleting subnets"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1374,7 +1374,7 @@ var subnetInspect = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1507,7 +1507,7 @@ var subnetCreate = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1796,7 +1796,7 @@ var subnetSecurityGroupAddCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Binding security group to subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1858,7 +1858,7 @@ var subnetSecurityGroupRemoveCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Unbinding security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1935,7 +1935,7 @@ var subnetSecurityGroupListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing security group of subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1997,7 +1997,7 @@ var subnetSecurityGroupEnableCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Enabling subnet security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -2070,7 +2070,7 @@ var subnetSecurityGroupDisableCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Disabling subnet security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {

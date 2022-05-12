@@ -58,7 +58,7 @@ var tenantListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing tenants"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -97,7 +97,7 @@ var tenantGetCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Getting current tenant"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -140,7 +140,7 @@ var tenantSetCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Setting tenant"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {

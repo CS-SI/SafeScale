@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -51,7 +50,6 @@ const (
 type SecurityGroup interface {
 	Metadata
 	data.Identifiable
-	observer.Observable
 	Consistent
 
 	AddRule(ctx context.Context, _ *abstract.SecurityGroupRule) fail.Error                                         // returns true if the host is member of a cluster

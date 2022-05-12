@@ -434,7 +434,7 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return empty, fail.NotImplementedError("not yet implemented")
+	return empty, fail.NotImplementedError("not yet implemented") // FIXME: Technical debt
 }
 
 // Bonds lists the resources bound to the Security Group

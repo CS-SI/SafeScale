@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -33,7 +32,6 @@ import (
 type Network interface {
 	Metadata
 	data.Identifiable
-	observer.Observable
 	Consistent
 
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network

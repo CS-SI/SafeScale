@@ -98,7 +98,7 @@ var clusterListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing clusters"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -228,7 +228,7 @@ var clusterInspectCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting cluster"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -550,7 +550,7 @@ var clusterCreateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating cluster"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -696,7 +696,7 @@ var clusterStateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Getting cluster state"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -799,7 +799,7 @@ var clusterExpandCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Expanding cluster"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1261,7 +1261,7 @@ var clusterNodeListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing cluster nodes"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1316,7 +1316,7 @@ var clusterNodeInspectCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting cluster node"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1474,7 +1474,7 @@ var clusterNodeStateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Getting node state"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1544,7 +1544,7 @@ var clusterMasterListCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing masters"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1600,7 +1600,7 @@ var clusterMasterInspectCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting nodes"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1704,7 +1704,7 @@ var clusterMasterStateCommand = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Checking master state"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -1783,7 +1783,7 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Listing features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1845,7 +1845,7 @@ func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Inspecting features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1912,7 +1912,7 @@ func clusterFeatureExportAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Exporting feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -1983,7 +1983,7 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Adding feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -2055,7 +2055,7 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Checking cluster feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -2119,7 +2119,7 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 		description := "Remove cluster feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 		go func() {
 			for {
 				if pb.IsFinished() {
@@ -2180,7 +2180,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Finding available master"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -2276,7 +2276,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Running ansible-inventory"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -2332,7 +2332,7 @@ var clusterAnsibleRunCommands = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Running cluster command"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -2782,76 +2782,84 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 
 			var foundPlaybook = false
 			for _, f := range archive.File {
-				if !f.FileInfo().IsDir() {
-
-					// Chech if file path is allow in ansible tree struct (ignore empty directories)
-					err := func(path string, allowDirs []string) error {
-						pos := strings.Index(path, "/")
-						if pos >= 0 {
-							fileBaseDir := path[:pos]
-							found := false
-							for _, v := range allowDirs {
-								if v == fileBaseDir {
-									found = true
-									break
+				p, err := filepath.Abs(f.Name)
+				if err != nil {
+					return nil, fmt.Errorf("problem reading playbook: %w", err)
+				}
+				if !strings.Contains(p, "..") {
+					if !f.FileInfo().IsDir() {
+						// Check if file path is allowed in ansible tree struct (ignore empty directories)
+						err := func(path string, allowDirs []string) error {
+							pos := strings.Index(path, "/")
+							if pos >= 0 {
+								fileBaseDir := path[:pos]
+								found := false
+								for _, v := range allowDirs {
+									if v == fileBaseDir {
+										found = true
+										break
+									}
+								}
+								if !found {
+									return fmt.Errorf(fmt.Sprintf("file path '%s' not allow in ansible tree struct", path))
 								}
 							}
-							if !found {
-								return fmt.Errorf(fmt.Sprintf("file path '%s' not allow in ansible tree struct", path))
-							}
-						}
-						return nil
-					}(f.Name, treeStruct)
-					if err != nil {
-						return nil, err
-					}
-
-					nerr := func() error {
-						// Playbook
-						if f.Name == "playbook.yml" {
-							foundPlaybook = true
-						}
-
-						// Unzip contain to temporary location
-						path := fmt.Sprintf("%s%s", tmpDirectory, f.Name)
-						err = os.MkdirAll(filepath.Dir(path), os.ModePerm)
+							return nil
+						}(f.Name, treeStruct)
 						if err != nil {
-							return err
+							return nil, err
 						}
 
-						dstFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-						defer func(afi *os.File) {
-							err := afi.Close()
+						nerr := func() error {
+							// Playbook
+							if f.Name == "playbook.yml" {
+								foundPlaybook = true
+							}
+
+							// Unzip contain to temporary location
+							path := fmt.Sprintf("%s%s", tmpDirectory, f.Name)
+							if strings.Contains(path, "..") {
+								return fmt.Errorf("unsanitized path")
+							}
+							err = os.MkdirAll(filepath.Dir(path), os.ModePerm)
 							if err != nil {
-								logrus.Debugf(err.Error())
+								return err
 							}
-						}(dstFile)
-						if err != nil {
-							return err
-						}
-						fileInArchive, err := f.Open()
-						defer func(afi *io.ReadCloser) {
-							err := (*afi).Close()
+
+							dstFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+							defer func(afi *os.File) {
+								err := afi.Close()
+								if err != nil {
+									logrus.Debugf(err.Error())
+								}
+							}(dstFile)
 							if err != nil {
-								logrus.Debugf(err.Error())
+								return err
 							}
-						}(&fileInArchive)
+							fileInArchive, err := f.Open()
+							defer func(afi *io.ReadCloser) {
+								err := (*afi).Close()
+								if err != nil {
+									logrus.Debugf(err.Error())
+								}
+							}(&fileInArchive)
 
-						if err != nil {
-							return err
+							if err != nil {
+								return err
+							}
+							_, err = io.Copy(dstFile, fileInArchive)
+							if err != nil {
+								return err
+							}
+
+							// Add filepath to valid files in archives
+							list = append(list, f.Name)
+							return nil
+						}()
+
+						if nerr != nil {
+							return nil, nerr
 						}
-						_, err = io.Copy(dstFile, fileInArchive)
-						if err != nil {
-							return err
-						}
-
-						// Add filepath to valid files in archives
-						list = append(list, f.Name)
-						return nil
-					}()
-
-					if nerr != nil {
-						return nil, nerr
 					}
 				}
 			}
@@ -2968,6 +2976,9 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 
 		for _, path := range list {
 			path := path
+			if strings.Contains(path, "..") {
+				return fmt.Errorf("unsanitzed path")
+			}
 			fpFrom, err := os.Open(fmt.Sprintf("%s%s", tmpDirectory, path))
 			if err != nil {
 				return err
