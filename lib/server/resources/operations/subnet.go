@@ -342,6 +342,17 @@ func (instance *Subnet) IsNull() bool {
 }
 
 func (instance *Subnet) Exists() (bool, fail.Error) {
+	theID := instance.GetID()
+	_, err := instance.Service().InspectSubnet(theID)
+	if err != nil {
+		switch err.(type) {
+		case *fail.ErrNotFound:
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+
 	return true, nil
 }
 
@@ -462,8 +473,6 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 
 // undoBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) {
-	// FIXME: Use ctx the right way
-
 	if xerr != nil && *xerr != nil && keepOnFailure {
 		_ = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
@@ -1233,15 +1242,6 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 		logrus.Debugf("Deleted Security Group '%s' (%s)...", sgName, sgID)
 	}
 	return nil
-}
-
-// Released overloads core.Released() to release the parent Network instance
-func (instance *Subnet) Released() error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	return instance.MetadataCore.Released()
 }
 
 // InspectNetwork returns the Network instance owning the Subnet

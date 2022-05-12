@@ -196,6 +196,7 @@ func (instance *Share) IsNull() bool {
 }
 
 func (instance *Share) Exists() (bool, fail.Error) {
+	// FIXME: There is no InspectShare
 	return true, nil
 }
 

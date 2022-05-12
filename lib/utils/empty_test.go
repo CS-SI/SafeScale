@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	_ "github.com/quasilyte/go-ruleguard/dsl"
 	"github.com/stretchr/testify/require"
 )
 

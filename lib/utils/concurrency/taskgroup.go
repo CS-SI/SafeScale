@@ -406,7 +406,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// instance.task.lock.RUnlock()
 
 			results, childrenErrors, waitingFailure := instance.waitChildren()
-			if waitingFailure != nil { // FIXME: Think how to react to that
+			if waitingFailure != nil { // TODO: Think how to react to that
 				logrus.Warnf(waitingFailure.Error())
 			}
 			instance.result = results
@@ -597,7 +597,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
 
 	// all children terminate, now recover results and errors
 	results, childrenErrors, waitingFailure := instance.waitChildren()
-	if waitingFailure != nil { // FIXME: Think how to react to that
+	if waitingFailure != nil { // TODO: Think how to react to that
 		logrus.Warnf(waitingFailure.Error())
 	}
 	instance.result = results

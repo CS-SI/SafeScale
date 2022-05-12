@@ -108,17 +108,11 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 		return ff, nil
 	}
 
-	// FIXME: Replace should also return an error
 	src, ok := p.(*FeatureFile) // nolint
 	if !ok {
 		return ff, fail.InvalidParameterError("p", "must be a '*FeatureFile'")
 	}
 
-	// VPL: Not used yet, need to think if we should return an error or panic, or something else
-	// src, ok := p.(*Feature)
-	// if !ok {
-	// 	panic("failed to cast p to '*Feature'")
-	// }
 	ff.displayName = src.displayName
 	ff.fileName = src.fileName
 	ff.displayFileName = src.displayFileName
@@ -169,97 +163,6 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 
 	roSpecs := *(ff.specs)
 	return &roSpecs
-}
-
-// Released is used to tell cache that the instance has been used and will not be anymore.
-// Helps the cache handler to know when a cached item can be removed from cache (if needed)
-// Note: Does nothing for now, prepared for future use
-// satisfies interface data.Cacheable
-func (ff *FeatureFile) Released() error {
-	if ff == nil || ff.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-
-	ff.observersLock.RLock()
-	defer ff.observersLock.RUnlock()
-
-	for _, v := range ff.observers {
-		v.MarkAsFreed(ff.displayName)
-	}
-	return nil
-}
-
-// Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
-// Note: Does nothing for now, prepared for future use
-// satisfies interface data.Cacheable
-func (ff *FeatureFile) Destroyed() error {
-	if ff == nil || ff.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-
-	ff.observersLock.RLock()
-	defer ff.observersLock.RUnlock()
-
-	for _, v := range ff.observers {
-		v.MarkAsDeleted(ff.displayName)
-	}
-	return nil
-}
-
-// AddObserver ...
-// satisfies interface data.Observable
-func (ff *FeatureFile) AddObserver(o observer.Observer) error {
-	if ff == nil || ff.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if o == nil {
-		return fail.InvalidParameterError("o", "cannot be nil")
-	}
-
-	ff.observersLock.Lock()
-	defer ff.observersLock.Unlock()
-
-	if pre, ok := ff.observers[o.GetID()]; ok {
-		if pre == o {
-			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
-		}
-		return nil
-	}
-
-	ff.observers[o.GetID()] = o
-	return nil
-}
-
-// NotifyObservers sends a signal to all registered Observers to notify change
-// Satisfies interface data.Observable
-func (ff *FeatureFile) NotifyObservers() error {
-	if ff == nil || ff.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-
-	ff.observersLock.RLock()
-	defer ff.observersLock.RUnlock()
-
-	for _, v := range ff.observers {
-		v.SignalChange(ff.displayName)
-	}
-	return nil
-}
-
-// RemoveObserver ...
-func (ff *FeatureFile) RemoveObserver(name string) error {
-	if ff == nil || ff.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if name == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("name")
-	}
-
-	ff.observersLock.Lock()
-	defer ff.observersLock.Unlock()
-
-	delete(ff.observers, name)
-	return nil
 }
 
 // LoadFeatureFile searches for a spec file named 'name' and initializes a new FeatureFile object

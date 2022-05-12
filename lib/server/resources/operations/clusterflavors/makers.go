@@ -26,11 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// VPL: not used
-// var (
-// 	templateBox atomic.Value
-// )
-
 // Makers ...
 type Makers struct {
 	MinimumRequiredServers func(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) // returns masterCount, privateNodeCount, publicNodeCount

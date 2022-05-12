@@ -19,8 +19,11 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
@@ -332,6 +335,28 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			SizingAsString: sizing,
 			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Creating host"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		resp, err := ClientSession.Host.Create(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -394,6 +419,28 @@ var hostResize = cli.Command{ // nolint
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Resizing host"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		resp, err := ClientSession.Host.Resize(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -419,6 +466,27 @@ var hostDelete = cli.Command{
 		hostList = append(hostList, c.Args().First())
 		hostList = append(hostList, c.Args().Tail()...)
 
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Deleting host"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		if err := ClientSession.Host.Delete(hostList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
@@ -437,6 +505,27 @@ var hostSSH = cli.Command{
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Getting SSH config"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
 		}
 
 		resp, err := ClientSession.Host.SSHConfig(c.Args().First())
@@ -588,6 +677,27 @@ var hostSecurityGroupAddCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Binding security group"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		err := ClientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -608,6 +718,27 @@ var hostSecurityGroupRemoveCommand = cli.Command{
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Unbinding security group"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
 		}
 
 		err := ClientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
@@ -646,6 +777,27 @@ var hostSecurityGroupListCommand = cli.Command{
 		state := strings.ToLower(c.String("state"))
 		if c.Bool("all") {
 			state = "all"
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Listing security groups"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
 		}
 
 		resp, err := ClientSession.Host.ListSecurityGroups(c.Args().First(), state, 0)
@@ -690,6 +842,27 @@ var hostSecurityGroupEnableCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Enabling security groups"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		err := ClientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -710,6 +883,27 @@ var hostSecurityGroupDisableCommand = cli.Command{
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Disabling security group"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
 		}
 
 		err := ClientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
@@ -763,6 +957,27 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		description := "Listing host features"
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		go func() {
+			for {
+				if pb.IsFinished() {
+					return
+				}
+				err := pb.Add(1)
+				if err != nil {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		defer func() {
+			_ = pb.Finish()
+		}()
+	}
+
 	list, err := ClientSession.Host.ListFeatures(hostName, c.Bool("all"), 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
@@ -801,6 +1016,27 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
+	}
+
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		description := "Inspecting host features"
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		go func() {
+			for {
+				if pb.IsFinished() {
+					return
+				}
+				err := pb.Add(1)
+				if err != nil {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		defer func() {
+			_ = pb.Finish()
+		}()
 	}
 
 	details, err := ClientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
@@ -845,6 +1081,27 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
+	}
+
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		description := "Exporting host features"
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		go func() {
+			for {
+				if pb.IsFinished() {
+					return
+				}
+				err := pb.Add(1)
+				if err != nil {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		defer func() {
+			_ = pb.Finish()
+		}()
 	}
 
 	export, err := ClientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout

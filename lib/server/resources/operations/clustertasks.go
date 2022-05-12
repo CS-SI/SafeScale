@@ -263,7 +263,6 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					}
 				}
 
-				// FIXME: WaitGroupFor NEEDS more UT
 				_, _, tgerr = tg.WaitGroupFor(timings.HostLongOperationTimeout())
 				tgerr = debug.InjectPlannedFail(tgerr)
 				if tgerr != nil {

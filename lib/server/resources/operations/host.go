@@ -164,6 +164,17 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 }
 
 func (instance *Host) Exists() (bool, fail.Error) {
+	theID := instance.GetID()
+	_, err := instance.Service().InspectHost(theID)
+	if err != nil {
+		switch err.(type) {
+		case *fail.ErrNotFound:
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+
 	return true, nil
 }
 
@@ -484,7 +495,6 @@ func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	return instance.unsafeReload(ctx)
 }
 
-// FIXME: unsafeXXX may need review, should not be needed anymore after lock sanitization
 // unsafeReload reloads Host from metadata and current Host state on provider state
 func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -3111,7 +3121,7 @@ func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return fail.NotImplementedError("Host.Resize() not yet implemented")
+	return fail.NotImplementedError("Host.Resize() not yet implemented") // FIXME: Technical debt
 }
 
 // GetPublicIP returns the public IP address of the Host

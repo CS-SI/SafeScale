@@ -119,5 +119,5 @@ func BackupMetadata(svc iaas.Service, filename string) fail.Error {
 
 	logrus.Warnf("trying to backup metadata into %s", targetFilename)
 
-	return fail.NotImplementedError()
+	return fail.NotImplementedError() // FIXME: Technical debt
 }

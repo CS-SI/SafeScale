@@ -933,7 +933,7 @@ func (instance service) TenantCleanup(force bool) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	return fail.NotImplementedError("service.TenantCleanup() not yet implemented")
+	return fail.NotImplementedError("service.TenantCleanup() not yet implemented") // FIXME: Technical debt
 }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules

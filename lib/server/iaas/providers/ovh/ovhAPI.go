@@ -60,11 +60,11 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail
 			return nil, fail.ConvertError(err)
 		}
 	case "PUT":
-		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt
 	case "POST":
-		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt
 	case "DELETE":
-		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt
 	default:
 		return nil, fail.NewError("unexpected HTTP code: %s", httpCode)
 	}

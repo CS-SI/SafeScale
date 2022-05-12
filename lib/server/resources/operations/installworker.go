@@ -1113,7 +1113,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (ferr fail.Error) {
 // parseClusterSizingRequest returns count, cpu and ram components of request
 func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
 	_ = request
-	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
+	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented") // FIXME: Technical debt
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)

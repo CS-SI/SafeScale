@@ -313,8 +313,7 @@ func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callba
 		return xerr
 	}
 
-	// notify observers there has been changed in the instance
-	return fail.ConvertError(myself.unsafeNotifyObservers())
+	return nil
 }
 
 // Carry links metadata with real data
@@ -397,12 +396,6 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 			return issue
 		}
 
-		// notify observers there has been changed in the instance
-		err := myself.unsafeNotifyObservers()
-		err = debug.InjectPlannedError(err)
-		if err != nil {
-			return fail.ConvertError(err)
-		}
 		return nil
 	}
 
@@ -804,7 +797,7 @@ func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
 	myself.loaded = true
 	myself.committed = true
 
-	return fail.ConvertError(myself.unsafeNotifyObservers())
+	return nil
 }
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
@@ -942,7 +935,6 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 		return fail.NewErrorList(errors)
 	}
 
-	myself.unsafeDestroyed() // notifies cache that the instance has been deleted
 	return nil
 }
 
@@ -1079,128 +1071,5 @@ func (myself *MetadataCore) unsafeDeserialize(buf []byte) (ferr fail.Error) {
 			return fail.Wrap(xerr, "failed to unsafeDeserialize properties")
 		}
 	}
-	return nil
-}
-
-// Released is used to tell cache that the instance has been used and will not be anymore.
-// Helps the cache handler to know when a cached item can be removed from cache (if needed)
-// satisfies interface data.Cacheable
-func (myself *MetadataCore) Released() error {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-
-	myself.RLock()
-	defer myself.RUnlock()
-
-	return myself.unsafeReleased()
-}
-
-// unsafeReleased is used to tell cache that the instance has been used and will not be anymore.
-// Helps the cache handler to know when a cached item can be removed from cache (if needed)
-// Note: must be called after locking the instance
-func (myself *MetadataCore) unsafeReleased() error {
-	id, ok := myself.id.Load().(string)
-	if !ok {
-		return fail.InconsistentError("field 'id' is not set with string")
-	}
-
-	for _, v := range myself.observers {
-		v.MarkAsFreed(id)
-	}
-	return nil
-}
-
-// Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
-// satisfies interface data.Cacheable
-func (myself *MetadataCore) Destroyed() error {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-
-	myself.RLock()
-	defer myself.RUnlock()
-
-	myself.unsafeDestroyed()
-	return nil
-}
-
-// unsafeDestroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
-// Note: Does nothing for now, prepared for future use
-func (myself *MetadataCore) unsafeDestroyed() {
-	id, ok := myself.id.Load().(string)
-	if !ok {
-		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
-		return
-	}
-
-	for _, v := range myself.observers {
-		v.MarkAsDeleted(id)
-	}
-}
-
-// AddObserver ...
-// satisfies interface data.Observable
-func (myself *MetadataCore) AddObserver(o observer.Observer) error {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-	if o == nil {
-		return fail.InvalidParameterError("o", "cannot be nil")
-	}
-
-	myself.Lock()
-	defer myself.Unlock()
-
-	if pre, ok := myself.observers[o.GetID()]; ok {
-		if pre == o {
-			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
-		}
-		return nil
-	}
-	myself.observers[o.GetID()] = o
-	return nil
-}
-
-// NotifyObservers sends a signal to all registered Observers to notify change
-// Satisfies interface data.Observable
-func (myself *MetadataCore) NotifyObservers() error {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-
-	myself.RLock()
-	defer myself.RUnlock()
-
-	return myself.unsafeNotifyObservers()
-}
-
-// unsafeNotifyObservers sends a signal to all registered Observers to notify change
-// Note: must be called after locking the instance
-func (myself *MetadataCore) unsafeNotifyObservers() error {
-	id, ok := myself.id.Load().(string)
-	if !ok {
-		return fail.InconsistentError("field 'id' is not set with string")
-	}
-
-	for _, v := range myself.observers {
-		v.SignalChange(id)
-	}
-	return nil
-}
-
-// RemoveObserver ...
-func (myself *MetadataCore) RemoveObserver(name string) error {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-	if name == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("name")
-	}
-
-	myself.Lock()
-	defer myself.Unlock()
-
-	delete(myself.observers, name)
 	return nil
 }

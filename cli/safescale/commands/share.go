@@ -17,8 +17,11 @@
 package commands
 
 import (
+	"os"
 	"sync/atomic"
+	"time"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -116,6 +119,27 @@ var shareCreate = cli.Command{
 			SecurityModes: c.StringSlice("securityModes"),
 		}
 
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Creating share"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		err := ClientSession.Share.Create(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -147,6 +171,27 @@ var shareDelete = cli.Command{
 		shareList = append(shareList, c.Args().First())
 		shareList = append(shareList, c.Args().Tail()...)
 
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Deleting share"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		if err := ClientSession.Share.Delete(shareList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of share", false).Error())))
@@ -162,6 +207,27 @@ var shareList = cli.Command{
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Listing share"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
 
 		list, err := ClientSession.Share.List(0)
 		if err != nil {
@@ -205,6 +271,28 @@ var shareMount = cli.Command{
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
 		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Mounting share"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		err := ClientSession.Share.Mount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -233,6 +321,28 @@ var shareUnmount = cli.Command{
 			Host:  &protocol.Reference{Name: hostName},
 			Share: &protocol.Reference{Name: shareName},
 		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Unmounting share"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		err := ClientSession.Share.Unmount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -253,6 +363,27 @@ var shareInspect = cli.Command{
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SHARE_REF."))
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Inspecting share"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
 		}
 
 		list, err := ClientSession.Share.Inspect(c.Args().Get(0), 0)

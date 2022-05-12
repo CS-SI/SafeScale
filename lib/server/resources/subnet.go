@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -36,7 +35,6 @@ import (
 type Subnet interface {
 	Metadata
 	data.Identifiable
-	observer.Observable
 	Consistent
 
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                    // unlinks host ID from subnet

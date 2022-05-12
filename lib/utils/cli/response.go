@@ -117,6 +117,10 @@ func (r *response) Display() {
 		logrus.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
 		return
 	}
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		fmt.Println("")
+	}
+
 	fmt.Println(string(out))
 }
 

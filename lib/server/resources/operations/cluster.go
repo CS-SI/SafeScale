@@ -115,6 +115,7 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 }
 
 func (instance *Cluster) Exists() (bool, fail.Error) {
+	// FIXME: Requires iteration of quite a few members...
 	return true, nil
 }
 
@@ -245,18 +246,6 @@ func (instance *Cluster) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-// Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
-func (instance *Cluster) Released() error {
-	if instance.randomDelayTask != nil {
-		// Stops task generating random delays
-		if err := instance.randomDelayTask.Abort(); err != nil {
-			logrus.Debugf("there was a problem stopping random delay generator: %v", err)
-		}
-	}
-
-	return instance.MetadataCore.Released()
-}
-
 // carry ...
 func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
@@ -368,7 +357,7 @@ func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (ferr fail.Error) 
 	case clusterflavor.K8S:
 		instance.localCache.makers = k8s.Makers
 	default:
-		return fail.NotImplementedError("unknown Cluster Flavor '%d'", flavor)
+		return fail.NotImplementedError("unknown Cluster Flavor '%d'", flavor) // FIXME: Mistake
 	}
 	return nil
 }

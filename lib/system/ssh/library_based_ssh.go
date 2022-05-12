@@ -289,7 +289,7 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 			Auth: []ssh.AuthMethod{
 				PublicKeyFromStr(sc.cfg.PrivateKey),
 			},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: sshtunnel.TrustedHostKeyCallback(""),
 			Timeout:         10 * time.Second,
 		}
 
@@ -772,7 +772,7 @@ func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string
 		Auth: []ssh.AuthMethod{
 			pk,
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: sshtunnel.TrustedHostKeyCallback(""),
 	}
 
 	if isUpload {
@@ -964,7 +964,7 @@ func (sc *Profile) Enter(username, shell string) (ferr fail.Error) {
 			pk,
 		},
 		Timeout:         7 * time.Second,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: sshtunnel.TrustedHostKeyCallback(""),
 	}
 
 	hostport := fmt.Sprintf("%s:%d", "localhost", tu.GetLocalEndpoint().Port())

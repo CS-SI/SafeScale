@@ -17,6 +17,10 @@
 package commands
 
 import (
+	"os"
+	"time"
+
+	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -52,6 +56,27 @@ var tenantListCommand = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Listing tenants"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
 		tenants, err := ClientSession.Tenant.List(0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -69,6 +94,27 @@ var tenantGetCommand = cli.Command{
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Getting current tenant"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
 
 		tenant, err := ClientSession.Tenant.Get(0)
 		if err != nil {
@@ -91,6 +137,27 @@ var tenantSetCommand = cli.Command{
 		}
 
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Setting tenant"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
 
 		err := ClientSession.Tenant.Set(c.Args().First(), 0)
 		if err != nil {
