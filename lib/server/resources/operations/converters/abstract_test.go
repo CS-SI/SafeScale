@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/obsolete"
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"

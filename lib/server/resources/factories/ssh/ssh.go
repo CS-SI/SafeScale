@@ -42,6 +42,11 @@ func ReplaceConnectorFactory(cb func(sshapi.Config) (sshapi.Connector, fail.Erro
 	return nil
 }
 
+// ResetConnectorFactory resets the Connector Factory to the default factory function
+func ResetConnectorFactory() {
+	currentSSHConnectorFactory = defaultSSHConnectorFactory
+}
+
 // NewConnector creates a connector using the factory
 func NewConnector(conf sshapi.Config) (sshapi.Connector, fail.Error) {
 	if valid.IsNull(conf) {

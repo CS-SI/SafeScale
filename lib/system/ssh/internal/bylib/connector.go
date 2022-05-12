@@ -30,13 +30,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	libssh "golang.org/x/crypto/ssh"
 	terminal "golang.org/x/term"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal/bylib/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -70,19 +70,6 @@ func NewConnector(conf api.Config) (*Connector, fail.Error) {
 	}
 	return &out, nil
 }
-
-// // RunWithTimeout ...
-// func (sc *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-// 	tu, _, err := sc.cfg.createTunneling()
-// 	if err != nil {
-// 		return 0, "", "", fail.NewError("failure creating tunnel: %w", err)
-// 	}
-// 	sc.tunnels = tu
-// 	defer tu.Close()
-//
-// 	rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
-// 	return rv, out, sterr, xerr
-// }
 
 // Close cleans up the resources created; ie closes SSH client connection and closes tunnels
 func (sc *Connector) Close() fail.Error {

@@ -144,7 +144,7 @@ func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, time
 			Auth: []libssh.AuthMethod{
 				PublicKeyFromStr(scmd.conn.TargetConfig.PrivateKey),
 			},
-			HostKeyCallback: libssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: sshtunnel.TrustedHostKeyCallback(""),
 			Timeout:         2 * time.Second,
 		}
 

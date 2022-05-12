@@ -19,8 +19,9 @@ package converters
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/obsolete"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func Test_SSHConfigFromSystemToProtocol(t *testing.T) {

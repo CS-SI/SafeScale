@@ -477,6 +477,8 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 	)
 }
 
+// CreateTunnel creates a persistent SSH tunnel using cli (using lib is not possible, it would close at safescale exit)
+// FIXME: don't use secondary gateway if first one is not available...
 func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) (ferr error) {
 	var fXErr fail.Error
 	defer func() {
