@@ -26,6 +26,6 @@ import (
 )
 
 func Test_Ansible(t *testing.T) {
-	helpers.InSection("features").AddScenario(AnsibleWrongZipPlaylist)
+	helpers.InSection("features").AddScenario(AnsibleWrongZipPlaylist).AddScenario(AnsibleGoodZipPlaylist)
 	helpers.RunScenarios(t)
 }
