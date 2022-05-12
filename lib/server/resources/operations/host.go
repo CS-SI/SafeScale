@@ -515,7 +515,6 @@ func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	return instance.unsafeReload(ctx)
 }
 
-// FIXME: unsafeXXX may need review, should not be needed anymore after lock sanitization
 // unsafeReload reloads Host from metadata and current Host state on provider state
 func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

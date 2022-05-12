@@ -233,8 +233,6 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 		return xerr
 	}
 
-	// VPL: already set earlier
-	// v["IPRanges"] = networkCfg.CIDR
 	return nil
 }
 

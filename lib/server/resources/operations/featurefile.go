@@ -108,17 +108,11 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 		return ff, nil
 	}
 
-	// FIXME: Replace should also return an error
 	src, ok := p.(*FeatureFile) // nolint
 	if !ok {
 		return ff, fail.InvalidParameterError("p", "must be a '*FeatureFile'")
 	}
 
-	// VPL: Not used yet, need to think if we should return an error or panic, or something else
-	// src, ok := p.(*Feature)
-	// if !ok {
-	// 	panic("failed to cast p to '*Feature'")
-	// }
 	ff.displayName = src.displayName
 	ff.fileName = src.fileName
 	ff.displayFileName = src.displayFileName

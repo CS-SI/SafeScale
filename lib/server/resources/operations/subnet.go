@@ -483,8 +483,6 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 
 // undoBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) {
-	// FIXME: Use ctx the right way
-
 	if xerr != nil && *xerr != nil && keepOnFailure {
 		_ = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			task, cerr := concurrency.TaskFromContextOrVoid(ctx)
