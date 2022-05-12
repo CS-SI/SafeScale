@@ -47,7 +47,7 @@ func NewLibConnector(conf api.Config) (api.Connector, fail.Error) {
 	return bylib.NewConnector(conf)
 }
 
-// NewEmptyConfig instanciates a sshConfig instance
+// NewEmptyConfig instantiates a sshConfig instance
 func NewEmptyConfig() api.Config {
 	return internal.NewEmptyConfig()
 }

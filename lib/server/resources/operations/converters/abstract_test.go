@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/obsolete"
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -33,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
@@ -470,19 +470,19 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gwConf, xerr := ssh.NewConfig("Config GW Hostname", "Config GW Hostname", 42, "Config GW Hostname", "Config GW Hostname")
+	gwConf, xerr := obsolete.NewConfig("Config GW Hostname", "Config GW Hostname", 42, "Config GW Hostname", "Config GW Hostname")
 	require.NotNil(t, gwConf)
 	require.Nil(t, xerr)
 	xerr = gwConf.SetLocalPort(43)
 	require.Nil(t, xerr)
 
-	gw2Conf, xerr := ssh.NewConfig("Config GW2 Hostname", "Config GW2 Hostname", 0, "Config GW2 Hostname", "Config GW2 Hostname")
+	gw2Conf, xerr := obsolete.NewConfig("Config GW2 Hostname", "Config GW2 Hostname", 0, "Config GW2 Hostname", "Config GW2 Hostname")
 	require.NotNil(t, gwConf)
 	require.Nil(t, xerr)
 	xerr = gwConf.SetLocalPort(45)
 	require.Nil(t, xerr)
 
-	hostConf, xerr := ssh.NewConfig("Config Hostname", "Config Hostname", 46, "Config Hostname", "Config Hostname", gwConf, gw2Conf)
+	hostConf, xerr := obsolete.NewConfig("Config Hostname", "Config Hostname", 46, "Config Hostname", "Config Hostname", gwConf, gw2Conf)
 	require.NotNil(t, gwConf)
 	require.Nil(t, xerr)
 	xerr = gwConf.SetLocalPort(47)
