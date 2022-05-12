@@ -21,7 +21,6 @@ package ansiblecluster
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
@@ -29,13 +28,13 @@ import (
 )
 
 func AnsibleWrongZipPlaylist(t *testing.T) {
-	name := "boomer"
+	name := "player0"
 
-	out, err := helpers.GetOutput(fmt.Sprintf("safescale network create --cidr 192.168.51.0/24 %s", name))
+	out, err := helpers.GetOutput(fmt.Sprintf("safescale cluster create -F BOH -C Small --cidr 192.168.52.0/24 %s", name))
 	require.Nil(t, err)
 
 	defer func() {
-		_, err := helpers.GetOutput(fmt.Sprintf("safescale network delete -f %s", name))
+		_, err := helpers.GetOutput(fmt.Sprintf("safescale cluster delete -f -y %s", name))
 		require.Nil(t, err)
 	}()
 
@@ -49,18 +48,39 @@ func AnsibleWrongZipPlaylist(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, name, res)
 
-	out, err = helpers.GetOutput(fmt.Sprintf("safescale host add-feature gw-%s ansible", name))
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale cluster ansible playbook %s ./playbook-failure-wrong-rolename.zip", name))
 	require.Nil(t, err)
+	require.NotContains(t, out, "ok=20")
+}
+
+func AnsibleGoodZipPlaylist(t *testing.T) {
+	name := "player1"
+
+	out, err := helpers.GetOutput(fmt.Sprintf("safescale cluster create -F BOH -C Small --cidr 192.168.53.0/24 %s", name))
+	require.Nil(t, err)
+
+	defer func() {
+		_, err := helpers.GetOutput(fmt.Sprintf("safescale cluster delete -f -y %s", name))
+		require.Nil(t, err)
+	}()
+
+	// check for success and name
+	var res string
 	res, err = helpers.RunJq(out, "-r .status")
 	require.Nil(t, err)
 	require.Equal(t, "success", res)
 
-	out, err = helpers.GetOutput(fmt.Sprintf(`safescale ssh run -c "ansible --version" gw-%s`, name))
+	res, err = helpers.RunJq(out, "-r .result.name")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "ansible python module"))
+	require.Equal(t, name, res)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale cluster ansible playbook %s ./playbook-success.zip", name))
+	require.Nil(t, err)
+	require.Contains(t, out, "ok=20")
 }
 
 func init() {
 	helpers.InSection("features").
-		AddScenario(AnsibleWrongZipPlaylist)
+		AddScenario(AnsibleWrongZipPlaylist).
+		AddScenario(AnsibleGoodZipPlaylist)
 }
