@@ -165,6 +165,17 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 }
 
 func (instance *Host) Exists() (bool, fail.Error) {
+	theID := instance.GetID()
+	_, err := instance.Service().InspectHost(theID)
+	if err != nil {
+		switch err.(type) {
+		case *fail.ErrNotFound:
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+
 	return true, nil
 }
 

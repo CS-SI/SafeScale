@@ -139,6 +139,7 @@ func (instance *SecurityGroup) IsNull() bool {
 }
 
 func (instance *SecurityGroup) Exists() (bool, fail.Error) {
+	// FIXME: Not so easy
 	return true, nil
 }
 

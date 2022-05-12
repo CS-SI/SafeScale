@@ -125,6 +125,17 @@ func (instance *Network) IsNull() bool {
 }
 
 func (instance *Network) Exists() (bool, fail.Error) {
+	theID := instance.GetID()
+	_, err := instance.Service().InspectNetwork(theID)
+	if err != nil {
+		switch err.(type) {
+		case *fail.ErrNotFound:
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+
 	return true, nil
 }
 
