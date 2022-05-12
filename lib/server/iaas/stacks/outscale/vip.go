@@ -72,7 +72,7 @@ func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {

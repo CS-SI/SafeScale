@@ -949,7 +949,7 @@ func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 
 // CheckConsistency checks the rules in the security group on provider side are identical to the ones registered in metadata
 func (instance *SecurityGroup) CheckConsistency(_ context.Context) fail.Error {
-	return fail.NotImplementedError()
+	return fail.NotImplementedError() // FIXME: Technical debt
 }
 
 // ToProtocol converts a Security Group to protobuf message

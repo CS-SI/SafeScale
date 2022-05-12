@@ -3234,7 +3234,7 @@ func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return fail.NotImplementedError("Host.Resize() not yet implemented")
+	return fail.NotImplementedError("Host.Resize() not yet implemented") // FIXME: Technical debt
 }
 
 // GetPublicIP returns the public IP address of the Host

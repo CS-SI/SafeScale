@@ -1099,7 +1099,6 @@ func (s stack) deleteHost(id string) fail.Error {
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-// FIXME: check if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
 }

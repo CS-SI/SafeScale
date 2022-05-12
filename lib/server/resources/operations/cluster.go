@@ -357,7 +357,7 @@ func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (ferr fail.Error) 
 	case clusterflavor.K8S:
 		instance.localCache.makers = k8s.Makers
 	default:
-		return fail.NotImplementedError("unknown Cluster Flavor '%d'", flavor)
+		return fail.NotImplementedError("unknown Cluster Flavor '%d'", flavor) // FIXME: Mistake
 	}
 	return nil
 }

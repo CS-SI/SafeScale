@@ -221,10 +221,10 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 
 	// Host checks
 	if hostFrom != "" && hostTo != "" {
-		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
+		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet") // FIXME: Technical debt
 	}
 	if hostFrom == "" && hostTo == "" {
-		return invalid, "", "", fail.NotImplementedError("no host name specified neither in from nor to")
+		return invalid, "", "", fail.NotImplementedError("no host name specified neither in from nor to") // FIXME: Technical debt
 	}
 
 	fromPath, rerr := extractPath(from)

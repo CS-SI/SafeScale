@@ -514,7 +514,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	// IPAddress checks
 	if hostFrom != "" && hostTo != "" {
-		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
+		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet") // FIXME: Technical debt
 	}
 	if hostFrom == "" && hostTo == "" {
 		return invalid, "", "", fail.InvalidRequestError("no host name specified neither in from nor to")
