@@ -55,14 +55,14 @@ type Command struct {
 	cmd          *exec.Cmd
 }
 
-// Wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
+// wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
 // The command must have been started by Start.
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
-// Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait does not release resources associated with the cmd; Command.Close() must be called for that.
+// wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
+// wait does not release resources associated with the cmd; Command.Close() must be called for that.
 // !!!WARNING!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
-func (scmd *Command) Wait() fail.Error {
+func (scmd *Command) wait() error {
 	if valid.IsNull(scmd) {
 		return fail.InvalidInstanceError()
 	}
@@ -70,7 +70,7 @@ func (scmd *Command) Wait() fail.Error {
 		return fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
 	}
 
-	return fail.Wrap(scmd.cmd.Wait())
+	return scmd.cmd.Wait()
 }
 
 // Kill kills Command process.
@@ -92,8 +92,8 @@ func (scmd *Command) Kill() fail.Error {
 }
 
 // getStdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
-// Wait will close the pipe after seeing the command exit, so most callers does not need to close the pipe themselves; however,
-// an implication is that it is incorrect to call Wait before all reads from the pipe have been completed.
+// wait will close the pipe after seeing the command exit, so most callers does not need to close the pipe themselves; however,
+// an implication is that it is incorrect to call wait before all reads from the pipe have been completed.
 // For the same reason, it is incorrect to call Run when using getStdoutPipe.
 func (scmd *Command) getStdoutPipe() (io.ReadCloser, fail.Error) {
 	if valid.IsNull(scmd) {
@@ -111,8 +111,8 @@ func (scmd *Command) getStdoutPipe() (io.ReadCloser, fail.Error) {
 }
 
 // getStderrPipe returns a pipe that will be connected to the Command's standard error when the Command starts.
-// Wait will close the pipe after seeing the Command exit, so most callers does not need to close the pipe themselves; however,
-// an implication is that it is incorrect to call Wait before all reads from the pipe have completed. For the same reason,
+// wait will close the pipe after seeing the Command exit, so most callers does not need to close the pipe themselves; however,
+// an implication is that it is incorrect to call wait before all reads from the pipe have completed. For the same reason,
 // it is incorrect to use Run when using getStderrPipe.
 func (scmd *Command) getStderrPipe() (io.ReadCloser, fail.Error) {
 	if valid.IsNull(scmd) {
@@ -130,7 +130,7 @@ func (scmd *Command) getStderrPipe() (io.ReadCloser, fail.Error) {
 }
 
 // getStdinPipe returns a pipe that will be connected to the Command's standard input when the command starts.
-// The pipe will be closed automatically after Wait sees the Command exit.
+// The pipe will be closed automatically after wait sees the Command exit.
 // A caller need only call Close to force the pipe to close sooner.
 // For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
 func (scmd *Command) getStdinPipe() (io.WriteCloser, fail.Error) {
@@ -184,7 +184,7 @@ func (scmd *Command) CombinedOutput() ([]byte, fail.Error) {
 }
 
 // Start starts the specified command but does not wait for it to complete.
-// The Wait method will wait for completion and return the exit code.
+// The wait method will wait for completion and return the exit code.
 func (scmd *Command) Start() fail.Error {
 	if valid.IsNull(scmd) {
 		return fail.InvalidInstanceError()
@@ -208,7 +208,7 @@ func (scmd *Command) Start() fail.Error {
 //   . *fail.ErrNotAvailable if remote SSH is not available
 //   . *fail.ErrTimeout if 'timeout' is reached
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
-//       you risk to call twice os/exec.Wait, which may panic
+//       you risk to call twice os/exec.wait, which may panic
 func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
 	if valid.IsNull(scmd) {
@@ -371,7 +371,7 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 	}
 
 	var pbcErr error
-	runErr := scmd.Wait()
+	runErr := scmd.wait()
 	_ = stdoutPipe.Close()
 	_ = stderrPipe.Close()
 
