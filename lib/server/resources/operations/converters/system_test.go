@@ -25,7 +25,7 @@ import (
 
 func Test_SSHConfigFromSystemToProtocol(t *testing.T) {
 
-	in := obsolete.NewEmptyConfig()
+	in := ssh.NewEmptyConfig()
 	in.SetHostname("Hostname")
 	in.SetIPAddress("IPAddress")
 	in.SetPort(22)

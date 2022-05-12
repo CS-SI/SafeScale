@@ -20,9 +20,9 @@
 package ssh
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/obsolete"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -35,5 +35,5 @@ func ConvertInternalToApiConfig(conf internal.Config) (sshapi.Config, fail.Error
 	if conf.SecondaryGatewayConfig() != nil {
 		gws[1] = conf.SecondaryGatewayConfig()
 	}
-	return obsolete.NewConfig(conf.Hostname(), conf.IPAddress(), conf.Port(), conf.User(), conf.PrivateKey(), gws...)
+	return ssh.NewConfig(conf.Hostname(), conf.IPAddress(), conf.Port(), conf.User(), conf.PrivateKey(), gws...)
 }

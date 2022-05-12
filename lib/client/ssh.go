@@ -29,7 +29,6 @@ import (
 	"time"
 
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/obsolete"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -498,7 +497,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 	}
 
 	if sshCfg.GatewayConfig(sshapi.PrimaryGateway) == nil {
-		gwCfg, xerr := obsolete.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
@@ -561,7 +560,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 
 	// FIXME: I do not understand the point here...
 	if sshCfg.GatewayConfig(sshapi.PrimaryGateway) == nil {
-		gwCfg, xerr := obsolete.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
 		if xerr != nil {
 			return xerr
 		}
