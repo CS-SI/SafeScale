@@ -82,27 +82,6 @@ var sshRun = cli.Command{
 			timeout = 0
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Running SSH command"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
 		retcode, _, _, err := ClientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -150,7 +129,7 @@ var sshCopy = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Copying files"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -203,27 +182,6 @@ var sshConnect = cli.Command{
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("missing mandatory argument <Host_name>")
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Getting host status"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
 		}
 
 		// Check host status 1st
@@ -297,27 +255,6 @@ var sshTunnel = cli.Command{
 
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating SSH tunnel"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
 		// c.GlobalInt("port") is the grpc port aka. 50051
 		err := ClientSession.SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
@@ -370,27 +307,6 @@ var sshClose = cli.Command{
 			if err != nil || 0 > remotePort || remotePort > 65535 {
 				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port", remotePort)))
 			}
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating ssh tunnel"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
 		}
 
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute

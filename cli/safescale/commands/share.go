@@ -121,7 +121,7 @@ var shareCreate = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Creating share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -173,7 +173,7 @@ var shareDelete = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Deleting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -210,7 +210,7 @@ var shareList = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Listing share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -274,7 +274,7 @@ var shareMount = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Mounting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -324,7 +324,7 @@ var shareUnmount = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Unmounting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
@@ -367,7 +367,7 @@ var shareInspect = cli.Command{
 
 		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
 			description := "Inspecting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
 			go func() {
 				for {
 					if pb.IsFinished() {
