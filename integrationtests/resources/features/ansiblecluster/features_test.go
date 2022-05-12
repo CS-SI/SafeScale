@@ -1,6 +1,5 @@
-//go:build !(allintegration || (integration && featuretests))
-// +build !allintegration
-// +build !integration !featuretests
+//go:build (integration && featuretests) || allintegration
+// +build integration,featuretests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -18,12 +17,15 @@
  * limitations under the License.
  */
 
-package ansible_cluster
+package ansiblecluster
 
 import (
 	"testing"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
-func Test_Nop(t *testing.T) {
-	t.Skip("feature tests disabled")
+func Test_Ansible(t *testing.T) {
+	helpers.InSection("features").AddScenario(Ansible)
+	helpers.RunScenarios(t)
 }

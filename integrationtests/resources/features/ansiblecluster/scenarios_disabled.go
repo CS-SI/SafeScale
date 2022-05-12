@@ -18,4 +18,4 @@
  * limitations under the License.
  */
 
-package ansible_cluster
+package ansiblecluster
