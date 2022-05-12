@@ -22,7 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -32,7 +31,6 @@ import (
 type Share interface {
 	Metadata
 	data.Identifiable
-	observer.Observable
 	Consistent
 
 	Browse(ctx context.Context, callback func(hostName string, shareID string) fail.Error) fail.Error

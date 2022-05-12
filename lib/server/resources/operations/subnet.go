@@ -1337,15 +1337,6 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 	return nil
 }
 
-// Released overloads core.Released() to release the parent Network instance
-func (instance *Subnet) Released() error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	return instance.MetadataCore.Released()
-}
-
 // InspectNetwork returns the Network instance owning the Subnet
 func (instance *Subnet) InspectNetwork(ctx context.Context) (rn resources.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

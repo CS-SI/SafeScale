@@ -245,18 +245,6 @@ func (instance *Cluster) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-// Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
-func (instance *Cluster) Released() error {
-	if instance.randomDelayTask != nil {
-		// Stops task generating random delays
-		if err := instance.randomDelayTask.Abort(); err != nil {
-			logrus.Debugf("there was a problem stopping random delay generator: %v", err)
-		}
-	}
-
-	return instance.MetadataCore.Released()
-}
-
 // carry ...
 func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {

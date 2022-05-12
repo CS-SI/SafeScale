@@ -28,7 +28,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -38,7 +37,6 @@ import (
 type Host interface {
 	Metadata
 	Targetable
-	observer.Observable
 	Consistent
 
 	BindSecurityGroup(ctx context.Context, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                // Binds a security group to host
