@@ -45,27 +45,23 @@ type dumper interface { // nolint
 	Dump() string
 }
 
-func OnPanic(err *error) func() {
-	return func() {
-		if x := recover(); x != nil {
-			if anError, ok := x.(error); ok {
-				*err = fmt.Errorf("runtime panic occurred: %w", anError)
-			} else {
-				*err = fmt.Errorf("runtime panic occurred: %v", x)
-			}
+func OnPanic(err *error) {
+	if x := recover(); x != nil {
+		if anError, ok := x.(error); ok {
+			*err = fmt.Errorf("runtime panic occurred: %w", anError)
+		} else {
+			*err = fmt.Errorf("runtime panic occurred: %v", x)
 		}
 	}
 }
 
 // SilentOnPanic sometimes we cannot return errors, in that case, log the panic
-func SilentOnPanic(err *error) func() {
-	return func() {
-		if x := recover(); x != nil {
-			if anError, ok := x.(error); ok {
-				logrus.Errorf("runtime panic occurred: %v", anError)
-			} else {
-				logrus.Errorf("runtime panic occurred: %v", x)
-			}
+func SilentOnPanic(err *error) {
+	if x := recover(); x != nil {
+		if anError, ok := x.(error); ok {
+			logrus.Errorf("runtime panic occurred: %v", anError)
+		} else {
+			logrus.Errorf("runtime panic occurred: %v", x)
 		}
 	}
 }
@@ -316,7 +312,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				if quittingErr != nil {
 					litter.Config.HidePrivateFields = false
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
-					tunnel.Close()
 				}
 				return // nolint
 			}()
@@ -631,15 +626,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 	return nil
 }
 
-func (tunnel *SSHTunnel) Close() {
-	var crash error
-	defer SilentOnPanic(&crash)
-
-	if tunnel.isOpen {
-		if tunnel.closer != nil {
-			tunnel.closer <- struct{}{}
-		}
-	}
+func (tunnel *SSHTunnel) Close() { // kept for compatibility issues
 	return // nolint
 }
 
@@ -696,12 +683,9 @@ func NewSSHTunnelWithLocalBinding(
 
 	sshTunnel := &SSHTunnel{
 		config: &ssh.ClientConfig{
-			User: server.user,
-			Auth: []ssh.AuthMethod{auth},
-			HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-				// Always accept key.
-				return nil
-			},
+			User:            server.user,
+			Auth:            []ssh.AuthMethod{auth},
+			HostKeyCallback: TrustedHostKeyCallback(""),
 		},
 		local:              localEndpoint,
 		server:             server,

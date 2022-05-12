@@ -18,17 +18,16 @@ package sshtunnel
 
 import (
 	"bufio"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -40,11 +39,9 @@ func convertToSSHClientConfig(toConvert *SSHJump, timeout time.Duration) (_ *ssh
 		return nil, fmt.Errorf("toConvert parameter cannot be nil")
 	}
 
-	// FIXME: Remove InsecureIgnoreHostKey later
-
 	config := &ssh.ClientConfig{
 		User:            toConvert.user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint
+		HostKeyCallback: TrustedHostKeyCallback(""),
 		Timeout:         timeout,
 	}
 
@@ -85,48 +82,6 @@ func AuthMethodFromPrivateKey(buffer []byte, passphrase []byte) (_ ssh.AuthMetho
 	return ssh.PublicKeys(signer), nil
 }
 
-// GenerateRSAKeyPair creates a key pair
-func GenerateRSAKeyPair(keylen int) (privKey string, pubKey string, err error) {
-	defer OnPanic(&err)
-
-	if keylen < 1024 {
-		return "", "", fmt.Errorf("too weak: %d", keylen)
-	}
-
-	privateKey, err := rsa.GenerateKey(rand.Reader, keylen)
-	if err != nil {
-		return "", "", err
-	}
-	publicKey := privateKey.PublicKey
-	pub, err := ssh.NewPublicKey(&publicKey)
-	if err != nil {
-		return "", "", err
-	}
-	pubBytes := ssh.MarshalAuthorizedKey(pub)
-
-	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	priKeyPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: priBytes,
-		},
-	)
-	return string(priKeyPem), string(pubBytes), nil
-}
-
-// FIXME: Add UT, remove nolint
-// writePemToFile writes keys to a file
-func writeKeyToFile(keyBytes []byte, saveFileTo string) (err error) { // nolint
-	defer OnPanic(&err)
-
-	err = ioutil.WriteFile(saveFileTo, keyBytes, 0600)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // FIXME: Add UT, remove nolint
 // getHostKey retrieves a key on unix systems
 func getHostKey(host string) (_ ssh.PublicKey, err error) { // nolint
@@ -163,4 +118,27 @@ func getHostKey(host string) (_ ssh.PublicKey, err error) { // nolint
 	}
 
 	return hostKey, nil
+}
+
+// create human-readable SSH-key strings
+func keyString(k ssh.PublicKey) string {
+	return k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal())
+}
+
+func TrustedHostKeyCallback(trustedKey string) ssh.HostKeyCallback {
+	if trustedKey == "" {
+		logrus.Tracef("using NO trusted key to connect")
+		return func(_ string, _ net.Addr, k ssh.PublicKey) error {
+			return nil
+		}
+	}
+
+	return func(_ string, _ net.Addr, k ssh.PublicKey) error {
+		ks := keyString(k)
+		if trustedKey != ks {
+			return fmt.Errorf("SSH-key verification: expected %q but got %q", trustedKey, ks)
+		}
+
+		return nil
+	}
 }
