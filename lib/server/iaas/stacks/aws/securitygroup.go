@@ -33,7 +33,7 @@ import (
 )
 
 // ListSecurityGroups lists existing security groups
-func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, fail.Error) {
+func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -42,7 +42,7 @@ func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, 
 	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcDescribeSecurityGroups(aws.String(networkID), nil)
+	resp, xerr := s.rpcDescribeSecurityGroups(aws.String(networkRef), nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -60,7 +60,7 @@ func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, 
 
 // CreateSecurityGroup creates a security group
 // Note: parameter 'networkRef' is used in AWS, Security Groups scope is Network/VPC-wide.
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -71,7 +71,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	network, xerr := s.InspectNetwork(networkRef)
+	network, xerr := s.InspectNetwork(ctx, networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -97,7 +97,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	asg.Description = description
 
 	// clears default rules set at creation
-	if _, xerr = s.ClearSecurityGroup(asg); xerr != nil {
+	if _, xerr = s.ClearSecurityGroup(ctx, asg); xerr != nil {
 		return nil, xerr
 	}
 
@@ -211,7 +211,7 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
+func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -220,7 +220,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error
 	}
 	if !asg.IsConsistent() {
 		var xerr fail.Error
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return xerr
 		}
@@ -233,7 +233,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error
 }
 
 // InspectSecurityGroup returns information about a security group
-func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -333,40 +333,8 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 	return out, nil
 }
 
-// InspectSecurityGroupByName inspects a security group identified by name
-func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.SecurityGroup, ferr fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if networkRef == "" {
-		return nil, fail.InvalidParameterError("networkRef", "cannot be empty string")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	an, xerr := s.InspectNetwork(networkRef)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			an, xerr = s.InspectNetworkByName(networkRef)
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
-	}
-
-	resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(an.ID), aws.String(name))
-	if xerr != nil {
-		return nil, xerr
-	}
-	return toAbstractSecurityGroup(resp)
-}
-
 // ClearSecurityGroup removes all rules but keep group
-func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -375,7 +343,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		return nil, xerr
 	}
 	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return asg, xerr
 		}
@@ -399,11 +367,11 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 			return asg, xerr
 		}
 	}
-	return s.InspectSecurityGroup(asg)
+	return s.InspectSecurityGroup(ctx, asg)
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -412,7 +380,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return nil, xerr
 	}
 	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return asg, xerr
 		}
@@ -434,7 +402,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return asg, xerr
 	}
 
-	return s.InspectSecurityGroup(asg)
+	return s.InspectSecurityGroup(ctx, asg)
 }
 
 // addRules applies the rules to the security group
@@ -454,7 +422,7 @@ func (s stack) addRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPe
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -463,7 +431,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return nil, xerr
 	}
 	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return asg, xerr
 		}
@@ -484,7 +452,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return asg, xerr
 	}
 
-	return s.InspectSecurityGroup(asg)
+	return s.InspectSecurityGroup(ctx, asg)
 }
 
 // deleteRules deletes the rules from the security group
@@ -513,7 +481,7 @@ func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.I
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to Hosts by provider
-func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
+func (s stack) GetDefaultSecurityGroupName(context.Context) (string, fail.Error) {
 	cfg, err := s.GetRawConfigurationOptions()
 	if err != nil {
 		return "", err
@@ -524,12 +492,12 @@ func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
 
 // EnableSecurityGroup enables a Security Group
 // Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("aws cannot enable a Security Group")
 }
 
 // DisableSecurityGroup disables a Security Group
 // Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("aws cannot disable a Security Group")
 }

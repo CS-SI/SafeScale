@@ -17,6 +17,7 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -440,7 +441,7 @@ func isFlexTemplate(t *abstract.HostTemplate) bool {
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
+func (p provider) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -450,7 +451,7 @@ func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network,
 	if len(req.DNSServers) == 0 {
 		req.DNSServers = []string{"0.0.0.0"}
 	}
-	return p.Stack.CreateNetwork(req)
+	return p.Stack.CreateNetwork(ctx, req)
 }
 
 // GetName returns the name of the driver
@@ -479,7 +480,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 }
 
 // BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+func (p provider) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNil(p) {
 		return fail.InvalidInstanceError()
 	}
@@ -494,7 +495,7 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 }
 
 // UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+func (p provider) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNil(p) {
 		return fail.InvalidInstanceError()
 	}

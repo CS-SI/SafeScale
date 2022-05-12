@@ -30,7 +30,7 @@ import (
 )
 
 // CreateVolume creates a block volume
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -74,7 +74,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		}
 	}()
 
-	xerr = s.WaitForVolumeState(resp.VolumeId, volumestate.Available)
+	xerr = s.WaitForVolumeState(ctx, resp.VolumeId, volumestate.Available)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -124,7 +124,7 @@ func toAbstractVolumeState(state string) volumestate.Enum {
 }
 
 // WaitForVolumeState wait for volume to be in the specified state
-func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (ferr fail.Error) {
+func (s stack) WaitForVolumeState(ctx context.Context, volumeID string, state volumestate.Enum) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -139,7 +139,7 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (ferr
 
 	return retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
-			vol, innerErr := s.InspectVolume(volumeID)
+			vol, innerErr := s.InspectVolume(ctx, volumeID)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -154,7 +154,7 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (ferr
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(id string) (av *abstract.Volume, ferr fail.Error) {
+func (s stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -206,7 +206,7 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.
 }
 
 // ListVolumes list available volumes
-func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
+func (s stack) ListVolumes(context.Context) (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -236,7 +236,7 @@ func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -261,7 +261,7 @@ func freeDevice(usedDevices []string, device string) bool {
 
 func (s stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
 	var usedDeviceNames []string
-	atts, _ := s.ListVolumeAttachments(serverID)
+	atts, _ := s.ListVolumeAttachments(nil, serverID)
 	if atts == nil {
 		if len(s.deviceNames) > 0 {
 			return s.deviceNames[0], nil
@@ -280,7 +280,7 @@ func (s stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
 }
 
 // CreateVolumeAttachment attaches a volume to a host
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -307,7 +307,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
-func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -344,7 +344,7 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -355,13 +355,13 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttac
 	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", serverID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	volumes, err := s.ListVolumes()
+	volumes, err := s.ListVolumes(ctx)
 	if err != nil {
 		return nil, err
 	}
 	atts := make([]*abstract.VolumeAttachment, 0, len(volumes))
 	for _, v := range volumes {
-		att, _ := s.InspectVolumeAttachment(serverID, v.ID)
+		att, _ := s.InspectVolumeAttachment(ctx, serverID, v.ID)
 		if att != nil {
 			atts = append(atts, att)
 		}
@@ -374,7 +374,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (ferr fail.Error) {
+func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, volumeID string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -392,5 +392,5 @@ func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (ferr fail.Erro
 	if xerr != nil {
 		return xerr
 	}
-	return s.WaitForVolumeState(volumeID, volumestate.Available)
+	return s.WaitForVolumeState(ctx, volumeID, volumestate.Available)
 }

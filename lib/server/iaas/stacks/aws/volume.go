@@ -37,7 +37,7 @@ import (
 )
 
 // CreateVolume ...
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -75,7 +75,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 }
 
 // InspectVolume ...
-func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -186,7 +186,7 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
+func (s stack) ListVolumes(context.Context) (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -233,7 +233,7 @@ func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 }
 
 // DeleteVolume ...
-func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -257,7 +257,7 @@ func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 }
 
 // CreateVolumeAttachment ...
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -354,7 +354,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 }
 
 // InspectVolumeAttachment returns information about a volume attachment
-func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
 		return nilA, fail.InvalidInstanceError()
@@ -399,7 +399,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 }
 
 // ListVolumeAttachments ...
-func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -448,7 +448,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 }
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
-func (s stack) DeleteVolumeAttachment(serverID, id string) (ferr fail.Error) {
+func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

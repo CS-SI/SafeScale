@@ -97,7 +97,7 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 	}
 
 	if all {
-		return svc.ListSubnets(networkID)
+		return svc.ListSubnets(ctx, networkID)
 	}
 
 	subnetInstance, xerr := NewSubnet(svc)
@@ -182,7 +182,7 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 			}
 		}
 
-		withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+		withDefaultSubnetwork, err := svc.HasDefaultNetwork(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -216,7 +216,7 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 			}
 		} else if withDefaultSubnetwork {
 			// No Network Metadata, try to use the default Network if there is one
-			an, xerr := svc.GetDefaultNetwork()
+			an, xerr := svc.GetDefaultNetwork(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -356,9 +356,9 @@ func (instance *Subnet) IsNull() bool {
 	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && valid.IsNil(instance.MetadataCore))))
 }
 
-func (instance *Subnet) Exists() (bool, fail.Error) {
+func (instance *Subnet) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
-	_, err := instance.Service().InspectSubnet(theID)
+	_, err := instance.Service().InspectSubnet(ctx, theID)
 	if err != nil {
 		switch err.(type) {
 		case *fail.ErrNotFound:
@@ -427,7 +427,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	defer func() {
 		if ferr != nil {
 			if !req.KeepOnFailure {
-				if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
+				if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), instance.GetID()); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				} else {
 					logrus.Infof("the subnet '%s' should be gone by now", instance.GetID())
@@ -525,7 +525,7 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 }
 
 // deleteSubnetThenWaitCompletion deletes the Subnet identified by 'id' and wait for deletion confirmation
-func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
+func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id string) fail.Error {
 	svc := instance.Service()
 
 	timings, xerr := svc.Timings()
@@ -533,7 +533,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 		return xerr
 	}
 
-	xerr = svc.DeleteSubnet(id)
+	xerr = svc.DeleteSubnet(ctx, id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -547,7 +547,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 	}
 	return retry.WhileUnsuccessful(
 		func() error {
-			_, xerr := svc.InspectSubnet(id)
+			_, xerr := svc.InspectSubnet(ctx, id)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -567,7 +567,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 }
 
 // validateCIDR tests if CIDR requested is valid, or select one if no CIDR is provided
-func (instance *Subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Network) fail.Error {
+func (instance *Subnet) validateCIDR(ctx context.Context, req *abstract.SubnetRequest, network abstract.Network) fail.Error {
 	_, networkDesc, _ := net.ParseCIDR(network.CIDR)
 	if req.CIDR != "" {
 		routable, xerr := netutils.IsCIDRRoutable(req.CIDR)
@@ -596,7 +596,7 @@ func (instance *Subnet) validateCIDR(req *abstract.SubnetRequest, network abstra
 	// CIDR is empty, choose the first Class C available one
 	logrus.Debugf("CIDR is empty, choosing one...")
 
-	subnets, xerr := instance.Service().ListSubnets(network.ID)
+	subnets, xerr := instance.Service().ListSubnets(ctx, network.ID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -670,7 +670,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+			withDefaultSubnetwork, err := svc.HasDefaultNetwork(ctx)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -679,7 +679,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 				return nil, nil, xerr
 			}
 
-			an, xerr = svc.GetDefaultNetwork()
+			an, xerr = svc.GetDefaultNetwork(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
@@ -694,7 +694,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 			}
 
 			// check the network exists on provider side
-			if _, innerXErr := svc.InspectNetwork(an.ID); innerXErr != nil {
+			if _, innerXErr := svc.InspectNetwork(ctx, an.ID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// TODO: automatic metadata cleanup ?
@@ -721,10 +721,10 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 
 // unbindHostFromVIP unbinds a Host from VIP
 // Actually does nothing in aws for now
-func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (ferr fail.Error) {
+func (instance *Subnet) unbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, host resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.Service().UnbindHostFromVIP(vip, host.GetID())
+	xerr := instance.Service().UnbindHostFromVIP(ctx, vip, host.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", ActionFromError(xerr), host.GetName())
@@ -1244,7 +1244,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 
 		// 2nd delete VIP if needed
 		if as.VIP != nil {
-			if innerXErr := svc.DeleteVIP(as.VIP); innerXErr != nil {
+			if innerXErr := svc.DeleteVIP(ctx, as.VIP); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 			}
 		}
@@ -1279,7 +1279,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 
 		// finally delete Subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = instance.deleteSubnetThenWaitCompletion(as.ID); innerXErr != nil {
+		if innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, as.ID); innerXErr != nil {
 			return innerXErr
 		}
 
@@ -1895,7 +1895,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 				return xerr
 			}
 			if caps.CanDisableSecurityGroup {
-				if innerXErr = svc.EnableSecurityGroup(asg); innerXErr != nil {
+				if innerXErr = svc.EnableSecurityGroup(ctx, asg); innerXErr != nil {
 					return innerXErr
 				}
 			} else {
@@ -2001,7 +2001,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 				return xerr
 			}
 			if caps.CanDisableSecurityGroup {
-				if innerXErr = svc.DisableSecurityGroup(abstractSG); innerXErr != nil {
+				if innerXErr = svc.DisableSecurityGroup(ctx, abstractSG); innerXErr != nil {
 					return innerXErr
 				}
 			} else {

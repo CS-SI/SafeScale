@@ -450,11 +450,11 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost gathers host information from provider
-func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -466,7 +466,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
+	server, xerr := s.WaitHostState(ctx, ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -503,7 +503,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, ferr fail.Error) {
+func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Updates intrinsic data of host if needed
@@ -573,7 +573,7 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 
 		// Fill the name of subnets
 		for k := range subnetsByID {
-			as, xerr := s.InspectSubnet(k)
+			as, xerr := s.InspectSubnet(ctx, k)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -648,7 +648,7 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 					return nil, fail.InconsistentError("entry[id] should be a string")
 				}
 				host.Name = name
-				hostFull, xerr := s.InspectHost(host)
+				hostFull, xerr := s.InspectHost(nil, host)
 				if xerr != nil {
 					return nil, fail.Wrap(xerr, "failed to inspect host '%s'", name)
 				}
@@ -660,7 +660,7 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 }
 
 // CreateHost creates a new host
-func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
@@ -763,7 +763,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defer func() {
 		if ferr != nil {
 			logrus.Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
-			if derr := s.DeleteHost(ahc.ID); derr != nil {
+			if derr := s.DeleteHost(ctx, ahc.ID); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
@@ -820,7 +820,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					return retry.StopRetryError(innerXErr)
 				}
 				if server != nil && server.ID != "" {
-					if derr := s.DeleteHost(server.ID); derr != nil {
+					if derr := s.DeleteHost(ctx, server.ID); derr != nil {
 						_ = innerXErr.AddConsequence(
 							fail.Wrap(
 								derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName,
@@ -842,7 +842,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			defer func() {
 				if innerXErr != nil {
 					logrus.Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-					if derr := s.DeleteHost(ahc.ID); derr != nil {
+					if derr := s.DeleteHost(ctx, ahc.ID); derr != nil {
 						logrus.Debugf(derr.Error())
 						_ = innerXErr.AddConsequence(
 							fail.Wrap(
@@ -875,7 +875,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 
 			timeout := timings.HostOperationTimeout()
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timeout)
+			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
 				logrus.Errorf(
 					"failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName,
@@ -912,7 +912,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		}
 	}
 
-	newHost, xerr := s.complementHost(ahc, *server, hostNets, hostPorts)
+	newHost, xerr := s.complementHost(ctx, ahc, *server, hostNets, hostPorts)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -993,7 +993,7 @@ func (s stack) deletePortsInSlice(ports []string) fail.Error {
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 // Does nothing for OpenStack, userdata cannot be updated
-func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	return nil
 }
 
@@ -1138,17 +1138,17 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(hostParam, hoststate.Started, timeout)
+	server, xerr := s.WaitHostState(ctx, hostParam, hoststate.Started, timeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -1164,7 +1164,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		}
 	}
 
-	ahf, xerr = s.complementHost(ahf.Core, *server, nil, nil)
+	ahf, xerr = s.complementHost(ctx, ahf.Core, *server, nil, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1174,12 +1174,12 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1276,14 +1276,14 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	host, xerr := s.InspectHost(hostParam)
+	host, xerr := s.InspectHost(ctx, hostParam)
 	if xerr != nil {
 		return hoststate.Error, xerr
 	}
@@ -1291,7 +1291,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 }
 
 // ListHosts lists all hosts
-func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
+func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
 	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
@@ -1314,7 +1314,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 						ahc.ID = srv.ID
 						var ahf *abstract.HostFull
 						if details {
-							ahf, err = s.complementHost(ahc, srv, nil, nil)
+							ahf, err = s.complementHost(ctx, ahc, srv, nil, nil)
 							if err != nil {
 								return false, err
 							}
@@ -1373,11 +1373,11 @@ func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1554,11 +1554,11 @@ func (s stack) rpcGetServer(id string) (_ *servers.Server, ferr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
+func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1574,11 +1574,11 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1603,11 +1603,11 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StartHost starts the host identified by id
-func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1623,11 +1623,11 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1645,11 +1645,11 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
-func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1658,7 +1658,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	if xerr != nil {
 		return xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(asg)
+	asg, xerr = s.InspectSecurityGroup(ctx, asg)
 	if xerr != nil {
 		return xerr
 	}
@@ -1672,7 +1672,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1680,7 +1680,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}

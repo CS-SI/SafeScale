@@ -52,7 +52,6 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
-	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]*abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
@@ -60,15 +59,14 @@ type Service interface {
 	GetProviderName() (string, fail.Error)
 	GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
-	InspectHostByName(string) (*abstract.HostFull, fail.Error)
-	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
-	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
+	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)
+	ListHostsByName(context.Context, bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
 	ObjectStorageConfiguration() (objectstorage.Config, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
-	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
-	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
+	WaitHostState(context.Context, string, hoststate.Enum, time.Duration) fail.Error
+	WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
@@ -199,10 +197,11 @@ func (instance *service) ChangeProvider(provider providers.Provider) fail.Error 
 	return nil
 }
 
+// FIXME: Unused ???
 // WaitHostState waits until a host achieves state 'state'
 // If host is in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
+func (instance service) WaitHostState(ctx context.Context, hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -235,7 +234,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 			default:
 			}
 
-			host, rerr = instance.InspectHost(host) // FIXME: all service functions should accept ctx in order to be canceled
+			host, rerr = instance.InspectHost(ctx, host) // FIXME: all service functions should accept ctx in order to be canceled
 			if rerr != nil {
 				errCh <- rerr
 				return
@@ -274,9 +273,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 
 // WaitVolumeState waits a host achieve state
 // If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitVolumeState(
-	volumeID string, state volumestate.Enum, timeout time.Duration,
-) (*abstract.Volume, fail.Error) {
+func (instance service) WaitVolumeState(ctx context.Context, volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -288,7 +285,7 @@ func (instance service) WaitVolumeState(
 	next := make(chan bool)
 	vc := make(chan *abstract.Volume)
 
-	go pollVolume(instance, volumeID, state, cout, next, vc)
+	go pollVolume(ctx, instance, volumeID, state, cout, next, vc)
 	for {
 		select {
 		case res := <-cout:
@@ -309,13 +306,13 @@ func (instance service) WaitVolumeState(
 }
 
 func pollVolume(
-	svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
+	ctx context.Context, svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
 ) {
 	var crash error
 	defer fail.SilentOnPanic(&crash)
 
 	for {
-		v, err := svc.InspectVolume(volumeID)
+		v, err := svc.InspectVolume(ctx, volumeID)
 		if err != nil {
 			cout <- 0
 			return
@@ -853,7 +850,7 @@ func addPadding(in string, maxLength int) string {
 }
 
 // CreateHostWithKeyPair creates a host
-func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
+func (instance service) CreateHostWithKeyPair(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
@@ -861,7 +858,7 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 	found := true
 	ah := abstract.NewHostCore()
 	ah.Name = request.ResourceName
-	_, rerr := instance.InspectHost(ah)
+	_, rerr := instance.InspectHost(ctx, ah)
 	var nilErrNotFound *fail.ErrNotFound = nil // nolint
 	if rerr != nil && rerr != nilErrNotFound {
 		if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
@@ -901,7 +898,7 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 		// DefaultGateway: request.DefaultGateway,
 		TemplateID: request.TemplateID,
 	}
-	host, userData, rerr := instance.CreateHost(hostReq)
+	host, userData, rerr := instance.CreateHost(ctx, hostReq)
 	if rerr != nil {
 		return nil, nil, nil, rerr
 	}
@@ -909,12 +906,12 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 }
 
 // ListHostsByName list hosts by name
-func (instance service) ListHostsByName(details bool) (map[string]*abstract.HostFull, fail.Error) {
+func (instance service) ListHostsByName(ctx context.Context, details bool) (map[string]*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	hosts, err := instance.ListHosts(details)
+	hosts, err := instance.ListHosts(ctx, details)
 	if err != nil {
 		return nil, err
 	}
@@ -957,19 +954,19 @@ func (instance service) LookupRuleInSecurityGroup(
 }
 
 // InspectHostByName hides the "complexity" of the way to get Host by name
-func (instance service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+func (instance service) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return instance.InspectHost(abstract.NewHostCore().SetName(name))
+	return instance.InspectHost(ctx, abstract.NewHostCore().SetName(name))
 }
 
 // InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
-func (instance service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
+func (instance service) InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return instance.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+	return instance.InspectSecurityGroup(ctx, abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location

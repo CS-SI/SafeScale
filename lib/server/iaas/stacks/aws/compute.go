@@ -433,13 +433,13 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) *abstract.HostTemplate {
 
 // WaitHostReady waits until a host achieves ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -449,7 +449,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, innerXErr := s.InspectHost(ahf)
+			hostTmp, innerXErr := s.InspectHost(ctx, ahf)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -494,7 +494,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 }
 
 // CreateHost creates a host
-func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -670,7 +670,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 					logrus.Warnf("error creating Host: %+v", captured)
 
 					if server != nil && server.ID != "" {
-						if derr := s.DeleteHost(server.ID); derr != nil {
+						if derr := s.DeleteHost(ctx, server.ID); derr != nil {
 							_ = innerXErr.AddConsequence(
 								fail.Wrap(
 									derr, "cleaning up on failure, failed to delete Host '%s'", server.Name,
@@ -690,8 +690,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			ahf.Core.Name = server.Name
 
 			// Wait until Host is ready, not just until the build is started
-			if _, innerXErr = s.WaitHostReady(ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
-				if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
+			if _, innerXErr = s.WaitHostReady(ctx, ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
+				if derr := s.DeleteHost(ctx, ahf.Core.ID); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 				}
 				return innerXErr
@@ -717,7 +717,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	defer func() {
 		if ferr != nil && !request.KeepOnFailure {
 			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
-			if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
+			if derr := s.DeleteHost(ctx, ahf.Core.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 				logrus.Warnf("Error deleting host in cleanup: %v", derr)
 			}
@@ -799,12 +799,12 @@ func (s stack) buildAwsMachine(
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	return nil
 }
 
 // InspectHost loads information of a host from AWS
-func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -812,7 +812,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	}
 	var hostLabel string
 	var xerr fail.Error
-	ahf, hostLabel, xerr = stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr = stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -974,12 +974,12 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.E
 }
 
 // GetHostState returns the current state of the host
-func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
-	host, xerr := s.InspectHost(hostParam)
+	host, xerr := s.InspectHost(ctx, hostParam)
 	if xerr != nil {
 		return hoststate.Error, xerr
 	}
@@ -988,7 +988,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, f
 }
 
 // ListHosts returns a list of hosts
-func (s stack) ListHosts(details bool) (hosts abstract.HostList, ferr fail.Error) {
+func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.HostList, ferr fail.Error) {
 	nullList := abstract.HostList{}
 	if valid.IsNil(s) {
 		return nullList, fail.InvalidInstanceError()
@@ -1021,7 +1021,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, ferr fail.Error
 			ahf.Core.Name = name
 			ahf.CurrentState, ahf.Core.LastState = state, state
 			if details {
-				ahf, xerr = s.InspectHost(ahf)
+				ahf, xerr = s.InspectHost(ctx, ahf)
 				if xerr != nil {
 					return nullList, xerr
 				}
@@ -1034,11 +1034,11 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, ferr fail.Error
 }
 
 // DeleteHost deletes a Host
-func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1079,7 +1079,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 	}
 
 	// Stop instance forcibly
-	xerr = s.StopHost(ahf, false)
+	xerr = s.StopHost(ctx, ahf, false)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted, *fail.ErrTimeout:
@@ -1157,11 +1157,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 }
 
 // StopHost stops a running host
-func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr fail.Error) {
+func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, gracefully bool) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, host)
 	if xerr != nil {
 		return xerr
 	}
@@ -1180,7 +1180,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr f
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, err := s.InspectHost(ahf.Core.ID)
+			hostTmp, err := s.InspectHost(ctx, ahf.Core.ID)
 			if err != nil {
 				return err
 			}
@@ -1213,11 +1213,11 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (ferr f
 }
 
 // StartHost starts a stopped host
-func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1237,7 +1237,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, innerErr := s.InspectHost(ahf.Core.ID)
+			hostTmp, innerErr := s.InspectHost(ctx, ahf.Core.ID)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1268,11 +1268,11 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 }
 
 // RebootHost stops then starts a host
-func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1291,7 +1291,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, innerErr := s.InspectHost(ahf)
+			hostTmp, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1322,7 +1322,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 }
 
 // ResizeHost changes the sizing of an existing host
-func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1333,16 +1333,16 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 	if !ahf.IsConsistent() {
-		if ahf, xerr = s.InspectHost(ahf); xerr != nil {
+		if ahf, xerr = s.InspectHost(ctx, ahf); xerr != nil {
 			return xerr
 		}
 	}
@@ -1351,7 +1351,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 		return xerr
 	}
 	if !asg.IsConsistent() {
-		if asg, xerr = s.InspectSecurityGroup(asg); xerr != nil {
+		if asg, xerr = s.InspectSecurityGroup(ctx, asg); xerr != nil {
 			return xerr
 		}
 	}
@@ -1387,16 +1387,16 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 	if !ahf.IsConsistent() {
-		ahf, xerr = s.InspectHost(ahf)
+		ahf, xerr = s.InspectHost(ctx, ahf)
 		if xerr != nil {
 			return xerr
 		}
@@ -1407,7 +1407,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	}
 
 	if !asg.IsComplete() {
-		asg, xerr = s.InspectSecurityGroup(asg)
+		asg, xerr = s.InspectSecurityGroup(ctx, asg)
 		if xerr != nil {
 			return xerr
 		}
@@ -1425,12 +1425,12 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG := abstract.NewSecurityGroup()
 		var err fail.Error
-		defaultSG.Name, err = s.GetDefaultSecurityGroupName()
+		defaultSG.Name, err = s.GetDefaultSecurityGroupName(ctx)
 		if err != nil {
 			return err
 		}
 		defaultSG.Network = asg.Network
-		defaultSG, xerr := s.InspectSecurityGroup(defaultSG)
+		defaultSG, xerr := s.InspectSecurityGroup(ctx, defaultSG)
 		if xerr != nil {
 			return xerr
 		}

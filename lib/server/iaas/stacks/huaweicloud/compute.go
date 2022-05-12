@@ -415,7 +415,7 @@ func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 }
 
 // CreateHost creates a new host
-func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
@@ -651,7 +651,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timings.HostOperationTimeout())
+			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -685,7 +685,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if ferr != nil {
-			derr := s.DeleteHost(ahc.ID)
+			derr := s.DeleteHost(ctx, ahc.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
@@ -702,7 +702,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		}
 	}()
 
-	host, xerr = s.complementHost(ahc, server)
+	host, xerr = s.complementHost(ctx, ahc, server)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -895,14 +895,14 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
-func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -912,7 +912,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
+	server, xerr := s.WaitHostState(ctx, ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -932,7 +932,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	host, xerr = s.complementHost(ahf.Core, server)
+	host, xerr = s.complementHost(ctx, ahf.Core, server)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1040,7 +1040,7 @@ func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
+func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
@@ -1128,7 +1128,7 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 	var errors []error
 	for subnetID, subnetName := range completedHost.Networking.SubnetsByID {
 		if subnetName == "" {
-			subnet, xerr := s.InspectSubnet(subnetID)
+			subnet, xerr := s.InspectSubnet(ctx, subnetID)
 			if xerr != nil {
 				logrus.Errorf("failed to get network '%s'", subnetID)
 				errors = append(errors, xerr)
@@ -1204,7 +1204,7 @@ func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversio
 }
 
 // ListHosts lists available hosts
-func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
+func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
 	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
@@ -1225,7 +1225,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 						h.ID = srv.ID
 						var ah *abstract.HostFull
 						if details {
-							ah, err = s.complementHost(h, &srv)
+							ah, err = s.complementHost(ctx, h, &srv)
 							if err != nil {
 								return false, err
 							}
@@ -1250,17 +1250,17 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, xerr = s.InspectHost(ahf)
+	_, xerr = s.InspectHost(ctx, ahf)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable: // It's in ERROR state, but it's there

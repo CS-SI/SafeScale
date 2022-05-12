@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -55,19 +56,19 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
-func (p provider) AddPublicIPToVIP(ip *abstract.VirtualIP) fail.Error {
+func (p provider) AddPublicIPToVIP(ctx context.Context, ip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) BindHostToVIP(*abstract.VirtualIP, string) fail.Error {
+func (p provider) BindHostToVIP(context.Context, *abstract.VirtualIP, string) fail.Error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) UnbindHostFromVIP(*abstract.VirtualIP, string) fail.Error {
+func (p provider) UnbindHostFromVIP(context.Context, *abstract.VirtualIP, string) fail.Error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
+func (p provider) DeleteVIP(context.Context, *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 

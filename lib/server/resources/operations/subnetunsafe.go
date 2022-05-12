@@ -518,14 +518,14 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	}
 
 	// Verify the CIDR is not routable
-	xerr = instance.validateCIDR(&req, *abstractNetwork)
+	xerr = instance.validateCIDR(ctx, &req, *abstractNetwork)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 
 	svc := instance.Service()
-	abstractSubnet, xerr := svc.CreateSubnet(req)
+	abstractSubnet, xerr := svc.CreateSubnet(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -539,7 +539,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		if ferr != nil && abstractSubnet != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetThenWaitCompletion(abstractSubnet.ID); derr != nil {
+			if derr := instance.deleteSubnetThenWaitCompletion(ctx, abstractSubnet.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			}
 		}
@@ -603,7 +603,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Creates VIP for gateways if asked for
 	var avip *abstract.VirtualIP
 	if failover {
-		avip, xerr = svc.CreateVIP(abstractSubnet.Network, abstractSubnet.ID, fmt.Sprintf(virtualIPNamePattern, abstractSubnet.Name, networkInstance.GetName()), []string{subnetGWSG.GetID()})
+		avip, xerr = svc.CreateVIP(ctx, abstractSubnet.Network, abstractSubnet.ID, fmt.Sprintf(virtualIPNamePattern, abstractSubnet.Name, networkInstance.GetName()), []string{subnetGWSG.GetID()})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to create VIP")
@@ -612,7 +612,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		// Starting from here, delete VIP if exists with error
 		defer func() {
 			if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && !req.KeepOnFailure {
-				if derr := svc.DeleteVIP(abstractSubnet.VIP); derr != nil {
+				if derr := svc.DeleteVIP(ctx, abstractSubnet.VIP); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
 				}
 			}
@@ -973,7 +973,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 							logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 						}
 						if req.HA {
-							if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+							if derr := instance.unbindHostFromVIP(ctx, as.VIP, primaryGateway); derr != nil {
 								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
 							}
 						}
@@ -1040,7 +1040,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 						}
 						_ = ferr.AddConsequence(derr)
 					}
-					derr = instance.unbindHostFromVIP(as.VIP, secondaryGateway)
+					derr = instance.unbindHostFromVIP(ctx, as.VIP, secondaryGateway)
 					derr = debug.InjectPlannedFail(derr)
 					if derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))

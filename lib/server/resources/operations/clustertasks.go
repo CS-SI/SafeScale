@@ -1407,7 +1407,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, xerr
 	}
 
-	xerr = svc.StartHost(id)
+	xerr = svc.StartHost(task.Context(), id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1461,7 +1461,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 	}
 
 	svc := instance.Service()
-	xerr = svc.StopHost(id, false)
+	xerr = svc.StopHost(task.Context(), id, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint

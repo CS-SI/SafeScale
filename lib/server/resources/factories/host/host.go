@@ -38,7 +38,7 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 	}
 
 	if all {
-		return svc.ListHosts(all)
+		return svc.ListHosts(ctx, all)
 	}
 
 	hostInstance, xerr := New(svc)

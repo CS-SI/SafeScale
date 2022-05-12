@@ -36,7 +36,7 @@ import (
 const tagNameLabel = "name"
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork() (bool, fail.Error) {
+func (s stack) HasDefaultNetwork(context.Context) (bool, fail.Error) {
 	if valid.IsNil(s) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -44,7 +44,7 @@ func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+func (s stack) GetDefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -55,7 +55,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 }
 
 // CreateNetwork creates a network named name (in OutScale terminology, a Network corresponds to a VPC)
-func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, ferr fail.Error) {
+func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (an *abstract.Network, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -72,7 +72,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.DeleteNetwork(resp.NetId); derr != nil {
+			if derr := s.DeleteNetwork(ctx, resp.NetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
 			}
 		}
@@ -247,7 +247,7 @@ func toAbstractNetwork(in osc.Net) *abstract.Network {
 }
 
 // InspectNetwork returns the network identified by id
-func (s stack) InspectNetwork(id string) (_ *abstract.Network, ferr fail.Error) {
+func (s stack) InspectNetwork(ctx context.Context, id string) (_ *abstract.Network, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -267,7 +267,7 @@ func (s stack) InspectNetwork(id string) (_ *abstract.Network, ferr fail.Error) 
 }
 
 // InspectNetworkByName returns the network identified by 'name'
-func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, ferr fail.Error) {
+func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstract.Network, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -284,7 +284,7 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, ferr fail
 }
 
 // ListNetworks lists all networks
-func (s stack) ListNetworks() (_ []*abstract.Network, ferr fail.Error) {
+func (s stack) ListNetworks(context.Context) (_ []*abstract.Network, ferr fail.Error) {
 	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -307,7 +307,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, ferr fail.Error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(id string) (ferr fail.Error) {
+func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -347,7 +347,7 @@ func (s stack) DeleteNetwork(id string) (ferr fail.Error) {
 }
 
 // CreateSubnet creates a Subnet
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, ferr fail.Error) {
+func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (as *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -356,7 +356,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, fe
 	defer tracer.Exiting()
 
 	// Check if CIDR intersects with VPC cidr; if not, error
-	vpc, xerr := s.InspectNetwork(req.NetworkID)
+	vpc, xerr := s.InspectNetwork(ctx, req.NetworkID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -396,7 +396,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, fe
 }
 
 // InspectSubnet returns the Subnet identified by id
-func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
+func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -416,7 +416,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, ferr fail.Error) {
 }
 
 // InspectSubnetByName returns the Subnet identified by name
-func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, ferr fail.Error) {
+func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName string) (_ *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -432,11 +432,11 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 
 	var networkID string
 	// If networkRef is not empty string, networkRef can be an ID or a Name; let's find out the ID of this network for sure
-	an, xerr := s.InspectNetwork(networkRef)
+	an, xerr := s.InspectNetwork(ctx, networkRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			an, xerr = s.InspectNetworkByName(networkRef)
+			an, xerr = s.InspectNetworkByName(ctx, networkRef)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -492,7 +492,7 @@ func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
 }
 
 // ListSubnets lists all subnets
-func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
+func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
 	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -508,11 +508,11 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, ferr fail.E
 		}
 	}
 
-	an, xerr := s.InspectNetwork(networkRef)
+	an, xerr := s.InspectNetwork(ctx, networkRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			if an, xerr = s.InspectNetworkByName(networkRef); xerr != nil {
+			if an, xerr = s.InspectNetworkByName(ctx, networkRef); xerr != nil {
 				return emptySlice, xerr
 			}
 		default:
@@ -532,7 +532,7 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, ferr fail.E
 	return subnets, nil
 }
 
-func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
+func (s stack) listSubnetsByHost(ctx context.Context, hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
 	var (
 		emptySubnetSlice []*abstract.Subnet
 		emptyNicSlice    []osc.Nic
@@ -551,7 +551,7 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 
 	var list []*abstract.Subnet
 	for _, nic := range resp {
-		item, xerr := s.InspectSubnet(nic.SubnetId)
+		item, xerr := s.InspectSubnet(ctx, nic.SubnetId)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -567,7 +567,7 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 }
 
 // DeleteSubnet deletes the subnet identified by id
-func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
+func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -609,7 +609,7 @@ func (s stack) DeleteSubnet(id string) (ferr fail.Error) {
 
 // BindSecurityGroupToSubnet binds a Security Group to a Subnet
 // Actually does nothing for outscale
-func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -622,7 +622,7 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
 // Actually does nothing for outscale
-func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

@@ -181,7 +181,7 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	s.MutableTimings.SSHConnection = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.SSHConnection)
 	s.MutableTimings.Operation = temporal.MaxTimeout(20*time.Minute, s.MutableTimings.Operation)
 
-	return &s, s.initDefaultNetwork()
+	return &s, s.initDefaultNetwork(context.Background()) // FIXME: Verify this
 }
 
 // IsNull tells if the instance is a null value of stack
@@ -190,9 +190,9 @@ func (s *stack) IsNull() bool {
 }
 
 // initDefaultNetwork() initializes the instance of the Network/VPC if one is defined in tenant
-func (s *stack) initDefaultNetwork() fail.Error {
+func (s *stack) initDefaultNetwork(ctx context.Context) fail.Error {
 	if s.vpc == nil && s.Options.Network.DefaultNetworkName != "" {
-		an, xerr := s.InspectNetworkByName(s.Options.Network.DefaultNetworkName)
+		an, xerr := s.InspectNetworkByName(ctx, s.Options.Network.DefaultNetworkName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -204,7 +204,7 @@ func (s *stack) initDefaultNetwork() fail.Error {
 					Name: s.Options.Network.DefaultNetworkName,
 					CIDR: s.Options.Network.DefaultNetworkCIDR,
 				}
-				an, xerr = s.CreateNetwork(req)
+				an, xerr = s.CreateNetwork(ctx, req)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
 				}

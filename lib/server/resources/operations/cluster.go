@@ -114,7 +114,7 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 	return instance, nil
 }
 
-func (instance *Cluster) Exists() (bool, fail.Error) {
+func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Requires iteration of quite a few members...
 	return true, nil
 }

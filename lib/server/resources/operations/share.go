@@ -196,7 +196,7 @@ func (instance *Share) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-func (instance *Share) Exists() (bool, fail.Error) {
+func (instance *Share) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: There is no InspectShare
 	return true, nil
 }
