@@ -37,5 +37,5 @@ type Command interface {
 	Output() ([]byte, fail.Error)
 	RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error)
 	// Start() fail.Error
-	// Wait() fail.Error
+	// wait() error
 }
