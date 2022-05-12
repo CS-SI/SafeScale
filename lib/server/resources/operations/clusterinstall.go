@@ -502,6 +502,14 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 
 	variables["Revision"] = system.REV
 
+	if len(variables) > 64*1024 {
+		return invalid, "", "", fail.OverflowError(nil, 64*1024, "variables, value too large")
+	}
+
+	if len(bashLibraryVariables) > 64*1024 {
+		return invalid, "", "", fail.OverflowError(nil, 64*1024, "bashLibraryVariables, value too large")
+	}
+
 	var fisize = uint64(len(variables) + len(bashLibraryVariables))
 	finalVariables := make(data.Map, fisize)
 	for k, v := range variables {
