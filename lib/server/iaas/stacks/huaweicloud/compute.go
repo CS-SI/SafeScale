@@ -299,7 +299,7 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var emptyMap map[string]bool
@@ -344,19 +344,19 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
+func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		cfg, err := s.GetRawAuthenticationOptions()
+		cfg, err := s.GetRawAuthenticationOptions(ctx)
 		if err != nil {
 			return "", err
 		}
 		s.selectedAvailabilityZone = cfg.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
-			azList, xerr := s.ListAvailabilityZones()
+			azList, xerr := s.ListAvailabilityZones(ctx)
 			if xerr != nil {
 				return "", xerr
 			}
@@ -477,12 +477,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get template")
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -517,7 +517,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	}
 
 	// Select usable availability zone
-	zone, xerr := s.SelectedAvailabilityZone()
+	zone, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
@@ -841,7 +841,7 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -944,7 +944,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(context.Context, bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -986,7 +986,7 @@ func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(context.Context, bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}

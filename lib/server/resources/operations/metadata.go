@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
@@ -40,7 +41,7 @@ const (
 )
 
 // CheckMetadataVersion checks if the content of /version in metadata bucket is equal to MetadataVersion
-func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
+func CheckMetadataVersion(ctx context.Context, svc iaas.Service) (string, fail.Error) {
 	// Read file /version in metadata
 	var currentMetadataVersion string
 	folder, xerr := NewMetadataFolder(svc, "")
@@ -48,7 +49,7 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 		return "", xerr
 	}
 
-	xerr = folder.Read("/", "version", func(data []byte) fail.Error {
+	xerr = folder.Read(ctx, "/", "version", func(data []byte) fail.Error {
 		currentMetadataVersion = string(data)
 		return nil
 	}, data.NewImmutableKeyValue("doNotCrypt", true),

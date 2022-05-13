@@ -64,12 +64,12 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	svc := job.Service()
-	originalList, xerr := svc.ListTemplates(all)
+	originalList, xerr := svc.ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	authOpts, xerr := svc.GetAuthenticationOptions()
+	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -155,7 +155,7 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 		return nil, xerr
 	}
 
-	templates, xerr := job.Service().ListTemplatesBySizing(*ahsr, false)
+	templates, xerr := job.Service().ListTemplatesBySizing(ctx, *ahsr, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -195,7 +195,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := job.Service()
-	authOpts, xerr := svc.GetAuthenticationOptions()
+	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -217,7 +217,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 		return nil, fail.ConvertError(err)
 	}
 
-	at, xerr := svc.FindTemplateByName(ref)
+	at, xerr := svc.FindTemplateByName(ctx, ref)
 	if xerr != nil {
 		return nil, xerr
 	}

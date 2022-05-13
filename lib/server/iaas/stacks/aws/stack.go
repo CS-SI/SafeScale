@@ -18,6 +18,7 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -64,7 +65,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) {
 		return stacks.ConfigurationOptions{}, fail.InvalidInstanceError()
 	}
@@ -72,7 +73,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
 	if valid.IsNil(s) {
 		return stacks.AuthenticationOptions{}, fail.InvalidInstanceError()
 	}

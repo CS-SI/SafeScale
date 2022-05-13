@@ -306,7 +306,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 				}
 			}
 
-			cfg, cerr := svc.GetConfigurationOptions()
+			cfg, cerr := svc.GetConfigurationOptions(ctx)
 			if cerr != nil {
 				return empty, cerr
 			}

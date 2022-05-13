@@ -214,7 +214,7 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1204,7 +1204,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	defer task.DisarmAbortSignal()()
 
 	// Remove Share metadata
-	return instance.MetadataCore.Delete()
+	return instance.MetadataCore.Delete(ctx)
 }
 
 func sanitize(in string) (string, fail.Error) {

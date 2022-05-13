@@ -17,6 +17,7 @@
 package flexibleengine
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -245,8 +246,8 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // InspectTemplate returns the Template referenced by id; overloads stack.InspectTemplate to inject templates with GPU
-func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-	tpl, xerr := p.Stack.InspectTemplate(id)
+func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.HostTemplate, fail.Error) {
+	tpl, xerr := p.Stack.InspectTemplate(ctx, id)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -257,8 +258,8 @@ func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Erro
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
+func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -291,8 +292,8 @@ func isBMSImage(image *abstract.Image) bool {
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
-	images, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)
+func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
+	images, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -305,10 +306,10 @@ func (p *provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -322,10 +323,10 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +368,7 @@ func (p *provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
+func (p *provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}, nil

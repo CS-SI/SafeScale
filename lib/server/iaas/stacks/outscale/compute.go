@@ -65,7 +65,7 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (_ []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(context.Context, bool) (_ []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -200,7 +200,7 @@ func (s stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
+func (s stack) ListTemplates(context.Context, bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -327,7 +327,7 @@ func (s *stack) buildTemplateList() {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -363,7 +363,7 @@ func toAbstractImage(in osc.Image) *abstract.Image {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
+func (s stack) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -703,9 +703,9 @@ func (s stack) addPublicIP(nic osc.Nic) (_ osc.PublicIp, ferr fail.Error) {
 }
 
 func (s stack) setHostProperties(
-	ahf *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic,
+	ctx context.Context, ahf *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic,
 ) fail.Error {
-	vmType, xerr := s.InspectTemplate(vm.VmType)
+	vmType, xerr := s.InspectTemplate(ctx, vm.VmType)
 	if xerr != nil {
 		return xerr
 	}
@@ -757,7 +757,7 @@ func (s stack) setHostProperties(
 }
 
 func (s stack) initHostProperties(
-	request *abstract.HostRequest, host *abstract.HostFull, udc userdata.Content,
+	ctx context.Context, request *abstract.HostRequest, host *abstract.HostFull, udc userdata.Content,
 ) fail.Error {
 	defaultSubnet := func() *abstract.Subnet {
 		if len(request.Subnets) == 0 {
@@ -767,7 +767,7 @@ func (s stack) initHostProperties(
 	}()
 
 	isGateway := request.IsGateway // && defaultSubnet != nil && defaultSubnet.Name != abstract.SingleHostNetworkName
-	template, err := s.InspectTemplate(request.TemplateID)
+	template, err := s.InspectTemplate(ctx, request.TemplateID)
 	if err != nil {
 		return err
 	}
@@ -859,7 +859,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}
 
 	defer func() {
-		if derr := s.DeleteKeyPair(creationKeyPair.Name); derr != nil {
+		if derr := s.DeleteKeyPair(ctx, creationKeyPair.Name); derr != nil {
 			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
 			if ferr != nil {
 				_ = ferr.AddConsequence(derr)
@@ -868,7 +868,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}()
 
 	ahf = abstract.NewHostFull()
-	if xerr = s.initHostProperties(&request, ahf, *udc); xerr != nil {
+	if xerr = s.initHostProperties(ctx, &request, ahf, *udc); xerr != nil {
 		return nil, nil, xerr
 	}
 
@@ -898,12 +898,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		KeypairName: creationKeyPair.Name,
 	}
 
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1067,7 +1067,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}
 
 	nics = append(nics, defaultNic)
-	xerr = s.setHostProperties(ahf, request.Subnets, vm, nics)
+	xerr = s.setHostProperties(ctx, ahf, request.Subnets, vm, nics)
 	return ahf, udc, xerr
 }
 
@@ -1211,7 +1211,7 @@ func (s stack) complementHost(ctx context.Context, ahf *abstract.HostFull, vm os
 	if xerr != nil {
 		return xerr
 	}
-	xerr = s.setHostProperties(ahf, subnets, vm, nics)
+	xerr = s.setHostProperties(ctx, ahf, subnets, vm, nics)
 	return xerr
 }
 

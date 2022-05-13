@@ -156,7 +156,7 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -324,7 +324,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
 			}
 		}

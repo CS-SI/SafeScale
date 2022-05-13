@@ -91,7 +91,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
 	}
 
-	az, xerr := s.SelectedAvailabilityZone()
+	az, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

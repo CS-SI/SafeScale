@@ -227,7 +227,7 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s stack) ListRegions() (_ []string, ferr fail.Error) {
+func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return []string{}, fail.InvalidInstanceError()
 	}
@@ -249,7 +249,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s stack) ListAvailabilityZones() (az map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(context.Context) (az map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()

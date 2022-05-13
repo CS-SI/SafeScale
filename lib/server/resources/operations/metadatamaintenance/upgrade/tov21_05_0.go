@@ -247,7 +247,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				if xerr != nil {
 					return xerr
 				}
-				xerr = stack.Migrate("networklayers", map[string]interface{}{
+				xerr = stack.Migrate(ctx, "networklayers", map[string]interface{}{
 					"layer": abstractNetwork,
 				})
 				if xerr != nil {
@@ -451,7 +451,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			if xerr != nil {
 				return xerr
 			}
-			xerr = stack.Migrate("tags", map[string]interface{}{
+			xerr = stack.Migrate(ctx, "tags", map[string]interface{}{
 				"subnetName":  subnetName,
 				"networkName": networkName,
 				"subnetID":    subnetID,
@@ -476,7 +476,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 
 		// delete currentInstance in metadata if owningInstance is different than currentInstance
 		if owningInstance != currentInstance {
-			xerr = currentInstance.(*operations.Network).MetadataCore.Delete()
+			xerr = currentInstance.(*operations.Network).MetadataCore.Delete(context.Background())
 			if xerr != nil {
 				return xerr
 			}
@@ -730,7 +730,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(ctx context.Context, instance *
 		if xerr != nil {
 			return xerr
 		}
-		xerr = stack.Migrate("removetag", map[string]interface{}{
+		xerr = stack.Migrate(ctx, "removetag", map[string]interface{}{
 			"instance":       instance,
 			"subnetInstance": subnetInstance,
 		})

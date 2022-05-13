@@ -557,12 +557,12 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s stack) GetDefaultSecurityGroupName(context.Context) (string, fail.Error) {
+func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	cfg, err := s.GetRawConfigurationOptions()
+	cfg, err := s.GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return "", err
 	}

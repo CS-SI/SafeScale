@@ -17,12 +17,14 @@
 package outscale
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	return stacks.ConfigurationOptions{
 		DNSList:          s.Options.Compute.DNSList,
 		MetadataBucket:   s.Options.Metadata.Bucket,
@@ -31,7 +33,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
 	return stacks.AuthenticationOptions{
 		AccessKeyID:      s.Options.Identity.AccessKey,
 		SecretAccessKey:  s.Options.Identity.SecretKey,

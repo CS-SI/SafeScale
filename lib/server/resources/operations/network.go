@@ -273,7 +273,7 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -615,7 +615,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Remove metadata
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure deleting metadata")
 	}

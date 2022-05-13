@@ -86,6 +86,7 @@ func NullStack() *stack { // nolint
 // New authenticates and return interface stack
 //goland:noinspection GoExportedFuncWithUnexportedType
 func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+	ctx := context.Background()
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
@@ -243,7 +244,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	}
 
 	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
-	validAvailabilityZones, xerr := s.ListAvailabilityZones()
+	validAvailabilityZones, xerr := s.ListAvailabilityZones(ctx)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -305,7 +306,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 }
 
 // ListRegions ...
-func (s stack) ListRegions() (list []string, ferr fail.Error) {
+func (s stack) ListRegions(context.Context) (list []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -340,7 +341,7 @@ func (s stack) ListRegions() (list []string, ferr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr fail.Error) {
+func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -374,7 +375,7 @@ func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr
 }
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -389,7 +390,7 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -414,7 +415,7 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs(context.Context) ([]*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -455,7 +456,7 @@ func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(id string) fail.Error {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1123,7 +1124,7 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 	)
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) fail.Error {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
 	if operation == "networklayers" {
 		abstractSubnet, ok := params["layer"].(*abstract.Subnet)
 		if !ok {

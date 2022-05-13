@@ -66,7 +66,7 @@ func Test_GetTemplates(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tpls, err := cli.Service.ListTemplates(false)
+	tpls, err := cli.Service.ListTemplates(ctx, false)
 	assert.NoError(t, err)
 	assert.True(t, len(tpls) > 0)
 
@@ -83,7 +83,7 @@ func Test_GetGpuTemplates(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tpls, err := cli.Service.ListTemplates(true)
+	tpls, err := cli.Service.ListTemplates(ctx, true)
 	assert.NoError(t, err)
 	assert.True(t, len(tpls) > 0)
 
@@ -99,7 +99,7 @@ func Test_GetGpuTemplates(t *testing.T) {
 
 func TemplateExists(name string) bool {
 	cli, _ := getTester()
-	tpls, _ := cli.Service.ListTemplates(false)
+	tpls, _ := cli.Service.ListTemplates(ctx, false)
 
 	find := false
 	for _, tpl := range tpls {
@@ -118,7 +118,7 @@ func Test_GetGpuTemplate(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tpls, err := cli.Service.ListTemplates(false)
+	tpls, err := cli.Service.ListTemplates(ctx, false)
 	assert.NoError(t, err)
 	find := TemplateExists("g3-120")
 
@@ -150,7 +150,7 @@ func Test_HostTemplates(t *testing.T) {
 	}
 	require.Nil(t, err)
 	cli.HostTemplates(t)
-	tpls, err := cli.Service.ListTemplates(false)
+	tpls, err := cli.Service.ListTemplates(ctx, false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {

@@ -71,7 +71,7 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 
 // Images tests
 func (tester *ServiceTester) Images(t *testing.T) {
-	images, err := tester.Service.ListImages(false)
+	images, err := tester.Service.ListImages(ctx, false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, images)
 	for _, i := range images {
@@ -79,12 +79,12 @@ func (tester *ServiceTester) Images(t *testing.T) {
 		assert.NotEqual(t, i.ID, "")
 		assert.NotEqual(t, i.Name, "")
 	}
-	imgs, err := tester.Service.FilterImages("ubuntu 18.04")
+	imgs, err := tester.Service.FilterImages(ctx, "ubuntu 18.04")
 	require.NotNil(t, err)
 	for _, img := range imgs {
 		fmt.Println(">>", img.Name)
 	}
-	imgs, err = tester.Service.FilterImages("ubuntu xenial")
+	imgs, err = tester.Service.FilterImages(ctx, "ubuntu xenial")
 	require.NotNil(t, err)
 	for _, img := range imgs {
 		fmt.Println(">>", img.Name)
@@ -93,7 +93,7 @@ func (tester *ServiceTester) Images(t *testing.T) {
 
 // HostTemplates test
 func (tester *ServiceTester) HostTemplates(t *testing.T) {
-	tpls, err := tester.Service.ListTemplates(false)
+	tpls, err := tester.Service.ListTemplates(ctx, false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {
@@ -109,16 +109,16 @@ func (tester *ServiceTester) HostTemplates(t *testing.T) {
 // KeyPairs tests
 func (tester *ServiceTester) KeyPairs(t *testing.T) {
 	// CreateKeyPair test
-	kp, err := tester.Service.CreateKeyPair("kp")
+	kp, err := tester.Service.CreateKeyPair(ctx, "kp")
 	assert.Nil(t, err)
 	assert.NotEqual(t, kp.ID, "")
 	assert.NotEqual(t, kp.Name, "")
 	assert.NotEqual(t, kp.PrivateKey, "")
 	assert.NotEqual(t, kp.PublicKey, "")
-	_ = tester.Service.DeleteKeyPair(kp.ID)
+	_ = tester.Service.DeleteKeyPair(ctx, kp.ID)
 
 	// CreateKeyPairAndLeaveItThere test
-	kp, err = tester.Service.CreateKeyPair("kp")
+	kp, err = tester.Service.CreateKeyPair(ctx, "kp")
 	assert.Nil(t, err)
 	assert.NotEqual(t, kp.ID, "")
 	assert.NotEqual(t, kp.Name, "")
@@ -126,35 +126,35 @@ func (tester *ServiceTester) KeyPairs(t *testing.T) {
 	assert.NotEqual(t, kp.PublicKey, "")
 
 	// InspectKeyPair test
-	kp, err = tester.Service.CreateKeyPair("unit_test_kp")
+	kp, err = tester.Service.CreateKeyPair(ctx, "unit_test_kp")
 	require.Nil(t, err)
 
-	kp2, err := tester.Service.InspectKeyPair("unit_test_kp")
+	kp2, err := tester.Service.InspectKeyPair(ctx, "unit_test_kp")
 	require.Nil(t, err)
 
 	assert.Equal(t, kp.ID, kp2.ID)
 	assert.Equal(t, kp.Name, kp2.Name)
 	assert.Equal(t, kp.PublicKey, kp2.PublicKey)
 	assert.Equal(t, "", kp2.PrivateKey)
-	_, err = tester.Service.InspectKeyPair("notfound")
+	_, err = tester.Service.InspectKeyPair(ctx, "notfound")
 	assert.NotNil(t, err)
 
 	defer func() {
-		_ = tester.Service.DeleteKeyPair("unit_test_kp")
+		_ = tester.Service.DeleteKeyPair(ctx, "unit_test_kp")
 	}()
 
 	// ListKeyPairs test
-	lst, err := tester.Service.ListKeyPairs()
+	lst, err := tester.Service.ListKeyPairs(ctx)
 	assert.Nil(t, err)
 	nbKP := len(lst)
-	kp, err = tester.Service.CreateKeyPair("kp")
+	kp, err = tester.Service.CreateKeyPair(ctx, "kp")
 	assert.Nil(t, err)
-	_ = tester.Service.DeleteKeyPair("kp")
-	kp2, err = tester.Service.CreateKeyPair("kp2")
+	_ = tester.Service.DeleteKeyPair(ctx, "kp")
+	kp2, err = tester.Service.CreateKeyPair(ctx, "kp2")
 	assert.Nil(t, err)
-	_ = tester.Service.DeleteKeyPair("kp2")
+	_ = tester.Service.DeleteKeyPair(ctx, "kp2")
 
-	lst, err = tester.Service.ListKeyPairs()
+	lst, err = tester.Service.ListKeyPairs(ctx)
 	assert.Nil(t, err)
 	assert.EqualValues(t, nbKP+2, len(lst))
 	for _, kpe := range lst {
@@ -197,15 +197,15 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 
 	var gateway *abstract.HostFull
 	if withGW {
-		tpls, err := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
+		tpls, err := tester.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 			MinCores:    1,
 			MinRAMSize:  1,
 			MinDiskSize: 0,
 		}, false)
 		require.Nil(t, err)
-		img, err := tester.Service.SearchImage("Ubuntu 20.04")
+		img, err := tester.Service.SearchImage(ctx, "Ubuntu 20.04")
 		require.Nil(t, err)
-		keypair, err := tester.Service.CreateKeyPair("kp_" + subnet.Name)
+		keypair, err := tester.Service.CreateKeyPair(ctx, "kp_"+subnet.Name)
 		require.Nil(t, err)
 
 		gwRequest := abstract.HostRequest{
@@ -227,13 +227,13 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 
 // CreateHost creates a test host
 func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstract.Subnet, public bool) (*abstract.HostFull, *userdata.Content, fail.Error) {
-	tpls, xerr := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
+	tpls, xerr := tester.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, xerr)
-	img, xerr := tester.Service.SearchImage("Ubuntu 20.04")
+	img, xerr := tester.Service.SearchImage(ctx, "Ubuntu 20.04")
 	assert.Nil(t, xerr)
 	hostRequest := abstract.HostRequest{
 		ResourceName:   name,
@@ -251,13 +251,13 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstr
 
 // CreateGW creates a test GW
 func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fail.Error {
-	tpls, xerr := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
+	tpls, xerr := tester.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, xerr)
-	img, xerr := tester.Service.SearchImage("Ubuntu 20.04")
+	img, xerr := tester.Service.SearchImage(ctx, "Ubuntu 20.04")
 	assert.Nil(t, xerr)
 	gwRequest := abstract.HostRequest{
 		ImageID:      img.ID,

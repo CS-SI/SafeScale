@@ -33,31 +33,31 @@ type StackProxy struct {
 	Name string
 }
 
-func (s StackProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
+func (s StackProxy) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	images, xerr := s.FullStack.ListImages(all)
+	images, xerr := s.FullStack.ListImages(ctx, all)
 	return images, xerr
 }
 
-func (s StackProxy) ListTemplates(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
+func (s StackProxy) ListTemplates(ctx context.Context, all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	templates, xerr := s.FullStack.ListTemplates(all)
+	templates, xerr := s.FullStack.ListTemplates(ctx, all)
 	return templates, xerr
 }
 
-func (s StackProxy) GetRawConfigurationOptions() (_ stacks.ConfigurationOptions, ferr fail.Error) {
+func (s StackProxy) GetRawConfigurationOptions(ctx context.Context) (_ stacks.ConfigurationOptions, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	cfg, xerr := s.FullStack.GetRawConfigurationOptions()
+	cfg, xerr := s.FullStack.GetRawConfigurationOptions(ctx)
 	return cfg, xerr
 }
 
-func (s StackProxy) GetRawAuthenticationOptions() (_ stacks.AuthenticationOptions, ferr fail.Error) {
+func (s StackProxy) GetRawAuthenticationOptions(ctx context.Context) (_ stacks.AuthenticationOptions, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	cfg, xerr := s.FullStack.GetRawAuthenticationOptions()
+	cfg, xerr := s.FullStack.GetRawAuthenticationOptions(ctx)
 	return cfg, xerr
 }
 
@@ -68,59 +68,59 @@ func (s StackProxy) GetStackName() (_ string, ferr fail.Error) {
 	return cfg, xerr
 }
 
-func (s StackProxy) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
+func (s StackProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	zones, xerr := s.FullStack.ListAvailabilityZones()
+	zones, xerr := s.FullStack.ListAvailabilityZones(ctx)
 	return zones, xerr
 }
 
-func (s StackProxy) ListRegions() (_ []string, ferr fail.Error) {
+func (s StackProxy) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	regions, xerr := s.FullStack.ListRegions()
+	regions, xerr := s.FullStack.ListRegions(ctx)
 	return regions, xerr
 }
 
-func (s StackProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s StackProxy) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	image, xerr := s.FullStack.InspectImage(id)
+	image, xerr := s.FullStack.InspectImage(ctx, id)
 	return image, xerr
 }
 
-func (s StackProxy) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
+func (s StackProxy) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	template, xerr := s.FullStack.InspectTemplate(id)
+	template, xerr := s.FullStack.InspectTemplate(ctx, id)
 	return template, xerr
 }
 
-func (s StackProxy) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s StackProxy) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	pair, xerr := s.FullStack.CreateKeyPair(name)
+	pair, xerr := s.FullStack.CreateKeyPair(ctx, name)
 	return pair, xerr
 }
 
-func (s StackProxy) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s StackProxy) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	pair, xerr := s.FullStack.InspectKeyPair(id)
+	pair, xerr := s.FullStack.InspectKeyPair(ctx, id)
 	return pair, xerr
 }
 
-func (s StackProxy) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s StackProxy) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	pair, xerr := s.FullStack.ListKeyPairs()
+	pair, xerr := s.FullStack.ListKeyPairs(ctx)
 	return pair, xerr
 }
 
-func (s StackProxy) DeleteKeyPair(id string) (ferr fail.Error) {
+func (s StackProxy) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.FullStack.DeleteKeyPair(id)
+	xerr := s.FullStack.DeleteKeyPair(ctx, id)
 	return xerr
 }
 
@@ -474,9 +474,9 @@ func (s StackProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 	return xerr
 }
 
-func (s StackProxy) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s StackProxy) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.FullStack.Migrate(operation, params)
+	xerr := s.FullStack.Migrate(ctx, operation, params)
 	return xerr
 }

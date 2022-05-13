@@ -260,7 +260,7 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr) // too many unchecked casts
 
 	if operation == "tags" {

@@ -35,38 +35,38 @@ type ProviderProxy struct {
 	Name string
 }
 
-func (s ProviderProxy) GetAuthenticationOptions() (_ Config, ferr fail.Error) {
+func (s ProviderProxy) GetAuthenticationOptions(ctx context.Context) (_ Config, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	config, xerr := s.Provider.GetAuthenticationOptions()
+	config, xerr := s.Provider.GetAuthenticationOptions(ctx)
 	return config, xerr
 }
 
-func (s ProviderProxy) GetConfigurationOptions() (_ Config, ferr fail.Error) {
+func (s ProviderProxy) GetConfigurationOptions(ctx context.Context) (_ Config, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	config, xerr := s.Provider.GetConfigurationOptions()
+	config, xerr := s.Provider.GetConfigurationOptions(ctx)
 	return config, xerr
 }
 
-func (s ProviderProxy) GetRawConfigurationOptions() (_ stacks.ConfigurationOptions, ferr fail.Error) {
+func (s ProviderProxy) GetRawConfigurationOptions(ctx context.Context) (_ stacks.ConfigurationOptions, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	asta, xerr := s.Provider.GetStack()
 	if xerr != nil {
 		return stacks.ConfigurationOptions{}, xerr
 	}
-	return asta.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	return asta.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 }
 
-func (s ProviderProxy) GetRawAuthenticationOptions() (_ stacks.AuthenticationOptions, ferr fail.Error) {
+func (s ProviderProxy) GetRawAuthenticationOptions(ctx context.Context) (_ stacks.AuthenticationOptions, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	asta, xerr := s.Provider.GetStack()
 	if xerr != nil {
 		return stacks.AuthenticationOptions{}, xerr
 	}
-	return asta.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	return asta.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 }
 
 func (s ProviderProxy) Build(m map[string]interface{}) (_ Provider, ferr fail.Error) {
@@ -100,10 +100,10 @@ func (s ProviderProxy) GetRegexpsOfTemplatesWithGPU() (_ []*regexp.Regexp, ferr 
 	return regexps, xerr
 }
 
-func (s ProviderProxy) GetCapabilities() (_ Capabilities, ferr fail.Error) {
+func (s ProviderProxy) GetCapabilities(ctx context.Context) (_ Capabilities, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	capabilities, xerr := s.Provider.GetCapabilities()
+	capabilities, xerr := s.Provider.GetCapabilities(ctx)
 	return capabilities, xerr
 }
 
@@ -114,17 +114,17 @@ func (s ProviderProxy) GetTenantParameters() (_ map[string]interface{}, ferr fai
 	return tenantParameters, xerr
 }
 
-func (s ProviderProxy) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
+func (s ProviderProxy) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	images, xerr := s.Provider.ListImages(all)
+	images, xerr := s.Provider.ListImages(ctx, all)
 	return images, xerr
 }
 
-func (s ProviderProxy) ListTemplates(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
+func (s ProviderProxy) ListTemplates(ctx context.Context, all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	templates, xerr := s.Provider.ListTemplates(all)
+	templates, xerr := s.Provider.ListTemplates(ctx, all)
 	return templates, xerr
 }
 
@@ -135,59 +135,59 @@ func (s ProviderProxy) GetStackName() (_ string, ferr fail.Error) {
 	return cfg, xerr
 }
 
-func (s ProviderProxy) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
+func (s ProviderProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	zones, xerr := s.Provider.ListAvailabilityZones()
+	zones, xerr := s.Provider.ListAvailabilityZones(ctx)
 	return zones, xerr
 }
 
-func (s ProviderProxy) ListRegions() (_ []string, ferr fail.Error) {
+func (s ProviderProxy) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	regions, xerr := s.Provider.ListRegions()
+	regions, xerr := s.Provider.ListRegions(ctx)
 	return regions, xerr
 }
 
-func (s ProviderProxy) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s ProviderProxy) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	image, xerr := s.Provider.InspectImage(id)
+	image, xerr := s.Provider.InspectImage(ctx, id)
 	return image, xerr
 }
 
-func (s ProviderProxy) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
+func (s ProviderProxy) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	template, xerr := s.Provider.InspectTemplate(id)
+	template, xerr := s.Provider.InspectTemplate(ctx, id)
 	return template, xerr
 }
 
-func (s ProviderProxy) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s ProviderProxy) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	pair, xerr := s.Provider.CreateKeyPair(name)
+	pair, xerr := s.Provider.CreateKeyPair(ctx, name)
 	return pair, xerr
 }
 
-func (s ProviderProxy) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s ProviderProxy) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	pair, xerr := s.Provider.InspectKeyPair(id)
+	pair, xerr := s.Provider.InspectKeyPair(ctx, id)
 	return pair, xerr
 }
 
-func (s ProviderProxy) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s ProviderProxy) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	pair, xerr := s.Provider.ListKeyPairs()
+	pair, xerr := s.Provider.ListKeyPairs(ctx)
 	return pair, xerr
 }
 
-func (s ProviderProxy) DeleteKeyPair(id string) (ferr fail.Error) {
+func (s ProviderProxy) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.DeleteKeyPair(id)
+	xerr := s.Provider.DeleteKeyPair(ctx, id)
 	return xerr
 }
 
@@ -541,9 +541,9 @@ func (s ProviderProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id 
 	return xerr
 }
 
-func (s ProviderProxy) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s ProviderProxy) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.Migrate(operation, params)
+	xerr := s.Provider.Migrate(ctx, operation, params)
 	return xerr
 }

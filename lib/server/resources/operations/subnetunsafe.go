@@ -555,7 +555,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Starting from here, delete Subnet metadata if exiting with error
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
 			}
 		}
@@ -586,7 +586,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		}
 	}()
 
-	caps, xerr := svc.GetCapabilities()
+	caps, xerr := svc.GetCapabilities(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -751,7 +751,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
 
-	template, xerr := svc.FindTemplateBySizing(*gwSizing)
+	template, xerr := svc.FindTemplateBySizing(ctx, *gwSizing)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find appropriate template")
@@ -762,7 +762,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	if imageQuery == "" {
 		imageQuery = req.ImageRef
 		if imageQuery == "" {
-			cfg, xerr := svc.GetConfigurationOptions()
+			cfg, xerr := svc.GetConfigurationOptions(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -774,13 +774,13 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				imageQuery = consts.DEFAULTOS
 			}
 		}
-		img, xerr := svc.SearchImage(imageQuery)
+		img, xerr := svc.SearchImage(ctx, imageQuery)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// look for an exact match by ID
-				imgs, xerr := svc.ListImages(true)
+				imgs, xerr := svc.ListImages(ctx, true)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failure listing images")

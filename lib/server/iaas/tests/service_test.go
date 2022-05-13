@@ -70,7 +70,7 @@ func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail
 	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
 
-	imgs, xerr := svc.ListImages(false)
+	imgs, xerr := svc.ListImages(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -105,7 +105,7 @@ func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Erro
 	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
 
-	imgs, xerr := svc.ListImages(false)
+	imgs, xerr := svc.ListImages(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}

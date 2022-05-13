@@ -377,7 +377,7 @@ func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1292,7 +1292,7 @@ func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Remove metadata
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1890,7 +1890,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 			}
 
 			// Do security group stuff to enable it
-			caps, xerr := svc.GetCapabilities()
+			caps, xerr := svc.GetCapabilities(ctx)
 			if xerr != nil {
 				return xerr
 			}
@@ -1996,7 +1996,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 				return fail.NotFoundError("security group '%s' is not bound to Subnet '%s'", sgInstance.GetName(), instance.GetID())
 			}
 
-			caps, xerr := svc.GetCapabilities()
+			caps, xerr := svc.GetCapabilities(ctx)
 			if xerr != nil {
 				return xerr
 			}

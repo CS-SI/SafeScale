@@ -44,7 +44,7 @@ import (
 )
 
 // CreateKeyPair creates a keypair and upload it to AWS
-func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -83,7 +83,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 
 // InspectKeyPair loads a keypair from AWS
 // Note: the private key is not stored by AWS...
-func (s stack) InspectKeyPair(id string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -115,7 +115,7 @@ func toAbstractKeyPair(in ec2.KeyPairInfo) *abstract.KeyPair {
 }
 
 // ListKeyPairs lists keypairs stored in AWS
-func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s stack) ListKeyPairs(context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -138,7 +138,7 @@ func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 }
 
 // DeleteKeyPair deletes a keypair from AWS
-func (s stack) DeleteKeyPair(id string) (ferr fail.Error) {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -150,7 +150,7 @@ func (s stack) DeleteKeyPair(id string) (ferr fail.Error) {
 }
 
 // ListAvailabilityZones lists AWS availability zones available
-func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(context.Context) (_ map[string]bool, ferr fail.Error) {
 	emptyMap := map[string]bool{}
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -178,7 +178,7 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
 }
 
 // ListRegions lists regions available in AWS
-func (s stack) ListRegions() (_ []string, ferr fail.Error) {
+func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -202,7 +202,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 }
 
 // InspectImage loads information about an image stored in AWS
-func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -222,7 +222,7 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 }
 
 // InspectTemplate loads information about a template stored in AWS
-func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr fail.Error) {
+func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -317,7 +317,7 @@ func filterOwners(s stack) []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages(all bool) (_ []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -357,7 +357,7 @@ func toAbstractImage(in ec2.Image) *abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates(all bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
+func (s stack) ListTemplates(ctx context.Context, all bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -555,12 +555,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
 	}
@@ -598,7 +598,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 	// Select usable availability zone, the first one in the list
 	if s.AwsConfig.Zone == "" {
-		azList, xerr := s.ListAvailabilityZones()
+		azList, xerr := s.ListAvailabilityZones(ctx)
 		if xerr != nil {
 			return nil, nil, xerr
 		}

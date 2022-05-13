@@ -18,6 +18,7 @@ package iaas
 
 import (
 	"bytes"
+	"context"
 	"expvar"
 	"fmt"
 	"regexp"
@@ -71,6 +72,8 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 func UseService(tenantName, metadataVersion string) (newService Service, ferr fail.Error) {
 	defer fail.OnExitLogError(&ferr)
 	defer fail.OnPanic(&ferr)
+
+	ctx := context.Background() // FIXME: Check context
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
@@ -158,7 +161,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		// 	}
 		// }
 
-		authOpts, xerr := providerInstance.GetAuthenticationOptions()
+		authOpts, xerr := providerInstance.GetAuthenticationOptions(ctx)
 		if xerr != nil {
 			return NullService(), xerr
 		}
@@ -216,7 +219,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 			}
 
 			if metadataLocationConfig.BucketName == "" {
-				serviceCfg, xerr := providerInstance.GetConfigurationOptions()
+				serviceCfg, xerr := providerInstance.GetConfigurationOptions(ctx)
 				if xerr != nil {
 					return NullService(), xerr
 				}

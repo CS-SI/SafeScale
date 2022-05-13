@@ -443,7 +443,7 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []
 	return vas, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 

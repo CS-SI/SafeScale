@@ -147,7 +147,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, innerXErr
 	}
 
-	xerr = hostInstance.updateCachedInformation()
+	xerr = hostInstance.updateCachedInformation(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -180,22 +180,16 @@ func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
-func (instance *Host) updateCachedInformation() fail.Error {
+func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 	svc := instance.Service()
 
-	opUser, opUserErr := getOperatorUsernameFromCfg(svc)
+	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
 	if opUserErr != nil {
 		return opUserErr
 	}
 
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
-
-	task, xerr := concurrency.VoidTask()
-	if xerr != nil {
-		return xerr
-	}
-	ctx := task.Context()
 
 	return instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -363,8 +357,8 @@ func (instance *Host) updateCachedInformation() fail.Error {
 	})
 }
 
-func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
-	cfg, xerr := svc.GetConfigurationOptions()
+func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, fail.Error) {
+	cfg, xerr := svc.GetConfigurationOptions(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -406,7 +400,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -619,7 +613,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	return instance.updateCachedInformation()
+	return instance.updateCachedInformation(ctx)
 }
 
 // GetState returns the last known state of the Host, without forced inspect
@@ -733,7 +727,7 @@ func (instance *Host) Create(
 				newHostDef.Template = hostReq.TemplateID
 			}
 		}
-		tmpl, xerr := svc.FindTemplateBySizing(newHostDef)
+		tmpl, xerr := svc.FindTemplateBySizing(ctx, newHostDef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")
@@ -753,7 +747,7 @@ func (instance *Host) Create(
 			imageQuery = consts.DEFAULTOS
 		}
 
-		hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
+		hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(ctx, svc, imageQuery)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -825,7 +819,7 @@ func (instance *Host) Create(
 				hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
 			}
 
-			opts, xerr := svc.GetConfigurationOptions()
+			opts, xerr := svc.GetConfigurationOptions(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -897,7 +891,7 @@ func (instance *Host) Create(
 
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				logrus.Errorf(
 					"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
 					derr,
@@ -1010,7 +1004,7 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	xerr = instance.updateCachedInformation()
+	xerr = instance.updateCachedInformation(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1128,9 +1122,9 @@ func (instance *Host) Create(
 	return userdataContent, nil
 }
 
-func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.Error) {
+func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (string, string, fail.Error) {
 	if imageRef == "" {
-		cfg, xerr := svc.GetConfigurationOptions()
+		cfg, xerr := svc.GetConfigurationOptions(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", "", xerr
@@ -1148,7 +1142,7 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			img, innerXErr = svc.SearchImage(imageRef)
+			img, innerXErr = svc.SearchImage(ctx, imageRef)
 			return innerXErr
 		},
 		timings.SmallDelay(),
@@ -1159,7 +1153,7 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			img = nil
-			imgs, xerr := svc.ListImages(true)
+			imgs, xerr := svc.ListImages(ctx, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return "", "", fail.Wrap(xerr, "failure listing images")
@@ -1931,7 +1925,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
 	}
 
-	xerr = instance.updateCachedInformation()
+	xerr = instance.updateCachedInformation(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2063,7 +2057,7 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 // createSingleHostNetwork creates Single-Host Network and Subnet
 func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
 	// Build network name
-	cfg, xerr := svc.GetConfigurationOptions()
+	cfg, xerr := svc.GetConfigurationOptions(ctx)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -2147,7 +2141,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			}
 
 			var dnsServers []string
-			opts, xerr := svc.GetConfigurationOptions()
+			opts, xerr := svc.GetConfigurationOptions(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -2655,7 +2649,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Deletes metadata from Object Storage
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
@@ -2674,7 +2668,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 	doRefresh := instance.localCache.sshProfile == nil
 	instance.localCache.RUnlock() // nolint
 	if doRefresh {
-		xerr := instance.updateCachedInformation()
+		xerr := instance.updateCachedInformation(ctx)
 		if xerr != nil {
 			return xerr
 		}
@@ -3877,7 +3871,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetID())
 			}
 
-			caps, xerr := svc.GetCapabilities()
+			caps, xerr := svc.GetCapabilities(ctx)
 			if xerr != nil {
 				return xerr
 			}
@@ -3978,7 +3972,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgInstance.GetID())
 			}
 
-			caps, xerr := svc.GetCapabilities()
+			caps, xerr := svc.GetCapabilities(ctx)
 			if xerr != nil {
 				return xerr
 			}

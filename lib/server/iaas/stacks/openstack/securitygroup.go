@@ -556,12 +556,12 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s stack) GetDefaultSecurityGroupName(context.Context) (string, fail.Error) {
+func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	cfg, err := s.GetRawConfigurationOptions()
+	cfg, err := s.GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -571,12 +571,12 @@ func (s stack) GetDefaultSecurityGroupName(context.Context) (string, fail.Error)
 
 // EnableSecurityGroup enables a Security Group
 // Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
+func (s stack) EnableSecurityGroup(ctx context.Context, _ *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("openstack cannot enable a Security Group")
 }
 
 // DisableSecurityGroup disables a Security Group
 // Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
+func (s stack) DisableSecurityGroup(ctx context.Context, _ *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

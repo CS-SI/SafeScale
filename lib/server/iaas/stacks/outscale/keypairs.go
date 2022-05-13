@@ -28,7 +28,7 @@ import (
 )
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (akp *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -63,7 +63,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (akp *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -87,7 +87,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s stack) ListKeyPairs(context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -112,16 +112,16 @@ func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(name string) (ferr fail.Error) {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if name == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("name")
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteKeypair(name)
+	return s.rpcDeleteKeypair(id)
 }

@@ -99,7 +99,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 
 	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
-	az, xerr := s.SelectedAvailabilityZone()
+	az, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil { // nolint
 		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
@@ -409,7 +409,7 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	return vs, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 

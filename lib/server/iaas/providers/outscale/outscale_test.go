@@ -156,9 +156,9 @@ func Test_VMWithGPU(t *testing.T) {
 	}
 	require.Nil(t, err)
 
-	img, err := tt.Service.SearchImage("Ubuntu 20.04")
+	img, err := tt.Service.SearchImage(ctx, "Ubuntu 20.04")
 	assert.NoError(t, err)
-	tpls, err := tt.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
+	tpls, err := tt.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 		MinCores:    1,
 		MaxCores:    1,
 		MinRAMSize:  1,

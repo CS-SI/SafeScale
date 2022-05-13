@@ -44,7 +44,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (out []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(context.Context, bool) (out []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -74,7 +74,7 @@ func toAbstractImage(in compute.Image) *abstract.Image {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -95,7 +95,7 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s stack) ListTemplates(bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
+func (s stack) ListTemplates(context.Context, bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -128,7 +128,7 @@ func toAbstractHostTemplate(in compute.MachineType) *abstract.HostTemplate {
 }
 
 // InspectTemplate ...
-func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
+func (s stack) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -150,7 +150,7 @@ func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.E
 
 // CreateKeyPair FIXME: change code to really create a keypair on provider side
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -165,17 +165,17 @@ func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error)
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs(context.Context) ([]*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(id string) fail.Error {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
@@ -240,12 +240,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}
 
 	// Determine system disk size based on vcpus count
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get image")
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -283,7 +283,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 	// Select usable availability zone, the first one in the list
 	if s.GcpConfig.Zone == "" {
-		azList, xerr := s.ListAvailabilityZones()
+		azList, xerr := s.ListAvailabilityZones(ctx)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
@@ -803,7 +803,7 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(context.Context) (_ map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -824,7 +824,7 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
 }
 
 // ListRegions ...
-func (s stack) ListRegions() (_ []string, ferr fail.Error) {
+func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
 	var emptySlice []string
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
