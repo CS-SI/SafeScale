@@ -71,6 +71,7 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 
 // Images tests
 func (tester *ServiceTester) Images(t *testing.T) {
+	ctx := context.Background()
 	images, err := tester.Service.ListImages(ctx, false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, images)
@@ -93,6 +94,7 @@ func (tester *ServiceTester) Images(t *testing.T) {
 
 // HostTemplates test
 func (tester *ServiceTester) HostTemplates(t *testing.T) {
+	ctx := context.Background()
 	tpls, err := tester.Service.ListTemplates(ctx, false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
@@ -108,6 +110,7 @@ func (tester *ServiceTester) HostTemplates(t *testing.T) {
 
 // KeyPairs tests
 func (tester *ServiceTester) KeyPairs(t *testing.T) {
+	ctx := context.Background()
 	// CreateKeyPair test
 	kp, err := tester.Service.CreateKeyPair(ctx, "kp")
 	assert.Nil(t, err)
@@ -187,6 +190,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, cidr strin
 
 // CreateSubnet creates a test subnet
 func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, withGW bool, cidr string) (*abstract.Subnet, *abstract.HostFull) {
+	ctx := context.Background()
 	subnet, err := tester.Service.CreateSubnet(context.Background(), abstract.SubnetRequest{
 		Name:      name,
 		IPVersion: ipversion.IPv4,
@@ -227,6 +231,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 
 // CreateHost creates a test host
 func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstract.Subnet, public bool) (*abstract.HostFull, *userdata.Content, fail.Error) {
+	ctx := context.Background()
 	tpls, xerr := tester.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
@@ -251,6 +256,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstr
 
 // CreateGW creates a test GW
 func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fail.Error {
+	ctx := context.Background()
 	tpls, xerr := tester.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
@@ -311,6 +317,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 
 // Networks test
 func (tester *ServiceTester) Networks(t *testing.T) {
+	ctx := context.Background()
 	// Get initial number of networks
 	nets, err := tester.Service.ListNetworks(ctx)
 	assert.Nil(t, err)
