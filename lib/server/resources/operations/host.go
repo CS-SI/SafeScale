@@ -1458,7 +1458,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ne
 		return err
 	}
 	if sgName != "" {
-		adsg, innerXErr := svc.InspectSecurityGroupByName(nil, networkID, sgName)
+		adsg, innerXErr := svc.InspectSecurityGroupByName(ctx, networkID, sgName)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:

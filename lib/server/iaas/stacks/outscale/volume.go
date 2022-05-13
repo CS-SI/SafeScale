@@ -206,7 +206,7 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, ferr fail.
 }
 
 // ListVolumes list available volumes
-func (s stack) ListVolumes(context.Context) (_ []*abstract.Volume, ferr fail.Error) {
+func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -259,9 +259,9 @@ func freeDevice(usedDevices []string, device string) bool {
 	return true
 }
 
-func (s stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
+func (s stack) getFirstFreeDeviceName(ctx context.Context, serverID string) (string, fail.Error) {
 	var usedDeviceNames []string
-	atts, _ := s.ListVolumeAttachments(nil, serverID)
+	atts, _ := s.ListVolumeAttachments(ctx, serverID)
 	if atts == nil {
 		if len(s.deviceNames) > 0 {
 			return s.deviceNames[0], nil
@@ -294,7 +294,7 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	firstDeviceName, xerr := s.getFirstFreeDeviceName(request.HostID)
+	firstDeviceName, xerr := s.getFirstFreeDeviceName(ctx, request.HostID)
 	if xerr != nil {
 		return "", xerr
 	}

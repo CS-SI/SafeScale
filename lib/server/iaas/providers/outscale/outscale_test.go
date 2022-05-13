@@ -150,6 +150,7 @@ func Test_NetworksWithDelete(t *testing.T) {
 }
 
 func Test_VMWithGPU(t *testing.T) {
+	ctx := context.Background()
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)

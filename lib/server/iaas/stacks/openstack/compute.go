@@ -607,7 +607,7 @@ func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, 
 }
 
 // InspectHostByName returns the host using the name passed as parameter
-func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+func (s stack) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -648,7 +648,7 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 					return nil, fail.InconsistentError("entry[id] should be a string")
 				}
 				host.Name = name
-				hostFull, xerr := s.InspectHost(nil, host)
+				hostFull, xerr := s.InspectHost(ctx, host)
 				if xerr != nil {
 					return nil, fail.Wrap(xerr, "failed to inspect host '%s'", name)
 				}

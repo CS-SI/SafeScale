@@ -17,6 +17,7 @@
 package ovh_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -61,6 +62,7 @@ func getService() (iaas.Service, error) {
 
 // Test that we have templates, and each template has 1 or more cores
 func Test_GetTemplates(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
@@ -78,6 +80,7 @@ func Test_GetTemplates(t *testing.T) {
 
 // Test that we have templates with GPUs
 func Test_GetGpuTemplates(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
@@ -98,6 +101,7 @@ func Test_GetGpuTemplates(t *testing.T) {
 }
 
 func TemplateExists(name string) bool {
+	ctx := context.Background()
 	cli, _ := getTester()
 	tpls, _ := cli.Service.ListTemplates(ctx, false)
 
@@ -113,6 +117,7 @@ func TemplateExists(name string) bool {
 }
 
 func Test_GetGpuTemplate(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
@@ -144,6 +149,7 @@ func Test_Images(t *testing.T) {
 }
 
 func Test_HostTemplates(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
