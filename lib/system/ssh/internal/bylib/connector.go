@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/sftp"
 	"github.com/sirupsen/logrus"
 	libssh "golang.org/x/crypto/ssh"
@@ -91,96 +92,17 @@ func (sc *Connector) Close() fail.Error {
 	return nil
 }
 
-// createTunneling ...
-// func (sc *libConnector) createTunneling() (*sshtunnel.SSHTunnel, *ConfigProperties, error) {
-func (sc *Connector) createTunneling() fail.Error {
-	if sc.tunnels == nil {
-		var tu *sshtunnel.SSHTunnel
-
-		internalPort := internal.DefaultPort // all machines use port 22...
-		var gateway *sshtunnel.Endpoint
-		gwConfig := sc.TargetConfig.GatewayConfig
-		if gwConfig == nil { // it has to be a gateway
-			internalPort = sc.TargetConfig.Port // ... except maybe the gateway itself
-
-			var rerr error
-			gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.TargetConfig.User, sc.TargetConfig.IPAddress, sc.TargetConfig.Port),
-				sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
-			if rerr != nil {
-				return fail.Wrap(rerr)
-			}
-		} else {
-			var rerr error
-			gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", gwConfig.User, gwConfig.IPAddress, gwConfig.Port),
-				sshtunnel.EndpointOptionKeyFromString(gwConfig.PrivateKey, ""))
-			if rerr != nil {
-				return fail.Wrap(rerr)
-			}
-		}
-
-		server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:%d", sc.TargetConfig.IPAddress, internalPort),
-			sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		local, err := sshtunnel.NewEndpoint(fmt.Sprintf("localhost:%d", sc.TargetConfig.LocalPort))
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, sshtunnel.TunnelOptionWithLogger(log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)), sshtunnel.TunnelOptionWithDefaultKeepAlive())
-			if err != nil {
-				return fail.Wrap(err)
-			}
-		} else {
-			tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, sshtunnel.TunnelOptionWithDefaultKeepAlive())
-			if err != nil {
-				return fail.Wrap(err)
-			}
-		}
-
-		var tsErr error
-		go func() {
-			tsErr = tu.Start()
-			if tsErr != nil {
-				tu.Close()
-			}
-		}()
-
-		tunnelReady := <-tu.Ready()
-		if !tunnelReady {
-			return fail.Wrap(tsErr, "unable to establish tunnel: %w")
-		}
-
-		sc.tunnels = tu
-	}
-
-	return nil
-}
-
-// // Command returns the cmd struct to execute cmdString remotely
-// func (sc *libConnector) Command(cmdString string) (*libCommand, fail.Error) {
-// 	return sc.newCommand(cmdString, false, false)
-// }
-
 // NewCommand returns the cmd struct to execute cmdString remotely
 func (sc *Connector) NewCommand(_ context.Context, cmdString string) (api.Command, fail.Error) {
-	return sc.newCommand(cmdString, false, false)
+	return sc.newExecuteCommand(cmdString, false, false)
 }
-
-// // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-// func (sc *libConnector) SudoCommand(cmdString string) (*libCommand, fail.Error) {
-// 	return sc.newCommand(cmdString, false, true)
-// }
 
 // NewSudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (sc *Connector) NewSudoCommand(_ context.Context, cmdString string) (api.Command, fail.Error) {
-	return sc.newCommand(cmdString, false, true)
+	return sc.newExecuteCommand(cmdString, false, true)
 }
 
-func (sc *Connector) newCommand(cmdString string, withTty, withSudo bool) (*Command, fail.Error) {
+func (sc *Connector) newExecuteCommand(cmdString string, withTty, withSudo bool) (*Command, fail.Error) {
 	cmd := exec.Command(cmdString)
 	sshCommand := Command{
 		withSudo:     withSudo,
@@ -245,7 +167,12 @@ func (sc *Connector) WaitServerReady(ctx context.Context, phase string, timeout 
 			var xerr fail.Error
 			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 10*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrAborted:
+					return retry.StopRetryError(xerr)
+				default:
+					return xerr
+				}
 			}
 
 			if retcode != 0 {
@@ -267,10 +194,8 @@ func (sc *Connector) WaitServerReady(ctx context.Context, phase string, timeout 
 		logrus.Debugf("WaitServerReady: the wait finished with: %v", retryErr)
 		return stdout, retryErr
 	}
-	logrus.Debugf(
-		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sc.TargetConfig.IPAddress, originalPhase,
-		temporal.FormatDuration(time.Since(begins)), stdout,
-	)
+	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sc.TargetConfig.IPAddress, originalPhase,
+		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
 }
 
@@ -329,31 +254,20 @@ func (sc *Connector) CopyWithTimeout(ctx context.Context, remotePath string, loc
 func (sc *Connector) Copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (_ int, _ string, _ string, ferr fail.Error) {
 	// FIXME: Use ctx if it can be handled at lower levels, if not, remove it as a parameter
 
-	// tu, sshConfig, err := sc.createTunneling()
-	xerr := sc.createTunneling()
-	if xerr != nil {
-		return -1, "", "", fail.Wrap(xerr, "unable to create tunnels")
-	}
-
-	client, xerr := sc.createTransferClient()
+	session, xerr := sc.createTransferSession()
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
-	defer func() {
-		derr := client.Close()
-		if derr != nil {
-			// FIXME: return error instead of log?
-			logrus.Warn(fail.Wrap(derr, "failed to close SFTP client").Error())
-		}
-	}()
+	defer sc.closeTransferSession(session, &ferr)
 
 	if isUpload {
 		// create destination file
-		dstFile, err := client.Create(remotePath)
+		dstFile, err := session.Create(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
 		defer func() {
+			// FIXME: should we delete remotely created file on abort?
 			if dstFile != nil {
 				dstErr := dstFile.Close()
 				if dstErr != nil {
@@ -368,6 +282,10 @@ func (sc *Connector) Copy(ctx context.Context, remotePath string, localPath stri
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
+
+		// if task.Aborted() {
+		// 	return fail.AbortedError()
+		// }
 
 		// copy source file to destination file
 		written, err := io.Copy(dstFile, srcFile)
@@ -384,10 +302,11 @@ func (sc *Connector) Copy(ctx context.Context, remotePath string, localPath stri
 		}
 
 		// it seems copy was ok, but make sure of it
-		finfo, err := client.Lstat(remotePath)
+		finfo, err := session.Lstat(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
+
 		if expected != 0 && finfo.Size() == 0 {
 			return -1, "", "", fail.NewError("problem checking file %s: empty file", remotePath)
 		}
@@ -409,16 +328,21 @@ func (sc *Connector) Copy(ctx context.Context, remotePath string, localPath stri
 		}()
 
 		// open source file
-		srcFile, err := client.Open(remotePath)
+		srcFile, err := session.Open(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
+
+		// if task.Aborted() {
+		// 	return fail.AbortedError()
+		// }
 
 		// copy source file to destination file
 		written, err := io.Copy(dstFile, srcFile)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
+		// FIXME: on abort, should we delete copied file?
 		logrus.Debugf("%d bytes copied from %s\n", written, remotePath)
 
 		if fi, err := srcFile.Stat(); err != nil {
@@ -429,7 +353,12 @@ func (sc *Connector) Copy(ctx context.Context, remotePath string, localPath stri
 			}
 		}
 
+		// if task.Aborted() {
+		// 	return fail.AbortedError()
+		// }
+
 		// flush in-memory copy
+		// FIXME: on abort, should not sync
 		err = dstFile.Sync()
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
@@ -456,19 +385,11 @@ func (sc *Connector) Enter(username, shell string) (ferr fail.Error) {
 		sshUsername = sc.TargetConfig.User
 	}
 
-	// tu, sshConfig, err := sc.createTunneling()
-	xerr := sc.createTunneling()
-	if xerr != nil {
-		return fail.Wrap(xerr, "unable to create tunnels")
-	}
-
 	session, xerr := sc.createExecutionSession()
 	if xerr != nil {
 		return fail.Wrap(xerr, "cannot open new session")
 	}
-	defer func() {
-		_ = session.Close()
-	}()
+	defer sc.closeExecutionSession(session, &ferr)
 
 	fd := int(os.Stdin.Fd())
 	state, err := terminal.MakeRaw(fd)
@@ -532,39 +453,60 @@ func (sc *Connector) Enter(username, shell string) (ferr fail.Error) {
 	return nil
 }
 
-// createExecutionSession ...
-func (sc *Connector) createExecutionSession() (*libssh.Session, fail.Error) {
+// createExecutionClient ...
+func (sc *Connector) createClient() fail.Error {
 	sc.Lock.Lock()
 	defer sc.Lock.Unlock()
 
 	if sc.client == nil {
-		conn, xerr := sc.dial()
+		conn, xerr := sc.dial(0)
 		if xerr != nil {
-			return nil, xerr
+			return xerr
 		}
+
 		sc.client = conn
 	}
 
+	return nil
+}
+
+// createExecutionSession returns a session instance configured to execute a command remotely
+func (sc *Connector) createExecutionSession() (*libssh.Session, fail.Error) {
+	xerr := sc.createTransientTunnel()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = sc.createClient()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	sc.Lock.RLock()
+	defer sc.Lock.RUnlock()
+
 	session, err := sc.client.NewSession()
 	if err != nil {
-		return nil, fail.Wrap(err, "cannot open new session")
+		return nil, fail.Wrap(err, "cannot create new session")
 	}
 
 	return session, nil
 }
 
-// createTransferClient ...
-func (sc *Connector) createTransferClient() (*sftp.Client, fail.Error) {
-	sc.Lock.Lock()
-	defer sc.Lock.Unlock()
-
-	if sc.client == nil {
-		conn, xerr := sc.dial()
-		if xerr != nil {
-			return nil, xerr
-		}
-		sc.client = conn
+// createTransferSession returns a session instance configured to transfer file with remote
+func (sc *Connector) createTransferSession() (*sftp.Client, fail.Error) {
+	xerr := sc.createTransientTunnel()
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	xerr = sc.createClient()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	sc.Lock.RLock()
+	defer sc.Lock.RUnlock()
 
 	session, err := sftp.NewClient(sc.client)
 	if err != nil {
@@ -574,8 +516,73 @@ func (sc *Connector) createTransferClient() (*sftp.Client, fail.Error) {
 	return session, nil
 }
 
+// createTransientTunnel creates the tunnel (if needed)
+func (sc *Connector) createTransientTunnel() fail.Error {
+	if sc.tunnels == nil {
+		var tu *sshtunnel.SSHTunnel
+
+		internalPort := internal.DefaultPort // all machines use port 22...
+		var gateway *sshtunnel.Endpoint
+		gwConfig := sc.TargetConfig.GatewayConfig
+		if gwConfig == nil { // it has to be a gateway
+			internalPort = sc.TargetConfig.Port // ... except maybe the gateway itself
+
+			var rerr error
+			gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.TargetConfig.User, sc.TargetConfig.IPAddress, sc.TargetConfig.Port),
+				sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
+			if rerr != nil {
+				return fail.Wrap(rerr)
+			}
+		} else {
+			var rerr error
+			gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", gwConfig.User, gwConfig.IPAddress, gwConfig.Port),
+				sshtunnel.EndpointOptionKeyFromString(gwConfig.PrivateKey, ""))
+			if rerr != nil {
+				return fail.Wrap(rerr)
+			}
+		}
+
+		server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:%d", sc.TargetConfig.IPAddress, internalPort),
+			sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		local, err := sshtunnel.NewEndpoint(fmt.Sprintf("localhost:%d", sc.TargetConfig.LocalPort))
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		options := []sshtunnel.Option{sshtunnel.TunnelOptionWithDefaultKeepAlive()}
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			options = append(options, sshtunnel.TunnelOptionWithLogger(log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)))
+		}
+		tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, options...)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		var tsErr error
+		go func() {
+			tsErr = tu.Start()
+			if tsErr != nil {
+				tu.Close()
+			}
+		}()
+
+		tunnelReady := <-tu.Ready()
+		if !tunnelReady {
+			return fail.Wrap(tsErr, "unable to establish tunnel: %w")
+		}
+
+		sc.tunnels = tu
+	}
+
+	return nil
+}
+
 // dial establishes connection with remote
-func (sc *Connector) dial() (*libssh.Client, fail.Error) {
+func (sc *Connector) dial(timeout time.Duration) (*libssh.Client, fail.Error) {
 	pk, err := sshtunnel.AuthMethodFromPrivateKey([]byte(sc.TargetConfig.PrivateKey), nil)
 	if err != nil {
 		return nil, fail.Wrap(err, "cannot create auth method")
@@ -590,20 +597,61 @@ func (sc *Connector) dial() (*libssh.Client, fail.Error) {
 		HostKeyCallback: libssh.InsecureIgnoreHostKey(),
 	}
 
+	if timeout <= 0 {
+		timeout = 45 * time.Second
+	}
 	hostport := fmt.Sprintf("%s:%d" /*"localhost"*/, internal.Loopback, sc.tunnels.GetLocalEndpoint().Port())
-	conn, err := libssh.Dial("tcp", hostport, config)
+	client, err := sshtunnel.DialSSHWithTimeout("tcp", hostport, config, timeout)
 	if err != nil {
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			logrus.Debugf(spew.Sdump(err))
+		}
 		return nil, fail.Wrap(err, "cannot connect %v", hostport)
 	}
-	return conn, nil
+
+	return client, nil
+}
+
+// closeExecutionSession closes properly a session
+func (sc *Connector) closeExecutionSession(session *libssh.Session, ferr *fail.Error) {
+	err := session.Signal(libssh.SIGABRT)
+	if err != nil && err.Error() != "EOF" {
+		if ferr != nil && *ferr != nil {
+			_ = (*ferr).AddConsequence(err)
+		} else {
+			*ferr = fail.Wrap(err)
+		}
+	}
+	err = session.Close()
+	if err != nil && err.Error() != "EOF" {
+		if ferr != nil && *ferr != nil {
+			_ = (*ferr).AddConsequence(err)
+		} else {
+			*ferr = fail.Wrap(err)
+		}
+		logrus.Warn(fail.Wrap(err, "failed to close SSH Session").Error())
+	}
+}
+
+// closeTransferSession closes properly a SFTP session (ie SFTP client)
+func (sc *Connector) closeTransferSession(session *sftp.Client, ferr *fail.Error) {
+	err := session.Close()
+	if err != nil && err.Error() != " EOF" {
+		if ferr != nil && *ferr != nil {
+			_ = (*ferr).AddConsequence(err)
+		} else {
+			*ferr = fail.Wrap(err)
+		}
+		logrus.Warn(fail.Wrap(err, "failed to close SFTP Client").Error())
+	}
 }
 
 // Config returns an api.Config corresponding to the one belonging to the connector
 func (sc Connector) Config() api.Config {
-	return internal.ConvertInternalToApiConfig(*sc.TargetConfig)
+	return internal.ConvertInternalToAPIConfig(*sc.TargetConfig)
 }
 
-// CreatePersistentTunnel is used to create SSH tunnel that will not be closed on .Close() (unlike createNonPersistentTunnel)
+// CreatePersistentTunnel is used to create SSH tunnel that will not be closed on .Close() (unlike createTransientTunnel)
 // Used to create persistent tunnel locally with 'safescale tunnel create'
 func (sc *Connector) CreatePersistentTunnel() (ferr fail.Error) {
 	return fail.InconsistentError("'bylib/Connector' is not able to create persistent SSH tunnel. Use 'bycli/Connector' instead.")

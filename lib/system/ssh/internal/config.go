@@ -341,8 +341,8 @@ func (conf Config) Clone() api.Config {
 	return out
 }
 
-// ConvertInternalToApiConfig ...
-func ConvertInternalToApiConfig(conf ConfigProperties) *Config {
+// ConvertInternalToAPIConfig ...
+func ConvertInternalToAPIConfig(conf ConfigProperties) *Config {
 	out := Config{
 		_private: ConfigProperties{
 			Hostname:   conf.Hostname,

@@ -217,9 +217,6 @@ func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, time
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if scmd == nil {
-		return invalid, "", "", fail.InvalidParameterCannotBeNilError("scmd")
-	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -356,7 +353,8 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 	}
 
 	// Launch the command and wait for its completion
-	if xerr = scmd.Start(); xerr != nil {
+	xerr = scmd.Start()
+	if xerr != nil {
 		return result, xerr
 	}
 

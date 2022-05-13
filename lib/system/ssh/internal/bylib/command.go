@@ -21,31 +21,30 @@
 package bylib
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	libssh "golang.org/x/crypto/ssh"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/internal/bylib/sshtunnel"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// Command defines a SSH newCommand
+// Command defines a SSH command
 type Command struct {
 	conn         *Connector
 	runCmdString string
@@ -54,7 +53,7 @@ type Command struct {
 	cmd          *exec.Cmd
 }
 
-// Output runs the newCommand and returns its standard output.
+// Output runs the command and returns its standard output.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
 func (scmd *Command) Output() (_ []byte, ferr fail.Error) {
@@ -65,7 +64,7 @@ func (scmd *Command) Output() (_ []byte, ferr fail.Error) {
 	// defer func() {
 	// 	nerr := scmd.cleanup()
 	// 	if nerr != nil {
-	// 		logrus.Warnf("Error waiting for newCommand cleanup: %v", nerr)
+	// 		logrus.Warnf("Error waiting for newExecuteCommand cleanup: %v", nerr)
 	// 		ferr = nerr
 	// 	}
 	// }()
@@ -87,19 +86,6 @@ func (scmd *Command) String() string {
 	return scmd.runCmdString
 }
 
-// // RunWithTimeout ...
-// func (sc *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-// 	tu, _, err := sc.cfg.createTunneling()
-// 	if err != nil {
-// 		return 0, "", "", fail.NewError("failure creating tunnel: %w", err)
-// 	}
-// 	sc.tunnels = tu
-// 	defer tu.Close()
-//
-// 	rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
-// 	return rv, out, sterr, xerr
-// }
-
 // PublicKeyFromStr ...
 func PublicKeyFromStr(keyStr string) libssh.AuthMethod {
 	key, err := libssh.ParsePrivateKey([]byte(keyStr))
@@ -111,219 +97,235 @@ func PublicKeyFromStr(keyStr string) libssh.AuthMethod {
 }
 
 // RunWithTimeout ...
-func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+	const invalid = -1
+	if valid.IsNull(scmd) {
+		return invalid, "", "", fail.InvalidInstanceError()
+	}
+	if valid.IsNull(scmd.conn) {
+		return invalid, "", "", fail.InvalidInstanceContentError("scmd.conn", "cannot be null value of 'apissh.Connector'")
+	}
+	if ctx == nil {
+		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return 0, "", "", xerr
+		return invalid, "", "", xerr
+	}
+
+	if task.Aborted() {
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-	tracer.Trace("newCommand=\n%s\n", scmd.String())
+	tracer.Trace("host='%s', command=\n%s\n", scmd.conn.TargetConfig.Hostname, scmd.runCmdString)
 	defer tracer.Exiting()
 
-	if task != nil && task.Aborted() {
-		return 0, "", "", fail.AbortedError(task.Context().Err(), "task aborted by parent")
+	session, xerr := scmd.conn.createExecutionSession()
+	if xerr != nil {
+		return -1, "", "", xerr
+	}
+	defer scmd.conn.closeExecutionSession(session, &ferr)
+
+	subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
+	if xerr != nil {
+		return invalid, "", "", xerr
 	}
 
-	type result struct {
-		errorcode int
-		stdout    string
-		stderr    string
-		reserr    error
+	if timeout == 0 {
+		timeout = 1200 * time.Second // upper bound of 20 min
+	} else if timeout > 1200*time.Second {
+		timeout = 1200 * time.Second // nothing should take more than 20 min
 	}
 
-	results := make(chan result)
-	enough := time.After(timeout)
+	params := taskExecuteParameters{
+		session:        session,
+		collectOutputs: outs != outputs.DISPLAY,
+	}
+	_, xerr = subtask.StartWithTimeout(scmd.taskExecute, params, timeout)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-	go func() {
-		defer close(results)
-
-		directConfig := &libssh.ClientConfig{
-			User: scmd.conn.TargetConfig.User,
-			Auth: []libssh.AuthMethod{
-				PublicKeyFromStr(scmd.conn.TargetConfig.PrivateKey),
-			},
-			HostKeyCallback: sshtunnel.TrustedHostKeyCallback(""),
-			Timeout:         2 * time.Second,
+	_, r, xerr := subtask.WaitFor(timeout)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
+		default:
+			debug.IgnoreError(xerr)
 		}
 
-		logrus.Debugf("Dialing to %s(%s):%d using relay %s:%d", scmd.conn.TargetConfig.Hostname, scmd.conn.TargetConfig.IPAddress, scmd.conn.TargetConfig.Port, "localhost", scmd.conn.tunnels.GetLocalEndpoint().Port())
-		// FIXME: think a way to factorize this dial code with connector.createExecutionSession/.dial... currently, these 2 methods do not accept timeout...
-		client, err := sshtunnel.DialSSHWithTimeout("tcp", fmt.Sprintf("%s:%d", internal.Loopback, scmd.conn.tunnels.GetLocalEndpoint().Port()), directConfig, 45*time.Second)
-		if err != nil {
-			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-				logrus.Debugf(spew.Sdump(err))
-			}
-			if ne, ok := err.(net.Error); ok {
-				if ne.Timeout() || ne.Temporary() {
-					results <- result{
-						errorcode: 255,
-						stdout:    "",
-						stderr:    "",
-						reserr:    err,
-					}
-					return
-				}
+		// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
+		{
+			if strings.Contains(xerr.Error(), "annot allocate memory") {
+				return invalid, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
 			}
 
-			results <- result{
-				errorcode: 255,
-				stdout:    "",
-				stderr:    "",
-				reserr:    err,
+			if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
+				return invalid, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")
 			}
-			return
 		}
+
+		tracer.Trace("run failed: %v", xerr)
+		return invalid, "", "", xerr
+	}
+
+	if result, ok := r.(data.Map); ok {
+		if outs == outputs.DISPLAY {
+			fmt.Print(result["stdout"].(string))
+		}
+		tracer.Trace("run succeeded, retcode=%d", result["retcode"].(int))
+		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
+	}
+	return invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
+}
+
+type taskExecuteParameters struct {
+	session        *libssh.Session
+	collectOutputs bool
+	timeout        time.Duration
+}
+
+func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	if valid.IsNull(scmd) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if len(scmd.String()) == 0 {
+		return nil, fail.InvalidInstanceContentError("scmd", "contains empty command")
+	}
+	params, ok := p.(taskExecuteParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("p", "must be a 'taskExecuteParameters'")
+	}
+	if params.session == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.session")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	result := data.Map{
+		"retcode": -1,
+		"stdout":  "",
+		"stderr":  "",
+	}
+
+	var (
+		stdoutBridge, stderrBridge cli.PipeBridge
+		pipeBridgeCtrl             *cli.PipeBridgeController
+		msgOut, msgErr             []byte
+		xerr                       fail.Error
+	)
+
+	opTimeout := params.timeout
+	if opTimeout > 0 && opTimeout < 150*time.Second {
+		opTimeout = 150 * time.Second
+	}
+
+	// Set up the outputs (std and err)
+	stdoutPipe, err := params.session.StdoutPipe()
+	if err != nil {
+		return result, fail.Wrap(err)
+	}
+
+	stderrPipe, err := params.session.StderrPipe()
+	if err != nil {
+		return result, fail.Wrap(err)
+	}
+
+	if !params.collectOutputs {
+		stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe.(io.ReadCloser))
+		if xerr != nil {
+			return result, xerr
+		}
+
+		stderrBridge, xerr = cli.NewStderrBridge(stderrPipe.(io.ReadCloser))
+		if xerr != nil {
+			return result, xerr
+		}
+
+		pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge)
+		if xerr != nil {
+			return result, xerr
+		}
+
+		// Starts pipebridge
+		xerr = pipeBridgeCtrl.Start(task)
+		if xerr != nil {
+			return result, xerr
+		}
+
+		// Ensure the pipebridge is properly closed
 		defer func() {
-			if client != nil {
-				clErr := client.Close()
-				if clErr != nil {
-					logrus.Warn(clErr)
+			if !params.collectOutputs {
+				derr := pipeBridgeCtrl.Stop()
+				if derr != nil {
+					if xerr != nil {
+						_ = xerr.AddConsequence(derr)
+					} else {
+						xerr = derr
+					}
+				}
+				derr = pipeBridgeCtrl.Wait()
+				if derr != nil {
+					if xerr != nil {
+						_ = xerr.AddConsequence(derr)
+					} else {
+						xerr = derr
+					}
 				}
 			}
 		}()
+	}
 
-		if task != nil && task.Aborted() {
-			results <- result{-1, "", "", fail.AbortedError(task.Context().Err(), "task aborted by parent")}
-			return
-		}
+	err = params.session.Start(scmd.String())
+	if err != nil {
+		return result, fail.Wrap(err)
+	}
 
-		beginDial := time.Now()
-		retries := 0
+	err = params.session.Wait()
 
-		var session *libssh.Session
-		err = retry.WhileUnsuccessful(func() error { // FIXME: Turn this into goroutine
-			// Each ClientConn can support multiple interactive sessions,
-			// represented by a Session.
-
-			newsession, internalErr := client.NewSession()
-			if internalErr != nil {
-				retries++
-				logrus.Debugf("problem creating session: %s", internalErr.Error())
-				return internalErr
-			}
-			if session != nil { // race condition mitigation
-				return fmt.Errorf("too late")
-			}
-			logrus.Debugf("creating the session took %s and %d retries", time.Since(beginDial), retries)
-			session = newsession
-			return nil
-		}, time.Second, 150*time.Second)
+	if params.collectOutputs {
+		msgOut, err = ioutil.ReadAll(stdoutPipe)
 		if err != nil {
-			results <- result{
-				errorcode: -1,
-				stdout:    "",
-				stderr:    "",
-				reserr:    err,
-			}
-			return
-		}
-		defer func() {
-			if session != nil {
-				err = session.Close()
-				if err != nil {
-					if !strings.Contains(err.Error(), "EOF") {
-						logrus.Warnf("error closing session: %v", err)
-					}
-				}
-			}
-		}()
-
-		if task != nil && task.Aborted() {
-			results <- result{-1, "", "", fail.AbortedError(task.Context().Err(), "task aborted by parent")}
-			return
+			return result, fail.Wrap(err)
 		}
 
-		if scmd == nil {
-			results <- result{-1, "", "", fail.AbortedError(nil, "nil ssh newCommand!!")}
-			return
+		msgErr, err = ioutil.ReadAll(stderrPipe)
+		if err != nil {
+			return result, fail.Wrap(err)
 		}
 
-		if len(scmd.String()) == 0 {
-			results <- result{-1, "", "", fail.AbortedError(nil, "empty ssh newCommand!!")}
-			return
-		}
+		result["stdout"] = string(msgOut)
+		result["stderr"] = string(msgErr)
+	}
 
-		// Once a Session is created, you can execute a single newCommand on
-		// the remote side using the Run method.
+	if err != nil {
 		var errorCode int
-
-		var be bytes.Buffer
-		var b bytes.Buffer
-		session.Stdout = &b
-		session.Stderr = &be
-
-		opTimeout := timeout
-		if timeout != 0 {
-			if 150*time.Second > timeout {
-				opTimeout = 150 * time.Second
-			}
+		switch casted := err.(type) {
+		case *libssh.ExitError:
+			errorCode = casted.ExitStatus()
+			logrus.Debugf("Found an exit error of newExecuteCommand '%s': %d", scmd.String(), errorCode)
+		case *libssh.ExitMissingError:
+			logrus.Warnf("Found exit missing error of newExecuteCommand '%s'", scmd.String())
+			errorCode = -1
+		case net.Error:
+			logrus.Debugf("Found network error running newExecuteCommand '%s'", scmd.String())
+			errorCode = 255
+		default:
+			errorCode = -1
 		}
 
-		breaker := false
-		for {
-			if breaker {
-				break
-			}
-
-			beginIter := time.Now()
-			if err := sshtunnel.RunCommandInSSHSessionWithTimeout(session, scmd.String(), opTimeout); err != nil {
-				logrus.Debugf("Running with session timeout here after %s", time.Since(beginIter))
-				errorCode = -1
-
-				if ee, ok := err.(*libssh.ExitError); ok {
-					errorCode = ee.ExitStatus()
-					logrus.Debugf("Found an exit error of newCommand '%s': %d", scmd.String(), errorCode)
-				}
-
-				if _, ok := err.(*libssh.ExitMissingError); ok {
-					logrus.Warnf("Found exit missing error of newCommand '%s'", scmd.String())
-					errorCode = -1
-				}
-
-				if _, ok := err.(net.Error); ok {
-					logrus.Debugf("Found network error running newCommand '%s'", scmd.String())
-					errorCode = 255
-				}
-
-				results <- result{
-					errorcode: errorCode,
-					stdout:    "",
-					stderr:    "",
-					reserr:    err,
-				}
-				return
-			}
-
-			breaker = true
-		}
-
-		results <- result{
-			errorcode: errorCode,
-			stdout:    b.String(),
-			stderr:    be.String(),
-			reserr:    nil,
-		}
-	}()
-
-	if timeout != 0 {
-		select {
-		case res := <-results:
-			if outs == outputs.DISPLAY {
-				fmt.Print(res.stdout)
-			}
-			return res.errorcode, res.stdout, res.stderr, nil
-		case <-enough:
-			return 255, "", "", fail.NewError("received timeout of %s", timeout)
-		}
+		result["retcode"] = errorCode
+		xerr = fail.Wrap(err)
+	} else {
+		result["retcode"] = 0
+		xerr = nil
 	}
 
-	res := <-results
-
-	if outs == outputs.DISPLAY {
-		fmt.Print(res.stdout)
-	}
-
-	return res.errorcode, res.stdout, res.stderr, nil
+	return result, xerr
 }

@@ -326,7 +326,7 @@ func createConsecutiveTunnels(sci *internal.ConfigProperties, tunnels *Tunnels) 
 	return nil, nil
 }
 
-// CreatePersistentTunnel is used to create SSH tunnel that will not be closed on .Close() (unlike createNonPersistentTunnel)
+// CreatePersistentTunnel is used to create SSH tunnel that will not be closed on .Close() (unlike createTransientTunnel)
 // Used to create persistent tunnel locally with 'safescale tunnel create'
 func (cc *Connector) CreatePersistentTunnel() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -379,8 +379,8 @@ func (cc Connector) createTunnel() (_ *internal.ConfigProperties, _ Tunnels, fer
 	return newConf, tunnels, nil
 }
 
-// createNonPersistentTunnel creates a tunnel that will end with Connector instance (ie non persistent)
-func (cc *Connector) createNonPersistentTunnel() (ferr fail.Error) {
+// createTransientTunnel creates a tunnel that will end with Connector instance (ie non persistent)
+func (cc *Connector) createTransientTunnel() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNull(cc) {
@@ -456,15 +456,15 @@ func (cc *Connector) buildSSHCommand(cmdString, username, shell string, withTty,
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
 func (cc *Connector) NewCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
-	return cc.newCommand(ctx, cmdString, false, false)
+	return cc.newExecuteCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
 func (cc *Connector) NewSudoCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
-	return cc.newCommand(ctx, cmdString, false, true)
+	return cc.newExecuteCommand(ctx, cmdString, false, true)
 }
 
-func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (_ *Command, ferr fail.Error) {
+func (cc *Connector) newExecuteCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (_ *Command, ferr fail.Error) {
 	if valid.IsNull(cc) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -485,7 +485,7 @@ func (cc *Connector) newCommand(ctx context.Context, cmdString string, withTty, 
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = cc.createNonPersistentTunnel()
+	xerr = cc.createTransientTunnel()
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "unable to create SSH tunnel")
 	}
@@ -531,7 +531,7 @@ func (cc *Connector) createTargetKeyfile() fail.Error {
 	return nil
 }
 
-// newCopyCommand does the same thing as newCommand for SCP actions
+// newCopyCommand does the same thing as newExecuteCommand for SCP actions
 func (cc *Connector) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*Command, fail.Error) {
 	if valid.IsNull(cc) {
 		return nil, fail.InvalidInstanceError()
@@ -624,7 +624,7 @@ func (cc *Connector) WaitServerReady(ctx context.Context, phase string, timeout 
 		temporal.FormatDuration(timeout),
 	)
 
-	xerr = cc.createNonPersistentTunnel()
+	xerr = cc.createTransientTunnel()
 	if xerr != nil {
 		return "", fail.Wrap(xerr, "unable to create private key file")
 	}
@@ -668,7 +668,7 @@ func (cc *Connector) WaitServerReady(ctx context.Context, phase string, timeout 
 				return innerXErr
 			}
 
-			innerXErr = cc.createNonPersistentTunnel()
+			innerXErr = cc.createTransientTunnel()
 			if xerr != nil {
 				return fail.Wrap(xerr, "unable to create tunnels")
 			}
@@ -749,7 +749,7 @@ func (cc *Connector) CopyWithTimeout(ctx context.Context, remotePath, localPath 
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	xerr = cc.createNonPersistentTunnel()
+	xerr = cc.createTransientTunnel()
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "unable to create tunnels")
 	}
@@ -788,7 +788,7 @@ func (cc *Connector) Enter(username, shell string) (ferr fail.Error) {
 		return fail.Wrap(xerr, "unable to create private key file")
 	}
 
-	xerr = cc.createNonPersistentTunnel()
+	xerr = cc.createTransientTunnel()
 	if xerr != nil {
 		return fail.Wrap(xerr, "unable to create tunnels")
 	}
@@ -899,5 +899,5 @@ func (cc *Connector) deleteKeyfile() fail.Error {
 }
 
 func (cc Connector) Config() api.Config {
-	return internal.ConvertInternalToApiConfig(*cc.TargetConfig)
+	return internal.ConvertInternalToAPIConfig(*cc.TargetConfig)
 }
