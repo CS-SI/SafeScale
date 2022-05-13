@@ -295,7 +295,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			// FIXME, this function lacks context
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
 			}
 		}

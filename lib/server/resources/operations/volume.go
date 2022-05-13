@@ -380,7 +380,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		return fail.DuplicateError("found an existing Volume named '%s' (but not managed by SafeScale)", req.Name)
 	}
 
-	av, xerr := svc.CreateVolume(req)
+	av, xerr := svc.CreateVolume(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

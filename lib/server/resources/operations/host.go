@@ -706,7 +706,7 @@ func (instance *Host) implCreate(
 		}
 
 		// Check if Host exists but is not managed by SafeScale
-		_, xerr = svc.InspectHost(abstract.NewHostCore().SetName(hostReq.ResourceName))
+		_, xerr = svc.InspectHost(ctx, abstract.NewHostCore().SetName(hostReq.ResourceName))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -731,7 +731,7 @@ func (instance *Host) implCreate(
 					newHostDef.Template = hostReq.TemplateID
 				}
 			}
-			tmpl, xerr := svc.FindTemplateBySizing(newHostDef)
+			tmpl, xerr := svc.FindTemplateBySizing(ctx, newHostDef)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				rCh <- result{nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")}
@@ -752,7 +752,7 @@ func (instance *Host) implCreate(
 				imageQuery = consts.DEFAULTOS
 			}
 
-			hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
+			hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(ctx, svc, imageQuery)
 			if xerr != nil {
 				rCh <- result{nil, xerr}
 				return xerr
@@ -830,7 +830,7 @@ func (instance *Host) implCreate(
 					hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
 				}
 
-				opts, xerr := svc.GetConfigurationOptions()
+				opts, xerr := svc.GetConfigurationOptions(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					rCh <- result{nil, xerr}
@@ -866,7 +866,7 @@ func (instance *Host) implCreate(
 		defaultSubnetID := defaultSubnet.GetID()
 
 		// instruct Cloud Provider to create host
-		ahf, userdataContent, xerr := svc.CreateHost(hostReq)
+		ahf, userdataContent, xerr := svc.CreateHost(ctx, hostReq)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
@@ -879,7 +879,7 @@ func (instance *Host) implCreate(
 
 		defer func() {
 			if ferr != nil && !hostReq.KeepOnFailure {
-				if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
+				if derr := svc.DeleteHost(ctx, ahf.Core.ID); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
 				}
 			}
@@ -907,7 +907,7 @@ func (instance *Host) implCreate(
 
 		defer func() {
 			if ferr != nil && !hostReq.KeepOnFailure {
-				if derr := instance.MetadataCore.Delete(); derr != nil {
+				if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 					logrus.Errorf(
 						"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
 						derr,
@@ -917,33 +917,33 @@ func (instance *Host) implCreate(
 			}
 		}()
 
-	defer func() {
-		if ferr != nil {
-			logrus.Warningf("Trying to mark instance as FAILED")
-			if !valid.IsNil(ahf) {
-				if !valid.IsNil(ahf.Core) {
-					logrus.Warningf("Marking instance as FAILED")
-					derr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-						ahc, ok := clonable.(*abstract.HostCore)
-						if !ok {
-							return fail.InconsistentError(
-								"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
-							)
-						}
+		defer func() {
+			if ferr != nil {
+				logrus.Warningf("Trying to mark instance as FAILED")
+				if !valid.IsNil(ahf) {
+					if !valid.IsNil(ahf.Core) {
+						logrus.Warningf("Marking instance as FAILED")
+						derr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+							ahc, ok := clonable.(*abstract.HostCore)
+							if !ok {
+								return fail.InconsistentError(
+									"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+								)
+							}
 
-						ahc.LastState = hoststate.Failed
-						ahc.ProvisioningState = hoststate.Failed
-						return nil
-					})
-					if derr != nil {
-						_ = ferr.AddConsequence(derr)
-					} else {
-						logrus.Warningf("Instance now should be in FAILED state")
+							ahc.LastState = hoststate.Failed
+							ahc.ProvisioningState = hoststate.Failed
+							return nil
+						})
+						if derr != nil {
+							_ = ferr.AddConsequence(derr)
+						} else {
+							logrus.Warningf("Instance now should be in FAILED state")
+						}
 					}
 				}
 			}
-		}
-	}()
+		}()
 
 		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
@@ -1116,7 +1116,7 @@ func (instance *Host) implCreate(
 			return xerr
 		}
 
-		xerr = instance.unbindDefaultSecurityGroupIfNeeded(networkInstance.GetID())
+		xerr = instance.unbindDefaultSecurityGroupIfNeeded(ctx, networkInstance.GetID())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			rCh <- result{nil, xerr}
@@ -1900,7 +1900,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
-	xerr := svc.ClearHostStartupScript(instance.GetID())
+	xerr := svc.ClearHostStartupScript(ctx, instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2933,7 +2933,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			return svc.WaitHostState(hostID, hoststate.Started, timings.HostOperationTimeout())
+			return svc.WaitHostState(ctx, hostID, hoststate.Started, timings.HostOperationTimeout())
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
@@ -2998,7 +2998,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			return svc.WaitHostState(hostID, hoststate.Stopped, timings.HostOperationTimeout())
+			return svc.WaitHostState(ctx, hostID, hoststate.Stopped, timings.HostOperationTimeout())
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
