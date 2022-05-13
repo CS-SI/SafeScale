@@ -138,8 +138,8 @@ func (instance *SecurityGroup) IsNull() bool {
 	return valid.IsNil(instance.MetadataCore)
 }
 
-func (instance *SecurityGroup) Exists() (bool, fail.Error) {
-	// FIXME: Not so easy
+func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
+	// FIXME: Not so easy, securitygroups are in some cases a metadata-only construct -> we need to turn those into tags (provider ones) 1st
 	return true, nil
 }
 
@@ -156,7 +156,7 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -247,7 +247,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	asg := abstract.NewSecurityGroup()
 	asg.Name = name
 	asg.Network = networkID
-	_, xerr = svc.InspectSecurityGroup(asg)
+	_, xerr = svc.InspectSecurityGroup(ctx, asg)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -263,7 +263,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		return fail.DuplicateError("a Security Group named '%s' already exists (not managed by SafeScale)", name)
 	}
 
-	asg, xerr = svc.CreateSecurityGroup(networkID, name, description, rules)
+	asg, xerr = svc.CreateSecurityGroup(ctx, networkID, name, description, rules)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
@@ -278,7 +278,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
+			if derr := svc.DeleteSecurityGroup(ctx, asg); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
 			}
 		}
@@ -368,7 +368,7 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 }
 
 // deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
-func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
+func deleteProviderSecurityGroup(ctx context.Context, svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
@@ -377,7 +377,7 @@ func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.Security
 	// FIXME: communication failure handled at service level, not necessary anymore to retry here
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			if innerXErr := svc.DeleteSecurityGroup(abstractSG); innerXErr != nil {
+			if innerXErr := svc.DeleteSecurityGroup(ctx, abstractSG); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					return retry.StopRetryError(innerXErr)
@@ -691,7 +691,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 		}
 		svc := instance.Service()
 		for _, v := range rules {
-			_, inErr := svc.AddRuleToSecurityGroup(asg, v)
+			_, inErr := svc.AddRuleToSecurityGroup(ctx, asg, v)
 			if inErr != nil {
 				return inErr
 			}
@@ -726,7 +726,7 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.Service().DeleteRuleFromSecurityGroup(asg, rule)
+		_, innerXErr := instance.Service().DeleteRuleFromSecurityGroup(ctx, asg, rule)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
@@ -871,7 +871,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 
 			// Unbind security group on provider side; if not found, considered as a success
 			hostID := hostInstance.GetID()
-			if innerXErr := instance.Service().UnbindSecurityGroupFromHost(instance.GetID(), hostID); innerXErr != nil {
+			if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					debug.IgnoreError(innerXErr)
@@ -922,7 +922,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 			}
 			if hostID != "" {
 				// Unbind security group on provider side; if not found, considered as a success
-				if innerXErr := instance.Service().UnbindSecurityGroupFromHost(instance.GetID(), hostID); innerXErr != nil {
+				if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						debug.IgnoreError(innerXErr)
@@ -1190,7 +1190,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
+			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), params.subnetID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1241,7 +1241,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 				subnetName = subnetRef
 			}
 			if subnetID != "" {
-				if innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(instance.GetID(), subnetID); innerXErr != nil {
+				if innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), subnetID); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// consider a Security Group not found as a successful unbind, and continue to update metadata

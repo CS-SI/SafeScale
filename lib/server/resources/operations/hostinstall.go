@@ -423,7 +423,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	}
 
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.Service().GetConfigurationOptions()
+		config, xerr := instance.Service().GetConfigurationOptions(ctx)
 		if xerr != nil {
 			return xerr
 		}

@@ -87,7 +87,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 
-	_, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	_, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -101,7 +101,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	cfg, xerr := svc.GetConfigurationOptions()
+	cfg, xerr := svc.GetConfigurationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

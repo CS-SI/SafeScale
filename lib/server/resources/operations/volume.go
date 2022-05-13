@@ -132,9 +132,9 @@ func (instance *volume) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-func (instance *volume) Exists() (bool, fail.Error) {
+func (instance *volume) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
-	_, err := instance.Service().InspectVolume(theID)
+	_, err := instance.Service().InspectVolume(ctx, theID)
 	if err != nil {
 		switch err.(type) {
 		case *fail.ErrNotFound:
@@ -162,7 +162,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -302,7 +302,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// delete volume
-	xerr = instance.Service().DeleteVolume(instance.GetID())
+	xerr = instance.Service().DeleteVolume(ctx, instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -322,7 +322,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// remove metadata
-	return instance.MetadataCore.Delete()
+	return instance.MetadataCore.Delete(ctx)
 }
 
 // Create a volume
@@ -367,7 +367,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	_, xerr = svc.InspectVolume(req.Name)
+	_, xerr = svc.InspectVolume(ctx, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -390,7 +390,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteVolume(av.ID); derr != nil {
+			if derr := svc.DeleteVolume(ctx, av.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
@@ -557,7 +557,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	// -- creates volume attachment --
-	vaID, xerr = svc.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
+	vaID, xerr = svc.CreateVolumeAttachment(ctx, abstract.VolumeAttachmentRequest{
 		Name:     fmt.Sprintf("%s-%s", volumeName, targetName),
 		HostID:   targetID,
 		VolumeID: volumeID,
@@ -571,7 +571,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteVolumeAttachment(targetID, vaID); derr != nil {
+			if derr := svc.DeleteVolumeAttachment(ctx, targetID, vaID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 		}
@@ -974,7 +974,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		}
 
 		// ... then detach volume ...
-		if innerXErr = svc.DeleteVolumeAttachment(targetID, attachment.AttachID); innerXErr != nil {
+		if innerXErr = svc.DeleteVolumeAttachment(ctx, targetID, attachment.AttachID); innerXErr != nil {
 			return innerXErr
 		}
 

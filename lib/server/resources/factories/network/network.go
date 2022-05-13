@@ -43,7 +43,7 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 
 	var list []*abstract.Network
 
-	withDefaultNetwork, err := svc.HasDefaultNetwork()
+	withDefaultNetwork, err := svc.HasDefaultNetwork(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 	// Default network has no metadata, so we need to "simulate" them.
 	if withDefaultNetwork {
 		var an *abstract.Network
-		an, xerr = svc.GetDefaultNetwork()
+		an, xerr = svc.GetDefaultNetwork(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}

@@ -148,14 +148,14 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 
 		// delete SecurityGroup resource
-		return deleteProviderSecurityGroup(instance.Service(), abstractSG)
+		return deleteProviderSecurityGroup(ctx, instance.Service(), abstractSG)
 	})
 	if xerr != nil {
 		return xerr
 	}
 
 	// delete Security Group metadata
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -199,7 +199,7 @@ func (instance *SecurityGroup) unsafeClear(ctx context.Context) fail.Error {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.Service().ClearSecurityGroup(asg)
+		_, innerXErr := instance.Service().ClearSecurityGroup(ctx, asg)
 		return innerXErr
 	})
 }
@@ -219,7 +219,7 @@ func (instance *SecurityGroup) unsafeAddRule(ctx context.Context, rule *abstract
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.Service().AddRuleToSecurityGroup(asg, rule)
+		_, innerXErr := instance.Service().AddRuleToSecurityGroup(ctx, asg, rule)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -264,7 +264,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
+			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), params.subnetID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -395,7 +395,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := instance.Service().BindSecurityGroupToHost(instance.GetID(), hostID)
+				xerr := instance.Service().BindSecurityGroupToHost(ctx, instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -408,7 +408,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				xerr := instance.Service().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
+				xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {

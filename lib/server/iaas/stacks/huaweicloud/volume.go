@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"context"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -80,17 +81,17 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 }
 
 // CreateVolume creates a block volume
-func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	volume, xerr := s.InspectVolume(request.Name)
+	volume, xerr := s.InspectVolume(ctx, request.Name)
 	if xerr == nil && volume != nil {
 		return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
 	}
 
-	az, xerr := s.SelectedAvailabilityZone()
+	az, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -123,7 +124,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
+func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -159,7 +160,7 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes lists volumes
-func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
+func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}

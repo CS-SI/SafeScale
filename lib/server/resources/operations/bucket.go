@@ -125,7 +125,7 @@ func (instance *bucket) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-func (instance *bucket) Exists() (bool, fail.Error) {
+func (instance *bucket) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
 	_, err := instance.Service().InspectBucket(theID)
 	if err != nil {
@@ -155,7 +155,7 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -373,7 +373,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// -- delete metadata
-	return instance.MetadataCore.Delete()
+	return instance.MetadataCore.Delete(ctx)
 }
 
 // Mount a bucket on a host on the given mount point
@@ -439,7 +439,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 		return xerr
 	}
 
-	authOpts, xerr := svc.GetAuthenticationOptions()
+	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -450,7 +450,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- assemble parameters for mount description
-	osConfig, xerr := svc.ObjectStorageConfiguration()
+	osConfig, xerr := svc.ObjectStorageConfiguration(ctx)
 	if xerr != nil {
 		return xerr
 	}

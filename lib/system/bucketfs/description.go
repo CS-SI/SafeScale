@@ -60,7 +60,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 		return xerr
 	}
 
-	svcConf, xerr := svc.GetConfigurationOptions()
+	svcConf, xerr := svc.GetConfigurationOptions(ctx)
 	if xerr != nil {
 		return xerr
 	}

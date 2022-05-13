@@ -121,7 +121,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["ClusterAdminUsername"] = "cladm"
 	v["ClusterAdminPassword"] = identity.AdminPassword
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.Service().GetConfigurationOptions()
+		config, xerr := instance.Service().GetConfigurationOptions(ctx)
 		if xerr != nil {
 			return xerr
 		}
@@ -693,7 +693,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	// FIXME: reuse ComplementFeatureParameters?
 	var dnsServers []string
-	cfg, xerr := instance.Service().GetConfigurationOptions()
+	cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

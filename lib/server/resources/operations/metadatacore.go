@@ -182,7 +182,7 @@ func (myself *MetadataCore) Inspect(ctx context.Context, callback resources.Call
 	// Reload reloads data from Object Storage to be sure to have the last revision
 	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
 		myself.Lock()
-		xerr = myself.unsafeReload()
+		xerr = myself.unsafeReload(ctx)
 		myself.Unlock() // nolint
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -285,7 +285,7 @@ func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callba
 	}
 	// Reload reloads data from object storage to be sure to have the last revision
 	if doReload {
-		xerr = myself.unsafeReload()
+		xerr = myself.unsafeReload(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to unsafeReload metadata")
@@ -307,7 +307,7 @@ func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callba
 
 	myself.committed = false
 
-	xerr = myself.write()
+	xerr = myself.write(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -323,7 +323,7 @@ func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callba
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the MetadataCore instance already carries a data
-func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
+func (myself *MetadataCore) Carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -364,7 +364,7 @@ func (myself *MetadataCore) Carry(clonable data.Clonable) (ferr fail.Error) {
 
 	myself.committed = false
 
-	xerr = myself.write()
+	xerr = myself.write(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -421,7 +421,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 	myself.Lock()
 	defer myself.Unlock()
 
-	bu, xerr := myself.folder.getBucket()
+	bu, xerr := myself.folder.getBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -433,7 +433,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 		}
 
 		if isName {
-			xerr := myself.readByName(ref)
+			xerr := myself.readByName(ctx, ref)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -454,7 +454,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 	}
 
 	if isName {
-		xerr := myself.readByName(ref)
+		xerr := myself.readByName(ctx, ref)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -467,7 +467,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 	}
 
 	if isID {
-		xerr := myself.readByID(ref)
+		xerr := myself.readByID(ctx, ref)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -510,7 +510,7 @@ func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.
 	if myself.kindSplittedStore {
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := myself.readByID(id); innerXErr != nil {
+				if innerXErr := myself.readByID(ctx, id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
 						return retry.StopRetryError(innerXErr)
@@ -528,7 +528,7 @@ func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.
 	} else {
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := myself.readByName(id); innerXErr != nil {
+				if innerXErr := myself.readByName(ctx, id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
 						return retry.StopRetryError(innerXErr)
@@ -563,7 +563,7 @@ func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (myself *MetadataCore) readByID(id string) fail.Error {
+func (myself *MetadataCore) readByID(ctx context.Context, id string) fail.Error {
 	var path string
 	if myself.kindSplittedStore {
 		path = byIDFolderName
@@ -575,7 +575,7 @@ func (myself *MetadataCore) readByID(id string) fail.Error {
 	}
 
 	rerr := retry.WhileUnsuccessful(func() error {
-		werr := myself.folder.Read(path, id, func(buf []byte) fail.Error {
+		werr := myself.folder.Read(ctx, path, id, func(buf []byte) fail.Error {
 			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -612,7 +612,7 @@ func (myself *MetadataCore) readByID(id string) fail.Error {
 }
 
 // readByName reads a metadata identified by name
-func (myself *MetadataCore) readByName(name string) fail.Error {
+func (myself *MetadataCore) readByName(ctx context.Context, name string) fail.Error {
 	var path string
 	if myself.kindSplittedStore {
 		path = byNameFolderName
@@ -624,7 +624,7 @@ func (myself *MetadataCore) readByName(name string) fail.Error {
 	}
 
 	rerr := retry.WhileUnsuccessful(func() error {
-		werr := myself.folder.Read(path, name, func(buf []byte) fail.Error {
+		werr := myself.folder.Read(ctx, path, name, func(buf []byte) fail.Error {
 			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
 			}
@@ -651,7 +651,7 @@ func (myself *MetadataCore) readByName(name string) fail.Error {
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (myself *MetadataCore) write() fail.Error {
+func (myself *MetadataCore) write(ctx context.Context) fail.Error {
 	if !myself.committed {
 		jsoned, xerr := myself.unsafeSerialize()
 		xerr = debug.InjectPlannedFail(xerr)
@@ -665,7 +665,7 @@ func (myself *MetadataCore) write() fail.Error {
 		}
 
 		if myself.kindSplittedStore {
-			xerr = myself.folder.Write(byNameFolderName, name, jsoned)
+			xerr = myself.folder.Write(ctx, byNameFolderName, name, jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -676,13 +676,13 @@ func (myself *MetadataCore) write() fail.Error {
 				return fail.InconsistentError("field 'id' is not set with string")
 			}
 
-			xerr = myself.folder.Write(byIDFolderName, id, jsoned)
+			xerr = myself.folder.Write(ctx, byIDFolderName, id, jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		} else {
-			xerr = myself.folder.Write("", name, jsoned)
+			xerr = myself.folder.Write(ctx, "", name, jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -704,12 +704,12 @@ func (myself *MetadataCore) Reload(ctx context.Context) (ferr fail.Error) {
 	myself.Lock()
 	defer myself.Unlock()
 
-	return myself.unsafeReload()
+	return myself.unsafeReload(ctx)
 }
 
 // unsafeReload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
+func (myself *MetadataCore) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	timings, xerr := myself.Service().Timings()
@@ -729,7 +729,7 @@ func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
 
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := myself.readByID(id); innerXErr != nil {
+				if innerXErr := myself.readByID(ctx, id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
 						return retry.StopRetryError(innerXErr)
@@ -766,7 +766,7 @@ func (myself *MetadataCore) unsafeReload() (ferr fail.Error) {
 
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				if innerXErr := myself.readByName(name); innerXErr != nil {
+				if innerXErr := myself.readByName(ctx, name); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
 						return retry.StopRetryError(innerXErr)
@@ -815,17 +815,17 @@ func (myself *MetadataCore) BrowseFolder(ctx context.Context, callback func(buf 
 	defer myself.RUnlock()
 
 	if myself.kindSplittedStore {
-		return myself.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
+		return myself.folder.Browse(ctx, byIDFolderName, func(buf []byte) fail.Error {
 			return callback(buf)
 		})
 	}
-	return myself.folder.Browse("", func(buf []byte) fail.Error {
+	return myself.folder.Browse(ctx, "", func(buf []byte) fail.Error {
 		return callback(buf)
 	})
 }
 
 // Delete deletes the metadata
-func (myself *MetadataCore) Delete() (ferr fail.Error) {
+func (myself *MetadataCore) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(myself) {
@@ -848,7 +848,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 		}
 
 		var xerr fail.Error
-		xerr = myself.folder.Lookup(byIDFolderName, id)
+		xerr = myself.folder.Lookup(ctx, byIDFolderName, id)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -870,7 +870,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 			return fail.InconsistentError("field 'name' cannot be empty")
 		}
 
-		xerr = myself.folder.Lookup(byNameFolderName, name)
+		xerr = myself.folder.Lookup(ctx, byNameFolderName, name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -886,14 +886,14 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 
 		// Deletes entries found
 		if idFound {
-			xerr = myself.folder.Delete(byIDFolderName, id)
+			xerr = myself.folder.Delete(ctx, byIDFolderName, id)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
 			}
 		}
 		if nameFound {
-			xerr = myself.folder.Delete(byNameFolderName, name)
+			xerr = myself.folder.Delete(ctx, byNameFolderName, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
@@ -906,7 +906,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 		}
 
 		var xerr fail.Error
-		xerr = myself.folder.Lookup("", name)
+		xerr = myself.folder.Lookup(ctx, "", name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -920,7 +920,7 @@ func (myself *MetadataCore) Delete() (ferr fail.Error) {
 			nameFound = true
 		}
 		if nameFound {
-			xerr = myself.folder.Delete("", name)
+			xerr = myself.folder.Delete(ctx, "", name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)

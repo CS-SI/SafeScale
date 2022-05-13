@@ -62,7 +62,7 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	return handler.job.Service().ListImages(all)
+	return handler.job.Service().ListImages(handler.job.Context(), all)
 }
 
 // Select selects the image that best fits osname
