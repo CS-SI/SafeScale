@@ -17,6 +17,7 @@
 package stacks
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -31,7 +32,7 @@ import (
 type HostParameter interface{}
 
 // ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
-func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
+func ValidateHostParameter(ctx context.Context, hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
 	ahf = abstract.NewHostFull()
 	switch hostParam := hostParam.(type) {
 	case string:

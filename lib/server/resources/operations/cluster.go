@@ -114,7 +114,7 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 	return instance, nil
 }
 
-func (instance *Cluster) Exists() (bool, fail.Error) {
+func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Requires iteration of quite a few members...
 	return true, nil
 }
@@ -258,7 +258,7 @@ func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (fer
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1123,7 +1123,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	nodeDef := complementHostDefinition(def, *nodeDefaultDefinition)
 
 	svc := instance.Service()
-	_, nodeDef.Image, xerr = determineImageID(svc, hostImage)
+	_, nodeDef.Image, xerr = determineImageID(ctx, svc, hostImage)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2513,7 +2513,7 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// --- Delete metadata ---
-	return instance.MetadataCore.Delete()
+	return instance.MetadataCore.Delete(ctx)
 }
 
 // extractNetworkingInfo returns the ID of the network from properties, taking care of ascending compatibility

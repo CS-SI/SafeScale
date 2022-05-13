@@ -124,9 +124,9 @@ func (instance *Network) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-func (instance *Network) Exists() (bool, fail.Error) {
+func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
-	_, err := instance.Service().InspectNetwork(theID)
+	_, err := instance.Service().InspectNetwork(ctx, theID)
 	if err != nil {
 		switch err.(type) {
 		case *fail.ErrNotFound:
@@ -202,7 +202,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	_, xerr = svc.InspectNetworkByName(req.Name)
+	_, xerr = svc.InspectNetworkByName(ctx, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -237,7 +237,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Create the Network
 	logrus.Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
-	abstractNetwork, xerr := svc.CreateNetwork(req)
+	abstractNetwork, xerr := svc.CreateNetwork(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure creating provider network")
@@ -245,7 +245,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			derr := svc.DeleteNetwork(abstractNetwork.ID)
+			derr := svc.DeleteNetwork(ctx, abstractNetwork.ID)
 			derr = debug.InjectPlannedFail(derr)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
@@ -273,7 +273,7 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -331,12 +331,12 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	}
 
 	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	abstractNetwork, xerr := svc.InspectNetworkByName(ref)
+	abstractNetwork, xerr := svc.InspectNetworkByName(ctx, ref)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			abstractNetwork, xerr = svc.InspectNetwork(ref)
+			abstractNetwork, xerr = svc.InspectNetwork(ctx, ref)
 			if xerr != nil {
 				return xerr
 			}
@@ -555,7 +555,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 			}
 
 			maybeDeleted := false
-			innerXErr = svc.DeleteNetwork(abstractNetwork.ID)
+			innerXErr = svc.DeleteNetwork(ctx, abstractNetwork.ID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -566,7 +566,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 					logrus.Error("cannot delete Network due to a timeout")
 					errWaitMore := retry.WhileUnsuccessful(
 						func() error {
-							recNet, recErr := svc.InspectNetwork(abstractNetwork.ID)
+							recNet, recErr := svc.InspectNetwork(ctx, abstractNetwork.ID)
 							if _, ok := recErr.(*fail.ErrNotFound); ok {
 								return nil
 							}
@@ -594,7 +594,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 			}
 			iterations := 6
 			for {
-				if _, ierr := svc.InspectNetwork(abstractNetwork.ID); ierr != nil {
+				if _, ierr := svc.InspectNetwork(ctx, abstractNetwork.ID); ierr != nil {
 					if _, ok := ierr.(*fail.ErrNotFound); ok {
 						break
 					}
@@ -615,7 +615,7 @@ func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Remove metadata
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure deleting metadata")
 	}

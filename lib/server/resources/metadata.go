@@ -48,7 +48,7 @@ type Metadata interface {
 }
 
 type Consistent interface {
-	Exists() (bool, fail.Error)
+	Exists(context.Context) (bool, fail.Error)
 }
 
 /*

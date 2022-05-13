@@ -162,7 +162,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 
 		if as != nil && as.VIP != nil {
-			xerr = svc.BindHostToVIP(as.VIP, rgw.GetID())
+			xerr = svc.BindHostToVIP(ctx, as.VIP, rgw.GetID())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

@@ -45,14 +45,14 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 			return nil, xerr
 		}
 
-		bucket, ierr := service.GetMetadataBucket()
+		bucket, ierr := service.GetMetadataBucket(ctx)
 		if ierr != nil {
 			return nil, ierr
 		}
 
 		tenant = &operations.Tenant{Name: tenantID, BucketName: bucket.GetName(), Service: service}
 	} else {
-		tenant = operations.CurrentTenant()
+		tenant = operations.CurrentTenant(ctx)
 		if tenant == nil {
 			return nil, fail.NotFoundError("no tenant set")
 		}

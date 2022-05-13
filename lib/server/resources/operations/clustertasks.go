@@ -90,7 +90,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure && !cleanFailure {
 			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				logrus.Errorf(
 					"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 				)
@@ -458,7 +458,7 @@ func (instance *Cluster) determineSizingRequirements(ctx context.Context, req ab
 	// Determine default image
 	imageQuery = req.NodesDef.Image
 	if imageQuery == "" {
-		cfg, xerr := instance.Service().GetConfigurationOptions()
+		cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
 		if xerr != nil {
 			return nil, nil, nil, fail.Wrap(xerr, "failed to get configuration options")
 		}
@@ -479,7 +479,7 @@ func (instance *Cluster) determineSizingRequirements(ctx context.Context, req ab
 		imageQuery = consts.DEFAULTOS
 	}
 	svc := instance.Service()
-	_, imageID, xerr = determineImageID(svc, imageQuery)
+	_, imageID, xerr = determineImageID(ctx, svc, imageQuery)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -514,7 +514,7 @@ func (instance *Cluster) determineSizingRequirements(ctx context.Context, req ab
 		}
 	}
 
-	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
+	tmpl, xerr := svc.FindTemplateBySizing(ctx, *gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -546,7 +546,7 @@ func (instance *Cluster) determineSizingRequirements(ctx context.Context, req ab
 		}
 	}
 
-	tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
+	tmpl, xerr = svc.FindTemplateBySizing(ctx, *mastersDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -577,7 +577,7 @@ func (instance *Cluster) determineSizingRequirements(ctx context.Context, req ab
 		}
 	}
 
-	tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
+	tmpl, xerr = svc.FindTemplateBySizing(ctx, *nodesDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -624,7 +624,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 
 	// Determine if getGateway Failover must be set
 	svc := instance.Service()
-	caps, xerr := svc.GetCapabilities()
+	caps, xerr := svc.GetCapabilities(ctx)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1407,7 +1407,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, xerr
 	}
 
-	xerr = svc.StartHost(id)
+	xerr = svc.StartHost(task.Context(), id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1461,7 +1461,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 	}
 
 	svc := instance.Service()
-	xerr = svc.StopHost(id, false)
+	xerr = svc.StopHost(task.Context(), id, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
