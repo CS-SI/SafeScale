@@ -32,10 +32,5 @@ import (
 type Command interface {
 	fmt.Stringer
 
-	// Kill() fail.Error
-	// CombinedOutput() ([]byte, fail.Error)
-	Output() ([]byte, fail.Error)
 	RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error)
-	// Start() fail.Error
-	// wait() error
 }

@@ -53,30 +53,6 @@ type Command struct {
 	cmd          *exec.Cmd
 }
 
-// Output runs the command and returns its standard output.
-// Any returned error will usually be of type *ExitError.
-// If c.Stderr was nil, Output populates ExitError.Stderr.
-func (scmd *Command) Output() (_ []byte, ferr fail.Error) {
-	if scmd.cmd.Stdout != nil {
-		return []byte(""), nil
-	}
-
-	// defer func() {
-	// 	nerr := scmd.cleanup()
-	// 	if nerr != nil {
-	// 		logrus.Warnf("Error waiting for newExecuteCommand cleanup: %v", nerr)
-	// 		ferr = nerr
-	// 	}
-	// }()
-
-	content, err := scmd.cmd.Output()
-	if err != nil {
-		return nil, fail.Wrap(err)
-	}
-
-	return content, nil
-}
-
 // String ...
 func (scmd *Command) String() string {
 	if valid.IsNull(scmd) {
@@ -84,16 +60,6 @@ func (scmd *Command) String() string {
 	}
 
 	return scmd.runCmdString
-}
-
-// PublicKeyFromStr ...
-func PublicKeyFromStr(keyStr string) libssh.AuthMethod {
-	key, err := libssh.ParsePrivateKey([]byte(keyStr))
-	if err != nil {
-		return nil
-	}
-
-	return libssh.PublicKeys(key)
 }
 
 // RunWithTimeout ...
@@ -287,28 +253,32 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 		return result, fail.Wrap(err)
 	}
 
-	err = params.session.Wait()
+	serr := params.session.Wait()
 
+	var consequences []error
 	if params.collectOutputs {
-		msgOut, err = ioutil.ReadAll(stdoutPipe)
-		if err != nil {
-			return result, fail.Wrap(err)
+		var derr error
+		msgOut, derr = ioutil.ReadAll(stdoutPipe)
+		if derr != nil {
+			consequences = append(consequences, derr)
 		}
 
-		msgErr, err = ioutil.ReadAll(stderrPipe)
-		if err != nil {
-			return result, fail.Wrap(err)
+		msgErr, derr = ioutil.ReadAll(stderrPipe)
+		if derr != nil {
+			consequences = append(consequences, derr)
 		}
 
-		result["stdout"] = string(msgOut)
-		result["stderr"] = string(msgErr)
+		if len(consequences) == 0 {
+			result["stdout"] = string(msgOut)
+			result["stderr"] = string(msgErr)
+		}
 	}
 
-	if err != nil {
+	if serr != nil {
 		var errorCode int
-		switch casted := err.(type) {
+		switch cerr := serr.(type) {
 		case *libssh.ExitError:
-			errorCode = casted.ExitStatus()
+			errorCode = cerr.ExitStatus()
 			logrus.Debugf("Found an exit error of newExecuteCommand '%s': %d", scmd.String(), errorCode)
 		case *libssh.ExitMissingError:
 			logrus.Warnf("Found exit missing error of newExecuteCommand '%s'", scmd.String())
@@ -321,9 +291,14 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 		}
 
 		result["retcode"] = errorCode
-		xerr = fail.Wrap(err)
+		xerr = fail.Wrap(serr)
+		if len(consequences) > 0 {
+			newErr := fail.NewErrorList(consequences)
+			_ = xerr.AddConsequence(newErr)
+		}
 	} else {
 		result["retcode"] = 0
+		// FIXME: what to do when len(consequences) > 0 in this case? log? return error? do nothing (like now)?
 		xerr = nil
 	}
 

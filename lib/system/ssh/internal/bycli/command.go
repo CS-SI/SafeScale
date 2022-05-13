@@ -56,7 +56,7 @@ type Command struct {
 }
 
 // wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
-// The command must have been started by Start.
+// The command must have been started by start.
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
@@ -71,24 +71,6 @@ func (scmd *Command) wait() error {
 	}
 
 	return scmd.cmd.Wait()
-}
-
-// Kill kills Command process.
-func (scmd *Command) Kill() fail.Error {
-	if valid.IsNull(scmd) {
-		return fail.InvalidInstanceError()
-	}
-	// if valid.IsNull(scmd.conn) {
-	// 	return fail.InvalidInstanceContentError("scmd.conn", "cannot be null value of 'ssh.Connector'")
-	// }
-	if scmd.cmd == nil {
-		return fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
-	}
-	if scmd.cmd.Process == nil {
-		return fail.InvalidInstanceContentError("scmd.cmd.Process", "cannot be nil")
-	}
-
-	return internal.KillProcess(scmd.cmd.Process)
 }
 
 // getStdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
@@ -148,44 +130,9 @@ func (scmd *Command) getStdinPipe() (io.WriteCloser, fail.Error) {
 	return pipe, nil
 }
 
-// Output returns the standard output of command started.
-// Any returned error will usually be of type *ExitError.
-// If c.Stderr was nil, Output populates ExitError.Stderr.
-func (scmd *Command) Output() ([]byte, fail.Error) {
-	if valid.IsNull(scmd) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if scmd.cmd == nil {
-		return nil, fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
-	}
-
-	content, err := scmd.cmd.Output()
-	if err != nil {
-		return nil, fail.NewError(err.Error())
-	}
-	return content, nil
-}
-
-// CombinedOutput returns the combined standard of command started
-// output and standard error.
-func (scmd *Command) CombinedOutput() ([]byte, fail.Error) {
-	if valid.IsNull(scmd) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if scmd.cmd == nil {
-		return nil, fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
-	}
-
-	content, err := scmd.cmd.CombinedOutput()
-	if err != nil {
-		return nil, fail.NewError(err.Error())
-	}
-	return content, nil
-}
-
-// Start starts the specified command but does not wait for it to complete.
+// start starts the specified command but does not wait for it to complete.
 // The wait method will wait for completion and return the exit code.
-func (scmd *Command) Start() fail.Error {
+func (scmd *Command) start() fail.Error {
 	if valid.IsNull(scmd) {
 		return fail.InvalidInstanceError()
 	}
@@ -353,7 +300,7 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 	}
 
 	// Launch the command and wait for its completion
-	xerr = scmd.Start()
+	xerr = scmd.start()
 	if xerr != nil {
 		return result, xerr
 	}
@@ -432,35 +379,6 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 
 	return result, nil
 }
-
-// VPL: moved to Connector.Close()
-// Close is called to clean Command (close tunnel(s), remove temporary files, ...)
-// func (scmd *cliCommand) Close() fail.Error {
-// 	if valid.IsNull(scmd) {
-// 		return fail.InvalidInstanceError()
-// 	}
-//
-// 	var err1 error
-// 	if len(scmd.conn.tunnels) > 0 {
-// 		err1 = scmd.conn.tunnels.Close()
-// 	}
-// 	if err1 != nil {
-// 		logrus.Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
-// 		defer func() { // lazy removal
-// 			ierr := utils.LazyRemove(scmd.keyFile.Name())
-// 			if ierr != nil {
-// 				debug.IgnoreError(ierr)
-// 			}
-// 		}()
-// 		return fail.Wrap(err1, "failed to close SSH tunnels")
-// 	}
-//
-// 	err2 := utils.LazyRemove(scmd.keyFile.Name())
-// 	if err2 != nil {
-// 		return fail.Wrap(err2, "failed to close SSH tunnels")
-// 	}
-// 	return nil
-// }
 
 // String implements interface fmt.Stringer
 func (scmd *Command) String() string {
