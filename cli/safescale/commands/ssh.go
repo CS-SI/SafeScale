@@ -209,7 +209,7 @@ var sshConnect = cli.Command{
 		if c.IsSet("shell") {
 			shell = c.String("shell")
 		}
-		err = ClientSession.SSH.Connect(c.Args().Get(0), username, shell, c.Bool("force-clu"), 0)
+		err = ClientSession.SSH.Connect(c.Args().Get(0), username, shell, c.Bool("force-cli"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))
