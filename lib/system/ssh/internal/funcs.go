@@ -25,6 +25,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -71,4 +73,28 @@ func KillProcess(proc *os.Process) fail.Error {
 	}
 
 	return nil
+}
+
+// DetermineResponsiveGateway ...
+func DetermineRespondingGateway(gateways []*ConfigProperties) (*ConfigProperties, fail.Error) {
+	if len(gateways) == 0 {
+		return nil, fail.InvalidParameterError("gateways", "need at least one entry in the slice")
+	}
+
+	nils := 0
+	for _, v := range gateways {
+		if valid.IsNil(v) {
+			nils++
+			continue
+		}
+		if netutils.CheckRemoteTCP(v.IPAddress, int(v.Port)) {
+			return v, nil
+		}
+	}
+
+	if nils == len(gateways) {
+		return nil, fail.InvalidParameterError("gateways", "cannot be a slice of nil")
+	}
+
+	return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
 }

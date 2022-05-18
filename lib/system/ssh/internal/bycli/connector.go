@@ -39,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -69,9 +68,17 @@ func NewConnector(conf api.Config) (*Connector, fail.Error) {
 		return nil, fail.InconsistentError("failed to cast 'conf' to '*internal.Config'")
 	}
 
+	props, xerr := casted.Properties()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast 'conf' to '*internal.Config'")
+	}
 	out := Connector{
 		Lock:         new(sync.RWMutex),
-		TargetConfig: casted.Properties(),
+		TargetConfig: props,
 	}
 	return &out, nil
 }
@@ -249,19 +256,9 @@ func createConsecutiveTunnels(sci *internal.ConfigProperties, tunnels *Tunnels) 
 	// }
 	if sci != nil {
 		// determine what gateway to use
-		var gwConf *internal.ConfigProperties
-		if !valid.IsNil(sci.GatewayConfig) {
-			gwConf = sci.GatewayConfig
-			if !netutils.CheckRemoteTCP(gwConf.IPAddress, int(gwConf.Port)) {
-				if !valid.IsNil(sci.SecondaryGatewayConfig) {
-					gwConf = sci.SecondaryGatewayConfig
-					if !netutils.CheckRemoteTCP(gwConf.IPAddress, int(gwConf.Port)) {
-						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
-					}
-				} else {
-					return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
-				}
-			}
+		gwConf, xerr := internal.DetermineRespondingGateway([]*internal.ConfigProperties{sci.GatewayConfig, sci.SecondaryGatewayConfig})
+		if xerr != nil {
+			return nil, xerr
 		}
 
 		tunnel, xerr := createConsecutiveTunnels(gwConf, tunnels)
@@ -279,7 +276,10 @@ func createConsecutiveTunnels(sci *internal.ConfigProperties, tunnels *Tunnels) 
 		}
 
 		if gwConf != nil {
-			cfg := sci.Clone()
+			cfg, xerr := sci.Clone()
+			if xerr != nil {
+				return nil, xerr
+			}
 			cfg.GatewayConfig = gwConf
 			if tunnel != nil {
 				gateway := *gwConf
@@ -364,7 +364,10 @@ func (cc Connector) createTunnel() (_ *internal.ConfigProperties, _ Tunnels, fer
 		return nil, nil, fail.Wrap(xerr, "failed to create SSH Tunnels")
 	}
 
-	newConf := cc.TargetConfig.Clone()
+	newConf, xerr := cc.TargetConfig.Clone()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 	if tunnel == nil {
 		return newConf, tunnels, nil
 	}
@@ -898,6 +901,6 @@ func (cc *Connector) deleteKeyfile() fail.Error {
 	return nil
 }
 
-func (cc Connector) Config() api.Config {
+func (cc Connector) Config() (api.Config, fail.Error) {
 	return internal.ConvertInternalToAPIConfig(*cc.TargetConfig)
 }

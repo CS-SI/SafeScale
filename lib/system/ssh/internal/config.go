@@ -38,21 +38,34 @@ type ConfigProperties struct {
 }
 
 // Clone makes a clone of instance
-func (sci *ConfigProperties) Clone() *ConfigProperties {
+func (sci *ConfigProperties) Clone() (*ConfigProperties, fail.Error) {
 	if sci == nil {
-		return &ConfigProperties{}
+		return sci, nil
 	}
 
-	out := *sci
+	out := sci
 	if sci.GatewayConfig != nil {
-		newConf := sci.GatewayConfig.Clone()
+		newConf, xerr := sci.GatewayConfig.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+
 		out.GatewayConfig = newConf
 	}
 	if sci.SecondaryGatewayConfig != nil {
-		newConf := sci.SecondaryGatewayConfig.Clone()
+		newConf, xerr := sci.SecondaryGatewayConfig.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+
 		out.SecondaryGatewayConfig = newConf
 	}
-	return &out
+	return out, nil
+}
+
+// HasGateways returns true if there is at least one gateway needed to reach the target describe by 'sci'
+func (sci ConfigProperties) HasGateways() bool {
+	return sci.GatewayConfig != nil || sci.SecondaryGatewayConfig != nil
 }
 
 // Config contains the properties of a SSH Config
@@ -79,9 +92,13 @@ func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, g
 	if ipAddress == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ipAddress")
 	}
+	if user == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("user")
+	}
 	if privateKey == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("privateKey")
 	}
+
 	if port == 0 {
 		port = DefaultPort
 	}
@@ -96,7 +113,12 @@ func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, g
 	if len(gws) > 0 {
 		gw := gws[api.PrimaryGateway]
 		if gw != nil {
-			xerr := out.SetGatewayConfig(api.PrimaryGateway, gw)
+			newConf, xerr := gw.Clone()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			xerr = out.SetGatewayConfig(api.PrimaryGateway, newConf)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -106,7 +128,12 @@ func NewConfig(hostname, ipAddress string, port uint, user, privateKey string, g
 	if len(gws) > 1 {
 		gw := gws[api.SecondaryGateway]
 		if gw != nil {
-			xerr := out.SetGatewayConfig(api.SecondaryGateway, gw)
+			newConf, xerr := gw.Clone()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			xerr = out.SetGatewayConfig(api.SecondaryGateway, newConf)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -284,35 +311,41 @@ func (conf Config) IPAddress() string {
 }
 
 // GatewayConfig ...
-func (conf Config) GatewayConfig(idx api.WhatGateway) api.Config {
+func (conf Config) GatewayConfig(idx api.WhatGateway) (api.Config, fail.Error) {
 	if idx > 1 {
-		return nil
+		return nil, fail.InvalidParameterError("idx", "must be 'api.PrimaryGateway' or 'api.SecondaryGateway'")
 	}
 
-	var newConf *ConfigProperties
+	var (
+		gwConf, clonedConf *ConfigProperties
+		xerr               fail.Error
+	)
 	switch idx {
 	case api.PrimaryGateway:
-		newConf = conf._private.GatewayConfig.Clone()
+		gwConf = conf._private.GatewayConfig
 	case api.SecondaryGateway:
-		newConf = conf._private.SecondaryGatewayConfig.Clone()
-	default:
-		return nil
+		gwConf = conf._private.SecondaryGatewayConfig
+	}
+	if gwConf != nil {
+		clonedConf, xerr = gwConf.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+	if clonedConf != nil {
+		return &Config{*clonedConf}, nil
 	}
 
-	if newConf == nil {
-		return NewEmptyConfig()
-	}
-
-	return &Config{*newConf}
+	return nil, fail.NotFoundError("requested gateway not set")
 }
 
 // PrimaryGatewayConfig ...
-func (conf Config) PrimaryGatewayConfig() api.Config {
+func (conf Config) PrimaryGatewayConfig() (api.Config, fail.Error) {
 	return conf.GatewayConfig(0)
 }
 
 // SecondaryGatewayConfig ...
-func (conf Config) SecondaryGatewayConfig() api.Config {
+func (conf Config) SecondaryGatewayConfig() (api.Config, fail.Error) {
 	return conf.GatewayConfig(1)
 }
 
@@ -327,22 +360,33 @@ func (conf Config) LocalPort() uint {
 }
 
 // Clone returns the configuration
-func (conf Config) Clone() api.Config {
-	out, _ := NewConfig(conf._private.Hostname, conf._private.IPAddress, conf._private.Port, conf._private.User, conf._private.PrivateKey)
-	gw := conf._private.GatewayConfig
+func (conf Config) Clone() (api.Config, fail.Error) {
+	out := NewEmptyConfig()
+	out._private = conf._private
 
+	gw := conf._private.GatewayConfig
 	if gw != nil {
-		out._private.GatewayConfig = gw.Clone()
+		gwConf, xerr := gw.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		out._private.GatewayConfig = gwConf
 	}
 	gw = conf._private.SecondaryGatewayConfig
 	if gw != nil {
-		out._private.SecondaryGatewayConfig = gw.Clone()
+		gwConf, xerr := gw.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		out._private.SecondaryGatewayConfig = gwConf
 	}
-	return out
+	return out, nil
 }
 
 // ConvertInternalToAPIConfig ...
-func ConvertInternalToAPIConfig(conf ConfigProperties) *Config {
+func ConvertInternalToAPIConfig(conf ConfigProperties) (*Config, fail.Error) {
 	out := Config{
 		_private: ConfigProperties{
 			Hostname:   conf.Hostname,
@@ -353,15 +397,30 @@ func ConvertInternalToAPIConfig(conf ConfigProperties) *Config {
 		},
 	}
 	if conf.GatewayConfig != nil {
-		out._private.GatewayConfig = conf.GatewayConfig.Clone()
+		gwConf, xerr := conf.GatewayConfig.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		out._private.GatewayConfig = gwConf
 	}
 	if conf.SecondaryGatewayConfig != nil {
-		out._private.SecondaryGatewayConfig = conf.SecondaryGatewayConfig.Clone()
+		gwConf, xerr := conf.SecondaryGatewayConfig.Clone()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		out._private.SecondaryGatewayConfig = gwConf
 	}
-	return &out
+	return &out, nil
 }
 
 // Properties ...
-func (conf Config) Properties() *ConfigProperties {
-	return conf._private.Clone()
+func (conf Config) Properties() (*ConfigProperties, fail.Error) {
+	clone, xerr := conf._private.Clone()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return clone, nil
 }

@@ -27,6 +27,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,6 +54,7 @@ import (
 type Connector struct {
 	Lock         *sync.RWMutex
 	TargetConfig *internal.ConfigProperties
+	tunnelSet    bool
 	tunnels      *sshtunnel.SSHTunnel
 	// finalConfig   internal.ConfigProperties // contains the ConfigProperties to used to reach the remote server after tunnels have been set
 	client *libssh.Client // Contains instance of established connection with target
@@ -65,9 +67,14 @@ func NewConnector(conf api.Config) (*Connector, fail.Error) {
 		return nil, fail.InconsistentError("failed to cast 'conf' to '*internal.Config'")
 	}
 
+	props, xerr := casted.Properties()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	out := Connector{
 		Lock:         new(sync.RWMutex),
-		TargetConfig: casted.Properties(),
+		TargetConfig: props,
 	}
 	return &out, nil
 }
@@ -81,12 +88,14 @@ func (sc *Connector) Close() fail.Error {
 		if err != nil {
 			return fail.Wrap(err)
 		}
+
 		sc.client = nil
 	}
 
-	if sc.tunnels != nil {
+	if sc.tunnelSet && sc.tunnels != nil {
 		sc.tunnels.Close()
 		sc.tunnels = nil
+		sc.tunnelSet = false
 	}
 
 	return nil
@@ -455,14 +464,27 @@ func (sc *Connector) Enter(username, shell string) (ferr fail.Error) {
 
 // createExecutionClient ...
 func (sc *Connector) createClient() fail.Error {
-	sc.Lock.Lock()
-	defer sc.Lock.Unlock()
 
-	if sc.client == nil {
-		conn, xerr := sc.dial(0)
+	if sc.tunnelSet {
+		conn, xerr := sc.dial(internal.Loopback, uint(sc.tunnels.GetLocalEndpoint().Port()), 45*time.Second)
 		if xerr != nil {
 			return xerr
 		}
+
+		sc.Lock.Lock()
+		defer sc.Lock.Unlock()
+
+		sc.client = conn
+	}
+
+	if sc.client == nil {
+		conn, xerr := sc.dial(sc.TargetConfig.IPAddress, sc.TargetConfig.Port, 45*time.Second)
+		if xerr != nil {
+			return xerr
+		}
+
+		sc.Lock.Lock()
+		defer sc.Lock.Unlock()
 
 		sc.client = conn
 	}
@@ -485,9 +507,44 @@ func (sc *Connector) createExecutionSession() (*libssh.Session, fail.Error) {
 	sc.Lock.RLock()
 	defer sc.Lock.RUnlock()
 
-	session, err := sc.client.NewSession()
-	if err != nil {
-		return nil, fail.Wrap(err, "cannot create new session")
+	var session *libssh.Session
+	beginDial := time.Now()
+	retries := 0
+	eofCount := 0
+	xerr = retry.WhileUnsuccessful(func() error { // FIXME: Turn this into goroutine
+		// Each ClientConn can support multiple interactive sessions,
+		// represented by a Session.
+		var internalErr error
+		var newsession *libssh.Session
+		newsession, internalErr = sc.client.NewSession()
+		if internalErr != nil {
+			retries = retries + 1 // nolint
+			logrus.Tracef("problem creating session: %s", internalErr.Error())
+			if strings.Contains(internalErr.Error(), "EOF") {
+				eofCount = eofCount + 1
+				if eofCount >= 14 {
+					// logrus.Warningf("client seems dead")
+					return retry.StopRetryError(internalErr, "client seems dead")
+				}
+			}
+			if strings.Contains(internalErr.Error(), "unexpected packet") {
+				// logrus.Warningf("client seems dead")
+				return retry.StopRetryError(internalErr, "client seems dead")
+			}
+			return internalErr
+		}
+
+		if session != nil { // race condition mitigation
+			// logrus.Warningf("too late")
+			return fmt.Errorf("too late")
+		}
+
+		logrus.Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
+		session = newsession
+		return nil
+	}, 2*time.Second, 150*time.Second)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return session, nil
@@ -518,89 +575,90 @@ func (sc *Connector) createTransferSession() (*sftp.Client, fail.Error) {
 
 // createTransientTunnel creates the tunnel (if needed)
 func (sc *Connector) createTransientTunnel() fail.Error {
-	if sc.tunnels == nil {
+	if !sc.tunnelSet {
 		var tu *sshtunnel.SSHTunnel
 
 		internalPort := internal.DefaultPort // all machines use port 22...
-		var gateway *sshtunnel.Endpoint
-		gwConfig := sc.TargetConfig.GatewayConfig
-		if gwConfig == nil { // it has to be a gateway
-			internalPort = sc.TargetConfig.Port // ... except maybe the gateway itself
-
-			var rerr error
-			gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.TargetConfig.User, sc.TargetConfig.IPAddress, sc.TargetConfig.Port),
-				sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
-			if rerr != nil {
-				return fail.Wrap(rerr)
+		var (
+			gateway  *sshtunnel.Endpoint
+			gwConfig *internal.ConfigProperties
+			xerr     fail.Error
+		)
+		if sc.TargetConfig.HasGateways() {
+			gwConfig, xerr = internal.DetermineRespondingGateway([]*internal.ConfigProperties{sc.TargetConfig.GatewayConfig, sc.TargetConfig.SecondaryGatewayConfig})
+			if xerr != nil {
+				return xerr
 			}
-		} else {
+		}
+
+		if gwConfig != nil {
 			var rerr error
 			gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", gwConfig.User, gwConfig.IPAddress, gwConfig.Port),
 				sshtunnel.EndpointOptionKeyFromString(gwConfig.PrivateKey, ""))
 			if rerr != nil {
 				return fail.Wrap(rerr)
 			}
-		}
 
-		server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:%d", sc.TargetConfig.IPAddress, internalPort),
-			sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		local, err := sshtunnel.NewEndpoint(fmt.Sprintf("localhost:%d", sc.TargetConfig.LocalPort))
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		options := []sshtunnel.Option{sshtunnel.TunnelOptionWithDefaultKeepAlive()}
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			options = append(options, sshtunnel.TunnelOptionWithLogger(log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)))
-		}
-		tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, options...)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		var tsErr error
-		go func() {
-			tsErr = tu.Start()
-			if tsErr != nil {
-				tu.Close()
+			server, err := sshtunnel.NewEndpoint(fmt.Sprintf("%s:%d", sc.TargetConfig.IPAddress, internalPort),
+				sshtunnel.EndpointOptionKeyFromString(sc.TargetConfig.PrivateKey, ""))
+			if err != nil {
+				return fail.Wrap(err)
 			}
-		}()
 
-		tunnelReady := <-tu.Ready()
-		if !tunnelReady {
-			return fail.Wrap(tsErr, "unable to establish tunnel: %w")
+			local, err := sshtunnel.NewEndpoint(fmt.Sprintf("localhost:%d", sc.TargetConfig.LocalPort))
+			if err != nil {
+				return fail.Wrap(err)
+			}
+
+			options := []sshtunnel.Option{sshtunnel.TunnelOptionWithDefaultKeepAlive()}
+			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+				options = append(options, sshtunnel.TunnelOptionWithLogger(log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)))
+			}
+			tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, options...)
+			if err != nil {
+				return fail.Wrap(err)
+			}
+
+			var tsErr error
+			go func() {
+				tsErr = tu.Start()
+				if tsErr != nil {
+					tu.Close()
+				}
+			}()
+
+			tunnelReady := <-tu.Ready()
+			if !tunnelReady {
+				return fail.Wrap(tsErr, "unable to establish tunnel: %w")
+			}
+
+			sc.Lock.Lock()
+			defer sc.Lock.Unlock()
+			sc.tunnels = tu
+			sc.tunnelSet = true
 		}
-
-		sc.tunnels = tu
 	}
-
 	return nil
 }
 
-// dial establishes connection with remote
-func (sc *Connector) dial(timeout time.Duration) (*libssh.Client, fail.Error) {
+// dial establishes connection with remote on defined port
+func (sc *Connector) dial(ipAddress string, port uint, timeout time.Duration) (*libssh.Client, fail.Error) {
 	pk, err := sshtunnel.AuthMethodFromPrivateKey([]byte(sc.TargetConfig.PrivateKey), nil)
 	if err != nil {
 		return nil, fail.Wrap(err, "cannot create auth method")
 	}
 
 	config := &libssh.ClientConfig{
-		User: sc.TargetConfig.User, // It should be sshUsername, but we assume no other sc users are allowed
-		Auth: []libssh.AuthMethod{
-			pk,
-		},
-		Timeout:         5 * time.Second,
+		User:            sc.TargetConfig.User, // It should be sshUsername, but we assume no other sc users are allowed
+		Auth:            []libssh.AuthMethod{pk},
+		Timeout:         10 * time.Second,
 		HostKeyCallback: libssh.InsecureIgnoreHostKey(),
 	}
 
 	if timeout <= 0 {
 		timeout = 45 * time.Second
 	}
-	hostport := fmt.Sprintf("%s:%d" /*"localhost"*/, internal.Loopback, sc.tunnels.GetLocalEndpoint().Port())
+	hostport := fmt.Sprintf("%s:%d", ipAddress, port)
 	client, err := sshtunnel.DialSSHWithTimeout("tcp", hostport, config, timeout)
 	if err != nil {
 		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
@@ -647,7 +705,7 @@ func (sc *Connector) closeTransferSession(session *sftp.Client, ferr *fail.Error
 }
 
 // Config returns an api.Config corresponding to the one belonging to the connector
-func (sc Connector) Config() api.Config {
+func (sc Connector) Config() (api.Config, fail.Error) {
 	return internal.ConvertInternalToAPIConfig(*sc.TargetConfig)
 }
 

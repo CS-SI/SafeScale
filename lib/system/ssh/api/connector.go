@@ -28,7 +28,7 @@ import (
 
 // Connector describes the interface that exposes methods to interact with remote
 type Connector interface {
-	Config() Config
+	Config() (Config, fail.Error)
 	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
 	Close() fail.Error
 	CreatePersistentTunnel() fail.Error

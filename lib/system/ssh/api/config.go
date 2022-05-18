@@ -32,15 +32,15 @@ const (
 
 // Config helper to manage ssh session
 type Config interface {
-	Clone() Config
-	GatewayConfig(idx WhatGateway) Config
+	Clone() (Config, fail.Error)
+	GatewayConfig(idx WhatGateway) (Config, fail.Error)
 	Hostname() string
 	IPAddress() string
 	LocalPort() uint
 	Port() uint
-	PrimaryGatewayConfig() Config
+	PrimaryGatewayConfig() (Config, fail.Error)
 	PrivateKey() string
-	SecondaryGatewayConfig() Config
+	SecondaryGatewayConfig() (Config, fail.Error)
 	SetGatewayConfig(idx WhatGateway, gwConfig Config) fail.Error
 	SetHostname(hostname string) fail.Error
 	SetIPAddress(ipAddress string) fail.Error

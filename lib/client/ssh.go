@@ -440,13 +440,18 @@ func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (sshapi.
 }
 
 // Connect is the "safescale ssh connect"
-func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Duration) error {
+func (s sshConsumer) Connect(hostname, username, shell string, useCli bool, timeout time.Duration) error {
 	sshCfg, xerr := s.getSSHConfigFromName(hostname, timeout) // timeout is ignored here
 	if xerr != nil {
 		return xerr
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(sshCfg)
+	var sshConn sshapi.Connector
+	if useCli {
+		sshConn, xerr = ssh.NewCliConnector(sshCfg)
+	} else {
+		sshConn, xerr = ssh.NewLibConnector(sshCfg)
+	}
 	if xerr != nil {
 		return xerr
 	}

@@ -270,14 +270,20 @@ func SSHConfigFromAbstractToProtocol(in sshapi.Config) (*protocol.SshConfig, fai
 		pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
 		xerr                                 fail.Error
 	)
-	gwSSHConf := in.GatewayConfig(sshapi.PrimaryGateway)
+	gwSSHConf, xerr := in.GatewayConfig(sshapi.PrimaryGateway)
+	if xerr != nil {
+		return nil, xerr
+	}
 	if !valid.IsNil(gwSSHConf) {
 		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
-	gwSSHConf = in.GatewayConfig(sshapi.SecondaryGateway)
+	gwSSHConf, xerr = in.GatewayConfig(sshapi.SecondaryGateway)
+	if xerr != nil {
+		return nil, xerr
+	}
 	if !valid.IsNil(gwSSHConf) {
 		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {

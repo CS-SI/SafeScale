@@ -31,20 +31,28 @@ func SSHConfigFromSystemToProtocol(from sshapi.Config) (*protocol.SshConfig, fai
 		pgw, sgw *protocol.SshConfig
 		xerr     fail.Error
 	)
-	pgwConf := from.GatewayConfig(sshapi.PrimaryGateway)
-	if !valid.IsNil(pgwConf) {
-		pgw, xerr = SSHConfigFromSystemToProtocol(pgwConf)
-	}
+	pgwConf, xerr := from.GatewayConfig(sshapi.PrimaryGateway)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgwConf := from.GatewayConfig(sshapi.SecondaryGateway)
-	if !valid.IsNil(sgwConf) {
-		sgw, xerr = SSHConfigFromSystemToProtocol(sgwConf)
+	if !valid.IsNil(pgwConf) {
+		pgw, xerr = SSHConfigFromSystemToProtocol(pgwConf)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
+
+	sgwConf, xerr := from.GatewayConfig(sshapi.SecondaryGateway)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	if !valid.IsNil(sgwConf) {
+		sgw, xerr = SSHConfigFromSystemToProtocol(sgwConf)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
 
 	out := protocol.SshConfig{

@@ -166,7 +166,15 @@ func run(ctx context.Context, sshConn api.Connector, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", sshConn.Config().Hostname(), temporal.FormatDuration(timeout))
+			var hostname string
+			conf, oerr := sshConn.Config()
+			if oerr != nil {
+				_ = xerr.AddConsequence(oerr)
+				hostname = "<unknown>"
+			} else {
+				hostname = conf.Hostname()
+			}
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", hostname, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			return retcode, stdout, stderr, fail.ConvertError(fail.Cause(xerr))
 		default:

@@ -17,22 +17,52 @@
 package internal
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
 func TestSSH_ConfigClone(t *testing.T) {
-	t.Skip("not implemented")
+	cfg := NewEmptyConfig()
+	xerr := cfg.SetHostname("host")
+	require.Nil(t, xerr)
+
+	cloned, xerr := cfg.Clone()
+	if xerr != nil {
+		t.Error(xerr)
+	}
+	require.NotNil(t, cloned)
+	xerr = cloned.SetPrivateKey("changed password")
+	require.Nil(t, xerr)
+
+	areEqual := reflect.DeepEqual(cfg, cloned)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+	require.NotEqualValues(t, cfg, cloned)
 }
 
 func TestSSH_Config_NewEmptyConfig(t *testing.T) {
 	in := NewEmptyConfig()
 	require.NotNil(t, in)
-	require.Nil(t, in.PrimaryGatewayConfig())
-	require.Nil(t, in.SecondaryGatewayConfig())
+
+	gwConf, xerr := in.PrimaryGatewayConfig()
+	require.NotNil(t, xerr)
+	require.Nil(t, gwConf)
+
+	gwConf, xerr = in.SecondaryGatewayConfig()
+	require.NotNil(t, xerr)
+	require.Nil(t, gwConf)
+
+	in, xerr = NewConfig("hostname", "10.11.12.13", 80022, "toto", "private key")
+	require.Nil(t, xerr)
+	require.NotNil(t, in)
+	require.False(t, valid.IsNull(in))
 }
 
 func TestSSH_Config_NewConfig(t *testing.T) {
@@ -52,7 +82,7 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.NotNil(t, xerr)
 	require.Nil(t, first)
 
-	first, xerr = NewConfig("host1", "10.11.12.13", 22, "me", "privatekey")
+	first, xerr = NewConfig("host1", "10.11.12.13", 22, "me1", "privatekey1")
 	require.Nil(t, xerr)
 	require.NotNil(t, first)
 
@@ -61,8 +91,12 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.EqualValues(t, first.Port(), 22)
 	require.EqualValues(t, first.User(), "me1")
 	require.EqualValues(t, first.PrivateKey(), "privatekey1")
-	require.Nil(t, first.PrimaryGatewayConfig())
-	require.Nil(t, first.SecondaryGatewayConfig())
+	gwConf, xerr := first.PrimaryGatewayConfig()
+	require.NotNil(t, xerr)
+	require.Nil(t, gwConf)
+	gwConf, xerr = first.SecondaryGatewayConfig()
+	require.NotNil(t, xerr)
+	require.Nil(t, gwConf)
 
 	second, xerr := NewConfig("host2", "14.15.16.17", 0, "me2", "privatekey2", first)
 	require.Nil(t, xerr)
@@ -73,8 +107,12 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.EqualValues(t, second.Port(), DefaultPort)
 	require.EqualValues(t, second.User(), "me2")
 	require.EqualValues(t, second.PrivateKey(), "privatekey2")
-	require.EqualValues(t, second.PrimaryGatewayConfig(), first)
-	require.Nil(t, second.SecondaryGatewayConfig())
+	gwConf, xerr = second.PrimaryGatewayConfig()
+	require.Nil(t, xerr)
+	require.EqualValues(t, gwConf, first)
+	gwConf, xerr = second.SecondaryGatewayConfig()
+	require.NotNil(t, xerr)
+	require.Nil(t, gwConf)
 
 	third, xerr := NewConfig("host3", "18.19.20.21", 8022, "me3", "privatekey3", first, second)
 	require.Nil(t, xerr)
@@ -85,9 +123,18 @@ func TestSSH_Config_NewConfig(t *testing.T) {
 	require.EqualValues(t, third.Port(), 8022)
 	require.EqualValues(t, third.User(), "me3")
 	require.EqualValues(t, third.PrivateKey(), "privatekey3")
-	require.NotNil(t, third.PrimaryGatewayConfig())
-	require.NotNil(t, third.SecondaryGatewayConfig())
-	require.EqualValues(t, third.GatewayConfig(sshapi.PrimaryGateway).Hostname(), "host2")
-	require.EqualValues(t, third.GatewayConfig(sshapi.SecondaryGateway).Hostname(), "host3")
 
+	gwConf, xerr = second.PrimaryGatewayConfig()
+	require.Nil(t, xerr)
+	require.NotNil(t, gwConf)
+	gwConf, xerr = second.SecondaryGatewayConfig()
+	require.NotNil(t, xerr)
+	require.Nil(t, gwConf)
+
+	gwConf, xerr = third.GatewayConfig(sshapi.PrimaryGateway)
+	require.Nil(t, xerr)
+	require.EqualValues(t, gwConf.Hostname(), "host1")
+	gwConf, xerr = third.GatewayConfig(sshapi.SecondaryGateway)
+	require.Nil(t, xerr)
+	require.EqualValues(t, gwConf.Hostname(), "host2")
 }
