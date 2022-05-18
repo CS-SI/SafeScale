@@ -26,6 +26,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -262,7 +263,7 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 
 // SSHConfigFromAbstractToProtocol ...
 func SSHConfigFromAbstractToProtocol(in sshapi.Config) (*protocol.SshConfig, fail.Error) {
-	if valid.IsNil(in) {
+	if valid.IsNull(in) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -272,19 +273,28 @@ func SSHConfigFromAbstractToProtocol(in sshapi.Config) (*protocol.SshConfig, fai
 	)
 	gwSSHConf, xerr := in.GatewayConfig(sshapi.PrimaryGateway)
 	if xerr != nil {
-		return nil, xerr
-	}
-	if !valid.IsNil(gwSSHConf) {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+		default:
+			return nil, xerr
+		}
+	} else if !valid.IsNull(gwSSHConf) {
 		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
+
 	gwSSHConf, xerr = in.GatewayConfig(sshapi.SecondaryGateway)
 	if xerr != nil {
-		return nil, xerr
-	}
-	if !valid.IsNil(gwSSHConf) {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+		default:
+			return nil, xerr
+		}
+	} else if !valid.IsNull(gwSSHConf) {
 		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
 		if xerr != nil {
 			return nil, xerr

@@ -483,7 +483,6 @@ func (s sshConsumer) Connect(hostname, username, shell string, useCli bool, time
 }
 
 // CreateTunnel creates a persistent SSH tunnel using cli (using lib is not possible, it would close at safescale exit)
-// FIXME: don't use secondary gateway if first one is not available...
 func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) (ferr error) {
 	var fXErr fail.Error
 	defer func() {
@@ -503,17 +502,18 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		return xerr
 	}
 
-	if sshCfg.GatewayConfig(sshapi.PrimaryGateway) == nil {
-		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
-		if xerr != nil {
-			return xerr
-		}
-
-		xerr = sshCfg.SetGatewayConfig(sshapi.PrimaryGateway, gwCfg)
-		if xerr != nil {
-			return xerr
-		}
-	}
+	// VPL: what is the point here?
+	// if !sshCfg.HasGateways() {
+	// 	gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	//
+	// 	xerr = sshCfg.SetGatewayConfig(sshapi.PrimaryGateway, gwCfg)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 	xerr = sshCfg.SetIPAddress(ssh.Loopback)
 	if xerr != nil {
 		return xerr
@@ -565,60 +565,81 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 		return xerr
 	}
 
-	// FIXME: I do not understand the point here...
-	if sshCfg.GatewayConfig(sshapi.PrimaryGateway) == nil {
-		gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
-		if xerr != nil {
-			return xerr
-		}
+	// VPL: what's the point here?
+	// if sshCfg.HasGateways() {
+	// 	gwCfg, xerr := ssh.NewConfig(sshCfg.Hostname(), sshCfg.IPAddress(), sshCfg.Port(), sshCfg.User(), sshCfg.PrivateKey())
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	//
+	// 	xerr = sshCfg.SetGatewayConfig(sshapi.PrimaryGateway, gwCfg)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	//
+	// 	xerr = sshCfg.SetIPAddress(ssh.Loopback)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
+	// ENDFIXME
 
-		xerr = sshCfg.SetGatewayConfig(sshapi.PrimaryGateway, gwCfg)
-		if xerr != nil {
-			return xerr
-		}
-
-		xerr = sshCfg.SetIPAddress(ssh.Loopback)
-		if xerr != nil {
+	var gwsConf [2]sshapi.Config
+	gwsConf[0], xerr = sshCfg.PrimaryGatewayConfig()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+		default:
 			return xerr
 		}
 	}
-	// ENDFIXME
 
-	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.PrimaryGatewayConfig().User(), sshCfg.PrimaryGatewayConfig().IPAddress())
-	output, err := exec.Command("pgrep", "-f", cmdString).Output()
-	if err != nil {
-		_, code, problem := utils.ExtractRetCode(err)
-		if problem != nil {
-			return fail.Wrap(err, "unable to close tunnel, running pgrep")
+	gwsConf[1], xerr = sshCfg.PrimaryGatewayConfig()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
 		}
+	}
 
-		if code == 127 { // pgrep not installed
-			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
-			return nil
-		}
-
-		if code == 1 {
-			// no process found, maybe we used secondary gateway?
-			if sshCfg.SecondaryGatewayConfig() != nil {
-				cmdString = fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, sshCfg.SecondaryGatewayConfig().User(), sshCfg.SecondaryGatewayConfig().IPAddress())
-				output, err = exec.Command("pgrep", "-f", cmdString).Output() // nolint
-
-				_, code, problem := utils.ExtractRetCode(err)
+	var (
+		code    int
+		output  []byte
+		stopped bool
+		err     error
+	)
+	for _, v := range gwsConf {
+		if v != nil {
+			cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress(), remotePort, v.User(), v.IPAddress())
+			output, err = exec.Command("pgrep", "-f", cmdString).Output()
+			if err != nil {
+				var problem fail.Error
+				_, code, problem = utils.ExtractRetCode(err)
 				if problem != nil {
 					return fail.Wrap(err, "unable to close tunnel, running pgrep")
 				}
 
-				if code == 1 {
-					debug.IgnoreError(err)
+				if code == 127 { // pgrep not installed
+					debug.IgnoreError(fmt.Errorf("pgrep not installed"))
 					return nil
 				}
-			} else {
-				debug.IgnoreError(err)
-				return nil
-			}
-		}
 
-		return fail.Wrap(err, "unable to close tunnel, unexpected error code running pgrep: %d", code)
+				if code == 1 { // process not found?
+					debug.IgnoreError(err)
+					continue
+				}
+			}
+
+			stopped = true
+			break
+		}
+	}
+
+	if !stopped {
+		return fail.NewError("unable to close tunnel, failed to find corresponding process (code: %d)", code)
 	}
 
 	portStrs := strings.Split(strings.Trim(string(output), "\n"), "\n")

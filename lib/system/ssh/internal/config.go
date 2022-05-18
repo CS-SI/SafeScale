@@ -424,3 +424,8 @@ func (conf Config) Properties() (*ConfigProperties, fail.Error) {
 
 	return clone, nil
 }
+
+// HasGateways tells if config contains gateways
+func (conf Config) HasGateways() bool {
+	return conf._private.HasGateways()
+}

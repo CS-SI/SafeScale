@@ -34,6 +34,7 @@ const (
 type Config interface {
 	Clone() (Config, fail.Error)
 	GatewayConfig(idx WhatGateway) (Config, fail.Error)
+	HasGateways() bool
 	Hostname() string
 	IPAddress() string
 	LocalPort() uint
