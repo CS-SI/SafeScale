@@ -319,8 +319,8 @@ feature:
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
-                                    if [ ! -x ${KUBE_VERSION} ]; then
-                                        sfApt update && sfApt install -y kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl"
+                                    if [ ! -z ${KUBE_VERSION} ]; then
+                                        sfApt update && sfApt install -y --allow-downgrades kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl v${KUBE_VERSION}-00"
                                     else
                                         sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 203 "Error installing kubelet kubeadm kubectl"
                                     fi
@@ -339,7 +339,7 @@ feature:
                             exclude=kube*
                             EOF
 
-                                    if [ ! -x ${KUBE_VERSION} ]; then
+                                    if [ ! -z ${KUBE_VERSION} ]; then
                                         yum -y install kubelet-${KUBE_VERSION} kubeadm-${KUBE_VERSION} kubectl-${KUBE_VERSION} --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
                                     else
                                         yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
