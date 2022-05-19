@@ -191,7 +191,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 
 	var list []*abstract.Network
 	if in.GetAll() {
-		list, xerr = svc.ListNetworks()
+		list, xerr = svc.ListNetworks(ctx)
 	} else {
 		list, xerr = networkfactory.List(job.Context(), svc)
 	}
@@ -288,11 +288,11 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			abstractNetwork, xerr := svc.InspectNetworkByName(ref)
+			abstractNetwork, xerr := svc.InspectNetworkByName(ctx, ref)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					abstractNetwork, xerr = svc.InspectNetwork(ref)
+					abstractNetwork, xerr = svc.InspectNetwork(ctx, ref)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -306,7 +306,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 				}
 			}
 
-			cfg, cerr := svc.GetConfigurationOptions()
+			cfg, cerr := svc.GetConfigurationOptions(ctx)
 			if cerr != nil {
 				return empty, cerr
 			}

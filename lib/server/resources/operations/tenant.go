@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
@@ -37,7 +38,7 @@ type Tenant struct {
 var currentTenant atomic.Value
 
 // CurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
-func CurrentTenant() *Tenant {
+func CurrentTenant(ctx context.Context) *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
 		tenants, err := iaas.GetTenants()
@@ -54,14 +55,14 @@ func CurrentTenant() *Tenant {
 				continue
 			}
 
-			service, xerr := loadTenant(name)
+			service, xerr := loadTenant(ctx, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				debug.IgnoreError(xerr)
 				return nil
 			}
 
-			bucket, xerr := service.GetMetadataBucket()
+			bucket, xerr := service.GetMetadataBucket(ctx)
 			if xerr != nil {
 				debug.IgnoreError(xerr)
 				return nil
@@ -76,19 +77,19 @@ func CurrentTenant() *Tenant {
 }
 
 // SetCurrentTenant sets the tenant to use for upcoming commands
-func SetCurrentTenant(tenantName string) error {
-	tenant := CurrentTenant()
+func SetCurrentTenant(ctx context.Context, tenantName string) error {
+	tenant := CurrentTenant(ctx)
 	if tenant != nil && tenant.Name == tenantName {
 		return nil
 	}
 
-	service, xerr := loadTenant(tenantName)
+	service, xerr := loadTenant(ctx, tenantName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	bucket, xerr := service.GetMetadataBucket()
+	bucket, xerr := service.GetMetadataBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -98,14 +99,14 @@ func SetCurrentTenant(tenantName string) error {
 	return nil
 }
 
-func loadTenant(tenantName string) (iaas.Service, fail.Error) {
+func loadTenant(ctx context.Context, tenantName string) (iaas.Service, fail.Error) {
 	service, xerr := iaas.UseService(tenantName, MinimumMetadataVersion)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	_, xerr = CheckMetadataVersion(service)
+	_, xerr = CheckMetadataVersion(ctx, service)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to set tenant '%s'", tenantName)

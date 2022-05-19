@@ -381,7 +381,7 @@ clean:
 
 zipsources:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Creating a tar.gz file safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz with the sources..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(git archive --format tar.gz --output safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz master)
+	@(git archive --format tar.gz --output safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz $$(git rev-parse --abbrev-ref HEAD))
 
 pack: zipsources
 

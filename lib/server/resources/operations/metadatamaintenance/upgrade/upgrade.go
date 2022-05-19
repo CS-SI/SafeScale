@@ -17,6 +17,7 @@
 package metadataupgrade
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -95,7 +96,7 @@ func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.E
 		return xerr
 	}
 
-	xerr = folder.Write("", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", true))
+	xerr = folder.Write(context.Background(), "", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", true))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update content of '/version' file in metadata bucket")

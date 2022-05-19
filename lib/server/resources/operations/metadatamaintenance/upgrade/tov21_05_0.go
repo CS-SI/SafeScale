@@ -98,7 +98,9 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (ferr fail.Error) {
 		owningInstance        resources.Network
 	)
 
-	withDefaultNetwork, err := svc.HasDefaultNetwork()
+	ctx := context.Background()
+
+	withDefaultNetwork, err := svc.HasDefaultNetwork(ctx)
 	if err != nil {
 		return err
 	}
@@ -106,7 +108,7 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (ferr fail.Error) {
 	var xerr fail.Error
 	if withDefaultNetwork {
 		// If there is a default Network/VPC, uses it as owning network for all defined networks in metadata to convert to Subnets
-		abstractOwningNetwork, xerr = svc.GetDefaultNetwork()
+		abstractOwningNetwork, xerr = svc.GetDefaultNetwork(ctx)
 		if xerr != nil {
 			return xerr
 		}
@@ -188,7 +190,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
-			abstractSubnet, innerXErr := svc.InspectSubnetByName(networkName, subnetName)
+			abstractSubnet, innerXErr := svc.InspectSubnetByName(ctx, networkName, subnetName)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -204,7 +206,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 
 			// If Subnet is not "owned" yet, do the necessary to create Network metadata
 			if (owningInstance == nil || valid.IsNil(owningInstance)) && abstractSubnet.Network != "" {
-				abstractOwningNetwork, innerXErr := svc.InspectNetwork(abstractSubnet.Network)
+				abstractOwningNetwork, innerXErr := svc.InspectNetwork(ctx, abstractSubnet.Network)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
@@ -245,7 +247,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				if xerr != nil {
 					return xerr
 				}
-				xerr = stack.Migrate("networklayers", map[string]interface{}{
+				xerr = stack.Migrate(ctx, "networklayers", map[string]interface{}{
 					"layer": abstractNetwork,
 				})
 				if xerr != nil {
@@ -449,7 +451,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			if xerr != nil {
 				return xerr
 			}
-			xerr = stack.Migrate("tags", map[string]interface{}{
+			xerr = stack.Migrate(ctx, "tags", map[string]interface{}{
 				"subnetName":  subnetName,
 				"networkName": networkName,
 				"subnetID":    subnetID,
@@ -474,7 +476,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 
 		// delete currentInstance in metadata if owningInstance is different than currentInstance
 		if owningInstance != currentInstance {
-			xerr = currentInstance.(*operations.Network).MetadataCore.Delete()
+			xerr = currentInstance.(*operations.Network).MetadataCore.Delete(context.Background())
 			if xerr != nil {
 				return xerr
 			}
@@ -728,7 +730,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(ctx context.Context, instance *
 		if xerr != nil {
 			return xerr
 		}
-		xerr = stack.Migrate("removetag", map[string]interface{}{
+		xerr = stack.Migrate(ctx, "removetag", map[string]interface{}{
 			"instance":       instance,
 			"subnetInstance": subnetInstance,
 		})
@@ -1227,6 +1229,8 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 }
 
 func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (resources.Network, resources.Subnet, bool, fail.Error) {
+	ctx := context.Background()
+
 	subnetInstance, xerr := operations.LoadSubnet(context.Background(), instance.Service(), "", networkName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1241,12 +1245,12 @@ func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (
 
 	// determine if the Network of the Subnet has been created by cluster creation
 	clusterCreatedNetwork := true
-	withDefaultNetwork, err := instance.Service().HasDefaultNetwork()
+	withDefaultNetwork, err := instance.Service().HasDefaultNetwork(ctx)
 	if err != nil {
 		return nil, nil, false, err
 	}
 	if withDefaultNetwork {
-		defaultNetwork, xerr := instance.Service().GetDefaultNetwork()
+		defaultNetwork, xerr := instance.Service().GetDefaultNetwork(ctx)
 		if xerr != nil {
 			return nil, nil, false, xerr
 		}
