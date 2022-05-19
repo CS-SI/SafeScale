@@ -29,8 +29,8 @@ var (
 
 // defaultSSHConnectorFactory is the default factory to create SSH Connector, based on ssh.cliconnector
 func defaultSSHConnectorFactory(config sshapi.Config) (sshapi.Connector, fail.Error) {
-	// return ssh.NewCliConnector(config)
-	return ssh.NewLibConnector(config)
+	return ssh.NewCliConnector(config)
+	// return ssh.NewLibConnector(config)
 }
 
 // ReplaceConnectorFactory replaces the default SSH Connector factory by the one provided
