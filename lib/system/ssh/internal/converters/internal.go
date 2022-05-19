@@ -29,11 +29,20 @@ import (
 // ConvertInternalToApiConfig ...
 func ConvertInternalToApiConfig(conf internal.Config) (sshapi.Config, fail.Error) {
 	var gws []sshapi.Config
-	if conf.PrimaryGatewayConfig() != nil {
-		gws[0] = conf.PrimaryGatewayConfig()
+
+	gwConf, xerr := conf.PrimaryGatewayConfig()
+	if xerr != nil {
+		return nil, xerr
 	}
-	if conf.SecondaryGatewayConfig() != nil {
-		gws[1] = conf.SecondaryGatewayConfig()
+	gws[0] = gwConf
+
+	{
+		gwConf, xerr := conf.SecondaryGatewayConfig()
+		if xerr != nil {
+			return nil, xerr
+		}
+		gws[1] = gwConf
 	}
+
 	return ssh.NewConfig(conf.Hostname(), conf.IPAddress(), conf.Port(), conf.User(), conf.PrivateKey(), gws...)
 }

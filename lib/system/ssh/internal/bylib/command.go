@@ -65,10 +65,10 @@ func (scmd *Command) String() string {
 // 		return invalid, "", "", fail.InvalidInstanceError()
 // 	}
 // 	if valid.IsNull(scmd.conn) {
-// 		return invalid, "", "", fail.InvalidInstanceContentError("scmd.conn", "cannot be null value of 'apissh.Connector'")
+// 		return invalid, "", "", fail.InvalidInstanceContentError("scmd.conn", "cannot be null value of 'sshapi.Connector'")
 // 	}
 // 	if ctx == nil {
-// 		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
+// 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 // 	}
 //
 // 	task, xerr := concurrency.TaskFromContext(ctx)

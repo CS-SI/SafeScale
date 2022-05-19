@@ -512,14 +512,16 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 	require.EqualValues(t, hostConf.Port(), phostcfg.Port)
 	require.EqualValues(t, hostConf.PrivateKey(), phostcfg.PrivateKey)
 
-	gwConf = hostConf.GatewayConfig(sshapi.PrimaryGateway)
+	gwConf, xerr = hostConf.GatewayConfig(sshapi.PrimaryGateway)
+	require.Nil(t, xerr)
 	require.NotNil(t, gwConf)
 	pgwcfg, xerr = SSHConfigFromAbstractToProtocol(gwConf)
 	require.Nil(t, xerr)
 	require.NotNil(t, pgwcfg)
 	require.EqualValues(t, pgwcfg, phostcfg.Gateway)
 
-	gw2Conf = hostConf.GatewayConfig(sshapi.SecondaryGateway)
+	gw2Conf, xerr = hostConf.GatewayConfig(sshapi.SecondaryGateway)
+	require.Nil(t, xerr)
 	require.NotNil(t, gw2Conf)
 	pgw2cfg, xerr = SSHConfigFromAbstractToProtocol(gw2Conf)
 	require.Nil(t, xerr)

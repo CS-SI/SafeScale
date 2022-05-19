@@ -521,7 +521,7 @@ func (sc *Connector) createExecutionSession() (*libssh.Session, fail.Error) {
 			retries = retries + 1 // nolint
 			logrus.Tracef("problem creating session: %s", internalErr.Error())
 			if strings.Contains(internalErr.Error(), "EOF") {
-				eofCount = eofCount + 1
+				eofCount++
 				if eofCount >= 14 {
 					// logrus.Warningf("client seems dead")
 					return retry.StopRetryError(internalErr, "client seems dead")
@@ -680,6 +680,7 @@ func (sc *Connector) closeExecutionSession(session *libssh.Session, ferr *fail.E
 			*ferr = fail.Wrap(err)
 		}
 	}
+
 	err = session.Close()
 	if err != nil && err.Error() != "EOF" {
 		if ferr != nil && *ferr != nil {
