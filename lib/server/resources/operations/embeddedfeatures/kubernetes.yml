@@ -83,7 +83,7 @@ feature:
         #  value: 3.19.1
         #  description: defines the Calico version to use
         - name: FlannelVersion
-          value: v0.13.0
+          value: v0.17.0
           description: defines the Flannel version to use
         - OIDCClientName=default
         - OIDCGroupName=user_groups
