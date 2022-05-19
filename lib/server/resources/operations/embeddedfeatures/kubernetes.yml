@@ -536,7 +536,7 @@ feature:
 
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta2
+                            apiVersion: kubeadm.k8s.io/v1beta3
                             kind: ClusterConfiguration
                             controlPlaneEndpoint: "${CP_ENDPOINT_IP}:6443"
                             kubernetesVersion: ${KUBE_VERSION}
@@ -578,8 +578,10 @@ feature:
                                     feature-gates: RotateKubeletServerCertificate=true
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
+                            clusterName: "{{ .ClusterName }}"
+                            imageRepository: "k8s.gcr.io"
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta2
+                            apiVersion: kubeadm.k8s.io/v1beta3
                             kind: InitConfiguration
                             localAPIEndpoint:
                                 bindPort: ${LOCAL_PORT}
@@ -588,7 +590,7 @@ feature:
                             clusterName: kubernetes
                             dns:
                                 type: CoreDNS
-                            imageRepository: k8s.gcr.io
+                            imageRepository: "k8s.gcr.io"
                             {{ if .OIDCRealm }}
                                 {{ if .ExternalLoadBalancerHostname }}
                             oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"

@@ -26,20 +26,28 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// ConvertInternalToApiConfig ...
-func ConvertInternalToApiConfig(conf internal.Config) (sshapi.Config, fail.Error) {
+// ConvertConfigInternalToAPI ...
+func ConvertConfigInternalToAPI(conf internal.Config) (sshapi.Config, fail.Error) {
 	var gws []sshapi.Config
 
 	gwConf, xerr := conf.PrimaryGatewayConfig()
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		default:
+			return nil, xerr
+		}
 	}
 	gws[0] = gwConf
 
 	{
 		gwConf, xerr := conf.SecondaryGatewayConfig()
 		if xerr != nil {
-			return nil, xerr
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+			default:
+				return nil, xerr
+			}
 		}
 		gws[1] = gwConf
 	}
