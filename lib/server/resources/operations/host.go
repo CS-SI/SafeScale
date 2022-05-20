@@ -216,10 +216,11 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			if instance.localCache.publicIP == "" {
 				instance.localCache.publicIP = hnV2.PublicIPv6
 			}
-			if instance.localCache.publicIP != "" {
-				instance.localCache.accessIP = instance.localCache.publicIP
-			} else {
+			from_inside := os.Getenv("SAFESCALED_FROM_INSIDE")
+			if instance.localCache.publicIP == "" || from_inside == "true" {
 				instance.localCache.accessIP = instance.localCache.privateIP
+			} else {
+				instance.localCache.accessIP = instance.localCache.publicIP
 			}
 
 			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
