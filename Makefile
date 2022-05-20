@@ -200,9 +200,9 @@ debug:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'debug' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "debug,$(BUILD_TAGS)")
 
-#tunnel:
-#	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'tunnel' flag$(NO_COLOR)\n";
-#	$(eval BUILD_TAGS = "tunnel,$(BUILD_TAGS)")
+tunnel:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'tunnel' flag$(NO_COLOR)\n";
+	$(eval BUILD_TAGS = "tunnel,$(BUILD_TAGS)")
 
 generics:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'generics' flag$(NO_COLOR)\n";
