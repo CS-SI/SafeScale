@@ -17,6 +17,7 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"regexp"
@@ -62,15 +63,16 @@ func getImages(filename string) ([]*abstract.Image, error) {
 	return result, nil
 }
 
-type searcher func(bool) ([]*abstract.Image, fail.Error)
+type searcher func(context.Context, bool) ([]*abstract.Image, fail.Error)
 
 // just a copy of original code from iaas/service.go, but mockable (the 1st parameter of this function can be replaced by a mock),
 // the only thing that changes is the method signature, the code inside is the same (even the commented/unused lines)
 func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
+	ctx := context.Background()
 	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
 
-	imgs, xerr := svc.ListImages(false)
+	imgs, xerr := svc.ListImages(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -102,10 +104,11 @@ func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail
 }
 
 func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
+	ctx := context.Background()
 	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
 
-	imgs, xerr := svc.ListImages(false)
+	imgs, xerr := svc.ListImages(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -166,6 +169,7 @@ func addPadding(in string, maxLength int) string {
 }
 
 func Test_service_SearchImage(t *testing.T) {
+	ctx := context.Background()
 	// the file aws-west3-images.json has been created with:
 	// safescale image list > aws-west3-images.json
 
@@ -179,7 +183,7 @@ func Test_service_SearchImage(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -210,6 +214,7 @@ func Test_service_SearchImage(t *testing.T) {
 }
 
 func Test_service_SearchImage_AWS_Ubu20(t *testing.T) {
+	ctx := context.Background()
 	// the file aws-west3-images.json has been created with:
 	// safescale image list > aws-west3-images.json
 
@@ -223,7 +228,7 @@ func Test_service_SearchImage_AWS_Ubu20(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -254,6 +259,7 @@ func Test_service_SearchImage_AWS_Ubu20(t *testing.T) {
 }
 
 func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
+	ctx := context.Background()
 	// the file aws-west3-images.json has been created with:
 	// safescale image list > aws-west3-images.json
 
@@ -267,7 +273,7 @@ func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -299,6 +305,7 @@ func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
 }
 
 func Test_service_SearchImage_OVH_Centos7(t *testing.T) {
+	ctx := context.Background()
 	recovered, err := getImages("ovh-images.json")
 	if err != nil {
 		t.FailNow()
@@ -306,7 +313,7 @@ func Test_service_SearchImage_OVH_Centos7(t *testing.T) {
 
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	res, err := SearchImageOriginal(common, "CentOS 7.4")
 	if err != nil {
@@ -330,6 +337,7 @@ func Test_service_SearchImage_OVH_Centos7(t *testing.T) {
 }
 
 func Test_service_SearchImage_FE_Centos7(t *testing.T) {
+	ctx := context.Background()
 	recovered, err := getImages("fe-images.json")
 	if err != nil {
 		t.FailNow()
@@ -337,7 +345,7 @@ func Test_service_SearchImage_FE_Centos7(t *testing.T) {
 
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	res, err := SearchImageOriginal(common, "CentOS 7.4")
 	if err != nil {
@@ -366,6 +374,7 @@ func Test_service_SearchImage_FE_Centos7(t *testing.T) {
 // use your function instead of SearchImageOriginal
 
 func Test_service_SearchImageNew(t *testing.T) {
+	ctx := context.Background()
 	// the file aws-west3-images.json has been created with:
 	// safescale image list > aws-west3-images.json
 
@@ -379,7 +388,7 @@ func Test_service_SearchImageNew(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -410,6 +419,7 @@ func Test_service_SearchImageNew(t *testing.T) {
 }
 
 func Test_service_SearchImageNew_AWS_Ubu20(t *testing.T) {
+	ctx := context.Background()
 	// the file aws-west3-images.json has been created with:
 	// safescale image list > aws-west3-images.json
 
@@ -423,7 +433,7 @@ func Test_service_SearchImageNew_AWS_Ubu20(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -454,6 +464,7 @@ func Test_service_SearchImageNew_AWS_Ubu20(t *testing.T) {
 }
 
 func Test_service_SearchImageNew_AWS_Centos7(t *testing.T) {
+	ctx := context.Background()
 	// the file aws-west3-images.json has been created with:
 	// safescale image list > aws-west3-images.json
 
@@ -467,7 +478,7 @@ func Test_service_SearchImageNew_AWS_Centos7(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(false).Return(recovered, nil)
+	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...

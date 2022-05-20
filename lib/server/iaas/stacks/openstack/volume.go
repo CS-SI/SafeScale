@@ -89,7 +89,7 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
+func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -99,7 +99,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
-	az, xerr := s.SelectedAvailabilityZone()
+	az, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil { // nolint
 		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
@@ -175,7 +175,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
+func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -213,7 +213,7 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
+func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -254,7 +254,7 @@ func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -308,7 +308,7 @@ func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -336,7 +336,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
 		return nilA, fail.InvalidInstanceError()
@@ -370,7 +370,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -409,12 +409,12 @@ func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachm
 	return vs, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
+func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

@@ -187,6 +187,8 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, fail.NewError("we only inspect current tenant right now")
 	}
 
+	ctx := handler.job.Context()
+
 	fromParams := func(in map[string]interface{}, key1 string, key2 string) string {
 		if val, ok := in[key1]; ok {
 			if adict, ok := val.(map[string]interface{}); ok {
@@ -231,7 +233,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return in
 	}
 
-	opts, err := svc.GetConfigurationOptions()
+	opts, err := svc.GetConfigurationOptions(ctx)
 	if err != nil {
 		return nil, fail.Wrap(err, "unable to recover driver configuration")
 	}
@@ -251,7 +253,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, err
 	}
 
-	bucket, err := svc.GetMetadataBucket()
+	bucket, err := svc.GetMetadataBucket(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +322,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
+	ctx := handler.job.Context()
 
 	isScannable, err := handler.checkScannable()
 	if err != nil {
@@ -330,28 +333,28 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	if isDryRun {
-		return handler.dryRun(templateNamesToScan)
+		return handler.dryRun(ctx, templateNamesToScan)
 	}
 
 	var templatesToScan []abstract.HostTemplate
 	if templateNamesToScan != nil { // nolint
 		for _, templateName := range templateNamesToScan {
-			template, err := svc.FindTemplateByName(templateName)
+			template, err := svc.FindTemplateByName(ctx, templateName)
 			if err != nil {
 				return nil, fail.AbortedError(err)
 			}
 			templatesToScan = append(templatesToScan, *template)
 		}
 	} else {
-		if xerr := handler.dumpImages(); xerr != nil {
+		if xerr := handler.dumpImages(ctx); xerr != nil {
 			return nil, xerr
 		}
 
-		if xerr := handler.dumpTemplates(); xerr != nil {
+		if xerr := handler.dumpTemplates(ctx); xerr != nil {
 			return nil, xerr
 		}
 
-		templatesToScan, xerr := svc.ListTemplates(false)
+		templatesToScan, xerr := svc.ListTemplates(ctx, false)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -365,7 +368,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	logrus.Infof("Using %q image", defaultScanImage)
 
 	var xerr fail.Error
-	handler.scannedHostImage, xerr = svc.SearchImage(defaultScanImage)
+	handler.scannedHostImage, xerr = svc.SearchImage(ctx, defaultScanImage)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not find needed image in given service")
 	}
@@ -460,7 +463,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	if xerr != nil {
 		return nil, xerr
 	}
-	if err := handler.collect(); err != nil {
+	if err := handler.collect(ctx); err != nil {
 		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svcName)
 	}
 	return &protocol.ScanResultList{Results: scanResultList}, nil
@@ -545,12 +548,12 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	return nil
 }
 
-func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
+func (handler *tenantHandler) dryRun(ctx context.Context, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	svc := handler.job.Service()
 
 	var resultList []*protocol.ScanResult
 
-	templates, xerr := svc.ListTemplates(false)
+	templates, xerr := svc.ListTemplates(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -593,7 +596,7 @@ func (handler *tenantHandler) checkScannable() (isScannable bool, ferr fail.Erro
 	return isScannable, xerr
 }
 
-func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
+func (handler *tenantHandler) dumpTemplates(ctx context.Context) (ferr fail.Error) {
 	err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
 		return fail.ConvertError(err)
@@ -604,7 +607,7 @@ func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
 	}
 
 	svc := handler.job.Service()
-	templates, xerr := svc.ListTemplates(false)
+	templates, xerr := svc.ListTemplates(ctx, false)
 	if xerr != nil {
 		return xerr
 	}
@@ -630,7 +633,7 @@ func (handler *tenantHandler) dumpTemplates() (ferr fail.Error) {
 	return nil
 }
 
-func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
+func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) {
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ConvertError(err)
 	}
@@ -640,7 +643,7 @@ func (handler *tenantHandler) dumpImages() (ferr fail.Error) {
 	}
 
 	svc := handler.job.Service()
-	images, xerr := svc.ListImages(false)
+	images, xerr := svc.ListImages(ctx, false)
 	if xerr != nil {
 		return xerr
 	}
@@ -808,10 +811,10 @@ func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {
 	return &info, nil
 }
 
-func (handler *tenantHandler) collect() (ferr fail.Error) {
+func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 	svc := handler.job.Service()
 
-	authOpts, xerr := svc.GetAuthenticationOptions()
+	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return xerr
 	}

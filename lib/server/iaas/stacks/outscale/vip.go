@@ -29,7 +29,7 @@ import (
 )
 
 // CreateVIP ...
-func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
+func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -44,7 +44,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	subnet, xerr := s.InspectSubnet(subnetID)
+	subnet, xerr := s.InspectSubnet(ctx, subnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -67,7 +67,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
+func (s stack) AddPublicIPToVIP(context.Context, *abstract.VirtualIP) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -99,7 +99,7 @@ func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
+func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -115,7 +115,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (ferr fail.
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
+func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -130,7 +130,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (ferr f
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s stack) DeleteVIP(vip *abstract.VirtualIP) (ferr fail.Error) {
+func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

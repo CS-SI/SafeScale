@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
+
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
@@ -33,11 +33,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // ListSecurityGroups lists existing security groups
 // There is no Security Group resource in GCP, so ListSecurityGroups always returns empty slice
-func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
+func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -51,7 +52,7 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -96,7 +97,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 
 	for k, v := range asg.Rules {
 		var xerr fail.Error
-		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
+		asg, xerr = s.AddRuleToSecurityGroup(ctx, asg, v)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed adding rule #%d", k)
 		}
@@ -174,7 +175,7 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error) {
+func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -211,7 +212,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (ferr fail.Error
 
 // InspectSecurityGroup returns information about a security group
 // Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
-func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
 	}
@@ -225,7 +226,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -262,7 +263,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -304,7 +305,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -326,7 +327,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 }
 
 // DisableSecurityGroup disables the rules of a Security Group
-func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+func (s stack) DisableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -361,7 +362,7 @@ func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 }
 
 // EnableSecurityGroup enables the rules of a Security Group
-func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+func (s stack) EnableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -397,12 +398,12 @@ func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
+func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	cfg, err := s.GetRawConfigurationOptions()
+	cfg, err := s.GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return "", err
 	}

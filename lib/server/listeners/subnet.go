@@ -173,12 +173,12 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	var networkID string
 	networkRef, _ := srvutils.GetReference(in.Network)
 	if networkRef == "" {
-		withDefaultNetwork, err := job.Service().HasDefaultNetwork()
+		withDefaultNetwork, err := job.Service().HasDefaultNetwork(ctx)
 		if err != nil {
 			return nil, err
 		}
 		if withDefaultNetwork {
-			an, xerr := job.Service().GetDefaultNetwork()
+			an, xerr := job.Service().GetDefaultNetwork(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}

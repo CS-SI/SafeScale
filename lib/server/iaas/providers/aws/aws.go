@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -55,19 +56,19 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
-func (p provider) AddPublicIPToVIP(ip *abstract.VirtualIP) fail.Error {
+func (p provider) AddPublicIPToVIP(ctx context.Context, ip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) BindHostToVIP(*abstract.VirtualIP, string) fail.Error {
+func (p provider) BindHostToVIP(context.Context, *abstract.VirtualIP, string) fail.Error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) UnbindHostFromVIP(*abstract.VirtualIP, string) fail.Error {
+func (p provider) UnbindHostFromVIP(context.Context, *abstract.VirtualIP, string) fail.Error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
+func (p provider) DeleteVIP(context.Context, *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -273,13 +274,13 @@ next:
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -292,13 +293,13 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -334,23 +335,23 @@ func (p provider) GetStack() (api.Stack, fail.Error) {
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
-func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
+func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
+	return p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
 }
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
-func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
+func (p provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PrivateVirtualIP: false,
 	}, nil

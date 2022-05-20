@@ -149,7 +149,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 		return nil, innerXErr
 	}
 
-	xerr = hostInstance.updateCachedInformation()
+	xerr = hostInstance.updateCachedInformation(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -166,9 +166,9 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 	return hostInstance, nil
 }
 
-func (instance *Host) Exists() (bool, fail.Error) {
+func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
-	_, err := instance.Service().InspectHost(theID)
+	_, err := instance.Service().InspectHost(ctx, theID)
 	if err != nil {
 		switch err.(type) {
 		case *fail.ErrNotFound:
@@ -182,22 +182,16 @@ func (instance *Host) Exists() (bool, fail.Error) {
 }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
-func (instance *Host) updateCachedInformation() fail.Error {
+func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 	svc := instance.Service()
 
-	opUser, opUserErr := getOperatorUsernameFromCfg(svc)
+	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
 	if opUserErr != nil {
 		return opUserErr
 	}
 
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
-
-	task, xerr := concurrency.VoidTask()
-	if xerr != nil {
-		return xerr
-	}
-	ctx := task.Context()
 
 	return instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -348,8 +342,8 @@ func (instance *Host) updateCachedInformation() fail.Error {
 	})
 }
 
-func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
-	cfg, xerr := svc.GetConfigurationOptions()
+func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, fail.Error) {
+	cfg, xerr := svc.GetConfigurationOptions(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -391,7 +385,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -477,7 +471,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		abstractHostFull, innerXErr := instance.Service().InspectHost(ahc.ID)
+		abstractHostFull, innerXErr := instance.Service().InspectHost(ctx, ahc.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -527,7 +521,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Request Host inspection from provider
-	ahf, xerr := instance.Service().InspectHost(instance.GetID())
+	ahf, xerr := instance.Service().InspectHost(ctx, instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -604,7 +598,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	return instance.updateCachedInformation()
+	return instance.updateCachedInformation(ctx)
 }
 
 // GetState returns the last known state of the Host, without forced inspect
@@ -691,7 +685,7 @@ func (instance *Host) Create(
 	}
 
 	// Check if Host exists but is not managed by SafeScale
-	_, xerr = svc.InspectHost(abstract.NewHostCore().SetName(hostReq.ResourceName))
+	_, xerr = svc.InspectHost(ctx, abstract.NewHostCore().SetName(hostReq.ResourceName))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -718,7 +712,7 @@ func (instance *Host) Create(
 				newHostDef.Template = hostReq.TemplateID
 			}
 		}
-		tmpl, xerr := svc.FindTemplateBySizing(newHostDef)
+		tmpl, xerr := svc.FindTemplateBySizing(ctx, newHostDef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")
@@ -738,7 +732,7 @@ func (instance *Host) Create(
 			imageQuery = consts.DEFAULTOS
 		}
 
-		hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
+		hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(ctx, svc, imageQuery)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -810,7 +804,7 @@ func (instance *Host) Create(
 				hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
 			}
 
-			opts, xerr := svc.GetConfigurationOptions()
+			opts, xerr := svc.GetConfigurationOptions(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -840,7 +834,7 @@ func (instance *Host) Create(
 	defaultSubnetID := defaultSubnet.GetID()
 
 	// instruct Cloud Provider to create host
-	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
+	ahf, userdataContent, xerr := svc.CreateHost(ctx, hostReq)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
@@ -851,7 +845,7 @@ func (instance *Host) Create(
 
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
-			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
+			if derr := svc.DeleteHost(ctx, ahf.Core.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
 			}
 		}
@@ -878,7 +872,7 @@ func (instance *Host) Create(
 
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				logrus.Errorf(
 					"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
 					derr,
@@ -991,7 +985,7 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	xerr = instance.updateCachedInformation()
+	xerr = instance.updateCachedInformation(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1080,7 +1074,7 @@ func (instance *Host) Create(
 		return nil, xerr
 	}
 
-	xerr = instance.unbindDefaultSecurityGroupIfNeeded(networkInstance.GetID())
+	xerr = instance.unbindDefaultSecurityGroupIfNeeded(ctx, networkInstance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1109,9 +1103,9 @@ func (instance *Host) Create(
 	return userdataContent, nil
 }
 
-func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.Error) {
+func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (string, string, fail.Error) {
 	if imageRef == "" {
-		cfg, xerr := svc.GetConfigurationOptions()
+		cfg, xerr := svc.GetConfigurationOptions(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", "", xerr
@@ -1129,7 +1123,7 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			img, innerXErr = svc.SearchImage(imageRef)
+			img, innerXErr = svc.SearchImage(ctx, imageRef)
 			return innerXErr
 		},
 		timings.SmallDelay(),
@@ -1140,7 +1134,7 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			img = nil
-			imgs, xerr := svc.ListImages(true)
+			imgs, xerr := svc.ListImages(ctx, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return "", "", fail.Wrap(xerr, "failure listing images")
@@ -1174,7 +1168,7 @@ func (instance *Host) setSecurityGroups(
 		hostID := instance.GetID()
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
-				xerr := svc.BindSecurityGroupToHost(k, hostID)
+				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -1427,14 +1421,14 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 }
 
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
-func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.Error {
+func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, networkID string) fail.Error {
 	svc := instance.Service()
-	sgName, err := svc.GetDefaultSecurityGroupName()
+	sgName, err := svc.GetDefaultSecurityGroupName(ctx)
 	if err != nil {
 		return err
 	}
 	if sgName != "" {
-		adsg, innerXErr := svc.InspectSecurityGroupByName(networkID, sgName)
+		adsg, innerXErr := svc.InspectSecurityGroupByName(ctx, networkID, sgName)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
@@ -1443,7 +1437,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 			default:
 				return innerXErr
 			}
-		} else if innerXErr = svc.UnbindSecurityGroupFromHost(adsg, instance.GetID()); innerXErr != nil {
+		} else if innerXErr = svc.UnbindSecurityGroupFromHost(ctx, adsg, instance.GetID()); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// Consider a security group not found as a successful unbind
@@ -1853,7 +1847,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
-	xerr = svc.ClearHostStartupScript(instance.GetID())
+	xerr = svc.ClearHostStartupScript(ctx, instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1895,7 +1889,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
 	}
 
-	xerr = instance.updateCachedInformation()
+	xerr = instance.updateCachedInformation(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2027,7 +2021,7 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 // createSingleHostNetwork creates Single-Host Network and Subnet
 func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
 	// Build network name
-	cfg, xerr := svc.GetConfigurationOptions()
+	cfg, xerr := svc.GetConfigurationOptions(ctx)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -2111,7 +2105,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			}
 
 			var dnsServers []string
-			opts, xerr := svc.GetConfigurationOptions()
+			opts, xerr := svc.GetConfigurationOptions(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -2530,7 +2524,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		waitForDeletion := true
 		innerXErr = retry.WhileUnsuccessful(
 			func() error {
-				if derr := svc.DeleteHost(instance.GetID()); derr != nil {
+				if derr := svc.DeleteHost(ctx, instance.GetID()); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
@@ -2561,7 +2555,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		if waitForDeletion {
 			innerXErr = retry.WhileUnsuccessfulWithHardTimeout(
 				func() error {
-					state, stateErr := svc.GetHostState(instance.GetID())
+					state, stateErr := svc.GetHostState(ctx, instance.GetID())
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
@@ -2619,7 +2613,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Deletes metadata from Object Storage
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
@@ -2638,7 +2632,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 	doRefresh := instance.localCache.sshProfile == nil
 	instance.localCache.RUnlock() // nolint
 	if doRefresh {
-		xerr := instance.updateCachedInformation()
+		xerr := instance.updateCachedInformation(ctx)
 		if xerr != nil {
 			return xerr
 		}
@@ -2974,7 +2968,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = svc.StartHost(hostID)
+	xerr = svc.StartHost(ctx, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2986,7 +2980,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.Started, timings.HostOperationTimeout())
+			return svc.WaitHostState(ctx, hostID, hoststate.Started, timings.HostOperationTimeout())
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
@@ -3053,7 +3047,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// FIXME: It has to TRY to run a sync first, if it fails, we log it and continue stopping the host
-	xerr = svc.StopHost(hostID, false)
+	xerr = svc.StopHost(ctx, hostID, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3065,7 +3059,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.Stopped, timings.HostOperationTimeout())
+			return svc.WaitHostState(ctx, hostID, hoststate.Stopped, timings.HostOperationTimeout())
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
@@ -3847,19 +3841,19 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetID())
 			}
 
-			caps, xerr := svc.GetCapabilities()
+			caps, xerr := svc.GetCapabilities(ctx)
 			if xerr != nil {
 				return xerr
 			}
 			if caps.CanDisableSecurityGroup {
-				xerr = svc.EnableSecurityGroup(asg)
+				xerr = svc.EnableSecurityGroup(ctx, asg)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 			} else {
 				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-				xerr = svc.BindSecurityGroupToHost(asg, instance.GetID())
+				xerr = svc.BindSecurityGroupToHost(ctx, asg, instance.GetID())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -3948,19 +3942,19 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgInstance.GetID())
 			}
 
-			caps, xerr := svc.GetCapabilities()
+			caps, xerr := svc.GetCapabilities(ctx)
 			if xerr != nil {
 				return xerr
 			}
 			if caps.CanDisableSecurityGroup {
-				xerr = svc.DisableSecurityGroup(asg)
+				xerr = svc.DisableSecurityGroup(ctx, asg)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 			} else {
 				// Bind the security group on provider side; if security group not binded, considered as a success
-				xerr = svc.UnbindSecurityGroupFromHost(asg, instance.GetID())
+				xerr = svc.UnbindSecurityGroupFromHost(ctx, asg, instance.GetID())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {

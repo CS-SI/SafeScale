@@ -18,23 +18,24 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"time"
 
-	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // MetadataFolder describes a metadata MetadataFolder
@@ -86,22 +87,17 @@ func (instance MetadataFolder) Service() iaas.Service {
 }
 
 // GetBucket returns the bucket used by the MetadataFolder to store Object Storage
-func (instance MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
+func (instance MetadataFolder) GetBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 
-	bucket, xerr := instance.service.GetMetadataBucket()
-	if xerr != nil {
-		return abstract.ObjectStorageBucket{}, xerr
-	}
-
-	return bucket, nil
+	return instance.getBucket(ctx)
 }
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
-func (instance MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.Error) {
-	bucket, xerr := instance.service.GetMetadataBucket()
+func (instance MetadataFolder) getBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+	bucket, xerr := instance.service.GetMetadataBucket(ctx)
 	if xerr != nil {
 		return abstract.ObjectStorageBucket{}, xerr
 	}
@@ -137,13 +133,13 @@ func (instance MetadataFolder) absolutePath(path ...string) string {
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
-func (instance MetadataFolder) Lookup(path string, name string) fail.Error {
+func (instance MetadataFolder) Lookup(ctx context.Context, path string, name string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	absPath := strings.Trim(instance.absolutePath(path), "/")
-	bucket, xerr := instance.getBucket()
+	bucket, xerr := instance.getBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -167,12 +163,12 @@ func (instance MetadataFolder) Lookup(path string, name string) fail.Error {
 }
 
 // Delete removes metadata passed as parameter
-func (instance MetadataFolder) Delete(path string, name string) fail.Error {
+func (instance MetadataFolder) Delete(ctx context.Context, path string, name string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	bucket, xerr := instance.getBucket()
+	bucket, xerr := instance.getBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -189,7 +185,7 @@ func (instance MetadataFolder) Delete(path string, name string) fail.Error {
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (instance MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
+func (instance MetadataFolder) Read(ctx context.Context, path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -209,7 +205,7 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			var buffer bytes.Buffer
-			bucket, iErr := instance.getBucket()
+			bucket, iErr := instance.getBucket(ctx)
 			if iErr != nil {
 				return iErr
 			}
@@ -284,7 +280,7 @@ func (instance MetadataFolder) Read(path string, name string, callback func([]by
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (instance MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
+func (instance MetadataFolder) Write(ctx context.Context, path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -317,7 +313,7 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 		data = content
 	}
 
-	bucket, xerr := instance.getBucket()
+	bucket, xerr := instance.getBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -403,13 +399,13 @@ func (instance MetadataFolder) Write(path string, name string, content []byte, o
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
-func (instance MetadataFolder) Browse(path string, callback folderDecoderCallback) fail.Error {
+func (instance MetadataFolder) Browse(ctx context.Context, path string, callback folderDecoderCallback) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	absPath := instance.absolutePath(path)
-	metadataBucket, xerr := instance.getBucket()
+	metadataBucket, xerr := instance.getBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}

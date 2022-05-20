@@ -36,7 +36,7 @@ func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.Security
 	}
 
 	if all {
-		return svc.ListSecurityGroups("")
+		return svc.ListSecurityGroups(ctx, "")
 	}
 
 	sgInstance, xerr := New(svc)

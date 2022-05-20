@@ -90,7 +90,7 @@ func (handler *sshHandler) Config(hostParam stacks.HostParameter) (sshConfig ssh
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 
-	_, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	_, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -104,7 +104,7 @@ func (handler *sshHandler) Config(hostParam stacks.HostParameter) (sshConfig ssh
 		return nil, xerr
 	}
 
-	cfg, xerr := svc.GetConfigurationOptions()
+	cfg, xerr := svc.GetConfigurationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -520,7 +520,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, innerXErr := sshConn.CopyWithTimeout(task.Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
+			iretcode, istdout, istderr, innerXErr := sshConn.CopyWithTimeout(handler.job.Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}

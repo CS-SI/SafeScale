@@ -17,6 +17,7 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ovh/go-ovh/ovh"
@@ -24,8 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail.Error) {
-	authOpts, xerr := p.GetAuthenticationOptions()
+func (p *provider) requestOVHAPI(ctx context.Context, url string, httpCode string) (interface{}, fail.Error) {
+	authOpts, xerr := p.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

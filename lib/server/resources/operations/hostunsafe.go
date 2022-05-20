@@ -27,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
@@ -43,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
 )
 
 // unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
@@ -136,13 +137,6 @@ func run(ctx context.Context, sshConn api.Connector, cmd string, outs outputs.En
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			// Do not forget to close the connector, the failure may be due to tunnel badly built...
-			defer func() {
-				if innerXErr != nil {
-					ssh.CloseConnector(sshConn, &innerXErr)
-				}
-			}()
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {

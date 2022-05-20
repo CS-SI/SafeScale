@@ -17,6 +17,7 @@
 package openstack // Package openstack contains the implemenation of a stack for OpenStack providers
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
@@ -64,6 +65,8 @@ func NullStack() *stack { // nolint
 
 // New authenticates and returns a stack pointer
 func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
+	ctx := context.Background()
+
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
@@ -213,7 +216,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	}
 
 	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
-	validAvailabilityZones, xerr := s.ListAvailabilityZones()
+	validAvailabilityZones, xerr := s.ListAvailabilityZones(ctx)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
