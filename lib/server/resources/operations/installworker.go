@@ -554,6 +554,8 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, f
 
 // Proceed executes the action
 func (w *worker) Proceed(ctx context.Context, params data.Map, settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
+	defer fail.OnExitWrapError(&ferr, "failed to %s Feature '%s'", w.action.String(), w.feature.GetName())
+
 	w.variables = params
 	w.settings = settings
 

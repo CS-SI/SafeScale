@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -17,10 +14,23 @@
  * limitations under the License.
  */
 
-package ssh
+package api
 
-import "syscall"
+import (
+	"context"
+	"time"
 
-func getSyscallAttrs() *syscall.SysProcAttr { // nolint
-	return &syscall.SysProcAttr{}
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+)
+
+// Connector describes the interface that exposes methods to interact with remote
+type Connector interface {
+	Config() (Config, fail.Error)
+	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
+	Close() fail.Error
+	CreatePersistentTunnel() fail.Error
+	Enter(string, string) fail.Error
+	NewCommand(context.Context, string) (Command, fail.Error)
+	NewSudoCommand(context.Context, string) (Command, fail.Error)
+	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)
 }

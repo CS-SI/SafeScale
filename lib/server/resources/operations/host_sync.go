@@ -1,6 +1,3 @@
-//go:build !tunnel
-// +build !tunnel
-
 package operations
 
 import (

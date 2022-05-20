@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -534,7 +534,7 @@ var hostSSH = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 
-		out, xerr := formatSSHConfig(*resp)
+		out, xerr := formatSSHConfig(resp)
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 		}
@@ -542,7 +542,7 @@ var hostSSH = cli.Command{
 	},
 }
 
-func formatSSHConfig(in ssh.Profile) (map[string]interface{}, fail.Error) {
+func formatSSHConfig(in sshapi.Config) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
 		return nil, fail.ConvertError(err)

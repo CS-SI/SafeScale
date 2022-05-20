@@ -69,21 +69,23 @@ const (
 
 // NewTracer creates a new Tracer instance
 func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
+	const skip = 1 // count of steps to skip...
+	// Note: Has this new NewTracer implementation introduces a new step, we have to usqe skip+1 when using NewTracerFromXXX
 	if thing == nil {
-		return NewTracerFromCtx(context.Background(), enable, msg...)
+		return NewTracerFromCtx(context.Background(), enable, skip+1, msg...)
 	}
 	switch casted := thing.(type) {
 	case context.Context:
-		return NewTracerFromCtx(casted, enable, msg...)
+		return NewTracerFromCtx(casted, enable, skip+1, msg...)
 	case concurrency.Task:
-		return NewTracerFromTask(casted, enable, msg...)
+		return NewTracerFromTask(casted, enable, skip+1, msg...)
 	default:
 		return nil
 	}
 }
 
-// NewTracer creates a new Tracer instance
-func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Tracer {
+// NewTracerFromCtx creates a new Tracer instance
+func NewTracerFromCtx(ctx context.Context, enable bool, skip int, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
 	}
@@ -106,7 +108,7 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	}
 	t.callerParams = strings.TrimSpace(message)
 
-	if pc, file, _, ok := runtime.Caller(1); ok {
+	if pc, file, _, ok := runtime.Caller(skip); ok {
 		t.fileName = callstack.SourceFilePathUpdater()(file)
 		if f := runtime.FuncForPC(pc); f != nil {
 			t.funcName = filepath.Base(f.Name())
@@ -122,8 +124,8 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	return &t
 }
 
-// NewTracer creates a new Tracer instance
-func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
+// NewTracerFromTask creates a new Tracer instance
+func NewTracerFromTask(task concurrency.Task, enable bool, skip int, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
 	}
@@ -137,7 +139,7 @@ func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) T
 	}
 	t.callerParams = strings.TrimSpace(message)
 
-	if pc, file, _, ok := runtime.Caller(1); ok {
+	if pc, file, _, ok := runtime.Caller(skip); ok {
 		t.fileName = callstack.SourceFilePathUpdater()(file)
 		if f := runtime.FuncForPC(pc); f != nil {
 			t.funcName = filepath.Base(f.Name())

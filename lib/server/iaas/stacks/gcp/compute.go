@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
@@ -39,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
-//go:build tunnel
-// +build tunnel
+//go:build disabled
+// +build disabled
 
 package operations
 

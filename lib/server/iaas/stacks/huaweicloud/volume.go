@@ -20,7 +20,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
@@ -31,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum

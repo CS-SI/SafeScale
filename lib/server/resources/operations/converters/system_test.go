@@ -26,21 +26,19 @@ import (
 
 func Test_SSHConfigFromSystemToProtocol(t *testing.T) {
 
-	in := &ssh.Profile{
-		Hostname:               "Hostname",
-		IPAddress:              "IPAddress",
-		Port:                   22,
-		User:                   "User",
-		PrivateKey:             "PrivateKey",
-		LocalPort:              22,
-		GatewayConfig:          &ssh.Profile{},
-		SecondaryGatewayConfig: &ssh.Profile{},
-	}
-	out := SSHConfigFromSystemToProtocol(in)
+	in := ssh.NewEmptyConfig()
+	in.SetHostname("Hostname")
+	in.SetIPAddress("IPAddress")
+	in.SetPort(22)
+	in.SetUser("User")
+	in.SetPrivateKey("PrivateKey")
+	in.SetLocalPort(22)
 
-	require.EqualValues(t, out.Host, in.IPAddress)
-	require.EqualValues(t, out.Port, in.Port)
-	require.EqualValues(t, out.PrivateKey, in.PrivateKey)
-	require.EqualValues(t, out.User, in.User)
+	out, xerr := SSHConfigFromSystemToProtocol(in)
+	require.Nil(t, xerr)
+	require.EqualValues(t, out.Host, in.IPAddress())
+	require.EqualValues(t, out.Port, in.Port())
+	require.EqualValues(t, out.PrivateKey, in.PrivateKey())
+	require.EqualValues(t, out.User, in.User())
 
 }

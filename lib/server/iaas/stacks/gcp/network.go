@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
@@ -33,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (

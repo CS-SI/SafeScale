@@ -27,8 +27,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
@@ -39,12 +37,14 @@ import (
 	_ "gomodules.xyz/stow/swift"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Location
+//go:generate minimock -o mocks/mock_location.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
 // FIXME: Make this easy to validate, what is optional ?, what is mandatory ?
