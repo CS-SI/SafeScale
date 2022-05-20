@@ -323,9 +323,12 @@ func (instance *tag) ToProtocol(ctx context.Context) (*protocol.TagInspectRespon
 		out.Id = atag.GetID()
 		out.Name = atag.GetName()
 
-		hosts := make([]string, 0, len(atag.HostsByName))
-		for k, _ := range atag.HostsByName {
-			hosts = append(hosts, k)
+		hosts := make([]*protocol.Host, 0)
+		for k, v := range atag.HostsByName {
+			hosts = append(hosts, &protocol.Host{
+				Name: k,
+				Id:   v,
+			})
 		}
 		out.Hosts = hosts
 		return nil

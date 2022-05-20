@@ -1172,7 +1172,7 @@ message TagDetachmentRequest {
 message TagInspectResponse {
 	string id = 1;
 	string name = 2;
-	repeated string hosts = 3;
+	repeated Host hosts = 3;
 }
 
 message TagListRequest {
