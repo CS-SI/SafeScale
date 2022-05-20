@@ -626,8 +626,12 @@ func (h host) Tag(hostName string, tagName string, timeout time.Duration) error 
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	req := &protocol.TagRequest{
 		Host: &protocol.Reference{Name: hostName},
@@ -649,8 +653,12 @@ func (h host) Untag(hostName string, tagName string, timeout time.Duration) erro
 	}
 
 	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	req := &protocol.TagRequest{
 		Host: &protocol.Reference{Name: hostName},
