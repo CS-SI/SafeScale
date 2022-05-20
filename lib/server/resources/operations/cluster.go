@@ -1062,6 +1062,9 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	nodeDef := complementHostDefinition(def, *nodeDefaultDefinition)
+	if def.Image != "" {
+		hostImage = def.Image
+	}
 
 	svc := instance.Service()
 	_, nodeDef.Image, xerr = determineImageID(ctx, svc, hostImage)
