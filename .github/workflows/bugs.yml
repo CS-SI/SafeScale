@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         go: [ 1.17.8 ]
-        tags: [ debug ]
+        tags: [ debug, tunnel ]
 
     runs-on: ubuntu-latest
 

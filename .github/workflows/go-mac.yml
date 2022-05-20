@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         go: [ 1.16.15, 1.17.8, 1.18 ]
-        tags: [ releasetags ]
+        tags: [ releasetags, tunnel ]
 
     runs-on: macos-latest
 
