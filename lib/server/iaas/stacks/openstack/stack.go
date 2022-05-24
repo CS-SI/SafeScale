@@ -17,11 +17,11 @@
 package openstack // Package openstack contains the implemenation of a stack for OpenStack providers
 
 import (
-	"context"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"

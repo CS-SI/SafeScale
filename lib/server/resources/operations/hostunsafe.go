@@ -31,12 +31,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
-	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -85,13 +82,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return retCode, stdOut, stdErr, xerr
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(sshProfile)
-	if xerr != nil {
-		return retCode, stdOut, stdErr, xerr
-	}
-	defer ssh.CloseConnector(sshConn, &ferr)
-
-	retCode, stdOut, stdErr, xerr = run(task.Context(), sshConn, cmd, outs, connTimeout+execTimeout)
+	retCode, stdOut, stdErr, xerr = run(task.Context(), sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -118,7 +109,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshConn api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile *ssh.Profile, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
@@ -132,11 +123,23 @@ func run(ctx context.Context, sshConn api.Connector, cmd string, outs outputs.En
 		func() error {
 			iterations++
 			// Create the command
-			sshCmd, innerXErr := sshConn.NewCommand(ctx, cmd)
+			sshCmd, innerXErr := sshProfile.NewCommand(ctx, cmd)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr
 			}
+
+			// Do not forget to close the command (allowing to close SSH tunnels and free process)
+			defer func(cmd *ssh.Command) {
+				derr := cmd.Close()
+				if derr != nil {
+					if innerXErr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+					} else {
+						innerXErr = derr
+					}
+				}
+			}(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {
@@ -160,15 +163,7 @@ func run(ctx context.Context, sshConn api.Connector, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			var hostname string
-			conf, oerr := sshConn.Config()
-			if oerr != nil {
-				_ = xerr.AddConsequence(oerr)
-				hostname = "<unknown>"
-			} else {
-				hostname = conf.Hostname()
-			}
-			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", hostname, temporal.FormatDuration(timeout))
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", sshProfile.Hostname, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			return retcode, stdout, stderr, fail.ConvertError(fail.Cause(xerr))
 		default:
@@ -235,20 +230,12 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return retcode, stdout, stderr, xerr
 	}
 
-	// FIXME: with a smarter use of Connector, the connector closure may be delayed later and the connector may be reused
-	// For now we keep the legacy behaviour
-	sshConn, xerr := sshfactory.NewConnector(sshProfile)
-	if xerr != nil {
-		return retcode, stdout, stderr, xerr
-	}
-	defer ssh.CloseConnector(sshConn, &ferr)
-
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			copyCtx, cancel := context.WithTimeout(task.Context(), timeout)
 			defer cancel()
 
-			iretcode, istdout, istderr, innerXErr := sshConn.CopyWithTimeout(copyCtx, target, source, true, timeout)
+			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, timeout)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -264,7 +251,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 				crcCtx, cancelCrc := context.WithTimeout(task.Context(), timeout)
 				defer cancelCrc()
 
-				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshConn, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
+				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -333,7 +320,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(task.Context(), sshConn, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(task.Context(), sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -448,7 +435,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	}
 
 	hostName := instance.GetName()
-	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")

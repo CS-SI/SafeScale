@@ -83,7 +83,7 @@ feature:
         #  value: 3.19.1
         #  description: defines the Calico version to use
         - name: FlannelVersion
-          value: v0.17.0
+          value: v0.13.0
           description: defines the Flannel version to use
         - OIDCClientName=default
         - OIDCGroupName=user_groups
@@ -319,8 +319,8 @@ feature:
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
-                                    if [ ! -z ${KUBE_VERSION} ]; then
-                                        sfApt update && sfApt install -y --allow-downgrades kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl v${KUBE_VERSION}-00"
+                                    if [ ! -x ${KUBE_VERSION} ]; then
+                                        sfApt update && sfApt install -y kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl"
                                     else
                                         sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 203 "Error installing kubelet kubeadm kubectl"
                                     fi
@@ -339,7 +339,7 @@ feature:
                             exclude=kube*
                             EOF
 
-                                    if [ ! -z ${KUBE_VERSION} ]; then
+                                    if [ ! -x ${KUBE_VERSION} ]; then
                                         yum -y install kubelet-${KUBE_VERSION} kubeadm-${KUBE_VERSION} kubectl-${KUBE_VERSION} --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
                                     else
                                         yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
@@ -536,7 +536,7 @@ feature:
 
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta3
+                            apiVersion: kubeadm.k8s.io/v1beta2
                             kind: ClusterConfiguration
                             controlPlaneEndpoint: "${CP_ENDPOINT_IP}:6443"
                             kubernetesVersion: ${KUBE_VERSION}
@@ -578,10 +578,8 @@ feature:
                                     feature-gates: RotateKubeletServerCertificate=true
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
-                            clusterName: "{{ .ClusterName }}"
-                            imageRepository: "k8s.gcr.io"
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta3
+                            apiVersion: kubeadm.k8s.io/v1beta2
                             kind: InitConfiguration
                             localAPIEndpoint:
                                 bindPort: ${LOCAL_PORT}
@@ -590,7 +588,7 @@ feature:
                             clusterName: kubernetes
                             dns:
                                 type: CoreDNS
-                            imageRepository: "k8s.gcr.io"
+                            imageRepository: k8s.gcr.io
                             {{ if .OIDCRealm }}
                                 {{ if .ExternalLoadBalancerHostname }}
                             oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"

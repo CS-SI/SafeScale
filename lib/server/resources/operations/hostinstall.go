@@ -264,9 +264,6 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
-	}
 	if feat == nil {
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
@@ -315,9 +312,6 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 
 	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
@@ -381,9 +375,6 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 // satisfies interface resources.Targetable
 func (instance *Host) InstalledFeatures(ctx context.Context) []string {
 	if instance == nil {
-		return []string{}
-	}
-	if ctx == nil {
 		return []string{}
 	}
 

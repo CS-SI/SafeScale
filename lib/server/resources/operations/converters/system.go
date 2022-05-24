@@ -20,57 +20,20 @@ package converters
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
-// SSHConfigFromSystemToProtocol converts a system.Config into a SshConfig
-func SSHConfigFromSystemToProtocol(from sshapi.Config) (*protocol.SshConfig, fail.Error) {
-	var (
-		pgw, sgw *protocol.SshConfig
-		xerr     fail.Error
-	)
-
-	pgwConf, xerr := from.GatewayConfig(sshapi.PrimaryGateway)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-		default:
-			return nil, xerr
-		}
+// SSHConfigFromSystemToProtocol converts a ssh.Profile into a protocol.SshConfig
+func SSHConfigFromSystemToProtocol(from *ssh.Profile) *protocol.SshConfig {
+	var gw *protocol.SshConfig
+	if from.GatewayConfig != nil {
+		gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)
 	}
-	if !valid.IsNull(pgwConf) {
-		pgw, xerr = SSHConfigFromSystemToProtocol(pgwConf)
-		if xerr != nil {
-			return nil, xerr
-		}
+	return &protocol.SshConfig{
+		Gateway:    gw,
+		Host:       from.IPAddress,
+		Port:       int32(from.Port),
+		PrivateKey: from.PrivateKey,
+		User:       from.User,
 	}
-
-	sgwConf, xerr := from.GatewayConfig(sshapi.SecondaryGateway)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-		default:
-			return nil, xerr
-		}
-	}
-
-	if !valid.IsNull(sgwConf) {
-		sgw, xerr = SSHConfigFromSystemToProtocol(sgwConf)
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
-
-	out := protocol.SshConfig{
-		HostName:         from.Hostname(),
-		Host:             from.IPAddress(),
-		Port:             int32(from.Port()),
-		PrivateKey:       from.PrivateKey(),
-		User:             from.User(),
-		Gateway:          pgw,
-		SecondaryGateway: sgw,
-	}
-	return &out, nil
 }

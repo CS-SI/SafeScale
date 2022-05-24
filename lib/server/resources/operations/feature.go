@@ -903,5 +903,7 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 			out = append(out, entry)
 		}
 	}
+
 	return out, nil
+
 }

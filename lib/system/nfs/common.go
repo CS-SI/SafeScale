@@ -24,12 +24,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system"
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -45,7 +45,7 @@ var nfsScripts embed.FS
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 func executeScript(
-	ctx context.Context, timings temporal.Timings, sshConn sshapi.Connector, name string,
+	ctx context.Context, timings temporal.Timings, sshconfig ssh.Profile, name string,
 	data map[string]interface{},
 ) (string, fail.Error) {
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
@@ -110,7 +110,7 @@ func executeScript(
 	}
 
 	// Copy script to remote host with retries if needed
-	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return "", xerr
 	}
@@ -124,7 +124,7 @@ func executeScript(
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshConn.CopyWithTimeout(task.Context(), filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(task.Context(), filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -167,10 +167,11 @@ func executeScript(
 
 	xerr = retry.Action(
 		func() error {
-			sshCmd, innerXErr := sshConn.NewSudoCommand(ctx, cmd)
+			sshCmd, innerXErr := sshconfig.NewSudoCommand(ctx, cmd)
 			if innerXErr != nil {
 				return fail.ExecutionError(xerr)
 			}
+			defer func() { _ = sshCmd.Close() }()
 
 			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timings.ConnectionTimeout()+timings.HostOperationTimeout()); innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")

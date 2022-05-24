@@ -175,10 +175,6 @@ var sshConnect = cli.Command{
 			Value: "bash",
 			Usage: "Shell to use (default: bash)",
 		},
-		cli.BoolFlag{
-			Name:  "force-cli",
-			Usage: "force use of cli of SSH instead of go library",
-		},
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
@@ -209,7 +205,7 @@ var sshConnect = cli.Command{
 		if c.IsSet("shell") {
 			shell = c.String("shell")
 		}
-		err = ClientSession.SSH.Connect(c.Args().Get(0), username, shell, c.Bool("force-cli"), 0)
+		err = ClientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))

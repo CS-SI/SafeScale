@@ -25,10 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 // Contains the function used to convert from abstract structures
@@ -262,60 +259,26 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 }
 
 // SSHConfigFromAbstractToProtocol ...
-func SSHConfigFromAbstractToProtocol(in sshapi.Config) (*protocol.SshConfig, fail.Error) {
-	if valid.IsNull(in) {
-		return nil, fail.InvalidInstanceError()
+func SSHConfigFromAbstractToProtocol(in ssh.Profile) *protocol.SshConfig {
+	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
+	if in.GatewayConfig != nil {
+		pbPrimaryGateway = SSHConfigFromAbstractToProtocol(*in.GatewayConfig)
 	}
-
-	var (
-		pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
-		xerr                                 fail.Error
-	)
-	gwSSHConf, xerr := in.GatewayConfig(sshapi.PrimaryGateway)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-		default:
-			return nil, xerr
-		}
-	} else if !valid.IsNull(gwSSHConf) {
-		pbPrimaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
-		if xerr != nil {
-			return nil, xerr
-		}
+	if in.SecondaryGatewayConfig != nil {
+		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig)
 	}
-
-	gwSSHConf, xerr = in.GatewayConfig(sshapi.SecondaryGateway)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-		default:
-			return nil, xerr
-		}
-	} else if !valid.IsNull(gwSSHConf) {
-		pbSecondaryGateway, xerr = SSHConfigFromAbstractToProtocol(gwSSHConf)
-		if xerr != nil {
-			return nil, xerr
-		}
+	if in.Port == 0 {
+		in.Port = 22
 	}
-
-	port := in.Port()
-	if port == 0 {
-		port = 22
-	}
-
-	out := protocol.SshConfig{
-		HostName:         in.Hostname(),
-		User:             in.User(),
-		Host:             in.IPAddress(),
-		Port:             int32(port),
-		PrivateKey:       in.PrivateKey(),
+	return &protocol.SshConfig{
+		HostName:         in.Hostname,
+		User:             in.User,
+		Host:             in.IPAddress,
+		Port:             int32(in.Port),
+		PrivateKey:       in.PrivateKey,
 		Gateway:          pbPrimaryGateway,
 		SecondaryGateway: pbSecondaryGateway,
 	}
-	return &out, nil
 }
 
 // HostStatusFromAbstractToProtocol ...

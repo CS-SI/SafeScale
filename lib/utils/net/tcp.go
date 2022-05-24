@@ -19,14 +19,13 @@ package net
 import (
 	"net"
 	"strconv"
-
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"time"
 )
 
 // CheckRemoteTCP returns true if ip:port is listening, false otherwise
 func CheckRemoteTCP(ip string, port int) bool {
 	address := net.JoinHostPort(ip, strconv.Itoa(port))
-	conn, err := net.DialTimeout("tcp", address, 3*temporal.SmallDelay())
+	conn, err := net.DialTimeout("tcp", address, 3*time.Second) // FIXME: change timeout to temporal.XXX function
 	if err != nil {
 		return false
 	}

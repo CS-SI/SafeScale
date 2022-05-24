@@ -22,20 +22,20 @@ import (
 	"strings"
 	"time"
 
+	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // MetadataFolder describes a metadata MetadataFolder
@@ -92,7 +92,12 @@ func (instance MetadataFolder) GetBucket(ctx context.Context) (abstract.ObjectSt
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 
-	return instance.getBucket(ctx)
+	bucket, xerr := instance.service.GetMetadataBucket(ctx)
+	if xerr != nil {
+		return abstract.ObjectStorageBucket{}, xerr
+	}
+
+	return bucket, nil
 }
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
