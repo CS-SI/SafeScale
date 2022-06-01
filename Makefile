@@ -329,8 +329,8 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n"; \
-		$(GO) install $(RULES)@v0.3.15 &>/dev/null || true; \
-		$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true; \
+		$(GO) install $(RULES)@v0.3.16 &>/dev/null || true; \
+		$(GO) get -d $(RULES_DSL)@v0.3.21 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) maintidx > /dev/null; if [ $$? -ne 0 ]; then \
