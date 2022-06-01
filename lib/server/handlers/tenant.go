@@ -872,7 +872,7 @@ func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 		}
 		if !file.IsDir() {
 			if err = os.Remove(theFile); err != nil {
-				logrus.Infof("Error Suppressing %s : %s", file.Name(), err.Error())
+				logrus.Debugf("Error Suppressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

@@ -792,6 +792,21 @@ func (sc *Profile) CopyWithTimeout(ctx context.Context, remotePath string, local
 	return -1, "", "", fail.NewError("timeout copying...")
 }
 
+func closeAndLog(in io.Closer) {
+	if in != nil {
+		err := in.Close()
+		if err != nil {
+			logrus.Tracef(err.Error())
+		}
+	}
+}
+
+func closeAndIgnore(in io.Closer) {
+	if in != nil {
+		_ = in.Close()
+	}
+}
+
 // Copy copies a file/directory from/to local to/from remote
 func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
 	tu, sshConfig, err := sc.CreateTunneling()
@@ -823,57 +838,28 @@ func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if conn != nil {
-				connErr := conn.Close()
-				if connErr != nil {
-					logrus.Tracef("connErr: %v", connErr)
-				}
-			}
-		}()
+		defer closeAndLog(conn)
 
 		// create new SFTP client
 		client, err := sftp.NewClient(conn)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if client != nil {
-				cliErr := client.Close()
-				if cliErr != nil {
-					logrus.Tracef("cliErr: %v", cliErr)
-				}
-			}
-		}()
+		defer closeAndLog(client)
 
 		// create destination file
 		dstFile, err := client.Create(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if dstFile != nil {
-				dstErr := dstFile.Close()
-				if dstErr != nil {
-					logrus.Tracef("dstErr: %v", dstErr)
-				}
-			}
-		}()
+		defer closeAndLog(dstFile)
 
 		// create source file
 		srcFile, err := os.Open(localPath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-
-		defer func() {
-			if srcFile != nil {
-				dstErr := srcFile.Close()
-				if dstErr != nil {
-					logrus.Tracef(dstErr.Error())
-				}
-			}
-		}()
+		defer closeAndLog(srcFile)
 
 		// copy source file to destination file
 		written, err := io.Copy(dstFile, srcFile)
@@ -909,57 +895,28 @@ func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if conn != nil {
-				clErr := conn.Close()
-				if clErr != nil {
-					logrus.Warnf("clErr: %v", clErr)
-				}
-			}
-		}()
+		defer closeAndLog(conn)
 
 		// create new SFTP client
 		client, err := sftp.NewClient(conn)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if client != nil {
-				cliErr := client.Close()
-				if cliErr != nil {
-					logrus.Warnf("cliErr: %v", cliErr)
-				}
-			}
-		}()
+		defer closeAndLog(client)
 
 		// create destination file
 		dstFile, err := os.Create(localPath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if dstFile != nil {
-				dstErr := dstFile.Close()
-				if dstErr != nil {
-					logrus.Warnf("dstErr: %v", dstErr)
-				}
-			}
-		}()
+		defer closeAndLog(dstFile)
 
 		// open source file
 		srcFile, err := client.Open(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-
-		defer func() {
-			if srcFile != nil {
-				dstErr := srcFile.Close()
-				if dstErr != nil {
-					logrus.Tracef(dstErr.Error())
-				}
-			}
-		}()
+		defer closeAndLog(srcFile)
 
 		// copy source file to destination file
 		written, err := io.Copy(dstFile, srcFile)

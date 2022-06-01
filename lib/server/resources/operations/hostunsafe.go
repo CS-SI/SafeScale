@@ -22,11 +22,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
@@ -453,6 +453,13 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
 
+	defer func() {
+		rerr := utils.LazyRemove(f.Name())
+		if rerr != nil {
+			logrus.Debugf(rerr.Error())
+		}
+	}()
+
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -476,7 +483,6 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		timings.SmallDelay(),
 		2*temporal.MaxTimeout(timings.ConnectionTimeout(), timings.ExecutionTimeout()),
 	)
-	_ = os.Remove(f.Name())
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
