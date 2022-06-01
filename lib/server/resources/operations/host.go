@@ -3890,7 +3890,6 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
 						debug.IgnoreError(xerr)
-						// continue
 					default:
 						return xerr
 					}
@@ -4046,4 +4045,50 @@ func ReserveCIDRForSingleHost(ctx context.Context, networkInstance resources.Net
 		return "", 0, xerr
 	}
 	return result.String(), index, nil
+}
+
+func getCommand(file string) string {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		command := fmt.Sprintf("sudo bash %s; exit $?", file)
+		logrus.Debugf("running '%s'", command)
+		return command
+	default:
+		// "sudo -b bash -c 'nohup %s > /dev/null 2>&1 &'"
+		command := fmt.Sprintf("sudo -b bash -c 'nohup %s > /dev/null 2>&1 &'", file)
+		logrus.Debugf("running '%s'", command)
+		return command
+	}
+}
+
+func getPhase2Timeout(timings temporal.Timings) time.Duration {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		return timings.HostOperationTimeout()
+	default:
+		return timings.ContextTimeout()
+	}
+}
+
+func getPhase4Timeout(timings temporal.Timings) time.Duration {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
+		return waitingTime
+	default:
+		return 30 * time.Second
+	}
+}
+
+func inBackground() bool {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		return false
+	default:
+		return true
+	}
 }
