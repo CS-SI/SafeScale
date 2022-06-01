@@ -114,6 +114,7 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 	return instance, nil
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Requires iteration of quite a few members...
 	return true, nil
