@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -540,9 +539,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		Remote: filename,
 	}
 
-	defer func() {
-		_ = os.Remove(rfcItem.Local)
-	}()
 	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
