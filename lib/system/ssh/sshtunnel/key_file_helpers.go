@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -127,7 +126,26 @@ func keyString(k ssh.PublicKey) string {
 
 func TrustedHostKeyCallback(trustedKey string) ssh.HostKeyCallback {
 	if trustedKey == "" {
-		logrus.Tracef("using NO trusted key to connect")
+		return func(_ string, _ net.Addr, k ssh.PublicKey) error {
+			return nil
+		}
+	}
+
+	return func(_ string, _ net.Addr, k ssh.PublicKey) error {
+		ks := keyString(k)
+		if trustedKey != ks {
+			return fmt.Errorf("SSH-key verification: expected %q but got %q", trustedKey, ks)
+		}
+
+		return nil
+	}
+}
+
+func TrustedHostKeyCallbackWithLogger(myLogger logger, trustedKey string) ssh.HostKeyCallback {
+	if trustedKey == "" {
+		if myLogger != nil {
+			myLogger.Printf("using NO trusted key to connect")
+		}
 		return func(_ string, _ net.Addr, k ssh.PublicKey) error {
 			return nil
 		}
