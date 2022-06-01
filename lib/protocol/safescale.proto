@@ -1159,6 +1159,8 @@ service PublicIPService {
 	rpc Unbind(PublicIPBindRequest) returns (google.protobuf.Empty){}
 }
 
+// Tag
+
 message TagCreateRequest {
 	string name = 1;
 	string tenant_id = 2;
