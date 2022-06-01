@@ -566,7 +566,11 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 
 	if remote {
 		if !netutils.CheckRemoteTCP(sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port) {
-			if !netutils.CheckRemoteTCP(sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port) {
+			if !valid.IsNil(sc.SecondaryGatewayConfig) {
+				if !netutils.CheckRemoteTCP(sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port) {
+					return nil, nil, fail.NewError("No direct connection to any gateway")
+				}
+			} else {
 				return nil, nil, fail.NewError("No direct connection to any gateway")
 			}
 			gateway = altgateway // connect through alternative gateway
@@ -775,13 +779,19 @@ func (sc *Profile) CopyWithTimeout(ctx context.Context, remotePath string, local
 	// wait anyway until call it's finished, then return an error
 	// if sc.Copy can handle contexts well, we don't have to wait until it's finished
 	// however is not the case here
-	<-rCh
+	select {
+	case _ = <-rCh:
+	case <-time.After(5 * time.Second): // grace period
+	}
+
 	if ctx.Err() != nil {
 		return -1, "", "", fail.Wrap(ctx.Err())
 	}
+
 	if currentCtx.Err() != nil {
 		return -1, "", "", fail.Wrap(currentCtx.Err())
 	}
+
 	return -1, "", "", fail.NewError("timeout copying...")
 }
 

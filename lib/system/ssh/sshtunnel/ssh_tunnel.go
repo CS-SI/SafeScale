@@ -210,7 +210,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 
 	tunnel.mu.Lock()
 	if tunnel.isOpen {
-		defer tunnel.mu.Unlock()
+		tunnel.mu.Unlock()
 		return fmt.Errorf("error starting the ssh tunnel: already started")
 	}
 
@@ -245,9 +245,12 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	}(time.Now())
 
 	for {
+		tunnel.mu.Lock()
 		if !tunnel.isOpen {
+			tunnel.mu.Unlock()
 			break
 		}
+		tunnel.mu.Unlock()
 
 		errCh := make(chan error)
 		connCh := make(chan net.Conn)
@@ -280,9 +283,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 			continue
 		case <-tunnel.closer:
 			tunnel.logf("close signal received through channel: closing tunnel...\n")
-			tunnel.isOpen = false
-			close(tunnel.closer)
-			tunnel.closer = nil
 		case conn := <-connCh:
 			tunnel.mu.Lock()
 			tunnel.conns = append(tunnel.conns, conn)
@@ -312,6 +312,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				if quittingErr != nil {
 					litter.Config.HidePrivateFields = false
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
+					tunnel.quit()
 				}
 				return // nolint
 			}()
@@ -614,7 +615,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 				return
 			default:
 				tunnel.errorf("the tunnel is dead after %s (%s)...", minim, tunnel.command)
-				// tunnel.Close() // if so, we have a use of closed connection error
+				tunnel.quit()
 				return
 			}
 		}
@@ -627,6 +628,22 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 }
 
 func (tunnel *SSHTunnel) Close() { // kept for compatibility issues
+	return // nolint
+}
+
+func (tunnel *SSHTunnel) quit() {
+	tunnel.mu.Lock()
+	defer tunnel.mu.Unlock()
+
+	if !tunnel.isOpen {
+		return
+	}
+
+	tunnel.isOpen = false
+
+	tunnel.closer <- struct{}{}
+	close(tunnel.closer)
+
 	return // nolint
 }
 
