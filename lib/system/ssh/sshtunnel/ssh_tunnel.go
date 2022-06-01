@@ -36,6 +36,8 @@ type logger interface {
 	Printf(string, ...interface{})
 }
 
+type Printfer = logger
+
 type extendedLogger interface {
 	Printf(string, ...interface{})
 	Errorf(string, ...interface{})
@@ -70,7 +72,7 @@ type Option func(tunnel *SSHTunnel) error
 
 type SSHTunnel struct {
 	local  *Entrypoint
-	server *SSHJump // a.k.a the gateway, or the jump
+	server *SSHJump // a.k.a. the gateway, or the jump
 	remote *Endpoint
 
 	config *ssh.ClientConfig
@@ -140,6 +142,10 @@ func (tunnel SSHTunnel) GetServerEndpoint() Endpoint {
 
 func (tunnel *SSHTunnel) SetCommand(cmd string) {
 	tunnel.command = cmd
+}
+
+func (tunnel *SSHTunnel) GetLogger() Printfer {
+	return tunnel.log
 }
 
 func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn) (err error) {
@@ -380,6 +386,13 @@ func TunnelOptionWithDefaultKeepAlive() Option {
 func TunnelOptionWithLogger(myLogger logger) Option {
 	return func(tunnel *SSHTunnel) error {
 		tunnel.log = myLogger
+		return nil
+	}
+}
+
+func TunnelOptionWithTrustedKey(tk string) Option {
+	return func(tunnel *SSHTunnel) error {
+		tunnel.config.HostKeyCallback = TrustedHostKeyCallbackWithLogger(tunnel.log, tk)
 		return nil
 	}
 }
