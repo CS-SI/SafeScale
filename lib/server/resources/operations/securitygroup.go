@@ -138,6 +138,7 @@ func (instance *SecurityGroup) IsNull() bool {
 	return valid.IsNil(instance.MetadataCore)
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Not so easy, securitygroups are in some cases a metadata-only construct -> we need to turn those into tags (provider ones) 1st
 	return true, nil

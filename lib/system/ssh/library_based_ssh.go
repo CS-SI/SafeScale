@@ -293,11 +293,11 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 			Timeout:         10 * time.Second,
 		}
 
-		logrus.Debugf("Dialing to %s:%d using %s:%d", sc.cfg.LocalHost, sc.cfg.LocalPort, "localhost", sc.tunnels.GetLocalEndpoint().Port())
+		logrus.Tracef("Dialing to %s:%d using %s:%d", sc.cfg.LocalHost, sc.cfg.LocalPort, "localhost", sc.tunnels.GetLocalEndpoint().Port())
 		client, err := sshtunnel.DialSSHWithTimeout("tcp", fmt.Sprintf("%s:%d", sc.cfg.LocalHost, sc.tunnels.GetLocalEndpoint().Port()), directConfig, 45*time.Second)
 		if err != nil {
 			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-				logrus.Debugf(spew.Sdump(err))
+				logrus.Tracef(spew.Sdump(err))
 			}
 			if ne, ok := err.(net.Error); ok {
 				if ne.Timeout() || ne.Temporary() {
@@ -335,8 +335,7 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 		var session *ssh.Session
 
 		err = retry.WhileUnsuccessful(func() error { // FIXME: Turn this into goroutine
-			// Each ClientConn can support multiple interactive sessions,
-			// represented by a Session.
+			// Each ClientConn can support multiple interactive sessions, represented by a Session.
 			var internalErr error
 			var newsession *ssh.Session
 			newsession, internalErr = client.NewSession()
@@ -346,7 +345,6 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 				if strings.Contains(internalErr.Error(), "EOF") {
 					eofCount = eofCount + 1
 					if eofCount >= 14 {
-						// logrus.Warningf("client seems dead")
 						return retry.StopRetryError(internalErr, "client seems dead")
 					}
 				}
@@ -357,7 +355,6 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 				return internalErr
 			}
 			if session != nil { // race condition mitigation
-				// logrus.Warningf("too late")
 				return fmt.Errorf("too late")
 			}
 			logrus.Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
@@ -545,7 +542,11 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 
 	if remote {
 		if !netutils.CheckRemoteTCP(sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port) {
-			if !netutils.CheckRemoteTCP(sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port) {
+			if !valid.IsNil(sc.SecondaryGatewayConfig) {
+				if !netutils.CheckRemoteTCP(sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port) {
+					return nil, nil, fail.NewError("No direct connection to any gateway")
+				}
+			} else {
 				return nil, nil, fail.NewError("No direct connection to any gateway")
 			}
 			gateway = altgateway // connect through alternative gateway
@@ -740,14 +741,35 @@ func (sc *Profile) CopyWithTimeout(ctx context.Context, remotePath string, local
 	// wait anyway until call it's finished, then return an error
 	// if sc.Copy can handle contexts well, we don't have to wait until it's finished
 	// however is not the case here
-	<-rCh
+	select {
+	case _ = <-rCh:
+	case <-time.After(5 * time.Second): // grace period
+	}
+
 	if ctx.Err() != nil {
 		return -1, "", "", fail.Wrap(ctx.Err())
 	}
+
 	if currentCtx.Err() != nil {
 		return -1, "", "", fail.Wrap(currentCtx.Err())
 	}
+
 	return -1, "", "", fail.NewError("timeout copying...")
+}
+
+func closeAndLog(in io.Closer) {
+	if in != nil {
+		err := in.Close()
+		if err != nil {
+			logrus.Tracef(err.Error())
+		}
+	}
+}
+
+func closeAndIgnore(in io.Closer) {
+	if in != nil {
+		_ = in.Close()
+	}
 }
 
 // Copy copies a file/directory from/to local to/from remote
@@ -781,48 +803,28 @@ func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if conn != nil {
-				connErr := conn.Close()
-				if connErr != nil {
-					logrus.Warnf("connErr: %v", connErr)
-				}
-			}
-		}()
+		defer closeAndLog(conn)
 
 		// create new SFTP client
 		client, err := sftp.NewClient(conn)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if client != nil {
-				cliErr := client.Close()
-				if cliErr != nil {
-					logrus.Warnf("cliErr: %v", cliErr)
-				}
-			}
-		}()
+		defer closeAndLog(client)
 
 		// create destination file
 		dstFile, err := client.Create(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if dstFile != nil {
-				dstErr := dstFile.Close()
-				if dstErr != nil {
-					logrus.Warnf("dstErr: %v", dstErr)
-				}
-			}
-		}()
+		defer closeAndLog(dstFile)
 
 		// create source file
 		srcFile, err := os.Open(localPath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
+		defer closeAndLog(srcFile)
 
 		// copy source file to destination file
 		written, err := io.Copy(dstFile, srcFile)
@@ -858,48 +860,28 @@ func (sc *Profile) copy(ctx context.Context, remotePath string, localPath string
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if conn != nil {
-				clErr := conn.Close()
-				if clErr != nil {
-					logrus.Warnf("clErr: %v", clErr)
-				}
-			}
-		}()
+		defer closeAndLog(conn)
 
 		// create new SFTP client
 		client, err := sftp.NewClient(conn)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if client != nil {
-				cliErr := client.Close()
-				if cliErr != nil {
-					logrus.Warnf("cliErr: %v", cliErr)
-				}
-			}
-		}()
+		defer closeAndLog(client)
 
 		// create destination file
 		dstFile, err := os.Create(localPath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		defer func() {
-			if dstFile != nil {
-				dstErr := dstFile.Close()
-				if dstErr != nil {
-					logrus.Warnf("dstErr: %v", dstErr)
-				}
-			}
-		}()
+		defer closeAndLog(dstFile)
 
 		// open source file
 		srcFile, err := client.Open(remotePath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
+		defer closeAndLog(srcFile)
 
 		// copy source file to destination file
 		written, err := io.Copy(dstFile, srcFile)

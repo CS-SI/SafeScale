@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -30,6 +31,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
@@ -46,6 +49,16 @@ func executeScript(
 	ctx context.Context, timings temporal.Timings, sshconfig ssh.Profile, name string,
 	data map[string]interface{},
 ) (string, fail.Error) {
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "aborted")
+	}
+
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
@@ -105,14 +118,21 @@ func executeScript(
 
 	defer func() {
 		if derr := utils.LazyRemove(f.Name()); derr != nil {
-			logrus.Warnf("Error deleting file: %v", derr)
+			logrus.Debugf("Error deleting file: %v", derr)
 		}
 	}()
 
+	transferTime := 30 * time.Second
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
+			fin, err := f.Stat()
+			if err != nil {
+				return err
+			}
+
+			transferTime = time.Duration(fin.Size())*time.Second/(64*1024) + 30*time.Second
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(task.Context(), filename, f.Name(), true, transferTime)
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -125,7 +145,7 @@ func executeScript(
 			return nil
 		},
 		timings.NormalDelay(),
-		2*temporal.MaxTimeout(timings.HostOperationTimeout(), timings.ConnectionTimeout()+timings.OperationTimeout()),
+		4*transferTime,
 	)
 	if xerr != nil {
 		switch xerr.(type) {

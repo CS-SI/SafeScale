@@ -93,7 +93,15 @@ func (c bucket) Download(name string, timeout time.Duration) (*protocol.BucketDo
 		return nil, xerr
 	}
 
-	dr, err := service.Download(ctx, &protocol.BucketRequest{Name: name})
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	dr, err := service.Download(newCtx, &protocol.BucketRequest{Name: name})
 	return dr, err
 }
 

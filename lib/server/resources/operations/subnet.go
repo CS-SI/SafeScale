@@ -337,10 +337,12 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	return nil
 }
 
+// IsNull tells if the instance is a null value
 func (instance *Subnet) IsNull() bool {
 	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && valid.IsNil(instance.MetadataCore))))
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Subnet) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
 	_, err := instance.Service().InspectSubnet(ctx, theID)

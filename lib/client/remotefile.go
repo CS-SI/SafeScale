@@ -75,43 +75,6 @@ func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error 
 	return nil
 }
 
-// UploadString transfers a string as file to the remote host
-func (rfc RemoteFileItem) UploadString(clientSession *Session, content string, hostname string) error {
-	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
-
-	}
-
-	// Copy the file
-	retcode, _, _, err := clientSession.SSH.Copy(rfc.Local, hostname+":"+rfc.Remote, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to copy file '%s'", rfc.Local)
-	}
-
-	// Updates owner and access rights if asked for
-	cmd := ""
-	if rfc.RemoteOwner != "" {
-		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
-	}
-	if rfc.RemoteRights != "" {
-		if cmd != "" {
-			cmd += " && "
-		}
-		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
-	}
-	retcode, _, _, err = clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to update owner and/or access rights of the remote file")
-	}
-	return nil
-}
-
 // RemoveRemote deletes the remote file from host
 func (rfc RemoteFileItem) RemoveRemote(clientSession *Session, hostname string) error {
 	if clientSession == nil {

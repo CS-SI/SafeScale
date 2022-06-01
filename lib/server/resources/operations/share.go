@@ -195,6 +195,7 @@ func (instance *Share) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Share) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: There is no InspectShare
 	return true, nil

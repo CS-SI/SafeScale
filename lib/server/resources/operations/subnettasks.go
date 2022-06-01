@@ -227,7 +227,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
+	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
 
 	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
 		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)
@@ -262,7 +262,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 
 		time.Sleep(timings.RebootTimeout())
 
-		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
+		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -279,7 +279,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	// By design, phase 5 doesn't  touch network cfg, so no reboot needed
-	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, time.Duration(0))
+	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, waitingTime)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

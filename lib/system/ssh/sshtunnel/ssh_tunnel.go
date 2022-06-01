@@ -36,6 +36,8 @@ type logger interface {
 	Printf(string, ...interface{})
 }
 
+type Printfer = logger
+
 type extendedLogger interface {
 	Printf(string, ...interface{})
 	Errorf(string, ...interface{})
@@ -70,7 +72,7 @@ type Option func(tunnel *SSHTunnel) error
 
 type SSHTunnel struct {
 	local  *Entrypoint
-	server *SSHJump // a.k.a the gateway, or the jump
+	server *SSHJump // a.k.a. the gateway, or the jump
 	remote *Endpoint
 
 	config *ssh.ClientConfig
@@ -142,6 +144,10 @@ func (tunnel *SSHTunnel) SetCommand(cmd string) {
 	tunnel.command = cmd
 }
 
+func (tunnel *SSHTunnel) GetLogger() Printfer {
+	return tunnel.log
+}
+
 func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn) (err error) {
 	defer OnPanic(&err)
 	conn, err := listener.Accept()
@@ -210,7 +216,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 
 	tunnel.mu.Lock()
 	if tunnel.isOpen {
-		defer tunnel.mu.Unlock()
+		tunnel.mu.Unlock() // nolint
 		return fmt.Errorf("error starting the ssh tunnel: already started")
 	}
 
@@ -245,9 +251,12 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	}(time.Now())
 
 	for {
+		tunnel.mu.Lock()
 		if !tunnel.isOpen {
+			tunnel.mu.Unlock() // nolint
 			break
 		}
+		tunnel.mu.Unlock() // nolint
 
 		errCh := make(chan error)
 		connCh := make(chan net.Conn)
@@ -280,9 +289,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 			continue
 		case <-tunnel.closer:
 			tunnel.logf("close signal received through channel: closing tunnel...\n")
-			tunnel.isOpen = false
-			close(tunnel.closer)
-			tunnel.closer = nil
 		case conn := <-connCh:
 			tunnel.mu.Lock()
 			tunnel.conns = append(tunnel.conns, conn)
@@ -312,6 +318,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				if quittingErr != nil {
 					litter.Config.HidePrivateFields = false
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
+					tunnel.quit()
 				}
 				return // nolint
 			}()
@@ -379,6 +386,13 @@ func TunnelOptionWithDefaultKeepAlive() Option {
 func TunnelOptionWithLogger(myLogger logger) Option {
 	return func(tunnel *SSHTunnel) error {
 		tunnel.log = myLogger
+		return nil
+	}
+}
+
+func TunnelOptionWithTrustedKey(tk string) Option {
+	return func(tunnel *SSHTunnel) error {
+		tunnel.config.HostKeyCallback = TrustedHostKeyCallbackWithLogger(tunnel.log, tk)
 		return nil
 	}
 }
@@ -614,7 +628,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 				return
 			default:
 				tunnel.errorf("the tunnel is dead after %s (%s)...", minim, tunnel.command)
-				// tunnel.Close() // if so, we have a use of closed connection error
+				tunnel.quit()
 				return
 			}
 		}
@@ -627,6 +641,23 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 }
 
 func (tunnel *SSHTunnel) Close() { // kept for compatibility issues
+	tunnel.quit()
+	return // nolint
+}
+
+func (tunnel *SSHTunnel) quit() {
+	tunnel.mu.Lock()
+	defer tunnel.mu.Unlock()
+
+	if !tunnel.isOpen {
+		return
+	}
+
+	tunnel.isOpen = false
+
+	tunnel.closer <- struct{}{}
+	close(tunnel.closer)
+
 	return // nolint
 }
 

@@ -22,11 +22,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
@@ -35,6 +35,7 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -52,6 +53,16 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if task.Aborted() {
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
+	}
+
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
@@ -66,12 +77,12 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	)
 
 	hostName := instance.GetName()
-	sshProfile, xerr := instance.GetSSHConfig(ctx)
+	sshProfile, xerr := instance.GetSSHConfig(task.Context())
 	if xerr != nil {
 		return retCode, stdOut, stdErr, xerr
 	}
 
-	retCode, stdOut, stdErr, xerr = run(ctx, sshProfile, cmd, outs, connTimeout+execTimeout)
+	retCode, stdOut, stdErr, xerr = run(task.Context(), sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -177,6 +188,13 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
+	instance.localCache.RLock()
+	notok := instance.localCache.sshProfile == nil
+	instance.localCache.RUnlock() // nolint
+	if notok {
+		return invalid, "", "", fail.InvalidInstanceContentError("instance.localCache.sshProfile", "cannot be nil")
+	}
+
 	if source == "" {
 		return invalid, "", "", fail.InvalidParameterError("source", "cannot be empty string")
 	}
@@ -184,19 +202,29 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
 
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if task.Aborted() {
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
+	}
+
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
 
-	timeout = temporal.MaxTimeout(timeout, timings.HostOperationTimeout())
-
 	md5hash := ""
+	uploadSize := 0
 	if source != "" {
 		content, err := ioutil.ReadFile(source)
 		if err != nil {
 			return invalid, "", "", fail.AbortedError(err, "aborted")
 		}
+		uploadSize = len(content)
 		md5hash = getMD5Hash(string(content))
 	}
 
@@ -204,17 +232,21 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		stdout, stderr string
 	)
 	retcode := -1
-	sshProfile, xerr := instance.GetSSHConfig(ctx)
+	sshProfile, xerr := instance.GetSSHConfig(task.Context())
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
 
+	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			copyCtx, cancel := context.WithTimeout(ctx, timeout)
+			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
+
+			copyCtx, cancel := context.WithTimeout(task.Context(), uploadTime)
 			defer cancel()
 
-			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, timeout)
+			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, uploadTime)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -225,12 +257,17 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 				problem.Annotate("retcode", iretcode)
 				return problem
 			}
+			if retcode == 1 && (strings.Contains(stderr, "lost connection") || strings.Contains(stdout, "lost connection")) {
+				problem := fail.NewError(stderr)
+				problem.Annotate("retcode", retcode)
+				return problem
+			}
 
 			crcCheck := func() fail.Error {
-				crcCtx, cancelCrc := context.WithTimeout(ctx, timeout)
+				crcCtx, cancelCrc := context.WithTimeout(task.Context(), uploadTime)
 				defer cancelCrc()
 
-				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
+				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, uploadTime)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -239,7 +276,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 					switch finnerXerr.(type) {
 					case *fail.ErrTimeout:
-						return fail.Wrap(fail.Cause(finnerXerr), "failed to check md5 in %v delay", timeout)
+						return fail.Wrap(fail.Cause(finnerXerr), "failed to check md5 in %v delay", uploadTime)
 					case *retry.ErrStopRetry:
 						return fail.Wrap(fail.Cause(finnerXerr), "stopping retries")
 					default:
@@ -273,7 +310,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			return nil
 		},
 		timings.NormalDelay(),
-		2*timeout,
+		timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -299,7 +336,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(ctx, sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(task.Context(), sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -377,10 +414,6 @@ func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1
 	return mounts, nil
 }
 
-func (instance *Host) unsafePushStringToFile(ctx context.Context, content string, filename string) (ferr fail.Error) {
-	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, "", "")
-}
-
 // unsafePushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
 func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -398,6 +431,16 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
@@ -409,6 +452,13 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
+
+	defer func() {
+		rerr := utils.LazyRemove(f.Name())
+		if rerr != nil {
+			logrus.Debugf(rerr.Error())
+		}
+	}()
 
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
@@ -433,7 +483,6 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		timings.SmallDelay(),
 		2*temporal.MaxTimeout(timings.ConnectionTimeout(), timings.ExecutionTimeout()),
 	)
-	_ = os.Remove(f.Name())
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
