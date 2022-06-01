@@ -164,6 +164,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 	return hostInstance, nil
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
 	_, err := instance.Service().InspectHost(ctx, theID)
@@ -2307,7 +2308,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 	var shares map[string]*propertiesv1.HostShare
 	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Do not remove a Host having shares that are currently remotely mounted
+		// Do not remove a Host having shared folders that are currently remotely mounted
 		innerXErr := props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -3756,7 +3757,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 		return xerr
 	}
 
-	// -- Remove Host reference in Security Group
+	// -- Remove Host referenced in Security Group
 	return sgInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
@@ -3889,7 +3890,6 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
 						debug.IgnoreError(xerr)
-						// continue
 					default:
 						return xerr
 					}
@@ -4045,4 +4045,50 @@ func ReserveCIDRForSingleHost(ctx context.Context, networkInstance resources.Net
 		return "", 0, xerr
 	}
 	return result.String(), index, nil
+}
+
+func getCommand(file string) string {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		command := fmt.Sprintf("sudo bash %s; exit $?", file)
+		logrus.Debugf("running '%s'", command)
+		return command
+	default:
+		// "sudo -b bash -c 'nohup %s > /dev/null 2>&1 &'"
+		command := fmt.Sprintf("sudo -b bash -c 'nohup %s > /dev/null 2>&1 &'", file)
+		logrus.Debugf("running '%s'", command)
+		return command
+	}
+}
+
+func getPhase2Timeout(timings temporal.Timings) time.Duration {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		return timings.HostOperationTimeout()
+	default:
+		return timings.ContextTimeout()
+	}
+}
+
+func getPhase4Timeout(timings temporal.Timings) time.Duration {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
+		return waitingTime
+	default:
+		return 30 * time.Second
+	}
+}
+
+func inBackground() bool {
+	theType, _ := getDefaultConnectorType()
+	switch theType {
+	case "cli":
+		return false
+	default:
+		return true
+	}
 }

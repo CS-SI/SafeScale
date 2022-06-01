@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -348,19 +349,20 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	stdErr := ""
 
 	task := handler.job.Task()
+	ctx := handler.job.Context()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(task.Context(), handler.job.Service(), hostRef)
+	host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, xerr := host.GetSSHConfig(task.Context())
+	ssh, xerr := host.GetSSHConfig(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -563,7 +565,18 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(task.Context(), remotePath, localPath, upload, timings.HostLongOperationTimeout())
+			theTime := timings.HostLongOperationTimeout()
+			if upload {
+				fi, err := os.Stat(localPath)
+				if err != nil {
+					return err
+				}
+				// get the size
+				size := fi.Size()
+				theTime = time.Duration(size)*time.Second/(64*1024) + 30*time.Second
+			}
+
+			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(task.Context(), remotePath, localPath, upload, theTime)
 			if innerXErr != nil {
 				return innerXErr
 			}

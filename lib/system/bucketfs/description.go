@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 // Description contains the configuration for bucket mount
@@ -51,7 +52,10 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 
 	// cleanup local temporary file
 	defer func() {
-		_ = os.Remove(f.Name())
+		rerr := utils.LazyRemove(f.Name())
+		if rerr != nil {
+			logrus.Debugf(rerr.Error())
+		}
 	}()
 
 	svc := host.Service()

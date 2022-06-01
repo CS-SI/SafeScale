@@ -532,7 +532,6 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	// Uploads the script into remote file
 	rfcItem := Item{Remote: path}
 	xerr = rfcItem.UploadString(task.Context(), script, host)
-	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to upload %s to %s", tmplName, host.GetName())
