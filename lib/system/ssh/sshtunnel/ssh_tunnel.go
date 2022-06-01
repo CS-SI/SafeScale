@@ -216,7 +216,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 
 	tunnel.mu.Lock()
 	if tunnel.isOpen {
-		tunnel.mu.Unlock()
+		tunnel.mu.Unlock() // nolint
 		return fmt.Errorf("error starting the ssh tunnel: already started")
 	}
 
@@ -253,10 +253,10 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	for {
 		tunnel.mu.Lock()
 		if !tunnel.isOpen {
-			tunnel.mu.Unlock()
+			tunnel.mu.Unlock() // nolint
 			break
 		}
-		tunnel.mu.Unlock()
+		tunnel.mu.Unlock() // nolint
 
 		errCh := make(chan error)
 		connCh := make(chan net.Conn)
