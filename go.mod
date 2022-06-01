@@ -37,7 +37,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.8.6
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.8.1
-	github.com/spf13/viper v1.12.0
+	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli v1.22.9
 	github.com/zserge/metric v0.1.0
