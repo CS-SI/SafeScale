@@ -641,6 +641,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 }
 
 func (tunnel *SSHTunnel) Close() { // kept for compatibility issues
+	tunnel.quit()
 	return // nolint
 }
 
