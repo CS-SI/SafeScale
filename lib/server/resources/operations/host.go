@@ -164,6 +164,7 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 	return hostInstance, nil
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
 	_, err := instance.Service().InspectHost(ctx, theID)
@@ -2307,7 +2308,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 	var shares map[string]*propertiesv1.HostShare
 	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Do not remove a Host having shares that are currently remotely mounted
+		// Do not remove a Host having shared folders that are currently remotely mounted
 		innerXErr := props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -3756,7 +3757,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 		return xerr
 	}
 
-	// -- Remove Host reference in Security Group
+	// -- Remove Host referenced in Security Group
 	return sgInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)

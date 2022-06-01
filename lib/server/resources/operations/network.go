@@ -124,6 +124,7 @@ func (instance *Network) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
 	_, err := instance.Service().InspectNetwork(ctx, theID)

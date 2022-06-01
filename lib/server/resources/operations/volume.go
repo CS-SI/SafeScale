@@ -133,6 +133,7 @@ func (instance *volume) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *volume) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
 	_, err := instance.Service().InspectVolume(ctx, theID)
