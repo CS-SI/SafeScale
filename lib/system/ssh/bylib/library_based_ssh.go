@@ -1,6 +1,3 @@
-//go:build tunnel
-// +build tunnel
-
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
@@ -17,14 +14,13 @@
  * limitations under the License.
  */
 
-package ssh
+package bylib
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -33,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
@@ -53,21 +50,54 @@ import (
 
 // Profile helper to manage ssh session
 type Profile struct {
-	User                   string   `json:"user"`
-	IPAddress              string   `json:"ip_address"`
-	PrivateKey             string   `json:"private_key"`
-	Port                   int      `json:"port"`
-	LocalPort              int      `json:"-"`
-	LocalHost              string   `json:"local_host"`
-	GatewayConfig          *Profile `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig *Profile `json:"secondary_gateway_config,omitempty"`
-	Hostname               string   `json:"hostname"`
+	Hostname               string      `json:"hostname"`
+	IPAddress              string      `json:"ip_address"`
+	Port                   int         `json:"port"`
+	User                   string      `json:"user"`
+	PrivateKey             string      `json:"private_key"`
+	LocalPort              int         `json:"-"`
+	LocalHost              string      `json:"local_host"`
+	GatewayConfig          ssh2.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig ssh2.Config `json:"secondary_gateway_config,omitempty"`
+}
+
+func (sconf *Profile) CreatePersistentTunneling() fail.Error {
+	return nil
+}
+
+func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
+	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
+}
+
+func NewConnector(ac ssh2.Config) (*Profile, fail.Error) {
+	if valid.IsNil(ac) {
+		return nil, fail.InvalidParameterCannotBeNilError("ac")
+	}
+
+	hostname, _ := ac.GetHostname()
+	IPAddress, _ := ac.GetIPAddress()
+	port, _ := ac.GetPort()
+	user, _ := ac.GetUser()
+	privateKey, _ := ac.GetPrivateKey()
+	localPort, _ := ac.GetLocalPort()
+	localHost, _ := ac.GetLocalHost()
+	gatewayConfig, _ := ac.GetPrimaryGatewayConfig()
+	secondaryGatewayConfig, _ := ac.GetSecondaryGatewayConfig()
+
+	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
 }
 
 // Tunnel a SSH tunnel
 type Tunnel struct {
 	cfg  Profile // nolint
 	port int     // nolint
+}
+
+func (sconf *Profile) Config() (ssh2.Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return sconf, nil
 }
 
 func (sconf *Profile) GetUser() (string, fail.Error) {
@@ -82,6 +112,13 @@ func (sconf *Profile) GetHostname() (string, fail.Error) {
 		return "", fail.InvalidInstanceError()
 	}
 	return sconf.Hostname, nil
+}
+
+func (sconf *Profile) GetLocalHost() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.LocalHost, nil
 }
 
 func (sconf *Profile) GetPort() (uint, fail.Error) {
@@ -112,21 +149,21 @@ func (sconf *Profile) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf *Profile) GetPrimaryGatewayConfig() (Config, fail.Error) {
+func (sconf *Profile) GetPrimaryGatewayConfig() (ssh2.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf *Profile) GetSecondaryGatewayConfig() (Config, fail.Error) {
+func (sconf *Profile) GetSecondaryGatewayConfig() (ssh2.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf *Profile) GetGatewayConfig(num uint) (Config, fail.Error) {
+func (sconf *Profile) GetGatewayConfig(num uint) (ssh2.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -141,34 +178,20 @@ func (sconf *Profile) GetGatewayConfig(num uint) (Config, fail.Error) {
 	}
 }
 
-// CreateTempFileFromString creates a temporary file containing 'content'
-func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
-	defaultTmpDir := os.TempDir()
-
-	f, err := ioutil.TempFile(defaultTmpDir, "")
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to create temporary file")
-	}
-	_, err = f.WriteString(content)
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to wrote string to temporary file")
+func (sconf *Profile) HasGateways() (bool, fail.Error) {
+	if valid.IsNil(sconf) {
+		return false, fail.InvalidInstanceError()
 	}
 
-	err = f.Chmod(filemode)
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
+	if sconf.GatewayConfig == nil && sconf.SecondaryGatewayConfig == nil {
+		return false, nil
 	}
 
-	err = f.Close()
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to close temporary file")
-	}
-
-	return f, nil
+	return true, nil
 }
 
-// Command defines a SSH command
-type Command struct {
+// LibCommand defines an SSH command
+type LibCommand struct {
 	withSudo bool
 	username string
 	cfg      *Profile
@@ -176,7 +199,7 @@ type Command struct {
 	tunnels  *sshtunnel.SSHTunnel
 }
 
-func (sc *Command) closeTunneling() error {
+func (sc *LibCommand) closeTunneling() error {
 	logrus.Debugf("Closing tunnels")
 
 	if sc.tunnels != nil {
@@ -189,7 +212,7 @@ func (sc *Command) closeTunneling() error {
 // Output runs the command and returns its standard output.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
-func (sc *Command) Output() (_ []byte, ferr error) {
+func (sc *LibCommand) Output() (_ []byte, ferr error) {
 	if sc.cmd.Stdout != nil {
 		return []byte(""), nil
 	}
@@ -211,12 +234,16 @@ func (sc *Command) Output() (_ []byte, ferr error) {
 }
 
 // Display ...
-func (sc *Command) Display() string {
+func (sc *LibCommand) Display() string {
 	return strings.Join(sc.cmd.Args, " ")
 }
 
+func (sc *LibCommand) String() string {
+	return sc.Display()
+}
+
 // RunWithTimeout ...
-func (sc *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (sc *LibCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	var rc int
 	var rout string
 	var rerr string
@@ -224,7 +251,7 @@ func (sc *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeou
 
 	expandedTimeout := timeout
 	if expandedTimeout > 0 {
-		expandedTimeout = expandedTimeout + 5*time.Second
+		expandedTimeout += 5 * time.Second
 	}
 
 	xerr := retry.WhileUnsuccessful(func() error { // retry only if we have a tunnel problem
@@ -266,8 +293,14 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 }
 
 // NewRunWithTimeout ...
-func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return 0, "", "", xerr
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.Exiting()
 
@@ -343,7 +376,7 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 				retries = retries + 1 // nolint
 				logrus.Tracef("problem creating session: %s", internalErr.Error())
 				if strings.Contains(internalErr.Error(), "EOF") {
-					eofCount = eofCount + 1
+					eofCount++
 					if eofCount >= 14 {
 						return retry.StopRetryError(internalErr, "client seems dead")
 					}
@@ -483,7 +516,7 @@ func (sc *Command) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 	return res.errorcode, res.stdout, res.stderr, nil
 }
 
-func (sc *Command) cleanup() error {
+func (sc *LibCommand) cleanup() error {
 	err1 := sc.closeTunneling()
 	if err1 != nil {
 		logrus.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
@@ -494,7 +527,7 @@ func (sc *Command) cleanup() error {
 }
 
 // Close this function exists only to provide compatibility with previous SSH api
-func (sc *Command) Close() fail.Error {
+func (sc *LibCommand) Close() fail.Error {
 	return nil
 }
 
@@ -503,10 +536,10 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
-		sc.LocalHost = LocalHost
+		sc.LocalHost = ssh2.LocalHost
 	}
 
-	internalPort := SSHPort // all machines use port 22...
+	internalPort := ssh2.SSHPort // all machines use port 22...
 	var gateway *sshtunnel.Endpoint
 	var altgateway *sshtunnel.Endpoint
 	var remote bool
@@ -523,8 +556,14 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 	} else {
 		var rerr error
 		remote = true
-		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.GatewayConfig.User, sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port),
-			sshtunnel.EndpointOptionKeyFromString(sc.GatewayConfig.PrivateKey, ""))
+
+		scu, _ := sc.GatewayConfig.GetUser()
+		sci, _ := sc.GatewayConfig.GetIPAddress()
+		scp, _ := sc.GatewayConfig.GetPort()
+		scpk, _ := sc.GatewayConfig.GetPrivateKey()
+
+		gateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", scu, sci, scp),
+			sshtunnel.EndpointOptionKeyFromString(scpk, ""))
 		if rerr != nil {
 			return nil, nil, rerr
 		}
@@ -533,17 +572,27 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 	if sc.SecondaryGatewayConfig != nil {
 		var rerr error
 		remote = true
-		altgateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", sc.SecondaryGatewayConfig.User, sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port),
-			sshtunnel.EndpointOptionKeyFromString(sc.SecondaryGatewayConfig.PrivateKey, ""))
+
+		scu, _ := sc.SecondaryGatewayConfig.GetUser()
+		sci, _ := sc.SecondaryGatewayConfig.GetIPAddress()
+		scp, _ := sc.SecondaryGatewayConfig.GetPort()
+		scpk, _ := sc.SecondaryGatewayConfig.GetPrivateKey()
+
+		altgateway, rerr = sshtunnel.NewEndpoint(fmt.Sprintf("%s@%s:%d", scu, sci, scp),
+			sshtunnel.EndpointOptionKeyFromString(scpk, ""))
 		if rerr != nil {
 			return nil, nil, rerr
 		}
 	}
 
 	if remote {
-		if !netutils.CheckRemoteTCP(sc.GatewayConfig.IPAddress, sc.GatewayConfig.Port) {
+		sci, _ := sc.GatewayConfig.GetIPAddress()
+		scp, _ := sc.GatewayConfig.GetPort()
+		if !netutils.CheckRemoteTCP(sci, int(scp)) {
 			if !valid.IsNil(sc.SecondaryGatewayConfig) {
-				if !netutils.CheckRemoteTCP(sc.SecondaryGatewayConfig.IPAddress, sc.SecondaryGatewayConfig.Port) {
+				sci, _ := sc.SecondaryGatewayConfig.GetIPAddress()
+				scp, _ := sc.SecondaryGatewayConfig.GetPort()
+				if !netutils.CheckRemoteTCP(sci, int(scp)) {
 					return nil, nil, fail.NewError("No direct connection to any gateway")
 				}
 			} else {
@@ -591,28 +640,28 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 }
 
 // Command returns the cmd struct to execute cmdString remotely
-func (sc *Profile) Command(cmdString string) (*Command, fail.Error) {
+func (sc *Profile) Command(cmdString string) (*LibCommand, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
 // NewCommand returns the cmd struct to execute cmdString remotely
-func (sc *Profile) NewCommand(_ context.Context, cmdString string) (*Command, fail.Error) {
+func (sc *Profile) NewCommand(_ context.Context, cmdString string) (ssh2.CommandInterface, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
 // SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *Profile) SudoCommand(cmdString string) (*Command, fail.Error) {
+func (sc *Profile) SudoCommand(cmdString string) (*LibCommand, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
 // NewSudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (*Command, fail.Error) {
+func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (ssh2.CommandInterface, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
-func (sc *Profile) command(cmdString string, withTty, withSudo bool) (*Command, fail.Error) {
+func (sc *Profile) command(cmdString string, withTty, withSudo bool) (*LibCommand, fail.Error) {
 	cmd := exec.Command(cmdString)
-	sshCommand := Command{
+	sshCommand := LibCommand{
 		withSudo: withSudo,
 		username: "",
 		cfg:      sc,
@@ -742,7 +791,7 @@ func (sc *Profile) CopyWithTimeout(ctx context.Context, remotePath string, local
 	// if sc.Copy can handle contexts well, we don't have to wait until it's finished
 	// however is not the case here
 	select {
-	case _ = <-rCh:
+	case <-rCh:
 	case <-time.After(5 * time.Second): // grace period
 	}
 
@@ -766,7 +815,7 @@ func closeAndLog(in io.Closer) {
 	}
 }
 
-func closeAndIgnore(in io.Closer) {
+func closeAndIgnore(in io.Closer) { // nolint
 	if in != nil {
 		_ = in.Close()
 	}

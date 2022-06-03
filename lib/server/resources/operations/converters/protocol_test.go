@@ -32,40 +32,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_SSHConfigFromProtocolToSystem(t *testing.T) {
-
-	sc := &protocol.SshConfig{
-		User:       "User",
-		Host:       "Host",
-		PrivateKey: "PrivateKey",
-		Port:       0,
-		Gateway: &protocol.SshConfig{
-			User:       "Gateway User",
-			Host:       "Gateway Host",
-			PrivateKey: "Gateway PrivateKey",
-			Port:       0,
-			HostName:   "Gateway HostName",
-		},
-		SecondaryGateway: &protocol.SshConfig{
-			User:       "SecondaryGateway User",
-			Host:       "SecondaryGateway Host",
-			PrivateKey: "SecondaryGateway PrivateKey",
-			Port:       0,
-			HostName:   "SecondaryGateway HostName",
-		},
-		HostName: "HostName",
-	}
-
-	ssc := SSHConfigFromProtocolToSystem(sc)
-
-	require.EqualValues(t, sc.User, ssc.User)
-	require.EqualValues(t, sc.HostName, ssc.Hostname)
-	require.EqualValues(t, sc.Host, ssc.IPAddress)
-	require.EqualValues(t, sc.PrivateKey, ssc.PrivateKey)
-	require.EqualValues(t, sc.Port, ssc.Port)
-
-}
-
 func Test_FeatureSettingsFromProtocolToResource(t *testing.T) {
 
 	rfs := FeatureSettingsFromProtocolToResource(nil)

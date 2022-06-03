@@ -29,11 +29,11 @@ import (
 // Server getServer structure
 type Server struct {
 	svc       iaas.Service
-	SSHConfig *ssh.Profile
+	SSHConfig ssh.Connector
 }
 
 // NewServer instantiates a new nfs.getServer struct
-func NewServer(svc iaas.Service, sshconfig *ssh.Profile) (srv *Server, err fail.Error) {
+func NewServer(svc iaas.Service, sshconfig ssh.Connector) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
@@ -56,7 +56,7 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 		return xerr
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install nfs server")
@@ -124,7 +124,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 		"Path": path,
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
@@ -151,7 +151,7 @@ func (s *Server) MountBlockDevice(
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		istdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "block_device_mount.sh", data)
+		istdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
 			return fail.Wrap(xerr, "error executing script to mount block device")
