@@ -294,13 +294,7 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 
 // NewRunWithTimeout ...
 func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return 0, "", "", xerr
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.Exiting()
 
