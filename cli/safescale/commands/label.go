@@ -1,0 +1,252 @@
+/*
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package commands
+
+import (
+	"fmt"
+
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/v22/lib/client"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+)
+
+var (
+	labelCmdName = "label"
+	tagCmdName   = "tag"
+)
+
+// LabelCommand tag command
+var LabelCommand = cli.Command{
+	Name:  labelCmdName,
+	Usage: labelCmdName + " COMMAND",
+	Subcommands: cli.Commands{
+		labelListCommand,
+		labelInspectCommand,
+		labelDeleteCommand,
+		labelCreateCommand,
+	},
+}
+
+var labelListCommand = cli.Command{
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available Labels",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
+
+		list, err := ClientSession.Label.List(false, temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Labels", false).Error())))
+		}
+		return clitools.SuccessResponse(list.Labels)
+	},
+}
+
+var labelInspectCommand = cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Inspect Label",
+	ArgsUsage: "LABELREF",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument LABELREF."))
+		}
+
+		labelInfo, err := ClientSession.Label.Inspect(c.Args().First(), false, temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of Label", false).Error())))
+		}
+
+		return clitools.SuccessResponse(labelInfo)
+	},
+}
+
+var labelDeleteCommand = cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
+	Usage:     "Remove Label",
+	ArgsUsage: "LABELREF [LABELREF...]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "force",
+			Usage: "Force deletion even if the Label has resources bound to it",
+		},
+	},
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
+		if c.NArg() < 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument LABELREF."))
+		}
+
+		var list []string
+		list = append(list, c.Args().First())
+		list = append(list, c.Args().Tail()...)
+
+		err := ClientSession.Label.Delete(list, false, temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of Label", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var labelCreateCommand = cli.Command{
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "Create a Label",
+	ArgsUsage: "LABELNAME [DEFAULTVALUE]",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Tag_name>. "))
+		}
+
+		label, err := ClientSession.Label.Create(c.Args().First(), true, c.Args().Get(1), temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of Label", true).Error())))
+		}
+		return clitools.SuccessResponse(label)
+	},
+}
+
+// TagCommand tag command
+var TagCommand = cli.Command{
+	Name:  "tag",
+	Usage: "tag COMMAND",
+	Subcommands: cli.Commands{
+		tagListCommand,
+		tagInspectCommand,
+		tagDeleteCommand,
+		tagCreateCommand,
+	},
+}
+
+var tagListCommand = cli.Command{
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available Tags in Tenant",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
+
+		list, err := ClientSession.Label.List(true, temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Tags", false).Error())))
+		}
+		return clitools.SuccessResponse(list.Labels)
+	},
+}
+
+var tagInspectCommand = cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Inspect tag",
+	ArgsUsage: "TAGREF",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument TAGREF."))
+		}
+
+		tagInfo, err := ClientSession.Label.Inspect(c.Args().First(), true, temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of Tag", false).Error())))
+		}
+
+		if tagInfo.HasDefault {
+			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("inspection of Tag: '%s' is a Label", c.Args().First())))
+		}
+		return clitools.SuccessResponse(tagInfo)
+	},
+}
+
+var tagDeleteCommand = cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
+	Usage:     "Remove tag",
+	ArgsUsage: "TAGREF [TAGREF...]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "force",
+			Usage: "Force deletion even if the tag has resources bound",
+		},
+	},
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
+		if c.NArg() < 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument TAGREF."))
+		}
+
+		var list []string
+		list = append(list, c.Args().First())
+		list = append(list, c.Args().Tail()...)
+
+		err := ClientSession.Label.Delete(list, true, temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of Tag", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var tagCreateCommand = cli.Command{
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "Create a tag",
+	ArgsUsage: "TAGNAME",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument TAGNAME."))
+		}
+
+		tag, err := ClientSession.Label.Create(c.Args().First(), false, "", temporal.ExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of Tag", true).Error())))
+		}
+
+		return clitools.SuccessResponse(tag)
+	},
+}

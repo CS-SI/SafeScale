@@ -25,56 +25,56 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// HostTags contains the list of tags on the host
+// HostLabels contains the list of labels on the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
-type HostTags struct {
-	ByID   map[string]string `json:"by_id,omitempty"`   // map of tags by Id
-	ByName map[string]string `json:"by_name,omitempty"` // map of tags IDs by Name
+type HostLabels struct {
+	ByID   map[string]string `json:"by_id,omitempty"`   // map of Label value for the Host indexed on Label ID
+	ByName map[string]string `json:"by_name,omitempty"` // map of Label value for the Host indexed on Label Name
 }
 
-// NewHostTags ...
-func NewHostTags() *HostTags {
-	return &HostTags{
+// NewHostLabels ...
+func NewHostLabels() *HostLabels {
+	return &HostLabels{
 		ByID:   map[string]string{},
 		ByName: map[string]string{},
 	}
 }
 
 // IsNull ...
-func (htag *HostTags) IsNull() bool {
-	return htag == nil || len(htag.ByID) == 0
+func (hlabel *HostLabels) IsNull() bool {
+	return hlabel == nil || len(hlabel.ByID) == 0
 }
 
 // Clone ...
-func (htag HostTags) Clone() (data.Clonable, error) {
-	return NewHostTags().Replace(&htag)
+func (hlabel HostLabels) Clone() (data.Clonable, error) {
+	return NewHostLabels().Replace(&hlabel)
 }
 
 // Replace ...
-func (htag *HostTags) Replace(p data.Clonable) (data.Clonable, error) {
-	if htag == nil || p == nil {
+func (hlabel *HostLabels) Replace(p data.Clonable) (data.Clonable, error) {
+	if hlabel == nil || p == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostTags)
+	src, ok := p.(*HostLabels)
 	if !ok {
 		return nil, fmt.Errorf("p is not a *HostTags")
 	}
 
-	*htag = *src
-	htag.ByID = make(map[string]string, len(src.ByID))
+	*hlabel = *src
+	hlabel.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
-		htag.ByID[k] = v
+		hlabel.ByID[k] = v
 	}
-	htag.ByName = make(map[string]string, len(src.ByName))
+	hlabel.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
-		htag.ByName[k] = v
+		hlabel.ByName[k] = v
 	}
-	return htag, nil
+	return hlabel, nil
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.TagsV1, NewHostTags())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.LabelsV1, NewHostLabels())
 }

@@ -50,6 +50,9 @@ type Network struct {
 	*MetadataCore
 }
 
+// verify that Network satisfies resources.Network
+var _ resources.Network = (*Network)(nil)
+
 // NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {

@@ -26,7 +26,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
@@ -182,12 +181,7 @@ var tenantInspectCommand = cli.Command{
 
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
-		Session, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		resp, err := Session.Tenant.Inspect(c.Args().First(), 0)
+		resp, err := ClientSession.Tenant.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -217,12 +211,7 @@ var tenantScanCommand = cli.Command{
 
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
-		Session, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		results, err := Session.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), 0)
+		results, err := ClientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
@@ -267,13 +256,8 @@ var tenantMetadataUpgradeCommand = cli.Command{
 
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Command.Name, c.Args())
 
-		Session, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		// dryRun := c.Bool("dry-run")
-		results, err := Session.Tenant.Upgrade(c.Args().First(), false /*dryRun*/, 0)
+		results, err := ClientSession.Tenant.Upgrade(c.Args().First(), false /*dryRun*/, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
@@ -297,12 +281,7 @@ var tenantMetadataDeleteCommand = cli.Command{
 
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
-		Session, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := Session.Tenant.Cleanup(c.Args().First(), 0)
+		err := ClientSession.Tenant.Cleanup(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))

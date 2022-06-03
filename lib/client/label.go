@@ -28,14 +28,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// tag is the part of safescale client handling tags
-type tag struct {
+// labelConsumer is the part of safescale client handling Labels/Tags
+type labelConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
-// List ...
-func (t tag) List(all bool, timeout time.Duration) (*protocol.TagListResponse, error) {
+// List returns a list of Labels (selectTags=false) or Tags (selectTags=true)
+func (t labelConsumer) List(selectTags bool, timeout time.Duration) (*protocol.LabelListResponse, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -48,12 +48,12 @@ func (t tag) List(all bool, timeout time.Duration) (*protocol.TagListResponse, e
 	newCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	service := protocol.NewTagServiceClient(t.session.connection)
-	return service.List(newCtx, &protocol.TagListRequest{All: all})
+	service := protocol.NewLabelServiceClient(t.session.connection)
+	return service.List(newCtx, &protocol.LabelListRequest{TenantId: t.session.tenant, Tags: selectTags})
 }
 
 // Inspect ...
-func (t tag) Inspect(name string, timeout time.Duration) (*protocol.TagInspectResponse, error) {
+func (t labelConsumer) Inspect(name string, selectTag bool, timeout time.Duration) (*protocol.LabelInspectResponse, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -66,12 +66,19 @@ func (t tag) Inspect(name string, timeout time.Duration) (*protocol.TagInspectRe
 	newCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	service := protocol.NewTagServiceClient(t.session.connection)
-	return service.Inspect(newCtx, &protocol.Reference{Name: name})
+	service := protocol.NewLabelServiceClient(t.session.connection)
+	req := &protocol.LabelInspectRequest{
+		Label: &protocol.Reference{
+			TenantId: t.session.tenant,
+			Name:     name,
+		},
+		IsTag: selectTag,
+	}
+	return service.Inspect(newCtx, req)
 }
 
 // Delete ...
-func (t tag) Delete(names []string, timeout time.Duration) error {
+func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -90,14 +97,19 @@ func (t tag) Delete(names []string, timeout time.Duration) error {
 		errs  []string
 	)
 
-	service := protocol.NewTagServiceClient(t.session.connection)
+	service := protocol.NewLabelServiceClient(t.session.connection)
 
-	tagDeleter := func(aname string) {
+	labelDeleter := func(aname string) {
 		var crash error
 		defer fail.OnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
+
+		req := &protocol.LabelInspectRequest{
+			Label: &protocol.Reference{TenantId: t.session.tenant, Name: aname},
+			IsTag: selectTags,
+		}
+		_, err := service.Delete(newCtx, req)
 
 		if err != nil {
 			mutex.Lock()
@@ -108,7 +120,7 @@ func (t tag) Delete(names []string, timeout time.Duration) error {
 
 	wg.Add(len(names))
 	for _, target := range names {
-		go tagDeleter(target)
+		go labelDeleter(target)
 	}
 	wg.Wait()
 
@@ -120,7 +132,7 @@ func (t tag) Delete(names []string, timeout time.Duration) error {
 }
 
 // Create ...
-func (t tag) Create(def *protocol.TagCreateRequest, timeout time.Duration) (*protocol.TagInspectResponse, error) {
+func (t labelConsumer) Create(name string, hasDefault bool, defaultValue string, timeout time.Duration) (*protocol.LabelInspectResponse, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -133,6 +145,11 @@ func (t tag) Create(def *protocol.TagCreateRequest, timeout time.Duration) (*pro
 	newCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	service := protocol.NewTagServiceClient(t.session.connection)
+	def := &protocol.LabelCreateRequest{
+		Name:         name,
+		HasDefault:   hasDefault,
+		DefaultValue: defaultValue,
+	}
+	service := protocol.NewLabelServiceClient(t.session.connection)
 	return service.Create(newCtx, def)
 }

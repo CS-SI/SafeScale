@@ -21,52 +21,57 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/labelproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	uuidpkg "github.com/gofrs/uuid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (
-	tagKind        = "tag"
-	tagsFolderName = "tags" // is the name of the Object Storage MetadataFolder used to store tag info
+	labelKind        = "label"
+	labelsFolderName = "labels" // is the name of the Object Storage MetadataFolder used to store Label info
 )
 
-// Tag links Object Storage MetadataFolder and unsafeGetTags
-type tag struct {
+// label links Object Storage MetadataFolder and Labels/Tags
+type label struct {
 	*MetadataCore
 }
 
-// NewTag creates an instance of Tag
-func NewTag(svc iaas.Service) (_ resources.Tag, ferr fail.Error) {
+// verify that Label satisfies resources.Label
+var _ resources.Label = (*label)(nil)
+
+// NewLabel creates an instance of Label
+func NewLabel(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, tagKind, tagsFolderName, &abstract.Tag{})
+	coreInstance, xerr := NewCore(svc, labelKind, labelsFolderName, abstract.NewLabel())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	instance := &tag{
+	instance := &label{
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
 }
 
-// LoadTag loads the metadata of a tag
-func LoadTag(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (tagInstance resources.Tag, ferr fail.Error) {
+// LoadLabel loads the metadata of a Label
+func LoadLabel(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Label, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -76,54 +81,54 @@ func LoadTag(ctx context.Context, svc iaas.Service, ref string, options ...data.
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onTagCacheMiss(svc, ref) }
+	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var ok bool
-	tagInstance, ok = anon.(resources.Tag)
+	labelInstance, ok := anon.(resources.Label)
 	if !ok {
-		return nil, fail.InconsistentError("value in cache for Tag with key '%s' is not a resources.Tag", ref)
+		return nil, fail.InconsistentError("value in cache for Label with key '%s' is not a resources.Label", ref)
 	}
-	if tagInstance == nil {
-		return nil, fail.InconsistentError("nil value in cache for Tag with key '%s'", ref)
+	if labelInstance == nil {
+		return nil, fail.InconsistentError("nil value in cache for Label with key '%s'", ref)
 	}
 
-	return tagInstance, nil
+	return labelInstance, nil
 }
 
-// onTagCacheMiss is called when there is no instance in cache of Tag 'ref'
-func onTagCacheMiss(svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
-	tagInstance, innerXErr := NewTag(svc)
+// onLabelCacheMiss is called when there is no instance in cache of Label 'ref'
+func onLabelCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+	labelInstance, innerXErr := NewLabel(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewTag(svc)
+	blank, innerXErr := NewLabel(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	if innerXErr = tagInstance.Read(ref); innerXErr != nil {
+	innerXErr = labelInstance.Read(ctx, ref)
+	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(tagInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
-		return nil, fail.NotFoundError("tag with ref '%s' does NOT exist", ref)
+	if strings.Compare(fail.IgnoreError(labelInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
+		return nil, fail.NotFoundError("Label with ref '%s' does NOT exist", ref)
 	}
 
-	return tagInstance, nil
+	return labelInstance, nil
 }
 
 // IsNull tells if the instance is a null value
-func (instance *tag) IsNull() bool {
+func (instance *label) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
-// carry overloads rv.core.Carry() to add Tag to service cache
-func (instance *tag) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+// carry overloads rv.core.Carry() to add Label to service cache
+func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -137,7 +142,7 @@ func (instance *tag) carry(ctx context.Context, clonable data.Clonable) (ferr fa
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -147,7 +152,7 @@ func (instance *tag) carry(ctx context.Context, clonable data.Clonable) (ferr fa
 }
 
 // Browse walks through tag MetadataFolder and executes a callback for each entry
-func (instance *tag) Browse(ctx context.Context, callback func(*abstract.Tag) fail.Error) (ferr fail.Error) {
+func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
@@ -178,12 +183,12 @@ func (instance *tag) Browse(ctx context.Context, callback func(*abstract.Tag) fa
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
 
-		at := abstract.NewTag()
+		at := abstract.NewLabel()
 		xerr = at.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -198,8 +203,8 @@ func (instance *tag) Browse(ctx context.Context, callback func(*abstract.Tag) fa
 	})
 }
 
-// Delete deletes Tag and its metadata
-func (instance *tag) Delete(ctx context.Context) (ferr fail.Error) {
+// Delete deletes Label and its metadata
+func (instance *label) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -238,11 +243,11 @@ func (instance *tag) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// remove metadata
-	return instance.MetadataCore.Delete()
+	return instance.MetadataCore.Delete(ctx)
 }
 
 // Create a tag
-func (instance *tag) Create(ctx context.Context, req abstract.TagRequest) (ferr fail.Error) {
+func (instance *label) Create(ctx context.Context, name string, hasDefault bool, defaultValue string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
@@ -268,35 +273,34 @@ func (instance *tag) Create(ctx context.Context, req abstract.TagRequest) (ferr 
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.tag"), "('%s')", req.Name).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.tag"), "('%s')", name).Entering()
 	defer tracer.Exiting()
 
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
-	// Check if Tag exists and is managed by SafeScale
+	// Check if Label exists and is managed by SafeScale
 	svc := instance.Service()
-	_, xerr = LoadTag(ctx, svc, req.Name)
+	_, xerr = LoadLabel(ctx, svc, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 		default:
-			return fail.Wrap(xerr, "failed to check if Tag '%s' already exists", req.Name)
+			return fail.Wrap(xerr, "failed to check if Label '%s' already exists", name)
 		}
 	} else {
-		return fail.DuplicateError("there is already a Tag named '%s'", req.Name)
+		return fail.DuplicateError("there is already a Label named '%s'", name)
 	}
 
 	uuid, err := uuidpkg.NewV4()
 	if err != nil {
-		return fail.Wrap(err, "failed to generate uuid for Tag")
+		return fail.Wrap(err, "failed to generate uuid for Label")
 	}
 
-	at := abstract.Tag{
-		Name: req.Name,
-		ID:   uuid.String(),
+	at := abstract.Label{
+		Name:         name,
+		ID:           uuid.String(),
+		HasDefault:   hasDefault,
+		DefaultValue: defaultValue,
 	}
 
 	if task.Aborted() {
@@ -307,24 +311,38 @@ func (instance *tag) Create(ctx context.Context, req abstract.TagRequest) (ferr 
 	return instance.carry(ctx, &at)
 }
 
-// ToProtocol converts the tag to protocol message TagInspectResponse
-func (instance *tag) ToProtocol(ctx context.Context) (*protocol.TagInspectResponse, fail.Error) {
+// ToProtocol converts the label to protocol message LabelInspectResponse
+func (instance *label) ToProtocol(ctx context.Context) (*protocol.LabelInspectResponse, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	out := &protocol.TagInspectResponse{}
-	return out, instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		atag, ok := clonable.(*abstract.Tag)
+	out := &protocol.LabelInspectResponse{}
+	return out, instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Tag' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		out.Id = atag.GetID()
-		out.Name = atag.GetName()
+		out.Id = alabel.GetID()
+		out.Name = alabel.GetName()
+
+		var labelHostsV1 *propertiesv1.LabelHosts
+		innerXErr := props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			labelHostsV1, ok = clonable.(*propertiesv1.LabelHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
 		hosts := make([]*protocol.Host, 0)
-		for k, v := range atag.HostsByName {
+		for k, v := range labelHostsV1.ByName {
 			hosts = append(hosts, &protocol.Host{
 				Name: k,
 				Id:   v,
@@ -333,4 +351,42 @@ func (instance *tag) ToProtocol(ctx context.Context) (*protocol.TagInspectRespon
 		out.Hosts = hosts
 		return nil
 	})
+}
+
+// IsTag tells of the Label represents a Tag (ie a Label that does not carry a defaut value)
+func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
+	var out bool
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		alabel, ok := clonable.(*abstract.Label)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		out = alabel.HasDefault
+		return nil
+	})
+	if xerr != nil {
+		return false, xerr
+	}
+
+	return out, nil
+}
+
+// DefaultValue returns the default value of the Label
+func (instance label) DefaultValue(ctx context.Context) (string, fail.Error) {
+	var out string
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		alabel, ok := clonable.(*abstract.Label)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		out = alabel.DefaultValue
+		return nil
+	})
+	if xerr != nil {
+		return "", xerr
+	}
+
+	return out, nil
 }

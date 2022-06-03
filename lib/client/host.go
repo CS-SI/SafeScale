@@ -32,13 +32,13 @@ import (
 
 // var sshCfgCache = cache.NewMapCache()
 
-// host is the safescale client part handling hosts
-type host struct {
+// hostConsumer is the safescale client part handling hosts
+type hostConsumer struct {
 	session *Session
 }
 
 // List ...
-func (h host) List(all bool, timeout time.Duration) (*protocol.HostList, error) {
+func (h hostConsumer) List(all bool, timeout time.Duration) (*protocol.HostList, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -56,11 +56,11 @@ func (h host) List(all bool, timeout time.Duration) (*protocol.HostList, error) 
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.List(newCtx, &protocol.HostListRequest{All: all})
+	return service.List(newCtx, &protocol.HostListRequest{TenantId: h.session.tenant, All: all})
 }
 
 // Inspect ...
-func (h host) Inspect(name string, timeout time.Duration) (*protocol.Host, error) {
+func (h hostConsumer) Inspect(name string, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -78,11 +78,11 @@ func (h host) Inspect(name string, timeout time.Duration) (*protocol.Host, error
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Inspect(newCtx, &protocol.Reference{Name: name})
+	return service.Inspect(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 }
 
-// GetStatus gets host status
-func (h host) GetStatus(name string, timeout time.Duration) (*protocol.HostStatus, error) {
+// GetStatus gets hostConsumer status
+func (h hostConsumer) GetStatus(name string, timeout time.Duration) (*protocol.HostStatus, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -100,11 +100,11 @@ func (h host) GetStatus(name string, timeout time.Duration) (*protocol.HostStatu
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Status(newCtx, &protocol.Reference{Name: name})
+	return service.Status(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 }
 
-// Reboot host
-func (h host) Reboot(name string, timeout time.Duration) error {
+// Reboot hostConsumer
+func (h hostConsumer) Reboot(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -122,12 +122,12 @@ func (h host) Reboot(name string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.Reboot(newCtx, &protocol.Reference{Name: name})
+	_, err := service.Reboot(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 	return err
 }
 
-// Start host
-func (h host) Start(name string, timeout time.Duration) error {
+// Start hostConsumer
+func (h hostConsumer) Start(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -145,12 +145,12 @@ func (h host) Start(name string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.Start(newCtx, &protocol.Reference{Name: name})
+	_, err := service.Start(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 	return err
 }
 
-// Stop host
-func (h host) Stop(name string, timeout time.Duration) error {
+// Stop hostConsumer
+func (h hostConsumer) Stop(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := protocol.NewHostServiceClient(h.session.connection)
@@ -167,12 +167,12 @@ func (h host) Stop(name string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Stop(newCtx, &protocol.Reference{Name: name})
+	_, err := service.Stop(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 	return err
 }
 
-// Create creates a new host
-func (h host) Create(req *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
+// Create creates a new hostConsumer
+func (h hostConsumer) Create(req *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -194,7 +194,7 @@ func (h host) Create(req *protocol.HostDefinition, timeout time.Duration) (*prot
 }
 
 // Delete deletes several hosts at the same time in goroutines
-func (h host) Delete(names []string, timeout time.Duration) error {
+func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -224,7 +224,8 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		if _, xerr := service.Delete(newCtx, &protocol.Reference{Name: aname}); xerr != nil {
+		_, xerr := service.Delete(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: aname})
+		if xerr != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
 			errs = append(errs, xerr.Error())
@@ -244,7 +245,7 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h host) SSHConfig(name string) (*api.Config, error) {
+func (h hostConsumer) SSHConfig(name string) (*ssh.Profile, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -254,7 +255,7 @@ func (h host) SSHConfig(name string) (*api.Config, error) {
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	pbSSHCfg, err := service.SSH(ctx, &protocol.Reference{Name: name})
+	pbSSHCfg, err := service.SSH(ctx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +266,7 @@ func (h host) SSHConfig(name string) (*api.Config, error) {
 }
 
 // Resize ...
-func (h host) Resize(def *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
+func (h hostConsumer) Resize(def *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -287,7 +288,7 @@ func (h host) Resize(def *protocol.HostDefinition, timeout time.Duration) (*prot
 }
 
 // ListFeatures ...
-func (h host) ListFeatures(hostRef string, all bool, timeout time.Duration) (*protocol.FeatureListResponse, error) {
+func (h hostConsumer) ListFeatures(hostRef string, all bool, timeout time.Duration) (*protocol.FeatureListResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -306,7 +307,7 @@ func (h host) ListFeatures(hostRef string, all bool, timeout time.Duration) (*pr
 
 	req := protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_HOST,
-		TargetRef:     &protocol.Reference{Name: hostRef},
+		TargetRef:     &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		InstalledOnly: !all,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
@@ -318,7 +319,7 @@ func (h host) ListFeatures(hostRef string, all bool, timeout time.Duration) (*pr
 }
 
 // InspectFeature ...
-func (h host) InspectFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureDetailResponse, error) {
+func (h hostConsumer) InspectFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureDetailResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -337,7 +338,7 @@ func (h host) InspectFeature(hostRef, featureName string, embedded bool, timeout
 
 	req := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -346,7 +347,7 @@ func (h host) InspectFeature(hostRef, featureName string, embedded bool, timeout
 }
 
 // ExportFeature ...
-func (h host) ExportFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
+func (h hostConsumer) ExportFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -365,7 +366,7 @@ func (h host) ExportFeature(hostRef, featureName string, embedded bool, timeout 
 
 	req := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -374,7 +375,7 @@ func (h host) ExportFeature(hostRef, featureName string, embedded bool, timeout 
 }
 
 // CheckFeature ...
-func (h host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
+func (h hostConsumer) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -394,7 +395,7 @@ func (h host) CheckFeature(hostRef, featureName string, params map[string]string
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -404,7 +405,7 @@ func (h host) CheckFeature(hostRef, featureName string, params map[string]string
 }
 
 // AddFeature ...
-func (h host) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
+func (h hostConsumer) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -424,7 +425,7 @@ func (h host) AddFeature(hostRef, featureName string, params map[string]string, 
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -434,7 +435,7 @@ func (h host) AddFeature(hostRef, featureName string, params map[string]string, 
 }
 
 // RemoveFeature ...
-func (h host) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
+func (h hostConsumer) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -454,7 +455,7 @@ func (h host) RemoveFeature(hostRef, featureName string, params map[string]strin
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -463,8 +464,8 @@ func (h host) RemoveFeature(hostRef, featureName string, params map[string]strin
 	return err
 }
 
-// BindSecurityGroup calls the gRPC server to bind a security group to a host
-func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time.Duration) error {
+// BindSecurityGroup calls the gRPC server to bind a security group to a hostConsumer
+func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -489,8 +490,8 @@ func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time
 		state = protocol.SecurityGroupState_SGS_DISABLED
 	}
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{Name: sgRef},
-		Host:  &protocol.Reference{Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 		State: state,
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
@@ -498,8 +499,8 @@ func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time
 	return err
 }
 
-// UnbindSecurityGroup calls the gRPC server to unbind a security group from a host
-func (h host) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
+// UnbindSecurityGroup calls the gRPC server to unbind a security group from a hostConsumer
+func (h hostConsumer) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -517,16 +518,16 @@ func (h host) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) 
 	}
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{Name: sgRef},
-		Host:  &protocol.Reference{Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.UnbindSecurityGroup(newCtx, req)
 	return err
 }
 
-// EnableSecurityGroup calls the gRPC server to enable a bound security group on host
-func (h host) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
+// EnableSecurityGroup calls the gRPC server to enable a bound security group on hostConsumer
+func (h hostConsumer) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -544,16 +545,16 @@ func (h host) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) 
 	}
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{Name: sgRef},
-		Host:  &protocol.Reference{Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.EnableSecurityGroup(newCtx, req)
 	return err
 }
 
-// DisableSecurityGroup calls the gRPC server to disable a bound security group on host
-func (h host) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
+// DisableSecurityGroup calls the gRPC server to disable a bound security group on hostConsumer
+func (h hostConsumer) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -571,16 +572,16 @@ func (h host) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration)
 	}
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{Name: sgRef},
-		Host:  &protocol.Reference{Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.DisableSecurityGroup(newCtx, req)
 	return err
 }
 
-// ListSecurityGroups calls the gRPC server to list bound security groups of a host
-func (h host) ListSecurityGroups(hostRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+// ListSecurityGroups calls the gRPC server to list bound security groups of a hostConsumer
+func (h hostConsumer) ListSecurityGroups(hostRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -600,7 +601,7 @@ func (h host) ListSecurityGroups(hostRef, state string, timeout time.Duration) (
 	service := protocol.NewHostServiceClient(h.session.connection)
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Host: &protocol.Reference{Name: hostRef},
+		Host: &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
 	}
 	switch strings.ToLower(strings.TrimSpace(state)) {
 	case "all":
@@ -615,10 +616,11 @@ func (h host) ListSecurityGroups(hostRef, state string, timeout time.Duration) (
 	return service.ListSecurityGroups(newCtx, req)
 }
 
-// Tag Host
-func (h host) Tag(hostName string, tagName string, timeout time.Duration) error {
+// ListLabels lists Labels bound to Host
+func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
+
 	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
@@ -630,20 +632,52 @@ func (h host) Tag(hostName string, tagName string, timeout time.Duration) error 
 	if timeout != 0 {
 		aCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
+
 		newCtx = aCtx
 	}
 
-	req := &protocol.TagRequest{
-		Host: &protocol.Reference{Name: hostName},
-		Tag:  &protocol.Reference{Name: tagName},
+	req := &protocol.LabelBoundsRequest{
+		Host: &protocol.Reference{
+			TenantId: h.session.tenant,
+			Name:     hostName,
+		},
+		Tags: selectTags,
 	}
-
-	_, err := service.Tag(newCtx, req)
+	_, err := service.ListLabels(newCtx, req)
 	return err
 }
 
-// Untag Host
-func (h host) Untag(hostName string, tagName string, timeout time.Duration) error {
+// BindLabel to Host
+func (h hostConsumer) BindLabel(hostName string, labelName string, value string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	service := protocol.NewHostServiceClient(h.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		newCtx = aCtx
+	}
+
+	req := &protocol.LabelBindRequest{
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Value: value,
+	}
+	_, err := service.BindLabel(newCtx, req)
+	return err
+}
+
+// UnbindLabel from Host
+func (h hostConsumer) UnbindLabel(hostName string, labelName string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := protocol.NewHostServiceClient(h.session.connection)
@@ -660,11 +694,70 @@ func (h host) Untag(hostName string, tagName string, timeout time.Duration) erro
 		newCtx = aCtx
 	}
 
-	req := &protocol.TagRequest{
-		Host: &protocol.Reference{Name: hostName},
-		Tag:  &protocol.Reference{Name: tagName},
+	// FIXME: recover tenantConsumer ID from current session
+	req := &protocol.LabelBindRequest{
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
 	}
 
-	_, err := service.Untag(newCtx, req)
+	_, err := service.UnbindLabel(newCtx, req)
+	return err
+}
+
+// UpdateLabel to Host
+func (h hostConsumer) UpdateLabel(hostName string, labelName string, value string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	service := protocol.NewHostServiceClient(h.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		newCtx = aCtx
+	}
+
+	req := &protocol.LabelBindRequest{
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Value: value,
+	}
+	_, err := service.UpdateLabel(newCtx, req)
+	return err
+}
+
+// ResetLabel from Host
+func (h hostConsumer) ResetLabel(hostName string, labelName string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	service := protocol.NewHostServiceClient(h.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	// FIXME: recover tenantConsumer ID from current session
+	req := &protocol.LabelBindRequest{
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+	}
+
+	_, err := service.ResetLabel(newCtx, req)
 	return err
 }

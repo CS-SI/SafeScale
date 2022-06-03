@@ -52,6 +52,9 @@ type bucket struct {
 	lock sync.RWMutex
 }
 
+// verify that bucket satisfies resources.Bucket
+var _ resources.Bucket = (*bucket)(nil)
+
 // NewBucket instantiates bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	if svc == nil {

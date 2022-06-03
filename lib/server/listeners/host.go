@@ -35,9 +35,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	labelfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/label"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
-	tagfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/tag"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
@@ -946,10 +946,10 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	return resp, nil
 }
 
-// Tag tags a host with a given tag
-func (s *HostListener) Tag(ctx context.Context, in *protocol.TagRequest) (empty *googleprotobuf.Empty, err error) {
+// BindLabel binds a Label to a Host
+func (s *HostListener) BindLabel(ctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot tag host")
+	defer fail.OnExitWrapError(&err, "cannot bind Label to Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -961,23 +961,24 @@ func (s *HostListener) Tag(ctx context.Context, in *protocol.TagRequest) (empty 
 	if ctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
 	}
+
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	tagRef, tagRefLabel := srvutils.GetReference(in.GetTag())
-	if tagRef == "" {
-		return nil, fail.InvalidRequestError("neither name nor id given as reference of Tag")
+	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
+	if labelRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/tag/%s", hostRef, tagRef))
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/bind", hostRef, labelRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, tagRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -986,23 +987,23 @@ func (s *HostListener) Tag(ctx context.Context, in *protocol.TagRequest) (empty 
 		return empty, xerr
 	}
 
-	tagInstance, xerr := tagfactory.Load(job.Context(), job.Service(), tagRef)
+	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = hostInstance.Tag(job.Context(), tagInstance); xerr != nil {
+	if xerr = hostInstance.BindLabel(job.Context(), labelInstance); xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Host %s tagged %s", hostRefLabel, tagRefLabel)
+	tracer.Trace("Label %s successfully bound to Host %s", labelRefLabel, hostRefLabel)
 	return empty, nil
 }
 
-// Untag remove a tag from a host $
-func (s *HostListener) Untag(ctx context.Context, in *protocol.TagRequest) (empty *googleprotobuf.Empty, err error) {
+// UnbindLabel unbinds a Label from a Host
+func (s *HostListener) UnbindLabel(ctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot tag host")
+	defer fail.OnExitWrapError(&err, "cannot unbind Label from Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -1014,23 +1015,24 @@ func (s *HostListener) Untag(ctx context.Context, in *protocol.TagRequest) (empt
 	if ctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
 	}
+
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	tagRef, tagRefLabel := srvutils.GetReference(in.GetTag())
-	if tagRef == "" {
-		return nil, fail.InvalidRequestError("neither name nor id given as reference of Tag")
+	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
+	if labelRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/untag/%s", hostRef, tagRef))
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/unbind", hostRef, labelRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, tagRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -1039,15 +1041,123 @@ func (s *HostListener) Untag(ctx context.Context, in *protocol.TagRequest) (empt
 		return empty, xerr
 	}
 
-	tagInstance, xerr := tagfactory.Load(job.Context(), job.Service(), tagRef)
+	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = hostInstance.Untag(job.Context(), tagInstance); xerr != nil {
+	if xerr = hostInstance.UnbindLabel(job.Context(), labelInstance); xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Host %s untagged %s", hostRefLabel, tagRefLabel)
+	tracer.Trace("Label %s successfully unbound from Host %s", hostRefLabel, labelRefLabel)
+	return empty, nil
+}
+
+// UpdateLabel updates Label value for the Host
+func (s *HostListener) UpdateLabel(ctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot bind Label to Host")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
+	if labelRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/update", hostRef, labelRef))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	if xerr = hostInstance.UpdateLabel(job.Context(), labelInstance); xerr != nil {
+		return empty, xerr
+	}
+
+	tracer.Trace("Value of Label %s successfully updated for Host %s", labelRefLabel, hostRefLabel)
+	return empty, nil
+}
+
+// ResetLabel restores default value of Label to the Host
+func (s *HostListener) ResetLabel(ctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot unbind Label from Host")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
+	if labelRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/reset", hostRef, labelRef))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	if xerr = hostInstance.ResetLabel(job.Context(), labelInstance); xerr != nil {
+		return empty, xerr
+	}
+
+	tracer.Trace("Label %s successfully unbound from Host %s", hostRefLabel, labelRefLabel)
 	return empty, nil
 }

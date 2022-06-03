@@ -241,15 +241,17 @@ func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (*a
 	return out, nil
 }
 
-// TagFromProtocolToAbstract ...
-func TagFromProtocolToAbstract(in *protocol.TagInspectResponse) (*abstract.Tag, fail.Error) {
+// LabelFromProtocolToAbstract ...
+func LabelFromProtocolToAbstract(in *protocol.LabelInspectResponse) (*abstract.Label, fail.Error) {
 	if in == nil {
-		return &abstract.Tag{}, fail.InvalidParameterCannotBeNilError("in")
+		return &abstract.Label{}, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	out := &abstract.Tag{
-		ID:   in.GetId(),
-		Name: in.GetName(),
+	out := &abstract.Label{
+		ID:           in.GetId(),
+		Name:         in.GetName(),
+		HasDefault:   in.GetHasDefault(),
+		DefaultValue: in.GetDefaultValue(),
 	}
 	return out, nil
 }

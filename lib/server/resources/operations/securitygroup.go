@@ -58,6 +58,9 @@ type SecurityGroup struct {
 	*MetadataCore
 }
 
+// verify that Network satisfies resources.Network
+var _ resources.SecurityGroup = (*SecurityGroup)(nil)
+
 // NewSecurityGroup ...
 func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 	if svc == nil {

@@ -22,32 +22,32 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	tagfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/tag"
+	labelfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/label"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// TagHandler defines API to manipulate tags
-type TagHandler interface {
+// LabelHandler defines API to manipulate tags
+type LabelHandler interface {
 	Delete(ref string) fail.Error
-	List(all bool) ([]resources.Tag, fail.Error)
-	Inspect(ref string) (resources.Tag, fail.Error)
-	Create(name string) (resources.Tag, fail.Error)
+	List(listTag bool) ([]resources.Label, fail.Error)
+	Inspect(ref string) (resources.Label, fail.Error)
+	Create(name string, hasDefault bool, defaultValue string) (resources.Label, fail.Error)
 }
 
-// tagHandler tag service
-type tagHandler struct {
+// labelHandler Label service
+type labelHandler struct {
 	job server.Job
 }
 
-// NewTagHandler creates a Tag service
-func NewTagHandler(job server.Job) TagHandler {
-	return &tagHandler{job: job}
+// NewTagHandler creates a Label service
+func NewTagHandler(job server.Job) LabelHandler {
+	return &labelHandler{job: job}
 }
 
 // List returns the network list
-func (handler *tagHandler) List(all bool) (tags []resources.Tag, ferr fail.Error) {
+func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -62,26 +62,36 @@ func (handler *tagHandler) List(all bool) (tags []resources.Tag, ferr fail.Error
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	objt, xerr := tagfactory.New(handler.job.Service())
+	browseInstance, xerr := labelfactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = objt.Browse(task.Context(), func(tag *abstract.Tag) fail.Error {
-		rv, innerXErr := tagfactory.Load(handler.job.Context(), handler.job.Service(), tag.ID)
+
+	xerr = browseInstance.Browse(task.Context(), func(label *abstract.Label) fail.Error {
+		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), label.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
-		tags = append(tags, rv)
+
+		isTag, innerXErr := labelInstance.IsTag(task.Context())
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		if listTag == isTag {
+			list = append(list, labelInstance)
+		}
+
 		return nil
 	})
 	if xerr != nil {
 		return nil, xerr
 	}
-	return tags, nil
+	return list, nil
 }
 
 // Delete deletes tag referenced by ref
-func (handler *tagHandler) Delete(ref string) (ferr fail.Error) {
+func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -99,7 +109,7 @@ func (handler *tagHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	tagInstance, xerr := tagfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -110,11 +120,11 @@ func (handler *tagHandler) Delete(ref string) (ferr fail.Error) {
 		}
 	}
 
-	return tagInstance.Delete(task.Context())
+	return instance.Delete(task.Context())
 }
 
 // Inspect returns the tag identified by ref and its attachment (if any)
-func (handler *tagHandler) Inspect(ref string) (tag resources.Tag, ferr fail.Error) {
+func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -132,18 +142,21 @@ func (handler *tagHandler) Inspect(ref string) (tag resources.Tag, ferr fail.Err
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	objt, xerr := tagfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
 			return nil, abstract.ResourceNotFoundError("tag", ref)
+		default:
+			return nil, xerr
 		}
-		return nil, xerr
 	}
-	return objt, nil
+
+	return instance, nil
 }
 
 // Create a tag
-func (handler *tagHandler) Create(name string) (objt resources.Tag, ferr fail.Error) {
+func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue string) (instance resources.Label, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -161,15 +174,18 @@ func (handler *tagHandler) Create(name string) (objt resources.Tag, ferr fail.Er
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
-	objt, xerr = tagfactory.New(handler.job.Service())
+	instance, xerr = labelfactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
-	request := abstract.TagRequest{
-		Name: name,
+
+	request := abstract.LabelRequest{
+		Name:       name,
+		HasDefault: hasDefault,
+		Default:    defaultValue,
 	}
-	if xerr = objt.Create(handler.job.Context(), request); xerr != nil {
+	if xerr = instance.Create(handler.job.Context(), request); xerr != nil {
 		return nil, xerr
 	}
-	return objt, nil
+	return instance, nil
 }

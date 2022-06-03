@@ -84,6 +84,9 @@ type Cluster struct {
 	randomDelayCh   <-chan int
 }
 
+// verify that Cluster satisfies resources.Cluster
+var _ resources.Cluster = (*Cluster)(nil)
+
 // NewCluster is the constructor of resources.Cluster struct
 func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

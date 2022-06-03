@@ -35,21 +35,23 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-	Bucket        bucket  // FIXME: rename to bucketConsumer
-	Cluster       cluster // FIXME: rename to clusterConsumer
-	Host          host    // FIXME: rename to hostConsumer
-	Image         image   // FIXME: rename to imageConsumer
+	Bucket        bucketConsumer
+	Cluster       clusterConsumer
+	Host          hostConsumer
+	Image         imageConsumer
 	JobManager    jobConsumer
-	Network       network       // FIXME: rename to networkConsumer
-	SecurityGroup securityGroup // FIXME: rename to securityGroupConsumer
-	Share         share         // FIXME: rename to shareConsumer
+	Network       networkConsumer
+	SecurityGroup securityGroupConsumer
+	Share         shareConsumer
 	SSH           sshConsumer
-	Subnet        subnet   // FIXME/ rename to subnetConsumer
-	Template      template // FIXME: rename to templateConsumer
-	Tenant        tenant   // FIXME: rename to tenantConsumer
-	Volume        volume   // FIXME: rename to volumeConsumer
+	Subnet        subnetConsumer
+	Template      templateConsumer
+	Tenant        tenantConsumer
+	Label         labelConsumer
+	Volume        volumeConsumer
 
 	server     string
+	tenant     string // contains the tenant to use (flag --tenantConsumer); if not set, server will use current default tenant (safescale tenant set)
 	connection *grpc.ClientConn
 
 	task concurrency.Task
@@ -67,7 +69,7 @@ const (
 )
 
 // New returns an instance of safescale Client
-func New(server string) (_ *Session, ferr fail.Error) {
+func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 	var xerr fail.Error
 	// Validate server parameter (can be empty string...)
 	if server != "" {
@@ -75,6 +77,7 @@ func New(server string) (_ *Session, ferr fail.Error) {
 			return nil, fail.Wrap(xerr, "server is invalid")
 		}
 	}
+
 	// if server is empty, try to see if env SAFESCALED_LISTEN is set...
 	if server == "" {
 		server = os.Getenv("SAFESCALED_LISTEN")
@@ -85,7 +88,7 @@ func New(server string) (_ *Session, ferr fail.Error) {
 			}
 		}
 
-		// LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
+		// LEGACY: if server is empty, hostConsumer will be localhost, try to see if env SAFESCALED_PORT is set
 		if server == "" {
 			if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
 				logrus.Warnf("SAFESCALED_PORT is deprecated and will be soon ignored, use SAFESCALED_LISTEN instead.")
@@ -104,26 +107,26 @@ func New(server string) (_ *Session, ferr fail.Error) {
 		}
 	}
 
-	s := &Session{server: server}
+	s := &Session{server: server, tenant: tenantID}
 	s.task, xerr = concurrency.VoidTask()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	s.Bucket = bucket{session: s}
-	s.Cluster = cluster{session: s}
-	s.Host = host{session: s}
-	s.Image = image{session: s}
-	s.Network = network{session: s}
-	s.Subnet = subnet{session: s}
+	s.Bucket = bucketConsumer{session: s}
+	s.Cluster = clusterConsumer{session: s}
+	s.Host = hostConsumer{session: s}
+	s.Image = imageConsumer{session: s}
+	s.Network = networkConsumer{session: s}
+	s.Subnet = subnetConsumer{session: s}
 	s.JobManager = jobConsumer{session: s}
-	s.SecurityGroup = securityGroup{session: s}
-	s.Share = share{session: s}
+	s.SecurityGroup = securityGroupConsumer{session: s}
+	s.Share = shareConsumer{session: s}
 	s.SSH = sshConsumer{session: s}
-	s.Template = template{session: s}
-	s.Tenant = tenant{session: s}
-	s.Volume = volume{session: s}
-	s.Tag = tag{session: s}
+	s.Template = templateConsumer{session: s}
+	s.Tenant = tenantConsumer{session: s}
+	s.Volume = volumeConsumer{session: s}
+	s.Label = labelConsumer{session: s}
 
 	return s, nil
 }

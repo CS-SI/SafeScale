@@ -74,6 +74,9 @@ type Subnet struct {
 	}
 }
 
+// verify that Subnet satisfies resources.Subnet
+var _ resources.Subnet = (*Subnet)(nil)
+
 // ListSubnets returns a list of available subnets
 func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

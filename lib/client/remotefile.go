@@ -75,7 +75,7 @@ func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error 
 	return nil
 }
 
-// RemoveRemote deletes the remote file from host
+// RemoveRemote deletes the remote file from hostConsumer
 func (rfc RemoteFileItem) RemoveRemote(clientSession *Session, hostname string) error {
 	if clientSession == nil {
 		return fail.InvalidParameterCannotBeNilError("clientSession")

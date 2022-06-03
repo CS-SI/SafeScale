@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package tag
+package label
 
 import (
 	"context"
@@ -25,12 +25,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// New creates an instance of resources.Tag
-func New(svc iaas.Service) (_ resources.Tag, ferr fail.Error) {
-	return operations.NewTag(svc)
+// New creates an instance of resources.Label
+func New(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
+	return operations.NewLabel(svc)
 }
 
-// Load loads the metadata of Security Group a,d returns an instance of resources.Tag
-func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.Tag, ferr fail.Error) {
-	return operations.LoadTag(ctx, svc, ref)
+// Load loads the metadata of Security Group a,d returns an instance of resources.Label
+func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.Label, ferr fail.Error) {
+	return operations.LoadLabel(ctx, svc, ref)
 }

@@ -24,81 +24,76 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// TagRequest represents a tag request (tagging or untagging operation)
-type TagRequest struct {
-	Name string `json:"name,omitempty"`
+type Label struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	HasDefault   bool   `json:"has_default"` // if false, this represents a Tag
+	DefaultValue string `json:"default_value,omitempty"`
 }
 
-// Tag represents a block tag
-type Tag struct {
-	ID          string            `json:"id,omitempty"`
-	Name        string            `json:"name,omitempty"`
-	HostsByID   map[string]string `json:"hosts_by_id,omitempty"`
-	HostsByName map[string]string `json:"hosts_by_name,omitempty"`
-}
-
-// NewTag ...
-func NewTag() *Tag {
-	return &Tag{
-		HostsByID:   map[string]string{},
-		HostsByName: map[string]string{},
+// NewLabel creates a new empty Label...
+func NewLabel() *Label {
+	return &Label{
+		HasDefault: true,
 	}
 }
 
 // IsNull ...
 // satisfies interface data.Clonable
-func (t *Tag) IsNull() bool {
+func (t *Label) IsNull() bool {
 	return t == nil || (t.ID == "" && t.Name == "")
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (t Tag) Clone() (data.Clonable, error) {
-	return NewTag().Replace(&t)
+func (t Label) Clone() (data.Clonable, error) {
+	return NewLabel().Replace(&t)
 }
 
 // Replace ...
-//
 // satisfies interface data.Clonable
-func (t *Tag) Replace(p data.Clonable) (data.Clonable, error) {
-	if t == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	src, ok := p.(*Tag) // nolint
-	if !ok {
-		return nil, fmt.Errorf("p is not a *Tag")
-	}
-	*t = *src
-	t.HostsByID = make(map[string]string, len(src.HostsByID))
-	for k, v := range src.HostsByID {
-		t.HostsByID[k] = v
-	}
-	t.HostsByName = make(map[string]string, len(src.HostsByName))
-	for k, v := range src.HostsByName {
-		t.HostsByName[k] = v
-	}
-	return t, nil
-}
-
-// OK ...
-func (t *Tag) OK() bool {
-	result := true
-	result = result && t != nil
-	return result
-}
-
-// Serialize serializes instance into bytes (output json code)
-func (t *Tag) Serialize() ([]byte, fail.Error) {
+func (t *Label) Replace(p data.Clonable) (data.Clonable, error) {
 	if t == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if p == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("p")
+	}
+
+	src, ok := p.(*Label) // nolint
+	if !ok {
+		return nil, fmt.Errorf("p is not a *Label")
+	}
+
+	*t = *src
+	return t, nil
+}
+
+// Valid checks if content of Label is valid
+func (t *Label) Valid() bool {
+	result := t != nil
+	result = result && t.ID != ""
+	result = result && t.Name != ""
+	return result
+}
+
+// OK is a synonym for Valid
+func (t Label) OK() bool {
+	return t.Valid()
+}
+
+// Serialize serializes instance into bytes (output json code)
+func (t *Label) Serialize() ([]byte, fail.Error) {
+	if t == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	r, err := json.Marshal(t)
 	return r, fail.ConvertError(err)
 }
 
 // Deserialize reads json code and restores a Tag
-func (t *Tag) Deserialize(buf []byte) (ferr fail.Error) {
+func (t *Label) Deserialize(buf []byte) (ferr fail.Error) {
 	if t == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -109,18 +104,29 @@ func (t *Tag) Deserialize(buf []byte) (ferr fail.Error) {
 
 // GetName returns the name of the tag
 // Satisfies interface data.Identifiable
-func (t *Tag) GetName() string {
+func (t *Label) GetName() string {
 	if t == nil {
 		return ""
 	}
+
 	return t.Name
 }
 
 // GetID returns the ID of the tag
 // Satisfies interface data.Identifiable
-func (t *Tag) GetID() string {
+func (t *Label) GetID() string {
 	if t == nil {
 		return ""
 	}
+
 	return t.ID
+}
+
+// IsTag tells of the Label represents a Tag (ie a Label without value)
+func (t *Label) IsTag() bool {
+	if t == nil {
+		return false
+	}
+
+	return t.HasDefault
 }

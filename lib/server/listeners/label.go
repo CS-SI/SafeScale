@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
-	tagfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/tag"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -30,16 +29,16 @@ import (
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// TagHandler ...
-var TagHandler = handlers.NewTagHandler
+// LabelHandler ...
+var LabelHandler = handlers.NewTagHandler
 
-// TagListener is the tag service gRPC server
-type TagListener struct {
+// LabelListener is the tag service gRPC server
+type LabelListener struct {
 	protocol.UnimplementedTagServiceServer
 }
 
 // List the available tags
-func (s *TagListener) List(ctx context.Context, in *protocol.TagListRequest) (_ *protocol.TagListResponse, err error) {
+func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest) (_ *protocol.TagListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list tag")
 
@@ -64,8 +63,8 @@ func (s *TagListener) List(ctx context.Context, in *protocol.TagListRequest) (_ 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := TagHandler(job)
-	tags, xerr := handler.List(in.GetAll())
+	handler := LabelHandler(job)
+	tags, xerr := handler.List(in.GetAll(), in.GetHasDefault())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -84,8 +83,8 @@ func (s *TagListener) List(ctx context.Context, in *protocol.TagListRequest) (_ 
 	return rv, nil
 }
 
-// Create a new tag
-func (s *TagListener) Create(ctx context.Context, in *protocol.TagCreateRequest) (_ *protocol.TagInspectResponse, err error) {
+// Create a new label/tag
+func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequest) (_ *protocol.LabelInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create tag")
 
@@ -109,20 +108,27 @@ func (s *TagListener) Create(ctx context.Context, in *protocol.TagCreateRequest)
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tag"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	handler := handlers.NewTagHandler(job)
-	rv, xerr := handler.Create(name)
+	rv, xerr := handler.Create(name, in.GetHasDefault(), in.GetValue())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer.Trace("Tag '%s' created", name)
+	var kind string
+	if in.GetHasDefault() {
+		kind = "Label"
+	} else {
+		kind = "Tag"
+	}
+	tracer.Trace("%s '%s' created", kind, name)
 	return rv.ToProtocol(job.Context())
 }
 
-// Delete a tag
-func (s *TagListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+// Delete a Label
+func (s *LabelListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete tag")
+	defer fail.OnExitWrapError(&err, "cannot delete label")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -149,19 +155,19 @@ func (s *TagListener) Delete(ctx context.Context, in *protocol.Reference) (empty
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := TagHandler(job)
+	handler := LabelHandler(job)
 	if xerr = handler.Delete(ref); xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Tag %s successfully deleted.", refLabel)
+	tracer.Trace("Label/Tag %s successfully deleted.", refLabel)
 	return empty, nil
 }
 
-// Inspect a tag
-func (s *TagListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.TagInspectResponse, err error) {
+// Inspect a Label/Tag
+func (s *LabelListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.TagInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect tag")
+	defer fail.OnExitWrapError(&err, "cannot inspect label")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -187,10 +193,10 @@ func (s *TagListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *p
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	tagInstance, xerr := tagfactory.Load(job.Context(), job.Service(), ref)
+	instance, xerr := labelfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return tagInstance.ToProtocol(job.Context())
+	return instance.ToProtocol(job.Context())
 }

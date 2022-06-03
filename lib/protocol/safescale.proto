@@ -410,7 +410,7 @@ message Host {
 	string creation_date = 16;
 	bool managed = 17;
 	string template = 18;
-  repeated string tag_names = 19;
+  repeated string label_names = 19;
 }
 
 message HostStatus {
@@ -453,8 +453,13 @@ service HostService {
 	rpc EnableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
 	rpc DisableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
 	rpc ListSecurityGroups(SecurityGroupHostBindRequest) returns (SecurityGroupBondsResponse){}
-  rpc Tag(TagRequest) returns (google.protobuf.Empty){}
-	rpc Untag(TagRequest) returns (google.protobuf.Empty){}
+	rpc ListLabels(LabelBoundsRequest) returns (LabelListResponse){}
+  rpc BindLabel(LabelBindRequest) returns (google.protobuf.Empty){}
+	rpc UnbindLabel(LabelBindRequest) returns (google.protobuf.Empty){}
+	rpc UpdateLabel(LabelBindRequest) returns (google.protobuf.Empty){}
+	rpc ResetLabel(LabelBindRequest) returns (google.protobuf.Empty){}
+	rpc BindPublicIP(PublicIPBindRequest) returns (google.protobuf.Empty){}
+	rpc UnbindPublicIP(PublicIPBindRequest) returns (google.protobuf.Empty){}
 }
 
 message HostTemplate {
@@ -984,7 +989,7 @@ message FeatureSettings {
 }
 
 message FeatureActionRequest {
-	string tenant_id = 1;
+	string tenant_id = 1;	// Deprecated; use target_ref.tenant_id
 	string name = 2;
 	FeatureTargetType target_type = 3;
 	Reference target_ref = 4;
@@ -1139,15 +1144,13 @@ message PublicIPListResponse {
 }
 
 message PublicIPDeleteRequest {
-	string tenant_id = 1;
-	Reference ip = 2;
-	bool force = 3;
+	Reference ip = 1;
+	bool force = 2;
 }
 
 message PublicIPBindRequest {
-	string tenant_id = 1;
-	Reference ip = 2;
-	Reference host = 3;
+	Reference ip = 1;
+	Reference host = 2;
 }
 
 service PublicIPService {
@@ -1155,45 +1158,53 @@ service PublicIPService {
 	rpc Delete(PublicIPDeleteRequest) returns (google.protobuf.Empty){}
 	rpc Inspect(Reference) returns (PublicIPResponse){}
 	rpc List(PublicIPListRequest) returns (PublicIPListResponse){}
-	rpc Bind(PublicIPBindRequest) returns (google.protobuf.Empty){}
-	rpc Unbind(PublicIPBindRequest) returns (google.protobuf.Empty){}
 }
 
-// Tag
+// Label (and Tag)
 
-message TagCreateRequest {
+message LabelCreateRequest {
 	string name = 1;
 	string tenant_id = 2;
+	bool has_default = 3;
+	string default_value = 4;
 }
 
-message TagDetachmentRequest {
-	Reference tag = 1;
-	Reference host = 2;
+message LabelInspectRequest {
+	Reference Label = 1;
+	bool is_tag = 2;
 }
 
-message TagInspectResponse {
+message LabelInspectResponse {
 	string id = 1;
 	string name = 2;
 	repeated Host hosts = 3;
+	bool has_default = 4;
+	string default_value = 5;
 }
 
-message TagListRequest {
-	bool all = 1;
+message LabelListRequest {
+	bool tags = 1;	// if set, returns list of tags, otherwise list of labels
 	string tenant_id = 2;
 }
 
-message TagListResponse {
-	repeated TagInspectResponse tags = 1;
+message LabelListResponse {
+	repeated LabelInspectResponse labels = 1;
 }
 
-message TagRequest {
-	Reference tag = 1;
+message LabelBindRequest {
+	Reference label = 1;
 	Reference host = 2;
+	string value = 3;
 }
 
-service TagService {
-	rpc Create(TagCreateRequest) returns (TagInspectResponse) {}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
-	rpc List(TagListRequest) returns (TagListResponse) {}
-	rpc Inspect(Reference) returns (TagInspectResponse){}
+message LabelBoundsRequest {
+	Reference host = 1;
+	bool tags = 2;	// if set, returns list of tags, otherwise list of labels
+}
+
+service LabelService {
+	rpc Create(LabelCreateRequest) returns (LabelInspectResponse) {}
+	rpc Delete(LabelInspectRequest) returns (google.protobuf.Empty){}
+	rpc List(LabelListRequest) returns (LabelListResponse) {}
+	rpc Inspect(LabelInspectRequest) returns (LabelInspectResponse){}
 }

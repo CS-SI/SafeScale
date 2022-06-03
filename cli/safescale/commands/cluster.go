@@ -43,7 +43,6 @@ import (
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -967,7 +966,7 @@ var clusterKubectlCommand = cli.Command{
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
@@ -1074,7 +1073,7 @@ var clusterHelmCommand = cli.Command{
 		}
 		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") // + useTLS
 
-		clientSession, xerr := client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
@@ -2174,7 +2173,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 		}
 
 		// Set client session
-		clientSession, xerr := client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
@@ -2326,7 +2325,7 @@ var clusterAnsibleRunCommands = cli.Command{
 		}
 
 		// Set client session
-		clientSession, xerr := client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
@@ -2655,7 +2654,7 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 		}
 
 		// Set client session
-		clientSession, xerr := client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}

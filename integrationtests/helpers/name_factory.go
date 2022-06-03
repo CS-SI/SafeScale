@@ -32,9 +32,10 @@ type Names struct {
 	Hosts    []string
 	Networks []string
 	Clusters []string
+	Tags     []string
 }
 
-func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHosts int, nbNetworks int, nbClusters int) Names {
+func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHosts int, nbNetworks int, nbClusters int, nbTags int) Names {
 	coreString = strings.ToLower(coreString)
 
 	names := Names{
@@ -44,6 +45,7 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 		Hosts:    []string{},
 		Networks: []string{},
 		Clusters: []string{},
+		Tags:     []string{},
 	}
 
 	for i := 1; i <= nbBukets; i++ {
@@ -63,6 +65,9 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 	}
 	for i := 1; i <= nbClusters; i++ {
 		names.Clusters = append(names.Clusters, fmt.Sprintf("%s-cluster-%d", coreString, i))
+	}
+	for i := 1; i <= nbTags; i++ {
+		names.Tags = append(names.Tags, fmt.Sprintf("%s-tag-%d", coreString, i))
 	}
 
 	return names
@@ -93,5 +98,8 @@ func (names *Names) TearDown() {
 	}
 	for _, clusterName := range names.Clusters {
 		_, _ = GetTaggedOutput(fmt.Sprintf("safescale cluster delete --yes %s", clusterName), "Teardown: ")
+	}
+	for _, tagName := range names.Tags {
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale tag delete --yes %s", tagName), "Teardown: ")
 	}
 }
