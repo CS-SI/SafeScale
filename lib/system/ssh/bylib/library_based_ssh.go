@@ -66,8 +66,8 @@ func (sconf *Profile) CreatePersistentTunneling() fail.Error {
 	return nil
 }
 
-func NewProfile(hostname string, IPAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
-	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
+func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
+	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
 func NewConnector(ac ssh2.Config) (*Profile, fail.Error) {
@@ -239,8 +239,8 @@ func (sc *LibCommand) Display() string {
 	return strings.Join(sc.cmd.Args, " ")
 }
 
-func (scmd *LibCommand) String() string {
-	return scmd.Display()
+func (sc *LibCommand) String() string {
+	return sc.Display()
 }
 
 // RunWithTimeout ...

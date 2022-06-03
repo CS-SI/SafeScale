@@ -17,8 +17,8 @@ type CommonConfig struct {
 	SecondaryGatewayConfig Config `json:"secondary_gateway_config,omitempty"`
 }
 
-func NewConfig(hostname string, IPAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig Config, secondaryGatewayConfig Config) *CommonConfig {
-	return &CommonConfig{Hostname: hostname, IPAddress: IPAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
+func NewConfig(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig Config, secondaryGatewayConfig Config) *CommonConfig {
+	return &CommonConfig{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
 func NewConfigFrom(ac Config) (*CommonConfig, fail.Error) {

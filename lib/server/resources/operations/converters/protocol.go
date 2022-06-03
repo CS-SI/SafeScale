@@ -45,8 +45,7 @@ func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *ssh.Config {
 
 	cfg := ssh.NewConfig(from.HostName, from.Host, int(from.Port), from.User, from.PrivateKey, 0, "", pgw, sgw)
 
-	var acfg ssh.Config
-	acfg = *cfg
+	var acfg ssh.Config = *cfg
 	return &acfg
 }
 
