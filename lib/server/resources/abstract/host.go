@@ -236,8 +236,8 @@ type HostCore struct {
 	PrivateKey        string            `json:"private_key,omitempty"`
 	SSHPort           uint32            `json:"ssh_port,omitempty"`
 	Password          string            `json:"password,omitempty"`
-	LastState         hoststate.Enum    `json:"last_state,omitempty"`
-	ProvisioningState hoststate.Enum    `json:"provisioning_state,omitempty"`
+	LastState         hoststate.Enum    `json:"last_state"`
+	ProvisioningState hoststate.Enum    `json:"provisioning_state"`
 	Tags              map[string]string `json:"tags,omitempty"`
 }
 
@@ -399,7 +399,7 @@ type HostFull struct {
 	Sizing       *HostEffectiveSizing
 	Networking   *HostNetworking
 	Description  *HostDescription
-	CurrentState hoststate.Enum `json:"current_state,omitempty"`
+	CurrentState hoststate.Enum `json:"current_state"`
 }
 
 // NewHostFull creates an instance of HostFull

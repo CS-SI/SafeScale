@@ -31,7 +31,7 @@ import (
 type VolumeRequest struct {
 	Name  string           `json:"name,omitempty"`
 	Size  int              `json:"size,omitempty"`
-	Speed volumespeed.Enum `json:"speed,omitempty"`
+	Speed volumespeed.Enum `json:"speed"`
 }
 
 // Volume represents a block volume
@@ -39,8 +39,8 @@ type Volume struct {
 	ID    string            `json:"id,omitempty"`
 	Name  string            `json:"name,omitempty"`
 	Size  int               `json:"size,omitempty"`
-	Speed volumespeed.Enum  `json:"speed,omitempty"`
-	State volumestate.Enum  `json:"state,omitempty"`
+	Speed volumespeed.Enum  `json:"speed"`
+	State volumestate.Enum  `json:"state"`
 	Tags  map[string]string `json:"tags,omitempty"`
 }
 
