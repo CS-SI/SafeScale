@@ -45,6 +45,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetproperty"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/consts"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
@@ -80,7 +81,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    *ssh.Profile
+		sshProfile                    ssh.Connector
 	}
 }
 
@@ -198,7 +199,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig *ssh.Profile
+		var primaryGatewayConfig, secondaryGatewayConfig ssh.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -252,13 +253,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 						return xerr
 					}
 
-					primaryGatewayConfig = &ssh.Profile{
-						PrivateKey: gwahc.PrivateKey,
-						Port:       int(gwahc.SSHPort),
-						IPAddress:  ip,
-						Hostname:   gwahc.Name,
-						User:       opUser,
-					}
+					primaryGatewayConfig = ssh.NewConfig(gwahc.Name, ip, int(gwahc.SSHPort), opUser, gwahc.PrivateKey, 0, "", nil, nil)
 					return nil
 				})
 				if gwErr != nil {
@@ -293,13 +288,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 							return xerr
 						}
 
-						secondaryGatewayConfig = &ssh.Profile{
-							PrivateKey: gwahc.PrivateKey,
-							Port:       int(gwahc.SSHPort),
-							IPAddress:  ip,
-							Hostname:   gwInstance.GetName(),
-							User:       opUser,
-						}
+						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(gwahc.SSHPort), opUser, gwahc.PrivateKey, 0, "", nil, nil)
 						return nil
 					})
 					if gwErr != nil {
@@ -313,15 +302,13 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return innerXErr
 		}
 
-		instance.localCache.sshProfile = &ssh.Profile{
-			Port:                   int(ahc.SSHPort),
-			IPAddress:              instance.localCache.accessIP,
-			Hostname:               instance.GetName(),
-			User:                   opUser,
-			PrivateKey:             ahc.PrivateKey,
-			GatewayConfig:          primaryGatewayConfig,
-			SecondaryGatewayConfig: secondaryGatewayConfig,
+		cfg := ssh.NewConfig(instance.GetName(), instance.localCache.accessIP, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
+		conn, innerXErr := sshfactory.NewConnector(cfg)
+		if innerXErr != nil {
+			return innerXErr
 		}
+
+		instance.localCache.sshProfile = conn
 
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
@@ -2678,7 +2665,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh.Profile, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ ssh.Connector, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -2693,7 +2680,7 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ *ssh.Profile, ferr fa
 	instance.localCache.RLock()
 	sshProfile := instance.localCache.sshProfile
 	instance.localCache.RUnlock() // nolint
-	if sshProfile == nil {
+	if valid.IsNil(sshProfile) {
 		return nil, fail.NotFoundError("failed to find SSH Config of Host '%s'", instance.GetName())
 	}
 

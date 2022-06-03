@@ -34,23 +34,19 @@ import (
 )
 
 // SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a ssh.Profile
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *ssh.Profile {
-	var pgw, sgw *ssh.Profile
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *ssh.Config {
+	var pgw, sgw ssh.Config
 	if from.Gateway != nil {
-		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
+		pgw = *SSHConfigFromProtocolToSystem(from.Gateway)
 	}
 	if from.SecondaryGateway != nil {
-		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
+		sgw = *SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
-	return &ssh.Profile{
-		User:                   from.User,
-		Hostname:               from.HostName,
-		IPAddress:              from.Host,
-		PrivateKey:             from.PrivateKey,
-		Port:                   int(from.Port),
-		GatewayConfig:          pgw,
-		SecondaryGatewayConfig: sgw,
-	}
+
+	cfg := ssh.NewConfig(from.HostName, from.Host, int(from.Port), from.User, from.PrivateKey, 0, "", pgw, sgw)
+
+	var acfg ssh.Config = *cfg
+	return &acfg
 }
 
 // FeatureSettingsFromProtocolToResource ...

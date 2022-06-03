@@ -1,6 +1,3 @@
-//go:build !tunnel
-// +build !tunnel
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -17,7 +14,7 @@
  * limitations under the License.
  */
 
-package ssh
+package bycli
 
 import (
 	"context"
@@ -33,6 +30,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -57,63 +55,46 @@ const (
 	sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 )
 
-var (
-	sshErrorMap = map[int]string{
-		1:  "Malformed configuration or invalid cli options",
-		2:  "Connection failed",
-		65: "Host not allowed to connect",
-		66: "General error in ssh protocol",
-		67: "Key exchange failed",
-		69: "MAC error",
-		70: "Compression error",
-		71: "Service not available",
-		72: "Protocol version not supported",
-		73: "Host key not verifiable",
-		74: "Connection failed",
-		75: "Disconnected by application",
-		76: "Too many connections",
-		77: "Authentication canceled by user",
-		78: "No more authentication methods available",
-		79: "Invalid user name",
-	}
-	scpErrorMap = map[int]string{
-		1:  "General error in file copy",
-		2:  "Destination is not directory, but it should be",
-		3:  "Maximum symlink level exceeded",
-		4:  "Connecting to host failed",
-		5:  "Connection broken",
-		6:  "File does not exist",
-		7:  "No permission to access file",
-		8:  "General error in sftp protocol",
-		9:  "File transfer protocol mismatch",
-		10: "No file matches a given criteria",
-		65: "Host not allowed to connect",
-		66: "General error in ssh protocol",
-		67: "Key exchange failed",
-		69: "MAC error",
-		70: "Compression error",
-		71: "Service not available",
-		72: "Protocol version not supported",
-		73: "Host key not verifiable",
-		74: "Connection failed",
-		75: "Disconnected by application",
-		76: "Too many connections",
-		77: "Authentication canceled by user",
-		78: "No more authentication methods available",
-		79: "Invalid user name",
-	}
-)
-
 // Profile helper to manage ssh session
 type Profile struct {
-	Hostname               string   `json:"hostname"`
-	IPAddress              string   `json:"ip_address"`
-	Port                   int      `json:"port"`
-	User                   string   `json:"user"`
-	PrivateKey             string   `json:"private_key"`
-	LocalPort              int      `json:"-"`
-	GatewayConfig          *Profile `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig *Profile `json:"secondary_gateway_config,omitempty"`
+	Hostname               string     `json:"hostname"`
+	IPAddress              string     `json:"ip_address"`
+	Port                   int        `json:"port"`
+	User                   string     `json:"user"`
+	PrivateKey             string     `json:"private_key"`
+	LocalPort              int        `json:"-"`
+	LocalHost              string     `json:"local_host"`
+	GatewayConfig          ssh.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig ssh.Config `json:"secondary_gateway_config,omitempty"`
+}
+
+func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
+	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
+}
+
+func NewConnector(ac ssh.Config) (*Profile, fail.Error) {
+	if valid.IsNil(ac) {
+		return nil, fail.InvalidParameterCannotBeNilError("ac")
+	}
+
+	hostname, _ := ac.GetHostname()
+	IPAddress, _ := ac.GetIPAddress()
+	port, _ := ac.GetPort()
+	user, _ := ac.GetUser()
+	privateKey, _ := ac.GetPrivateKey()
+	localPort, _ := ac.GetLocalPort()
+	localHost, _ := ac.GetLocalHost()
+	gatewayConfig, _ := ac.GetPrimaryGatewayConfig()
+	secondaryGatewayConfig, _ := ac.GetSecondaryGatewayConfig()
+
+	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
+}
+
+func (sconf *Profile) Config() (ssh.Config, fail.Error) {
+	if valid.IsNil(sconf) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return sconf, nil
 }
 
 // IsNull tells if the instance is a null value
@@ -149,6 +130,13 @@ func (sconf *Profile) GetHostname() (string, fail.Error) {
 	return sconf.Hostname, nil
 }
 
+func (sconf *Profile) GetLocalHost() (string, fail.Error) {
+	if valid.IsNil(sconf) {
+		return "", fail.InvalidInstanceError()
+	}
+	return sconf.LocalHost, nil
+}
+
 func (sconf *Profile) GetIPAddress() (string, fail.Error) {
 	if valid.IsNil(sconf) {
 		return "", fail.InvalidInstanceError()
@@ -163,21 +151,21 @@ func (sconf *Profile) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf *Profile) GetPrimaryGatewayConfig() (Config, fail.Error) {
+func (sconf *Profile) GetPrimaryGatewayConfig() (ssh.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf *Profile) GetSecondaryGatewayConfig() (Config, fail.Error) {
+func (sconf *Profile) GetSecondaryGatewayConfig() (ssh.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf *Profile) GetGatewayConfig(num uint) (Config, fail.Error) {
+func (sconf *Profile) GetGatewayConfig(num uint) (ssh.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -192,16 +180,22 @@ func (sconf *Profile) GetGatewayConfig(num uint) (Config, fail.Error) {
 	}
 }
 
+func (sconf *Profile) HasGateways() (bool, fail.Error) {
+	if valid.IsNil(sconf) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	if sconf.GatewayConfig == nil && sconf.SecondaryGatewayConfig == nil {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 // Clone clones the Profile
 func (sconf *Profile) Clone() *Profile {
 	out := &Profile{}
 	*out = *sconf
-	if out.GatewayConfig != nil {
-		out.GatewayConfig = sconf.GatewayConfig.Clone()
-	}
-	if out.SecondaryGatewayConfig != nil {
-		out.SecondaryGatewayConfig = sconf.SecondaryGatewayConfig.Clone()
-	}
 	return out
 }
 
@@ -214,22 +208,6 @@ type Tunnel struct {
 }
 
 type Tunnels []*Tunnel
-
-// SSHErrorString returns if possible the string corresponding to SSH execution
-func SSHErrorString(retcode int) string {
-	if msg, ok := sshErrorMap[retcode]; ok {
-		return msg
-	}
-	return "Unqualified error"
-}
-
-// SCPErrorString returns if possible the string corresponding to SCP execution
-func SCPErrorString(retcode int) string {
-	if msg, ok := scpErrorMap[retcode]; ok {
-		return msg
-	}
-	return "Unqualified error"
-}
 
 // Close closes ssh tunnel
 func (stun *Tunnel) Close() fail.Error {
@@ -338,7 +316,7 @@ func (tunnels Tunnels) Close() fail.Error {
 }
 
 // GetFreePort get a free port
-func getFreePort() (int, fail.Error) {
+func getFreePort() (uint, fail.Error) {
 	listener, err := net.Listen("tcp", ":0")
 	defer func() {
 		clErr := listener.Close()
@@ -355,7 +333,7 @@ func getFreePort() (int, fail.Error) {
 	}
 
 	port := tcp.Port
-	return port, nil
+	return uint(port), nil
 }
 
 // CreateTempFileFromString creates a temporary file containing 'content'
@@ -390,7 +368,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 // If yes, the tunnel is ready, otherwise it failed
 func isTunnelReady(port int) bool {
 	// Try to create a server with the port
-	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", LocalHost, port))
+	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ssh.LocalHost, port))
 	if err != nil {
 		return true
 	}
@@ -403,13 +381,21 @@ func isTunnelReady(port int) bool {
 
 // buildTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's automatically chosen
-func buildTunnel(scfg *Profile) (*Tunnel, fail.Error) {
-	f, err := CreateTempFileFromString(scfg.GatewayConfig.PrivateKey, 0400)
+func buildTunnel(scfg ssh.Config) (*Tunnel, fail.Error) {
+	if valid.IsNil(scfg) {
+		return nil, fail.InvalidParameterCannotBeNilError("scfg")
+	}
+
+	gwCfg, _ := scfg.GetPrimaryGatewayConfig()
+
+	// Creates temporary file with private key
+	scpk, _ := gwCfg.GetPrivateKey()
+	f, err := CreateTempFileFromString(scpk, 0400)
 	if err != nil {
 		return nil, err
 	}
 
-	localPort := scfg.LocalPort
+	localPort, _ := scfg.GetLocalPort()
 	if localPort == 0 {
 		localPort, err = getFreePort()
 		if err != nil {
@@ -417,30 +403,40 @@ func buildTunnel(scfg *Profile) (*Tunnel, fail.Error) {
 		}
 	}
 
-	if scfg.Port == 0 {
-		scfg.Port = SSHPort
+	targetPort, _ := scfg.GetPort()
+	gwPort, _ := gwCfg.GetPort()
+
+	if targetPort == 0 {
+		targetPort = ssh.SSHPort
 	}
-	if scfg.GatewayConfig.Port == 0 {
-		scfg.GatewayConfig.Port = SSHPort
+	if gwPort == 0 {
+		gwPort = ssh.SSHPort
 	}
+
 	// VPL: never used
 	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
 	// 	scfg.SecondaryGatewayConfig.Port = 22
 	// }
 
+	targetHost, _ := scfg.GetHostname()
+	targetIPAddr, _ := scfg.GetIPAddress()
+
+	gwUser, _ := gwCfg.GetUser()
+	gwIPAddr, _ := gwCfg.GetIPAddress()
+
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
 		"ssh -i \"%s\" -NL %s:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
-		LocalHost,
+		ssh.LocalHost,
 		localPort,
-		scfg.IPAddress,
-		scfg.Port,
-		scfg.GatewayConfig.User,
-		scfg.GatewayConfig.IPAddress,
+		targetIPAddr,
+		targetPort,
+		gwUser,
+		gwIPAddr,
 		options,
-		scfg.Hostname,
-		scfg.GatewayConfig.Port,
+		targetHost,
+		gwPort,
 	)
 
 	logrus.Debugf("Creating SSH tunnel with '%s'", cmdString)
@@ -453,11 +449,11 @@ func buildTunnel(scfg *Profile) (*Tunnel, fail.Error) {
 	}
 
 	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
-	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
+	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 100; nbiter++ {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	if !isTunnelReady(localPort) {
+	if !isTunnelReady(int(localPort)) {
 		xerr := fail.NotAvailableError("the tunnel is not ready")
 		derr := killProcess(cmd.Process)
 		if derr != nil {
@@ -467,7 +463,7 @@ func buildTunnel(scfg *Profile) (*Tunnel, fail.Error) {
 	}
 
 	return &Tunnel{
-		port:      localPort,
+		port:      int(localPort),
 		cmd:       cmd,
 		cmdString: cmdString,
 		keyFile:   f,
@@ -475,7 +471,7 @@ func buildTunnel(scfg *Profile) (*Tunnel, fail.Error) {
 }
 
 // Command defines a SSH command
-type Command struct {
+type CliCommand struct {
 	hostname     string
 	runCmdString string
 	cmd          *exec.Cmd
@@ -490,7 +486,7 @@ type Command struct {
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
 // Wait does not release resources associated with the cmd; Command.Close() must be called for that.
 // !!!WARNING!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
-func (scmd *Command) Wait() error {
+func (scmd *CliCommand) Wait() error {
 	if scmd == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -501,8 +497,12 @@ func (scmd *Command) Wait() error {
 	return scmd.cmd.Wait()
 }
 
+func (scmd *CliCommand) String() string {
+	return scmd.runCmdString
+}
+
 // Kill kills Command process.
-func (scmd *Command) Kill() fail.Error {
+func (scmd *CliCommand) Kill() fail.Error {
 	if scmd == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -520,7 +520,7 @@ func (scmd *Command) Kill() fail.Error {
 // Wait will close the pipe after seeing the command exit, so most callers does not need to close the pipe themselves; however,
 // an implication is that it is incorrect to call Wait before all reads from the pipe have been completed.
 // For the same reason, it is incorrect to call Run when using getStdoutPipe.
-func (scmd *Command) getStdoutPipe() (io.ReadCloser, fail.Error) {
+func (scmd *CliCommand) getStdoutPipe() (io.ReadCloser, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -539,7 +539,7 @@ func (scmd *Command) getStdoutPipe() (io.ReadCloser, fail.Error) {
 // Wait will close the pipe after seeing the Command exit, so most callers does not need to close the pipe themselves; however,
 // an implication is that it is incorrect to call Wait before all reads from the pipe have completed. For the same reason,
 // it is incorrect to use Run when using getStderrPipe.
-func (scmd *Command) getStderrPipe() (io.ReadCloser, fail.Error) {
+func (scmd *CliCommand) getStderrPipe() (io.ReadCloser, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -558,7 +558,7 @@ func (scmd *Command) getStderrPipe() (io.ReadCloser, fail.Error) {
 // The pipe will be closed automatically after Wait sees the Command exit.
 // A caller need only call Close to force the pipe to close sooner.
 // For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
-func (scmd *Command) getStdinPipe() (io.WriteCloser, fail.Error) {
+func (scmd *CliCommand) getStdinPipe() (io.WriteCloser, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -576,7 +576,7 @@ func (scmd *Command) getStdinPipe() (io.WriteCloser, fail.Error) {
 // Output returns the standard output of command started.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
-func (scmd *Command) Output() ([]byte, fail.Error) {
+func (scmd *CliCommand) Output() ([]byte, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -593,7 +593,7 @@ func (scmd *Command) Output() ([]byte, fail.Error) {
 
 // CombinedOutput returns the combined standard of command started
 // output and standard error.
-func (scmd *Command) CombinedOutput() ([]byte, fail.Error) {
+func (scmd *CliCommand) CombinedOutput() ([]byte, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -610,7 +610,7 @@ func (scmd *Command) CombinedOutput() ([]byte, fail.Error) {
 
 // Start starts the specified command but does not wait for it to complete.
 // The Wait method will wait for completion and return the exit code.
-func (scmd *Command) Start() fail.Error {
+func (scmd *CliCommand) Start() fail.Error {
 	if scmd == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -635,7 +635,7 @@ func (scmd *Command) Start() fail.Error {
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
-func (scmd *Command) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (scmd *CliCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
 	if scmd == nil {
 		return invalid, "", "", fail.InvalidInstanceError()
@@ -709,7 +709,7 @@ type taskExecuteParameters struct {
 	collectOutputs bool
 }
 
-func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -855,7 +855,7 @@ func (scmd *Command) taskExecute(task concurrency.Task, p concurrency.TaskParame
 }
 
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
-func (scmd *Command) Close() fail.Error {
+func (scmd *CliCommand) Close() fail.Error {
 	var err1 error
 
 	if len(scmd.tunnels) > 0 {
@@ -880,16 +880,31 @@ func (scmd *Command) Close() fail.Error {
 }
 
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
-func createConsecutiveTunnels(sc *Profile, tunnels *Tunnels) (*Tunnel, fail.Error) {
+func createConsecutiveTunnels(sc ssh.Config, tunnels *Tunnels) (*Tunnel, fail.Error) {
 	if sc != nil {
 		// determine what gateway to use
-		var gwConf *Profile
-		if sc.GatewayConfig != nil {
-			gwConf = sc.GatewayConfig
-			if !netutils.CheckRemoteTCP(gwConf.IPAddress, gwConf.Port) {
-				if !valid.IsNil(sc.SecondaryGatewayConfig) {
-					gwConf = sc.SecondaryGatewayConfig
-					if !netutils.CheckRemoteTCP(gwConf.IPAddress, gwConf.Port) {
+		var gwConf ssh.Config
+
+		gwConf, xerr := sc.GetPrimaryGatewayConfig()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		sgwConf, xerr := sc.GetSecondaryGatewayConfig()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if gwConf != nil {
+			gwi, _ := gwConf.GetIPAddress()
+			gwp, _ := gwConf.GetPort()
+
+			if !netutils.CheckRemoteTCP(gwi, int(gwp)) {
+				if !valid.IsNil(sgwConf) {
+					gwConf = sgwConf
+					gwi, _ := sgwConf.GetIPAddress()
+					gwp, _ := sgwConf.GetPort()
+					if !netutils.CheckRemoteTCP(gwi, int(gwp)) {
 						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
 					}
 				} else {
@@ -902,7 +917,7 @@ func createConsecutiveTunnels(sc *Profile, tunnels *Tunnels) (*Tunnel, fail.Erro
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotAvailable:
-				gwConf = sc.SecondaryGatewayConfig
+				gwConf = sgwConf
 				tunnel, xerr = createConsecutiveTunnels(gwConf, tunnels)
 				if xerr != nil {
 					return nil, xerr
@@ -913,14 +928,15 @@ func createConsecutiveTunnels(sc *Profile, tunnels *Tunnels) (*Tunnel, fail.Erro
 		}
 
 		if gwConf != nil {
-			cfg := sc.Clone()
+			cfg, _ := ssh.NewConfigFrom(sc)
 			cfg.GatewayConfig = gwConf
 			if tunnel != nil {
-				gateway := *gwConf
+				gateway, _ := ssh.NewConfigFrom(gwConf)
 				gateway.Port = tunnel.port
-				gateway.IPAddress = LocalHost
-				cfg.GatewayConfig = &gateway
+				gateway.IPAddress = ssh.LocalHost
+				cfg.GatewayConfig = gateway
 			}
+
 			failures := 0
 			xerr = retry.WhileUnsuccessful(
 				func() error {
@@ -960,6 +976,11 @@ func createConsecutiveTunnels(sc *Profile, tunnels *Tunnels) (*Tunnel, fail.Erro
 	return nil, nil
 }
 
+func (sconf *Profile) CreatePersistentTunneling() (ferr fail.Error) {
+	_, _, xerr := sconf.CreateTunneling()
+	return xerr
+}
+
 // CreateTunneling ...
 func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -986,7 +1007,7 @@ func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error)
 
 	if sconf.GatewayConfig != nil {
 		sshConfig.Port = tunnel.port
-		sshConfig.IPAddress = LocalHost
+		sshConfig.IPAddress = ssh.LocalHost
 	}
 	return tunnels, &sshConfig, nil
 }
@@ -1043,18 +1064,18 @@ func createSSHCommand(
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
-func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (*Command, fail.Error) {
+func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (ssh.CommandInterface, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
-func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (*Command, fail.Error) {
+func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (ssh.CommandInterface, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
 func (sconf *Profile) newCommand(
 	ctx context.Context, cmdString string, withTty, withSudo bool,
-) (*Command, fail.Error) {
+) (*CliCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1089,7 +1110,7 @@ func (sconf *Profile) newCommand(
 		return nil, fail.Wrap(err, "unable to create command")
 	}
 
-	sshCommand := Command{
+	sshCommand := CliCommand{
 		hostname:     sconf.Hostname,
 		runCmdString: sshCmdString,
 		tunnels:      tunnels,
@@ -1101,7 +1122,7 @@ func (sconf *Profile) newCommand(
 // newCopyCommand does the same thing as newCommand for SCP actions
 func (sconf *Profile) newCopyCommand(
 	ctx context.Context, localPath, remotePath string, isUpload bool,
-) (*Command, fail.Error) {
+) (*CliCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1139,7 +1160,7 @@ func (sconf *Profile) newCopyCommand(
 		return nil, xerr
 	}
 
-	sshCommand := Command{
+	sshCommand := CliCommand{
 		hostname:     sconf.Hostname,
 		runCmdString: sshCmdString,
 		tunnels:      tunnels,
@@ -1214,7 +1235,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		stdout, stderr string
 	)
 
-	cmdCloseFunc := func(cmd *Command, deferErr *fail.Error) {
+	cmdCloseFunc := func(cmd ssh.CommandInterface, deferErr *fail.Error) {
 		derr := cmd.Close()
 		if derr != nil {
 			if deferErr != nil {
@@ -1242,7 +1263,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			}
 
 			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd *Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+			defer func(cmd ssh.CommandInterface) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
@@ -1258,7 +1279,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 					}
 
 					// Do not forget to close command, ie close SSH tunnel
-					defer func(cmd *Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+					defer func(cmd ssh.CommandInterface) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {
@@ -1266,13 +1287,12 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 					}
 				default:
 				}
-			}
-			if retcode != 0 {
+
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				fe.Annotate("retcode", retcode)
 				fe.Annotate("stdout", stdout)
 				fe.Annotate("stderr", stderr)
-				fe.Annotate("operation", sshCmd.runCmdString)
+				fe.Annotate("operation", sshCmd.String())
 				fe.Annotate("iterations", iterations)
 				return fe
 			}
