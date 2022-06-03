@@ -109,17 +109,26 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile *ssh.Profile, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile ssh.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
+	}
+
+	cfg, xerr := sshProfile.Config()
+	if xerr != nil {
+		return 0, "", "", xerr
+	}
+	hn, xerr := cfg.GetHostname()
+	if xerr != nil {
+		return 0, "", "", xerr
 	}
 
 	var (
 		iterations, retcode int
 		stdout, stderr      string
 	)
-	xerr := retry.WhileUnsuccessful(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			iterations++
 			// Create the command
@@ -130,7 +139,7 @@ func run(ctx context.Context, sshProfile *ssh.Profile, cmd string, outs outputs.
 			}
 
 			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(cmd *ssh.Command) {
+			defer func(cmd ssh.CommandInterface) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerXErr != nil {
@@ -163,7 +172,7 @@ func run(ctx context.Context, sshProfile *ssh.Profile, cmd string, outs outputs.
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", sshProfile.Hostname, temporal.FormatDuration(timeout))
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", hn, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			return retcode, stdout, stderr, fail.ConvertError(fail.Cause(xerr))
 		default:

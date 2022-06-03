@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -14,26 +17,10 @@
  * limitations under the License.
  */
 
-package converters
+package bycli
 
-// Contains functions that are used to convert from system
+import "syscall"
 
-import (
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-)
-
-// SSHConfigFromSystemToProtocol converts a ssh.Profile into a protocol.SshConfig
-func SSHConfigFromSystemToProtocol(from *ssh.Profile) *protocol.SshConfig {
-	var gw *protocol.SshConfig
-	if from.GatewayConfig != nil {
-		gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)
-	}
-	return &protocol.SshConfig{
-		Gateway:    gw,
-		Host:       from.IPAddress,
-		Port:       int32(from.Port),
-		PrivateKey: from.PrivateKey,
-		User:       from.User,
-	}
+func getSyscallAttrs() *syscall.SysProcAttr { // nolint
+	return &syscall.SysProcAttr{}
 }

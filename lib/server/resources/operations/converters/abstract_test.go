@@ -33,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func Test_HostTemplateToHostEffectiveSizing(t *testing.T) {
@@ -464,49 +463,6 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 	for i := range blr.Buckets {
 		require.EqualValues(t, blr.Buckets[i].Name, in[i])
 	}
-
-}
-
-func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
-
-	gw_scfg := ssh.Profile{
-		Hostname:               "Profile GW Hostname",
-		IPAddress:              "Profile GW Hostname",
-		Port:                   42,
-		User:                   "Profile GW Hostname",
-		PrivateKey:             "Profile GW Hostname",
-		LocalPort:              43,
-		GatewayConfig:          nil,
-		SecondaryGatewayConfig: nil,
-	}
-	gw2_scfg := ssh.Profile{
-		Hostname:               "Profile GW2 Hostname",
-		IPAddress:              "Profile GW2 Hostname",
-		Port:                   0,
-		User:                   "Profile GW2 Hostname",
-		PrivateKey:             "Profile GW2 Hostname",
-		LocalPort:              45,
-		GatewayConfig:          nil,
-		SecondaryGatewayConfig: nil,
-	}
-	scfg := ssh.Profile{
-		Hostname:               "Profile Hostname",
-		IPAddress:              "Profile Hostname",
-		Port:                   46,
-		User:                   "Profile Hostname",
-		PrivateKey:             "Profile Hostname",
-		LocalPort:              47,
-		GatewayConfig:          &gw_scfg,
-		SecondaryGatewayConfig: &gw2_scfg,
-	}
-	pcfg := SSHConfigFromAbstractToProtocol(scfg)
-	require.EqualValues(t, scfg.Hostname, pcfg.HostName)
-	require.EqualValues(t, scfg.User, pcfg.User)
-	require.EqualValues(t, scfg.IPAddress, pcfg.Host)
-	require.EqualValues(t, scfg.Port, pcfg.Port)
-	require.EqualValues(t, scfg.PrivateKey, pcfg.PrivateKey)
-	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.GatewayConfig), pcfg.Gateway)
-	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.SecondaryGatewayConfig), pcfg.SecondaryGateway)
 
 }
 

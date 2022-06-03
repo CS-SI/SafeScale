@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package ssh
+package bycli
 
 import "syscall"
 

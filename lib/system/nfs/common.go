@@ -46,7 +46,7 @@ var nfsScripts embed.FS
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 func executeScript(
-	ctx context.Context, timings temporal.Timings, sshconfig ssh.Profile, name string,
+	ctx context.Context, timings temporal.Timings, sshconfig ssh.Connector, name string,
 	data map[string]interface{},
 ) (string, fail.Error) {
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
