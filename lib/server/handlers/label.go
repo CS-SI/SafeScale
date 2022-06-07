@@ -179,12 +179,7 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 		return nil, xerr
 	}
 
-	request := abstract.LabelRequest{
-		Name:       name,
-		HasDefault: hasDefault,
-		Default:    defaultValue,
-	}
-	if xerr = instance.Create(handler.job.Context(), request); xerr != nil {
+	if xerr = instance.Create(handler.job.Context(), name, hasDefault, defaultValue); xerr != nil {
 		return nil, xerr
 	}
 	return instance, nil

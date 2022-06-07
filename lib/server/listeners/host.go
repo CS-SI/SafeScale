@@ -992,7 +992,7 @@ func (s *HostListener) BindLabel(ctx context.Context, in *protocol.LabelBindRequ
 		return empty, xerr
 	}
 
-	if xerr = hostInstance.BindLabel(job.Context(), labelInstance); xerr != nil {
+	if xerr = hostInstance.BindLabel(job.Context(), labelInstance, in.GetValue()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -1100,7 +1100,7 @@ func (s *HostListener) UpdateLabel(ctx context.Context, in *protocol.LabelBindRe
 		return empty, xerr
 	}
 
-	if xerr = hostInstance.UpdateLabel(job.Context(), labelInstance); xerr != nil {
+	if xerr = hostInstance.UpdateLabel(job.Context(), labelInstance, in.GetValue()); xerr != nil {
 		return empty, xerr
 	}
 

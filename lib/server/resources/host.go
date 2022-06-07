@@ -39,6 +39,7 @@ type Host interface {
 	Targetable
 	Consistent
 
+	BindLabel(ctx context.Context, labelInstance Label, value string) fail.Error
 	BindSecurityGroup(ctx context.Context, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                // Binds a security group to host
 	Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) fail.Error                                               // ...
 	Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (*userdata.Content, fail.Error) // creates a new host and its metadata

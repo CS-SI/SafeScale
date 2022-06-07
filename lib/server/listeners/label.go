@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
+	labelfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/label"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -34,13 +35,13 @@ var LabelHandler = handlers.NewTagHandler
 
 // LabelListener is the tag service gRPC server
 type LabelListener struct {
-	protocol.UnimplementedTagServiceServer
+	protocol.UnimplementedLabelServiceServer
 }
 
 // List the available tags
-func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest) (_ *protocol.TagListResponse, err error) {
+func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest) (_ *protocol.LabelListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list tag")
+	defer fail.OnExitWrapError(&err, "cannot list labels")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -52,41 +53,41 @@ func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest)
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "/tags/list")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "/labels/list")
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	all := in.GetAll()
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tag"), "(%v)", all).WithStopwatch().Entering()
+	selectTags := in.GetTags()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "(%v)", selectTags).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := LabelHandler(job)
-	tags, xerr := handler.List(in.GetAll(), in.GetHasDefault())
+	list, xerr := handler.List(selectTags)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Map resources.Tag to protocol.Tag
-	var pbtags []*protocol.TagInspectResponse
-	for _, v := range tags {
-		pbTag, xerr := v.ToProtocol(job.Context())
+	var outList []*protocol.LabelInspectResponse
+	for _, v := range list {
+		item, xerr := v.ToProtocol(job.Context())
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		pbtags = append(pbtags, pbTag)
+		outList = append(outList, item)
 	}
-	rv := &protocol.TagListResponse{Tags: pbtags}
-	return rv, nil
+	out := &protocol.LabelListResponse{Labels: outList}
+	return out, nil
 }
 
 // Create a new label/tag
 func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequest) (_ *protocol.LabelInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create tag")
+	defer fail.OnExitWrapError(&err, "cannot create label")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -99,36 +100,38 @@ func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequ
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/tag/%s/create", name))
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/label/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tag"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewTagHandler(job)
-	rv, xerr := handler.Create(name, in.GetHasDefault(), in.GetValue())
+	labelInstance, xerr := handler.Create(name, in.GetHasDefault(), in.GetDefaultValue())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var kind string
-	if in.GetHasDefault() {
-		kind = "Label"
-	} else {
-		kind = "Tag"
+	tracer.Trace("%s '%s' created", kindToString(in.GetHasDefault()), name)
+	return labelInstance.ToProtocol(job.Context())
+}
+
+func kindToString(state bool) string {
+	if state {
+		return "Tag"
 	}
-	tracer.Trace("%s '%s' created", kind, name)
-	return rv.ToProtocol(job.Context())
+
+	return "Label"
 }
 
 // Delete a Label
-func (s *LabelListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *LabelListener) Delete(ctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete label")
+	defer fail.OnExitWrapError(&err, "cannot delete Label")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -140,18 +143,18 @@ func (s *LabelListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	if ctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in.GetLabel())
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/tag/%s/delete", ref))
+	job, xerr := PrepareJob(ctx, in.GetLabel().GetTenantId(), fmt.Sprintf("/label/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -165,7 +168,7 @@ func (s *LabelListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 }
 
 // Inspect a Label/Tag
-func (s *LabelListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.TagInspectResponse, err error) {
+func (s *LabelListener) Inspect(ctx context.Context, in *protocol.LabelInspectRequest) (_ *protocol.LabelInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect label")
 
@@ -178,24 +181,33 @@ func (s *LabelListener) Inspect(ctx context.Context, in *protocol.Reference) (_ 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in.GetLabel())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/tag/%s/inspect", ref))
+	job, xerr := PrepareJob(ctx, in.GetLabel().GetTenantId(), fmt.Sprintf("/label/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tag"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance, xerr := labelfactory.Load(job.Context(), job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	istag, xerr := instance.IsTag(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if in.GetIsTag() != istag {
+		return nil, fail.NotFoundError("failed to find %s '%s'", kindToString(istag), ref)
 	}
 
 	return instance.ToProtocol(job.Context())
