@@ -955,6 +955,7 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 	}
+
 	return clitools.SuccessResponse(list)
 }
 
@@ -1249,9 +1250,9 @@ var hostTagListCommand = cli.Command{
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostTagCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 2 {
+		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTNAME and$/or TAGNAME"))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTNAME"))
 		}
 
 		err := ClientSession.Host.ListLabels(c.Args().First(), true, 0)
@@ -1267,16 +1268,17 @@ var hostTagBindCommand = cli.Command{
 	Name:      "bind",
 	Aliases:   []string{"attach"},
 	Usage:     "bind Tag to Host",
-	ArgsUsage: "HOSTNAME TAGNAME",
+	ArgsUsage: "HOSTREF TAGREF",
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostTagCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTNAME and/or TAGNAME"))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or TAGREF"))
 		}
 
-		label, err := ClientSession.Label.Inspect(c.Args().First(), true, 0)
+		// Check corresponding Label is a Tag
+		label, err := ClientSession.Label.Inspect(c.Args().Get(1), true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
@@ -1286,11 +1288,13 @@ var hostTagBindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("bind Tag to Host: '%s' is a Label", c.Args().First())))
 		}
 
+		// Confirmed, can be bound
 		err = ClientSession.Host.BindLabel(c.Args().First(), c.Args().Get(1), "", 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
 		}
+
 		return clitools.SuccessResponse(nil)
 	},
 }
@@ -1351,7 +1355,7 @@ var hostLabelListCommand = cli.Command{
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostLabelCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 2 {
+		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTNAME"))
 		}

@@ -25,6 +25,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -166,7 +168,23 @@ var tagListCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Tags", false).Error())))
 		}
-		return clitools.SuccessResponse(list.Labels)
+
+		// Remove hosts from list content for this command
+		jsoned, err := json.Marshal(list.Labels)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+		}
+
+		var body []map[string]interface{}
+		err = json.Unmarshal(jsoned, &body)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+		}
+
+		for _, v := range body {
+			delete(v, "hosts")
+		}
+		return clitools.SuccessResponse(body)
 	},
 }
 

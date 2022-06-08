@@ -122,10 +122,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		req.InitialNodeCount = privateNodeCount
 	}
 	if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-		logrus.Warnf(
-			"[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')",
-			req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String(),
-		)
+		logrus.Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
 		req.InitialNodeCount = privateNodeCount
 	}
 

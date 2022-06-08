@@ -362,7 +362,7 @@ func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		out = alabel.HasDefault
+		out = !alabel.HasDefault
 		return nil
 	})
 	if xerr != nil {
@@ -389,4 +389,90 @@ func (instance label) DefaultValue(ctx context.Context) (string, fail.Error) {
 	}
 
 	return out, nil
+}
+
+// BindToHost binds Host to the Label
+func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Host, value string) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if valid.IsNull(hostInstance) {
+		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
+	}
+
+	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		alabel, ok := clonable.(*abstract.Label)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		isTag := !alabel.HasDefault
+
+		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// If the tag has this host, consider it a success
+			hostID := hostInstance.GetID()
+			hostName := hostInstance.GetName()
+			_, ok = labelHostsV1.ByID[hostID]
+			if !ok {
+				if isTag {
+					value = ""
+				}
+				labelHostsV1.ByID[hostID] = value
+				labelHostsV1.ByName[hostName] = value
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// UnbindFromHost removes Host from Label metadata, unbinding Host from Label
+func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resources.Host) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if valid.IsNull(hostInstance) {
+		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
+	}
+
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			hID := hostInstance.GetID()
+			hName := hostInstance.GetName()
+
+			// If the Label does not reference this Host, consider it a success
+			if _, ok = labelHostsV1.ByID[hID]; ok {
+				delete(labelHostsV1.ByID, hID)
+				delete(labelHostsV1.ByName, hName)
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }

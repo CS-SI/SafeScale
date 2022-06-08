@@ -2539,6 +2539,49 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
 		}
 
+		// Unbind labels from Host
+		innerXErr = props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hlV1, ok := clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// Unbind Security Groups from Host
+			var errors []error
+			for k := range hlV1.ByID {
+				labelInstance, derr := LoadLabel(task.Context(), svc, k)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						debug.IgnoreError(derr)
+					default:
+						errors = append(errors, derr)
+					}
+					continue
+				}
+
+				derr = labelInstance.UnbindFromHost(task.Context(), instance)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						debug.IgnoreError(derr)
+					default:
+						errors = append(errors, derr)
+					}
+				}
+			}
+			if len(errors) > 0 {
+				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
+			}
+
+			return nil
+		})
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+		}
+
 		// Delete Host
 		waitForDeletion := true
 		innerXErr = retry.WhileUnsuccessful(
@@ -4014,7 +4057,7 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if labelInstance == nil {
-		return fail.InvalidParameterCannotBeNilError("tag")
+		return fail.InvalidParameterCannotBeNilError("label")
 	}
 
 	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
@@ -4033,39 +4076,20 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	var isTag bool
-	hostID := instance.GetID()
-	hostName := instance.GetName()
-	xerr = labelInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, ok := clonable.(*abstract.Label)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		isTag = !alabel.HasDefault
-
-		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			// If the tag has this host, consider it a success
-			_, ok = labelHostsV1.ByID[hostID]
-			if !ok {
-				if isTag {
-					value = ""
-				}
-				labelHostsV1.ByID[hostID] = value
-				labelHostsV1.ByName[hostName] = value
-			}
-			return nil
-		})
-	})
+	// Inform Label we want it bound to Host (updates its metadata)
+	xerr = labelInstance.BindToHost(ctx, instance, value)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
+	defer func() {
+		if ferr != nil {
+			derr := labelInstance.UnbindFromHost(ctx, instance)
+			if derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure"))
+			}
+		}
+	}()
 
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
@@ -4141,24 +4165,7 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 		return xerr
 	}
 
-	xerr = labelInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			hID := instance.GetID()
-			hName := instance.GetName()
-
-			// If the tag does not have this host, consider it a success
-			if _, ok = labelHostsV1.ByID[hID]; ok {
-				delete(labelHostsV1.ByID, hID)
-				delete(labelHostsV1.ByName, hName)
-			}
-			return nil
-		})
-	})
+	xerr = labelInstance.UnbindFromHost(ctx, instance)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

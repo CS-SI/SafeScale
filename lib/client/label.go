@@ -44,9 +44,12 @@ func (t labelConsumer) List(selectTags bool, timeout time.Duration) (*protocol.L
 		return nil, xerr
 	}
 
-	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewLabelServiceClient(t.session.connection)
 	return service.List(newCtx, &protocol.LabelListRequest{TenantId: t.session.tenant, Tags: selectTags})
@@ -62,9 +65,12 @@ func (t labelConsumer) Inspect(name string, selectTag bool, timeout time.Duratio
 		return nil, xerr
 	}
 
-	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	service := protocol.NewLabelServiceClient(t.session.connection)
 	req := &protocol.LabelInspectRequest{
@@ -87,9 +93,12 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 		return xerr
 	}
 
-	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	var (
 		mutex sync.Mutex
@@ -141,9 +150,12 @@ func (t labelConsumer) Create(name string, hasDefault bool, defaultValue string,
 		return nil, xerr
 	}
 
-	// finally, using context
-	newCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	def := &protocol.LabelCreateRequest{
 		Name:         name,

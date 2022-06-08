@@ -39,6 +39,7 @@ import (
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -944,6 +945,76 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 
 	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "hosts")
 	return resp, nil
+}
+
+// ListLabels lists Label/Tag bound to an Host
+func (s *HostListener) ListLabels(ctx context.Context, in *protocol.LabelBoundsRequest) (_ *protocol.LabelListResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot bind Label to Host")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	kind := strings.ToLower(kindToString(in.GetTags()))
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/%s/list", hostRef, kind))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, kind=%s)", hostRefLabel, kind).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var list []*protocol.LabelInspectResponse
+	xerr = hostInstance.Review(job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hlV1, ok := clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			for k := range hlV1.ByID {
+				labelInstance, innerXErr := labelfactory.Load(ctx, job.Service(), k)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				item, innerXErr := labelInstance.ToProtocol(ctx)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				list = append(list, item)
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &protocol.LabelListResponse{
+		Labels: list,
+	}
+	return out, nil
 }
 
 // BindLabel binds a Label to a Host
