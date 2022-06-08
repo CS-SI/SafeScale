@@ -223,7 +223,6 @@ func executeScript(
 		}
 
 		resChan <- result{stdout, nil}
-		return
 	}()
 
 	select {
