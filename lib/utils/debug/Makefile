@@ -7,7 +7,6 @@ all: generate
 generate:
 	@$(GO) generate -run stringer ./...
 	@mkdir -p ./mocks || true
-	@$(GO) generate -run minimock . >/dev/null 2>&1 || true
 
 vet:
 	@$(GO) vet ./...

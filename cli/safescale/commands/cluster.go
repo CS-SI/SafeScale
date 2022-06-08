@@ -973,7 +973,7 @@ var clusterKubectlCommand = cli.Command{
 
 		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		return clitools.SuccessResponse(nil)
