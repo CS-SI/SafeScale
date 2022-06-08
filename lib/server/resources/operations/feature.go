@@ -51,9 +51,6 @@ type Feature struct {
 	conditionedParameters ConditionedFeatureParameters
 }
 
-// verify that Feature satisfies resources.Feature
-var _ resources.Feature = (*Feature)(nil)
-
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 // error contains :

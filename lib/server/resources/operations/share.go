@@ -116,9 +116,6 @@ type Share struct {
 	*MetadataCore
 }
 
-// verify that Share satisfies resources.Share
-var _ resources.Share = (*Share)(nil)
-
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {

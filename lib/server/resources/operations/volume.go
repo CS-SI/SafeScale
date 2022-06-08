@@ -57,9 +57,6 @@ type volume struct {
 	*MetadataCore
 }
 
-// verify that Network satisfies resources.Network
-var _ resources.Volume = (*volume)(nil)
-
 // NewVolume creates an instance of Volume
 func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 	if svc == nil {

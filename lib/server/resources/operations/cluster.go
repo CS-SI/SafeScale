@@ -84,9 +84,6 @@ type Cluster struct {
 	randomDelayCh   <-chan int
 }
 
-// verify that Cluster satisfies resources.Cluster
-var _ resources.Cluster = (*Cluster)(nil)
-
 // NewCluster is the constructor of resources.Cluster struct
 func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -1066,9 +1063,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	nodeDef := complementHostDefinition(def, *nodeDefaultDefinition)
-	if def.Image != "" {
-		hostImage = def.Image
-	}
 
 	svc := instance.Service()
 	_, nodeDef.Image, xerr = determineImageID(ctx, svc, hostImage)

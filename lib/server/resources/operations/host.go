@@ -29,6 +29,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
@@ -49,7 +51,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -62,7 +63,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -83,9 +83,6 @@ type Host struct {
 		sshProfile                    api.Connector
 	}
 }
-
-// verify that Host satisfies resources.Host
-var _ resources.Host = (*Host)(nil)
 
 // NewHost ...
 func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
