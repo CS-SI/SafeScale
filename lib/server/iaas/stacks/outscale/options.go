@@ -25,8 +25,10 @@ import (
 
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
+	// FIXME: Wrong
 	return stacks.ConfigurationOptions{
 		DNSList:          s.Options.Compute.DNSList,
+		DefaultImage:     s.Options.Compute.DefaultImage,
 		MetadataBucket:   s.Options.Metadata.Bucket,
 		OperatorUsername: s.Options.Compute.OperatorUsername,
 	}, nil
@@ -34,6 +36,7 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stacks.Configuration
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
+	// FIXME: Wrong
 	return stacks.AuthenticationOptions{
 		AccessKeyID:      s.Options.Identity.AccessKey,
 		SecretAccessKey:  s.Options.Identity.SecretKey,
