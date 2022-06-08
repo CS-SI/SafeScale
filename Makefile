@@ -52,8 +52,6 @@ all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock e
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 with-soft:
 	@echo "go easy running semgrep"
@@ -71,10 +69,6 @@ allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet s
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescale/safescale 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescaled/safescaled-cover 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescale/safescale-cover 2>/dev/null >> sums.log || true
 
 version:
 	@printf "%b" "$(VERSION)-$$(git rev-parse --abbrev-ref HEAD | tr \"/\" \"_\")";
@@ -84,16 +78,12 @@ release: logclean ground getdevdeps mod releasetags sdk generate lib cli test mi
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 releasetags:
 	@echo "settings go build tags for release"
@@ -155,8 +145,6 @@ ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@$(MD5) cli/safescale/safescale 2>/dev/null >> sums.log || true
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 endif

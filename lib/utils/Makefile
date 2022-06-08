@@ -9,7 +9,6 @@ generate:
 	@echo "package valid" > ./valid/consts.go
 	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go
 	@$(GO) generate -run stringer . >/dev/null || true
-	@$(GO) generate -run minimock . >/dev/null || true
 	@(cd concurrency && $(MAKE) $@)
 	@(cd cli && $(MAKE) $@)
 	@(cd data && $(MAKE) $@)
