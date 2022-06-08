@@ -31,7 +31,7 @@ import (
 )
 
 func Docker(t *testing.T) {
-	names := helpers.GetNames("Docker", 0, 0, 0, 0, 1, 0)
+	names := helpers.GetNames("Docker", 0, 0, 0, 0, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -76,7 +76,7 @@ func Docker(t *testing.T) {
 }
 
 func DockerNotGateway(t *testing.T) {
-	names := helpers.GetNames("DockerNotGateway", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("DockerNotGateway", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -125,7 +125,7 @@ func DockerNotGateway(t *testing.T) {
 }
 
 func DockerCompose(t *testing.T) {
-	names := helpers.GetNames("DockerCompose", 0, 0, 0, 0, 1, 0)
+	names := helpers.GetNames("DockerCompose", 0, 0, 0, 0, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -169,7 +169,7 @@ func DockerCompose(t *testing.T) {
 }
 
 func RemoteDesktopOnSingleHost(t *testing.T) {
-	names := helpers.GetNames("RemoteDesktop", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("RemoteDesktop", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -212,7 +212,7 @@ func RemoteDesktopOnSingleHost(t *testing.T) {
 }
 
 func RemoteDesktopOnSubnetHost(t *testing.T) {
-	names := helpers.GetNames("RemoteDesktop", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("RemoteDesktop", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -259,7 +259,7 @@ func RemoteDesktopOnSubnetHost(t *testing.T) {
 }
 
 func ReverseProxy(t *testing.T) {
-	names := helpers.GetNames("ReverseProxy", 0, 0, 0, 0, 1, 0)
+	names := helpers.GetNames("ReverseProxy", 0, 0, 0, 0, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 

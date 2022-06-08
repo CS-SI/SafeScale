@@ -31,7 +31,7 @@ import (
 )
 
 func CreateNetwork(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 0, 2, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 0, 0, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -103,7 +103,7 @@ func CreateNetwork(t *testing.T) {
 }
 
 func CreateNetworkWithoutSubnet(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 0, 2, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 0, 0, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 

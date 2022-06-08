@@ -1,6 +1,6 @@
-//go:build !(allintegration || (integration && tagtests))
+//go:build !(allintegration || (integration && labeltests))
 // +build !allintegration
-// +build !integration !tagtests
+// +build !integration !labeltests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -18,12 +18,4 @@
  * limitations under the License.
  */
 
-package tags
-
-import (
-	"testing"
-)
-
-func Test_Nop(t *testing.T) {
-	t.Skip("tag tests disabled")
-}
+package labels

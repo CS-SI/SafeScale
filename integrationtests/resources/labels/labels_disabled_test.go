@@ -1,5 +1,6 @@
-//go:build (integration && volumetests) || allintegration
-// +build integration,volumetests allintegration
+//go:build !(allintegration || (integration && labeltests))
+// +build !allintegration
+// +build !integration !labeltests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,25 +18,12 @@
  * limitations under the License.
  */
 
-package tagsÒ
+package labels
 
 import (
 	"testing"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
-func Test_VolumeError(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t)
-}
-
-func Test_DeleteVolumeMounted(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t)
-}
-
-func Test_UntilVolume(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
-	helpers.RunScenarios(t)
+func Test_Nop(t *testing.T) {
+	t.Skip("label tests disabled")
 }

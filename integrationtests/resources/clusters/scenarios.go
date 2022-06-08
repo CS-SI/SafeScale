@@ -29,7 +29,7 @@ import (
 )
 
 func ClusterK8S(t *testing.T) {
-	names := helpers.GetNames("ClusterK8S", 0, 0, 0, 0, 0, 1)
+	names := helpers.GetNames("ClusterK8S", 0, 0, 0, 0, 0, 1, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 

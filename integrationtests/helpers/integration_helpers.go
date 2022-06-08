@@ -99,6 +99,31 @@ func GetOutput(command string) (string, error) {
 	return string(out), nil
 }
 
+// JSONToMap converts a slice of byte containing JSON code to a map
+func JSONToMap(in string) (map[string]interface{}, error) {
+	jsoned, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+
+	var out map[string]interface{}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func ExtractResult(in string) ([]map[string]interface{}, error) {
+	jsoned, err := JSONToMap(in)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsoned["result"].([]map[string]interface{}), nil
+}
+
 // RunOnlyInIntegrationTest ...
 func RunOnlyInIntegrationTest(key string) error {
 	tenantOverride := os.Getenv(key)
