@@ -492,8 +492,8 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 				results <- result{
 					errorcode: errorCode,
-					stdout:    "",
-					stderr:    "",
+					stdout:    b.String(),
+					stderr:    be.String(),
 					reserr:    err,
 				}
 				return
@@ -515,6 +515,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 		case res := <-results:
 			if outs == outputs.DISPLAY {
 				fmt.Print(res.stdout)
+				fmt.Print(res.stderr)
 			}
 			return res.errorcode, res.stdout, res.stderr, nil
 		case <-enough:
@@ -526,6 +527,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 	if outs == outputs.DISPLAY {
 		fmt.Print(res.stdout)
+		fmt.Print(res.stderr)
 	}
 
 	return res.errorcode, res.stdout, res.stderr, nil
