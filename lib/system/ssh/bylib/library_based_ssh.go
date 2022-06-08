@@ -41,7 +41,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -295,19 +294,9 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 
 // NewRunWithTimeout ...
 func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return 0, "", "", xerr
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.Exiting()
-
-	if task != nil && task.Aborted() {
-		return 0, "", "", fail.AbortedError(task.Context().Err(), "task aborted by parent")
-	}
 
 	type result struct {
 		errorcode int
@@ -365,11 +354,6 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				}
 			}
 		}()
-
-		if task != nil && task.Aborted() {
-			results <- result{-1, "", "", fail.AbortedError(task.Context().Err(), "task aborted by parent")}
-			return
-		}
 
 		beginDial := time.Now()
 		retries := 0
@@ -432,11 +416,6 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				}
 			}
 		}()
-
-		if task != nil && task.Aborted() {
-			results <- result{-1, "", "", fail.AbortedError(task.Context().Err(), "task aborted by parent")}
-			return
-		}
 
 		if sc.cmd == nil {
 			results <- result{-1, "", "", fail.AbortedError(nil, "nil ssh command!!")}
@@ -700,13 +679,7 @@ func (sc *Profile) WaitServerReady(ctx context.Context, phase string, timeout ti
 		return "", fail.InvalidInstanceContentError("sc.Host", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %s)", phase, temporal.FormatDuration(timeout)).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %s)", phase, temporal.FormatDuration(timeout)).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// no timeout is unsafe, we set an upper limit
@@ -731,18 +704,10 @@ func (sc *Profile) WaitServerReady(ctx context.Context, phase string, timeout ti
 			retcode = -1
 			iterations++
 
-			// FIXME: Remove WaitServerReady logs and ensure minimum of iterations
-			if task != nil {
-				if task != nil && task.Aborted() {
-					// logrus.Warningf("Someone aborted")
-					return fail.AbortedError(nil, "task already aborted by the parent")
-				}
-			}
-
 			cmd, _ := sc.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(task.Context(), outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				return xerr
 			}
