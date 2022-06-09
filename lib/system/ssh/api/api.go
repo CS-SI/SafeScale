@@ -45,13 +45,13 @@ type Connector interface {
 	Config() (Config, fail.Error)
 	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
 	Enter(string, string) fail.Error
-	NewCommand(context.Context, string) (CommandInterface, fail.Error)
-	NewSudoCommand(context.Context, string) (CommandInterface, fail.Error)
+	NewCommand(context.Context, string) (Command, fail.Error)
+	NewSudoCommand(context.Context, string) (Command, fail.Error)
 	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)
 }
 
-// CommandInterface defines an SSH command
-type CommandInterface interface {
+// Command defines an SSH command
+type Command interface {
 	String() string
 	Close() fail.Error
 	RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error)

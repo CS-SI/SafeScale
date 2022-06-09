@@ -1027,12 +1027,12 @@ func createSSHCommand(
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
-func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (api.CommandInterface, fail.Error) {
+func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
-func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (api.CommandInterface, fail.Error) {
+func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
@@ -1160,7 +1160,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		stdout, stderr string
 	)
 
-	cmdCloseFunc := func(cmd api.CommandInterface, deferErr *fail.Error) {
+	cmdCloseFunc := func(cmd api.Command, deferErr *fail.Error) {
 		derr := cmd.Close()
 		if derr != nil {
 			if deferErr != nil {
@@ -1188,7 +1188,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			}
 
 			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd api.CommandInterface) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+			defer func(cmd api.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
@@ -1204,7 +1204,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 					}
 
 					// Do not forget to close command, ie close SSH tunnel
-					defer func(cmd api.CommandInterface) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+					defer func(cmd api.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {

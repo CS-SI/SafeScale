@@ -87,7 +87,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 				return innerXErr
 			}
 
-			defer func(cmd api.CommandInterface) {
+			defer func(cmd api.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerErr != nil {

@@ -139,7 +139,7 @@ func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs
 			}
 
 			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(cmd api.CommandInterface) {
+			defer func(cmd api.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerXErr != nil {

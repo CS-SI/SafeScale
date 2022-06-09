@@ -642,7 +642,7 @@ func (sc *Profile) Command(cmdString string) (*LibCommand, fail.Error) {
 }
 
 // NewCommand returns the cmd struct to execute cmdString remotely
-func (sc *Profile) NewCommand(_ context.Context, cmdString string) (api.CommandInterface, fail.Error) {
+func (sc *Profile) NewCommand(_ context.Context, cmdString string) (api.Command, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
@@ -652,7 +652,7 @@ func (sc *Profile) SudoCommand(cmdString string) (*LibCommand, fail.Error) {
 }
 
 // NewSudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (api.CommandInterface, fail.Error) {
+func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (api.Command, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 
