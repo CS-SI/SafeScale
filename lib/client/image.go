@@ -24,13 +24,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
-// hostConsumer is the safescale client part handling hosts
+// imageConsumer is the safescale client part handling images
 type imageConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
-// List return the list of available images on the current tenantConsumer
+// List return the list of available images of tenant
 func (img imageConsumer) List(all bool, timeout time.Duration) (*protocol.ImageList, error) {
 	img.session.Connect()
 	defer img.session.Disconnect()

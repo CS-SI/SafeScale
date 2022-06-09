@@ -31,7 +31,7 @@ import (
 
 // var sshCfgCache = cache.NewMapCache()
 
-// hostConsumer is the safescale client part handling hosts
+// clusterConsumer is the safescale client part handling clusters
 type clusterConsumer struct {
 	// session is not used currently
 	session *Session
@@ -93,7 +93,7 @@ func (c clusterConsumer) Inspect(clusterName string, timeout time.Duration) (*pr
 	return result, nil
 }
 
-// GetState gets clusterConsumer status
+// GetState gets cluster status
 func (c clusterConsumer) GetState(clusteName string, timeout time.Duration) (*protocol.ClusterStateResponse, error) {
 	if clusteName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusteName")
@@ -118,7 +118,7 @@ func (c clusterConsumer) GetState(clusteName string, timeout time.Duration) (*pr
 	return service.State(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusteName})
 }
 
-// Start starts all the hosts of the clusterConsumer
+// Start starts all the hosts of the cluster
 func (c clusterConsumer) Start(clusterName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -140,7 +140,7 @@ func (c clusterConsumer) Start(clusterName string, timeout time.Duration) error 
 	return err
 }
 
-// Stop stops all the hosts of the clusterConsumer
+// Stop stops all the hosts of the cluster
 func (c clusterConsumer) Stop(clusterName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -189,7 +189,7 @@ func (c clusterConsumer) Create(def *protocol.ClusterCreateRequest, timeout time
 	return service.Create(newCtx, def)
 }
 
-// Delete deletes a clusterConsumer
+// Delete deletes a cluster
 func (c clusterConsumer) Delete(clusterName string, force bool, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
@@ -649,7 +649,7 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 	}
 
 	if len(nodes) > 1 {
-		// We want to check first if tenantConsumer is set when there are more than 1 node, to avoid multiple message claiming there is no tenantConsumer set...
+		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenantConsumer set...
 		tenantService := protocol.NewTenantServiceClient(c.session.connection)
 		_, err := tenantService.Get(newCtx, &googleprotobuf.Empty{})
 		if err != nil {

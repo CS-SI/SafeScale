@@ -24,13 +24,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
-// hostConsumer is the safescale client part handling hosts
+// templateConsumer is the safescale client part handling templates
 type templateConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
-// List returns the list of available templates on the current tenantConsumer
+// List returns the list of available templates on the current templates
 func (t templateConsumer) List(all, scannedOnly bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
@@ -74,7 +74,7 @@ func (t templateConsumer) Match(sizing string, timeout time.Duration) (*protocol
 	return service.Match(newCtx, &protocol.TemplateMatchRequest{Sizing: sizing})
 }
 
-// Inspect returns details of a templateConsumer identified by name of ID
+// Inspect returns details of a template identified by name of ID
 func (t templateConsumer) Inspect(name string, timeout time.Duration) (*protocol.HostTemplate, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()

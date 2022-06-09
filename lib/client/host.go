@@ -81,7 +81,7 @@ func (h hostConsumer) Inspect(name string, timeout time.Duration) (*protocol.Hos
 	return service.Inspect(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 }
 
-// GetStatus gets hostConsumer status
+// GetStatus gets host status
 func (h hostConsumer) GetStatus(name string, timeout time.Duration) (*protocol.HostStatus, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -103,7 +103,7 @@ func (h hostConsumer) GetStatus(name string, timeout time.Duration) (*protocol.H
 	return service.Status(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
 }
 
-// Reboot hostConsumer
+// Reboot host
 func (h hostConsumer) Reboot(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -126,7 +126,7 @@ func (h hostConsumer) Reboot(name string, timeout time.Duration) error {
 	return err
 }
 
-// Start hostConsumer
+// Start host
 func (h hostConsumer) Start(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -149,7 +149,7 @@ func (h hostConsumer) Start(name string, timeout time.Duration) error {
 	return err
 }
 
-// Stop hostConsumer
+// Stop host
 func (h hostConsumer) Stop(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -171,7 +171,7 @@ func (h hostConsumer) Stop(name string, timeout time.Duration) error {
 	return err
 }
 
-// Create creates a new hostConsumer
+// Create creates a new host
 func (h hostConsumer) Create(req *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -245,7 +245,7 @@ func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h hostConsumer) SSHConfig(name string) (*ssh.Profile, error) {
+func (h hostConsumer) SSHConfig(name string) (*ssh.Config, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -464,7 +464,7 @@ func (h hostConsumer) RemoveFeature(hostRef, featureName string, params map[stri
 	return err
 }
 
-// BindSecurityGroup calls the gRPC server to bind a security group to a hostConsumer
+// BindSecurityGroup calls the gRPC server to bind a security group to a host
 func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -499,7 +499,7 @@ func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, time
 	return err
 }
 
-// UnbindSecurityGroup calls the gRPC server to unbind a security group from a hostConsumer
+// UnbindSecurityGroup calls the gRPC server to unbind a security group from a host
 func (h hostConsumer) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -526,7 +526,7 @@ func (h hostConsumer) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Du
 	return err
 }
 
-// EnableSecurityGroup calls the gRPC server to enable a bound security group on hostConsumer
+// EnableSecurityGroup calls the gRPC server to enable a bound security group on host
 func (h hostConsumer) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -553,7 +553,7 @@ func (h hostConsumer) EnableSecurityGroup(hostRef, sgRef string, timeout time.Du
 	return err
 }
 
-// DisableSecurityGroup calls the gRPC server to disable a bound security group on hostConsumer
+// DisableSecurityGroup calls the gRPC server to disable a bound security group on host
 func (h hostConsumer) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -580,7 +580,7 @@ func (h hostConsumer) DisableSecurityGroup(hostRef, sgRef string, timeout time.D
 	return err
 }
 
-// ListSecurityGroups calls the gRPC server to list bound security groups of a hostConsumer
+// ListSecurityGroups calls the gRPC server to list bound security groups of a host
 func (h hostConsumer) ListSecurityGroups(hostRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()

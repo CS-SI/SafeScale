@@ -275,7 +275,7 @@ func TagIsNotLabel(t *testing.T) {
 
 func init() {
 	helpers.InSection("labels").
+		AddScenario(TagIsNotLabel).
 		AddScenario(TagBase).
-		AddScenario(LabelBase).
 		AddScenario(TagIsNotLabel)
 }

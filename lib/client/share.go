@@ -53,12 +53,12 @@ func (n shareConsumer) Create(def *protocol.ShareDefinition, timeout time.Durati
 
 	_, err := service.Create(newCtx, def)
 	if err != nil {
-		return DecorateTimeoutError(err, "creation of shareConsumer", true)
+		return DecorateTimeoutError(err, "creation of share", true)
 	}
 	return nil
 }
 
-// Delete deletes a shareConsumer
+// Delete deletes a share
 func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
@@ -154,7 +154,7 @@ func (n shareConsumer) Mount(def *protocol.ShareMountDefinition, timeout time.Du
 
 	_, err := service.Mount(newCtx, def)
 	if err != nil {
-		return DecorateTimeoutError(err, "mount of shareConsumer", true)
+		return DecorateTimeoutError(err, "mount of share", true)
 	}
 	return nil
 }
@@ -179,7 +179,7 @@ func (n shareConsumer) Unmount(def *protocol.ShareMountDefinition, timeout time.
 
 	_, err := service.Unmount(newCtx, def)
 	if err != nil {
-		return DecorateTimeoutError(err, "unmount of shareConsumer", true)
+		return DecorateTimeoutError(err, "unmount of share", true)
 	}
 	return nil
 }
@@ -204,7 +204,7 @@ func (n shareConsumer) Inspect(name string, timeout time.Duration) (*protocol.Sh
 
 	list, err := service.Inspect(newCtx, &protocol.Reference{Name: name})
 	if err != nil {
-		return nil, DecorateTimeoutError(err, "inspection of shareConsumer", true)
+		return nil, DecorateTimeoutError(err, "inspection of share", true)
 	}
 	return list, nil
 }

@@ -50,7 +50,7 @@ type Connector interface {
 	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)
 }
 
-// Command defines a SSH command
+// CommandInterface defines a SSH command
 type CommandInterface interface {
 	String() string
 	Close() fail.Error

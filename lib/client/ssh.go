@@ -33,6 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
@@ -128,9 +129,9 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				if t.Err != nil {
-					logrus.Debugf("Remote SSH service on hostConsumer '%s' isn't ready (%s), retrying...\n", hostName, t.Err.Error())
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...\n", hostName, t.Err.Error())
 				} else {
-					logrus.Debugf("Remote SSH service on hostConsumer '%s' isn't ready, retrying...", hostName)
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostName)
 				}
 			}
 		},
@@ -148,12 +149,13 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Profile, fail.Error) {
-	host := &hostConsumer{session: s.session}
-	cfg, err := host.SSHConfig(hostname)
+func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
+	hostConsumer := s.session.Host
+	cfg, err := hostConsumer.SSHConfig(hostname)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	return cfg, nil
 }
 
@@ -170,7 +172,7 @@ func extracthostName(in string) (string, fail.Error) {
 	hostName := strings.TrimSpace(parts[0])
 	for _, proto := range []string{"file", "http", "https", "ftp"} {
 		if strings.ToLower(hostName) == proto {
-			return "", fail.SyntaxError("no protocol expected. Only hostConsumer name")
+			return "", fail.SyntaxError("no protocol expected. Only host name")
 		}
 	}
 
@@ -215,7 +217,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
-	// Try extract hostConsumer
+	// Try extract host
 	hostFrom, xerr := extracthostName(from)
 	if xerr != nil {
 		return invalid, "", "", xerr
@@ -230,7 +232,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet") // FIXME: Technical debt
 	}
 	if hostFrom == "" && hostTo == "" {
-		return invalid, "", "", fail.NotImplementedError("no hostConsumer name specified neither in from nor to") // FIXME: Technical debt
+		return invalid, "", "", fail.NotImplementedError("no host name specified neither in from nor to") // FIXME: Technical debt
 	}
 
 	fromPath, rerr := extractPath(from)
@@ -313,9 +315,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 							return finnerXerr
 						}
 
-						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-							crcCtx, outputs.COLLECT, executionTimeout,
-						)
+						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
 						finnerXerr = debug.InjectPlannedFail(finnerXerr)
 						if finnerXerr != nil {
 							finnerXerr.Annotate("retcode", fretcode)
@@ -382,9 +382,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 						return fail.WarningError(finnerXerr, "failure creating md5 command")
 					}
 
-					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-						crcCtx, outputs.COLLECT, executionTimeout,
-					)
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
 						finnerXerr.Annotate("retcode", fretcode)
@@ -478,9 +476,9 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				if t.Err != nil {
-					logrus.Debugf("Remote SSH service on hostConsumer '%s' isn't ready (%s), retrying...", hostname, t.Err.Error())
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", hostname, t.Err.Error())
 				} else {
-					logrus.Debugf("Remote SSH service on hostConsumer '%s' isn't ready, retrying...", hostname)
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
 				}
 			}
 		},
@@ -517,9 +515,9 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				if t.Err != nil {
-					logrus.Debugf("Remote SSH service on hostConsumer '%s' isn't ready (%s), retrying...\n", name, t.Err.Error())
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...\n", name, t.Err.Error())
 				} else {
-					logrus.Debugf("Remote SSH service on hostConsumer '%s' isn't ready, retrying...", name)
+					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", name)
 				}
 			}
 		},

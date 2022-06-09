@@ -71,6 +71,7 @@ func NewScenarios() Scenarios {
 			"shares",
 			"features",
 			"buckets",
+			"labels",
 			"clusters",
 		},
 		scenariosOrder: make(map[section][]string),

@@ -55,7 +55,7 @@ type Host interface {
 	GetPublicIP(ctx context.Context) (string, fail.Error)                                                                  // returns the public IP address of the host, with error handling
 	GetShare(ctx context.Context, shareRef string) (*propertiesv1.HostShare, fail.Error)                                   // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares(ctx context.Context) (*propertiesv1.HostShares, fail.Error)                                                  // returns the shares hosted on the host
-	GetSSHConfig(ctx context.Context) (*ssh.Profile, fail.Error)                                                           // loads SSH configuration for host from metadata
+	GetSSHConfig(ctx context.Context) (ssh.Connector, fail.Error)                                                          // loads SSH configuration for host from metadata
 	GetState(ctx context.Context) (hoststate.Enum, fail.Error)                                                             // returns the current state of the host, with error handling
 	GetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error)                                                // returns the volumes attached to the host
 	IsClusterMember(ctx context.Context) (bool, fail.Error)                                                                // returns true if the host is member of a cluster
