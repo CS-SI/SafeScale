@@ -26,16 +26,16 @@ import (
 )
 
 func Test_TagBase(t *testing.T) {
-	helpers.InSection("labels").AddScenario(TagBase)
+	helpers.InSection("labels").Clear().AddScenario(TagBase)
 	helpers.RunScenarios(t)
 }
 
 func Test_LabelBase(t *testing.T) {
-	helpers.InSection("labels").AddScenario(LabelBase)
+	helpers.InSection("labels").Clear().AddScenario(LabelBase)
 	helpers.RunScenarios(t)
 }
 
 func Test_TagIsNotLabel(t *testing.T) {
-	helpers.InSection("labels").AddScenario(TagIsNotLabel)
+	helpers.InSection("labels").Clear().AddScenario(TagIsNotLabel)
 	helpers.RunScenarios(t)
 }

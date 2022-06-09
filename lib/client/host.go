@@ -617,14 +617,14 @@ func (h hostConsumer) ListSecurityGroups(hostRef, state string, timeout time.Dur
 }
 
 // ListLabels lists Labels bound to Host
-func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.Duration) error {
+func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.Duration) (*protocol.LabelListResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 
 	// finally, using context
@@ -643,8 +643,7 @@ func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.
 		},
 		Tags: selectTags,
 	}
-	_, err := service.ListLabels(newCtx, req)
-	return err
+	return service.ListLabels(newCtx, req)
 }
 
 // BindLabel to Host

@@ -44,6 +44,13 @@ func InSection(label string) section {
 	return section(label)
 }
 
+// Clear can be used to clean already registered scenario from section
+func (section section) Clear() section {
+	scenarios.scenarios[section] = make(map[string]ScenarioFunc)
+	scenarios.scenariosOrder[section] = make([]string, 0)
+	return section
+}
+
 // AddScenario allows to add a scenario to run
 // Name of the scenario is extracted from the parameter
 func (section section) AddScenario(scenario ScenarioFunc) section {
@@ -112,11 +119,11 @@ func (s Scenarios) Run(t *testing.T) {
 	}
 
 	for _, section := range s.sectionsOrder {
-		if len(scenarios.scenariosOrder[section]) > 0 {
+		if len(s.scenariosOrder[section]) > 0 {
 			t.Run(string(section), func(t *testing.T) {
-				for _, name := range scenarios.scenariosOrder[section] {
+				for _, name := range s.scenariosOrder[section] {
 					t.Run(name, func(t *testing.T) {
-						scenarios.scenarios[section][name](t)
+						s.scenarios[section][name](t)
 					})
 				}
 			})

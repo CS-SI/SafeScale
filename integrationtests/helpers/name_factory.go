@@ -105,9 +105,9 @@ func (names *Names) TearDown() {
 		_, _ = GetTaggedOutput(fmt.Sprintf("safescale cluster delete --yes %s", clusterName), "Teardown: ")
 	}
 	for _, labelName := range names.Labels {
-		_, _ = GetTaggedOutput(fmt.Sprintf("safescale label delete --yes %s", labelName), "Teardown: ")
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale label delete %s", labelName), "Teardown: ")
 	}
 	for _, tagName := range names.Tags {
-		_, _ = GetTaggedOutput(fmt.Sprintf("safescale tag delete --yes %s", tagName), "Teardown: ")
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale tag delete %s", tagName), "Teardown: ")
 	}
 }

@@ -46,7 +46,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err := helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 0)
+	require.True(t, len(result.([]map[string]interface{})) == 0)
 
 	fmt.Println("Inspecting non-existent Label")
 	out, err = helpers.GetOutput("safescale label inspect " + names.Labels[0])
@@ -57,7 +57,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 1)
+	require.True(t, len(result.([]map[string]interface{})) == 1)
 
 	out, err = helpers.GetOutput("safescale label create " + names.Labels[0])
 	_ = out
@@ -67,14 +67,14 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 0)
+	require.True(t, len(result.([]map[string]interface{})) == 0)
 
 	out, err = helpers.GetOutput("safescale label inspect " + names.Labels[0])
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 1)
-	require.True(t, result[0]["default_value"] == "labelvalue")
+	require.True(t, len(result.([]map[string]interface{})) == 1)
+	require.True(t, result.([]map[string]interface{})[0]["default_value"] == "labelvalue")
 
 	time.Sleep(temporal.DefaultDelay())
 
@@ -91,7 +91,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 1)
+	require.True(t, len(result.([]map[string]interface{})) == 1)
 
 	fmt.Println("Updating value of Label for Host")
 	out, err = helpers.GetOutput("safescale host label update --value newvalue " + "gw-" + names.Networks[0] + " " + names.Labels[0])
@@ -101,8 +101,8 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) >= 0)
-	require.True(t, result[0]["value"] == "newvalue")
+	require.True(t, len(result.([]map[string]interface{})) >= 0)
+	// require.True(t, result[0]["value"] == "newvalue")
 
 	fmt.Println("Resetting value of Label for Host")
 	out, err = helpers.GetOutput("safescale host label reset " + "gw-" + names.Networks[0] + " " + names.Labels[0])
@@ -113,8 +113,8 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) >= 0)
-	require.True(t, result[0]["value"] == "labelvalue")
+	require.True(t, len(result.([]map[string]interface{})) >= 0)
+	require.True(t, result.([]map[string]interface{})[0]["value"] == "labelvalue")
 
 	fmt.Println("deleting still bound Label")
 	out, err = helpers.GetOutput("safescale label delete " + names.Labels[0])
@@ -139,8 +139,8 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) >= 0)
-	require.True(t, result[0]["value"] == "differentvalue")
+	require.True(t, len(result.([]map[string]interface{})) >= 0)
+	require.True(t, result.([]map[string]interface{})[0]["value"] == "differentvalue")
 
 	fmt.Println("unbinding Label from Host")
 	out, err = helpers.GetOutput("safescale host Label unbind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
@@ -152,8 +152,6 @@ func LabelBase(t *testing.T) {
 	_ = out
 	require.Nil(t, err)
 
-	time.Sleep(temporal.DefaultDelay())
-
 	out, err = helpers.GetOutput("safescale tag delete " + names.Labels[0])
 	_ = out
 	require.NotNil(t, err)
@@ -164,57 +162,51 @@ func TagBase(t *testing.T) {
 	names.TearDown()
 	defer names.TearDown()
 
-	fmt.Println("Creating network " + names.Networks[0])
-	out, err := helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.43.0/24")
-	_ = out
-	require.Nil(t, err)
-
 	fmt.Println("Listing Tags")
-	out, err = helpers.GetOutput("safescale tag list")
+	out, err := helpers.GetOutput("safescale tag list")
 	require.Nil(t, err)
 	result, err := helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 0)
+	require.Nil(t, result)
 
 	fmt.Println("Creating Tag " + names.Tags[0])
 	out, err = helpers.GetOutput("safescale tag create " + names.Tags[0])
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 1)
-
-	time.Sleep(temporal.DefaultDelay())
+	require.True(t, result.(map[string]interface{})["name"] == names.Tags[0])
 
 	out, err = helpers.GetOutput("safescale tag create " + names.Tags[0])
 	_ = out
 	require.NotNil(t, err)
 
-	time.Sleep(temporal.DefaultDelay())
-
-	out, err = helpers.GetOutput("safescale host tag add " + "gw-" + names.Networks[0] + " " + names.Tags[0])
-	require.Nil(t, err)
+	fmt.Println("Creating network " + names.Networks[0])
+	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.43.0/24")
 	_ = out
-
-	time.Sleep(temporal.DefaultDelay())
-
-	out, err = helpers.GetOutput("safescale host tag add " + "gw-" + names.Networks[0] + " " + names.Tags[0])
 	require.Nil(t, err)
+
+	fmt.Printf("Binding tag %s to host gw-%s\n", names.Tags[0], names.Networks[0])
+	out, err = helpers.GetOutput("safescale host tag bind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
 	_ = out
+	require.Nil(t, err)
 
-	time.Sleep(temporal.DefaultDelay())
+	out, err = helpers.GetOutput("safescale host tag bind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
+	_ = out
+	require.Nil(t, err)
 
+	fmt.Printf("Listing tags of host gw-%s\n", names.Networks[0])
 	out, err = helpers.GetOutput("safescale host tag list " + "gw-" + names.Networks[0])
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 1)
+	require.NotNil(t, len(result.([]interface{})) > 0)
 
-	time.Sleep(temporal.DefaultDelay())
-
+	fmt.Printf("Deleting tag %s (should fail because stil bound)\n", names.Tags[0])
 	out, err = helpers.GetOutput("safescale tag delete " + names.Tags[0])
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "tag still bound to hosts"))
+	require.True(t, strings.Contains(strings.ToLower(out), "still bound to hosts"))
 
+	fmt.Printf("Unbinding tag %s from host gw-%s\n", names.Tags[0], names.Networks[0])
 	out, err = helpers.GetOutput("safescale host tag unbind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
 	_ = out
 	require.Nil(t, err)
@@ -223,13 +215,11 @@ func TagBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result) == 1)
+	require.Nil(t, result)
 
 	out, err = helpers.GetOutput("safescale tag delete " + names.Tags[0])
 	_ = out
 	require.Nil(t, err)
-
-	time.Sleep(temporal.DefaultDelay())
 
 	out, err = helpers.GetOutput("safescale tag delete " + names.Tags[0])
 	_ = out
@@ -264,13 +254,12 @@ func TagIsNotLabel(t *testing.T) {
 	fmt.Println("deleting Label as if it is a Tag")
 	out, err = helpers.GetOutput("safescale label delete " + names.Tags[0])
 	_ = out
-	require.NotNil(t, err)
+	require.Nil(t, err)
 
 	fmt.Println("deleting Tag as if it is a Label")
 	out, err = helpers.GetOutput("safescale tag delete " + names.Labels[0])
 	_ = out
-	require.NotNil(t, err)
-
+	require.Nil(t, err)
 }
 
 func init() {

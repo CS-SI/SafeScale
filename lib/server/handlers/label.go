@@ -90,7 +90,7 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 	return list, nil
 }
 
-// Delete deletes tag referenced by ref
+// Delete deletes Label referenced by ref
 func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

@@ -1255,12 +1255,12 @@ var hostTagListCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTNAME"))
 		}
 
-		err := ClientSession.Host.ListLabels(c.Args().First(), true, 0)
+		result, err := ClientSession.Host.ListLabels(c.Args().First(), true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "tag of host", false).Error())))
 		}
-		return clitools.SuccessResponse(nil)
+		return clitools.SuccessResponse(result.Labels)
 	},
 }
 
@@ -1277,8 +1277,11 @@ var hostTagBindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or TAGREF"))
 		}
 
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+
 		// Check corresponding Label is a Tag
-		label, err := ClientSession.Label.Inspect(c.Args().Get(1), true, 0)
+		label, err := ClientSession.Label.Inspect(labelRef, true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
@@ -1289,7 +1292,7 @@ var hostTagBindCommand = cli.Command{
 		}
 
 		// Confirmed, can be bound
-		err = ClientSession.Host.BindLabel(c.Args().First(), c.Args().Get(1), "", 0)
+		err = ClientSession.Host.BindLabel(hostRef, labelRef, "", 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
@@ -1312,7 +1315,9 @@ var hostTagUnbindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments <Host_name> <Tag_name>."))
 		}
 
-		label, err := ClientSession.Label.Inspect(c.Args().First(), true, 0)
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+		label, err := ClientSession.Label.Inspect(labelRef, true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Tag from Host", false).Error())))
@@ -1322,7 +1327,7 @@ var hostTagUnbindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("unbind Tag from Host: '%s' is a Label", c.Args().First())))
 		}
 
-		err = ClientSession.Host.UnbindLabel(c.Args().First(), c.Args().Get(1), 0)
+		err = ClientSession.Host.UnbindLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Tag from Host", false).Error())))
@@ -1360,13 +1365,13 @@ var hostLabelListCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTNAME"))
 		}
 
-		err := ClientSession.Host.ListLabels(c.Args().First(), false, 0)
+		result, err := ClientSession.Host.ListLabels(c.Args().First(), false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list Labels bound to Host", false).Error())))
 		}
 
-		return clitools.SuccessResponse(nil)
+		return clitools.SuccessResponse(result.Labels)
 	},
 }
 
@@ -1389,7 +1394,9 @@ var hostLabelBindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or LABELREF"))
 		}
 
-		label, err := ClientSession.Label.Inspect(c.Args().First(), false, 0)
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
@@ -1399,7 +1406,7 @@ var hostLabelBindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("bind Label to Host: '%s' is a Tag", c.Args().First())))
 		}
 
-		err = ClientSession.Host.BindLabel(c.Args().First(), c.Args().Get(1), "", 0)
+		err = ClientSession.Host.BindLabel(hostRef, labelRef, "", 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
@@ -1421,7 +1428,9 @@ var hostLabelUnbindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or LABELREF."))
 		}
 
-		label, err := ClientSession.Label.Inspect(c.Args().First(), false, 0)
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Label from Host", false).Error())))
@@ -1431,7 +1440,7 @@ var hostLabelUnbindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("unbind Label from Host: '%s' is a Tag", c.Args().First())))
 		}
 
-		err = ClientSession.Host.UnbindLabel(c.Args().First(), c.Args().Get(1), 0)
+		err = ClientSession.Host.UnbindLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Label from Host", false).Error())))
@@ -1460,7 +1469,9 @@ var hostLabelUpdateCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or LABELREF"))
 		}
 
-		label, err := ClientSession.Label.Inspect(c.Args().First(), false, 0)
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
@@ -1470,11 +1481,12 @@ var hostLabelUpdateCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("bind Label to Host: '%s' is a Tag", c.Args().First())))
 		}
 
-		err = ClientSession.Host.UpdateLabel(c.Args().First(), c.Args().Get(1), c.String("value"), 0)
+		err = ClientSession.Host.UpdateLabel(hostRef, labelRef, c.String("value"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
+
 		return clitools.SuccessResponse(nil)
 	},
 }
@@ -1491,7 +1503,9 @@ var hostLabelResetCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or LABELREF"))
 		}
 
-		label, err := ClientSession.Label.Inspect(c.Args().First(), false, 0)
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
@@ -1501,11 +1515,12 @@ var hostLabelResetCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("bind Label to Host: '%s' is a Tag", c.Args().First())))
 		}
 
-		err = ClientSession.Host.ResetLabel(c.Args().First(), c.Args().Get(1), 0)
+		err = ClientSession.Host.ResetLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
+
 		return clitools.SuccessResponse(nil)
 	},
 }
