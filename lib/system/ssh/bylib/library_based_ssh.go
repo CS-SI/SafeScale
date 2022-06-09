@@ -533,7 +533,7 @@ func (sc *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
 	var tu *sshtunnel.SSHTunnel
 
 	if sc.LocalHost == "" {
-		sc.LocalHost = ssh2.LocalHost
+		sc.LocalHost = ssh2.Loopback
 	}
 
 	internalPort := ssh2.SSHPort // all machines use port 22...

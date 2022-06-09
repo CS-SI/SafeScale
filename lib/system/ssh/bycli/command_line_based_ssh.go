@@ -341,7 +341,7 @@ func getFreePort() (uint, fail.Error) {
 // If yes, the tunnel is ready, otherwise it failed
 func isTunnelReady(port int) bool {
 	// Try to create a server with the port
-	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ssh.LocalHost, port))
+	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ssh.Loopback, port))
 	if err != nil {
 		return true
 	}
@@ -401,7 +401,7 @@ func buildTunnel(scfg api.Config) (*Tunnel, fail.Error) {
 	cmdString := fmt.Sprintf(
 		"ssh -i \"%s\" -NL %s:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
-		ssh.LocalHost,
+		ssh.Loopback,
 		localPort,
 		targetIPAddr,
 		targetPort,
@@ -896,7 +896,7 @@ func createConsecutiveTunnels(sc api.Config, tunnels *Tunnels) (*Tunnel, fail.Er
 			if tunnel != nil {
 				gateway, _ := ssh.NewConfigFrom(gwConf)
 				gateway.Port = tunnel.port
-				gateway.IPAddress = ssh.LocalHost
+				gateway.IPAddress = ssh.Loopback
 				cfg.GatewayConfig = gateway
 			}
 
@@ -970,7 +970,7 @@ func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error)
 
 	if sconf.GatewayConfig != nil {
 		sshConfig.Port = tunnel.port
-		sshConfig.IPAddress = ssh.LocalHost
+		sshConfig.IPAddress = ssh.Loopback
 	}
 	return tunnels, &sshConfig, nil
 }

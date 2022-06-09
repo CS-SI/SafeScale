@@ -536,7 +536,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	ncfg, _ := ssh.NewConfigFrom(*acfg)
 	if ncfg.GatewayConfig == nil {
 		ncfg.GatewayConfig = ssh.NewConfig(ncfg.Hostname, ncfg.IPAddress, ncfg.Port, ncfg.User, ncfg.PrivateKey, 0, "", nil, nil)
-		ncfg.IPAddress = ssh.LocalHost
+		ncfg.IPAddress = ssh.Loopback
 	}
 
 	ngu, _ := ncfg.GatewayConfig.GetUser()
