@@ -29,7 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -167,7 +166,7 @@ func uploadContentToFile(
 	ctx context.Context, content, name, owner, rights string, host resources.Host,
 ) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
-	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return "", xerr
 	}

@@ -1,27 +1,28 @@
 package ssh
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 type CommonConfig struct {
-	Hostname               string `json:"hostname"`
-	IPAddress              string `json:"ip_address"`
-	Port                   int    `json:"port"`
-	User                   string `json:"user"`
-	PrivateKey             string `json:"private_key"`
-	LocalPort              int    `json:"-"`
-	LocalHost              string `json:"local_host"`
-	GatewayConfig          Config `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig Config `json:"secondary_gateway_config,omitempty"`
+	Hostname               string     `json:"hostname"`
+	IPAddress              string     `json:"ip_address"`
+	Port                   int        `json:"port"`
+	User                   string     `json:"user"`
+	PrivateKey             string     `json:"private_key"`
+	LocalPort              int        `json:"-"`
+	LocalHost              string     `json:"local_host"`
+	GatewayConfig          api.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig api.Config `json:"secondary_gateway_config,omitempty"`
 }
 
-func NewConfig(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig Config, secondaryGatewayConfig Config) *CommonConfig {
+func NewConfig(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig api.Config, secondaryGatewayConfig api.Config) *CommonConfig {
 	return &CommonConfig{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
-func NewConfigFrom(ac Config) (*CommonConfig, fail.Error) {
+func NewConfigFrom(ac api.Config) (*CommonConfig, fail.Error) {
 	if valid.IsNil(ac) {
 		return nil, fail.InvalidParameterCannotBeNilError("ac")
 	}
@@ -88,21 +89,21 @@ func (sconf CommonConfig) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf CommonConfig) GetPrimaryGatewayConfig() (Config, fail.Error) {
+func (sconf CommonConfig) GetPrimaryGatewayConfig() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf CommonConfig) GetSecondaryGatewayConfig() (Config, fail.Error) {
+func (sconf CommonConfig) GetSecondaryGatewayConfig() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf CommonConfig) GetGatewayConfig(num uint) (Config, fail.Error) {
+func (sconf CommonConfig) GetGatewayConfig(num uint) (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}

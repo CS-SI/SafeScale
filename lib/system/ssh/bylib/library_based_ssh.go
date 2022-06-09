@@ -30,6 +30,7 @@ import (
 	"time"
 
 	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
@@ -50,15 +51,15 @@ import (
 
 // Profile helper to manage ssh session
 type Profile struct {
-	Hostname               string      `json:"hostname"`
-	IPAddress              string      `json:"ip_address"`
-	Port                   int         `json:"port"`
-	User                   string      `json:"user"`
-	PrivateKey             string      `json:"private_key"`
-	LocalPort              int         `json:"-"`
-	LocalHost              string      `json:"local_host"`
-	GatewayConfig          ssh2.Config `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig ssh2.Config `json:"secondary_gateway_config,omitempty"`
+	Hostname               string     `json:"hostname"`
+	IPAddress              string     `json:"ip_address"`
+	Port                   int        `json:"port"`
+	User                   string     `json:"user"`
+	PrivateKey             string     `json:"private_key"`
+	LocalPort              int        `json:"-"`
+	LocalHost              string     `json:"local_host"`
+	GatewayConfig          api.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig api.Config `json:"secondary_gateway_config,omitempty"`
 }
 
 func (sconf *Profile) CreatePersistentTunneling() fail.Error {
@@ -69,7 +70,7 @@ func NewProfile(hostname string, ipAddress string, port int, user string, privat
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
-func NewConnector(ac ssh2.Config) (*Profile, fail.Error) {
+func NewConnector(ac api.Config) (*Profile, fail.Error) {
 	if valid.IsNil(ac) {
 		return nil, fail.InvalidParameterCannotBeNilError("ac")
 	}
@@ -93,7 +94,7 @@ type Tunnel struct {
 	port int     // nolint
 }
 
-func (sconf *Profile) Config() (ssh2.Config, fail.Error) {
+func (sconf *Profile) Config() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -149,21 +150,21 @@ func (sconf *Profile) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf *Profile) GetPrimaryGatewayConfig() (ssh2.Config, fail.Error) {
+func (sconf *Profile) GetPrimaryGatewayConfig() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf *Profile) GetSecondaryGatewayConfig() (ssh2.Config, fail.Error) {
+func (sconf *Profile) GetSecondaryGatewayConfig() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf *Profile) GetGatewayConfig(num uint) (ssh2.Config, fail.Error) {
+func (sconf *Profile) GetGatewayConfig(num uint) (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -641,7 +642,7 @@ func (sc *Profile) Command(cmdString string) (*LibCommand, fail.Error) {
 }
 
 // NewCommand returns the cmd struct to execute cmdString remotely
-func (sc *Profile) NewCommand(_ context.Context, cmdString string) (ssh2.CommandInterface, fail.Error) {
+func (sc *Profile) NewCommand(_ context.Context, cmdString string) (api.CommandInterface, fail.Error) {
 	return sc.command(cmdString, false, false)
 }
 
@@ -651,7 +652,7 @@ func (sc *Profile) SudoCommand(cmdString string) (*LibCommand, fail.Error) {
 }
 
 // NewSudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
-func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (ssh2.CommandInterface, fail.Error) {
+func (sc *Profile) NewSudoCommand(_ context.Context, cmdString string) (api.CommandInterface, fail.Error) {
 	return sc.command(cmdString, false, true)
 }
 

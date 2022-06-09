@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/sirupsen/logrus"
 
@@ -33,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -109,7 +109,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile ssh.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
@@ -139,7 +139,7 @@ func run(ctx context.Context, sshProfile ssh.Connector, cmd string, outs outputs
 			}
 
 			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(cmd ssh.CommandInterface) {
+			defer func(cmd api.CommandInterface) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerXErr != nil {
@@ -456,7 +456,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	}
 
 	hostName := instance.GetName()
-	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")

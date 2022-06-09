@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ssh
+package api
 
 import (
 	"context"
@@ -50,7 +50,7 @@ type Connector interface {
 	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)
 }
 
-// Command defines a SSH command
+// CommandInterface defines an SSH command
 type CommandInterface interface {
 	String() string
 	Close() fail.Error
