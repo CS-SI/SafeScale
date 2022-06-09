@@ -32,7 +32,7 @@ import (
 )
 
 func LabelBase(t *testing.T) {
-	names := helpers.GetNames("LabelBase", 0, 1, 1, 1, 1, 0, 1, 0)
+	names := helpers.GetNames("LabelBase", 0, 0, 0, 0, 1, 0, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -160,7 +160,7 @@ func LabelBase(t *testing.T) {
 }
 
 func TagBase(t *testing.T) {
-	names := helpers.GetNames("TagBase", 0, 1, 1, 1, 1, 0, 0, 1)
+	names := helpers.GetNames("TagBase", 0, 0, 0, 0, 1, 0, 0, 1)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -275,7 +275,7 @@ func TagIsNotLabel(t *testing.T) {
 
 func init() {
 	helpers.InSection("labels").
-		AddScenario(TagIsNotLabel).
+		AddScenario(LabelBase).
 		AddScenario(TagBase).
 		AddScenario(TagIsNotLabel)
 }
