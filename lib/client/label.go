@@ -140,7 +140,7 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 
 }
 
-// Create ...
+// Create requests creation of a new Label
 func (t labelConsumer) Create(name string, hasDefault bool, defaultValue string, timeout time.Duration) (*protocol.LabelInspectResponse, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()

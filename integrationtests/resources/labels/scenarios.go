@@ -59,6 +59,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, result.(map[string]interface{})["name"].(string) == names.Labels[0])
 
+	fmt.Println("Creating same Label " + names.Labels[0] + " with other value (none)")
 	out, err = helpers.GetOutput("safescale label create " + names.Labels[0])
 	_ = out
 	require.NotNil(t, err)

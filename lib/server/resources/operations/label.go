@@ -348,6 +348,8 @@ func (instance *label) ToProtocol(ctx context.Context) (*protocol.LabelInspectRe
 
 		out.Id = alabel.GetID()
 		out.Name = alabel.GetName()
+		out.HasDefault = alabel.HasDefault
+		out.DefaultValue = alabel.DefaultValue
 
 		var labelHostsV1 *propertiesv1.LabelHosts
 		innerXErr := props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {

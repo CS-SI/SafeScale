@@ -85,7 +85,12 @@ var labelInspectCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of Label", false).Error())))
 		}
 
-		return clitools.SuccessResponse(labelInfo)
+		output := map[string]interface{}{
+			"name":          labelInfo.Name,
+			"id":            labelInfo.Id,
+			"default_value": labelInfo.DefaultValue,
+		}
+		return clitools.SuccessResponse(output)
 	},
 }
 
@@ -140,7 +145,7 @@ var labelCreateCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Tag_name>. "))
 		}
 
-		label, err := ClientSession.Label.Create(c.Args().First(), true, c.Args().Get(1), temporal.ExecutionTimeout())
+		label, err := ClientSession.Label.Create(c.Args().First(), true, c.String("value"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of Label", true).Error())))
