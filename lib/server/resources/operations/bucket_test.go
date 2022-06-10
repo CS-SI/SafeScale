@@ -65,21 +65,39 @@ func Test_LoadBucket(t *testing.T) {
 	var svc iaas.Service
 	ctx := context.Background()
 
+	// Wrong service
 	bucket, err := LoadBucket(ctx, svc, "mybucket")
 	require.Nil(t, bucket)
 	require.Contains(t, err.Error(), "cannot be nil")
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		// Load unnamed bucket
 		bucket, err = LoadBucket(ctx, svc, "")
 		require.Nil(t, bucket)
 		require.Contains(t, err.Error(), "cannot be empty string")
 
 		svc._reset()
 
+		// Load not existing bucket
 		bucket, err = LoadBucket(ctx, svc, "mybucket")
 		require.Nil(t, bucket, nil)
 		require.Contains(t, err.Error(), "nor buckets/byName/mybucket nor buckets/byID/mybucket were found in the bucket")
+
+		svc._reset()
+
+		// Bucket, but not a bucket
+		network := abstract.NewNetwork()
+		network.ID = "Network ID"
+		network.Name = "Network Name"
+
+		_ = svc._setInternalData("buckets/byID/notabucket", network)
+		_ = svc._setInternalData("buckets/byName/notabucket", network)
+
+		// FIXME: Seriously ? Network in bucket correctly casted to bucket, no error ?
+		bucket, err = LoadBucket(ctx, svc, "notabucket")
+		require.Nil(t, err)
+		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 
 		svc._reset()
 
@@ -124,8 +142,6 @@ func TestBucket_IsNull(t *testing.T) {
 	require.Nil(t, xerr)
 
 }
-
-// func TestBucket_Carry(t *testing.T) {} // Private, unreachable
 
 func TestBucket_Browse(t *testing.T) {
 
@@ -177,10 +193,6 @@ func TestBucket_Browse(t *testing.T) {
 	require.Nil(t, xerr)
 
 }
-
-// func TestBucket_GetHost(t *testing.T) {} // Private, unreachable
-
-// func TestBucket_GetMountPoint(t *testing.T) {} // Private, unreachable
 
 func TestBucket_Create(t *testing.T) {
 

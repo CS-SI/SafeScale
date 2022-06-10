@@ -18,7 +18,6 @@ package operations
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
@@ -197,12 +196,8 @@ func TestHost_DeleteFeature(t *testing.T) {
 		svc._setLogLevel(2)
 
 		_, xerr = ohost.DeleteFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
-		fmt.Println("###################", xerr)
+		require.Nil(t, xerr)
 
-		/*
-
-			require.Nil(t, xerr)
-		*/
 	})
 	require.Nil(t, err)
 
