@@ -410,7 +410,7 @@ message Host {
 	string creation_date = 16;
 	bool managed = 17;
 	string template = 18;
-  repeated string label_names = 19;
+  repeated string tag_names = 19;
 }
 
 message HostStatus {
@@ -454,12 +454,23 @@ service HostService {
 	rpc DisableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
 	rpc ListSecurityGroups(SecurityGroupHostBindRequest) returns (SecurityGroupBondsResponse){}
 	rpc ListLabels(LabelBoundsRequest) returns (LabelListResponse){}
+	rpc InspectLabel(HostLabelRequest) returns (HostLabelResponse){}
   rpc BindLabel(LabelBindRequest) returns (google.protobuf.Empty){}
 	rpc UnbindLabel(LabelBindRequest) returns (google.protobuf.Empty){}
 	rpc UpdateLabel(LabelBindRequest) returns (google.protobuf.Empty){}
 	rpc ResetLabel(LabelBindRequest) returns (google.protobuf.Empty){}
 	rpc BindPublicIP(PublicIPBindRequest) returns (google.protobuf.Empty){}
 	rpc UnbindPublicIP(PublicIPBindRequest) returns (google.protobuf.Empty){}
+}
+
+message HostLabelRequest {
+	Reference Host = 1;
+	Reference Label = 2;
+}
+
+message HostLabelResponse {
+	LabelInspectResponse Label = 1;
+	string value = 2;
 }
 
 message HostTemplate {

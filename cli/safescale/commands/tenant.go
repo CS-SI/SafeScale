@@ -186,6 +186,7 @@ var tenantInspectCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
+
 		return clitools.SuccessResponse(resp)
 	},
 }
@@ -216,6 +217,7 @@ var tenantScanCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
 		}
+
 		return clitools.SuccessResponse(results.GetResults())
 	},
 }
@@ -262,6 +264,7 @@ var tenantMetadataUpgradeCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
 		}
+
 		return clitools.SuccessResponse(results)
 	},
 }
@@ -286,6 +289,7 @@ var tenantMetadataDeleteCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
 		}
+
 		return clitools.SuccessResponse(nil)
 	},
 }

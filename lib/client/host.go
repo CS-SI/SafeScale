@@ -646,6 +646,33 @@ func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.
 	return service.ListLabels(newCtx, req)
 }
 
+// InspectLabel to Host
+func (h hostConsumer) InspectLabel(hostName string, labelName string, timeout time.Duration) (*protocol.HostLabelResponse, error) {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	service := protocol.NewHostServiceClient(h.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		newCtx = aCtx
+	}
+
+	req := &protocol.HostLabelRequest{
+		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+	}
+	return service.InspectLabel(newCtx, req)
+}
+
 // BindLabel to Host
 func (h hostConsumer) BindLabel(hostName string, labelName string, value string, timeout time.Duration) error {
 	h.session.Connect()

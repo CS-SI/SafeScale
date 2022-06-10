@@ -216,6 +216,9 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			if instance.localCache.publicIP == "" {
 				instance.localCache.publicIP = hnV2.PublicIPv6
 			}
+
+			// FIXME: find a better way to handle the use case (adjust SG? something else?)
+			// Workaround for a specific use: safescaled inside a cluster, to force access to host using internal IP
 			from_inside := os.Getenv("SAFESCALED_FROM_INSIDE")
 			if instance.localCache.publicIP == "" || from_inside == "true" {
 				instance.localCache.accessIP = instance.localCache.privateIP
@@ -1212,24 +1215,18 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 	}
 
 	if img == nil {
-		return "", "", fail.Wrap(
-			xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef,
-		)
+		return "", "", fail.Wrap(xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef)
 	}
 
 	if img.ID == "" {
-		return "", "", fail.Wrap(
-			xerr, "failed to find image ID corresponding to '%s' to use on compute resource, with img '%v'", imageRef, img,
-		)
+		return "", "", fail.Wrap(xerr, "failed to find image ID corresponding to '%s' to use on compute resource, with img '%v'", imageRef, img)
 	}
 
 	return imageRef, img.ID, nil
 }
 
 // setSecurityGroups sets the Security Groups for the host
-func (instance *Host) setSecurityGroups(
-	ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet,
-) fail.Error {
+func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet) fail.Error {
 	svc := instance.Service()
 	if req.Single {
 		hostID := instance.GetID()
@@ -3480,8 +3477,6 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		hostSizingV2  *propertiesv2.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string
-		hostLabelsV1  *propertiesv1.HostLabels
-		labels        []string
 	)
 
 	publicIP, _ := instance.GetPublicIP(ctx)   // There may be no public ip, but the returned value is pertinent in this case, no need to handle error
@@ -3505,7 +3500,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 			return innerXErr
 		}
 
-		innerXErr = props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String)
@@ -3517,26 +3512,6 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 			}
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		innerXErr = props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
-			hostLabelsV1, ok = clonable.(*propertiesv1.HostLabels)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String)
-			}
-
-			labels = make([]string, 0, len(hostLabelsV1.ByName))
-			for k := range hostLabelsV1.ByName {
-				labels = append(labels, k)
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3558,7 +3533,6 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
 		Template:            hostSizingV2.Template,
-		LabelNames:          labels,
 	}
 	return ph, nil
 }

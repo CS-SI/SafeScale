@@ -1345,6 +1345,7 @@ var hostLabelCommands = cli.Command{
 	Usage: hostLabelCmdLabel + " COMMAND",
 	Subcommands: cli.Commands{
 		hostLabelListCommand,
+		hostLabelInspectCommand,
 		hostLabelBindCommand,
 		hostLabelUnbindCommand,
 		hostLabelUpdateCommand,
@@ -1372,6 +1373,43 @@ var hostLabelListCommand = cli.Command{
 		}
 
 		return clitools.SuccessResponse(result.Labels)
+	},
+}
+
+var hostLabelInspectCommand = cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "insect Label bound to Host",
+	ArgsUsage: "HOSTREF LABELREF",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostLabelCmdLabel, c.Command.Name, c.Args())
+		if c.NArg() != 2 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments HOSTREF and/or LABELREF"))
+		}
+
+		hostRef := c.Args().First()
+		labelRef := c.Args().Get(1)
+		result, err := ClientSession.Host.InspectLabel(hostRef, labelRef, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspect Host Label", false).Error())))
+		}
+
+		if !result.Label.GetHasDefault() {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("cannot nspect Host Label: '%s' is a Tag", c.Args().First())))
+		}
+
+		out := map[string]interface{}{
+			"label": map[string]string{
+				"name":          result.Label.GetName(),
+				"id":            result.Label.GetId(),
+				"default_value": result.Label.GetDefaultValue(),
+			},
+			"value": result.Value,
+		}
+		return clitools.SuccessResponse(out)
 	},
 }
 

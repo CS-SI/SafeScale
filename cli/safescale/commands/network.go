@@ -695,8 +695,7 @@ var networkSecurityGroupCreate = cli.Command{
 		resp, err := ClientSession.SecurityGroup.Create(c.Args().First(), req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of security-group", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of security-group", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -1019,12 +1018,11 @@ var networkSecurityGroupRuleAdd = cli.Command{
 			}()
 		}
 
-		if err := ClientSession.SecurityGroup.AddRule(
-			c.Args().Get(1), rule, 0,
-		); err != nil {
+		if err := ClientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
 		}
+
 		return clitools.SuccessResponse(nil)
 	},
 }
@@ -1750,9 +1748,7 @@ var subnetSecurityGroupAddCommand = cli.Command{
 			}()
 		}
 
-		err := ClientSession.Subnet.BindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), 0,
-		)
+		err := ClientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "adding security group to network", false).Error())))

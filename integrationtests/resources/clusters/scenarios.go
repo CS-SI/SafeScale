@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package clusters // Package clusters contains integration tests
+package clusters // Package clusters this package contains integration tests of clusters
 
 import (
 	"fmt"
