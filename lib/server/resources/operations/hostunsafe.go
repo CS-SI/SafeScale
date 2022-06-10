@@ -139,8 +139,11 @@ func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs
 			}
 
 			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(cmd api.Command) {
-				derr := cmd.Close()
+			defer func(acmd api.Command) {
+				var ignored error
+				defer fail.IgnoreProblems(&ignored)
+
+				derr := acmd.Close()
 				if derr != nil {
 					if innerXErr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
