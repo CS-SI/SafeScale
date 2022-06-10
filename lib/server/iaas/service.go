@@ -71,7 +71,7 @@ type Service interface {
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
 
-	LookupRuleInSecurityGroup(*abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
+	LookupRuleInSecurityGroup(context.Context, *abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
@@ -542,7 +542,7 @@ func (instance service) ListTemplatesBySizing(
 				var images []abstract.StoredCPUInfo
 				for _, f := range imageList {
 					imageFound := abstract.StoredCPUInfo{}
-					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+					if err := json.Unmarshal(f, &imageFound); err != nil {
 						return nil, fail.Wrap(err, "error unmarshalling image '%s'")
 					}
 
@@ -935,7 +935,7 @@ func (instance service) TenantCleanup(ctx context.Context, force bool) fail.Erro
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (instance service) LookupRuleInSecurityGroup(
-	asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
+	ctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
 ) (bool, fail.Error) {
 	if valid.IsNil(asg) {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
