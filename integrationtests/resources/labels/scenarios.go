@@ -46,7 +46,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err := helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result.([]map[string]interface{})) == 0)
+	require.Nil(t, result)
 
 	fmt.Println("Inspecting non-existent Label")
 	out, err = helpers.GetOutput("safescale label inspect " + names.Labels[0])
@@ -67,7 +67,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, len(result.([]map[string]interface{})) == 0)
+	require.Nil(t, result)
 
 	out, err = helpers.GetOutput("safescale label inspect " + names.Labels[0])
 	require.Nil(t, err)

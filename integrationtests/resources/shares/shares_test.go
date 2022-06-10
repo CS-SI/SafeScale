@@ -26,26 +26,26 @@ import (
 )
 
 func Test_ShareStandard(t *testing.T) {
-	helpers.InSection("shares").AddScenario(Standard)
+	helpers.InSection("shares").Clear().AddScenario(Standard)
 	helpers.RunScenarios(t)
 }
 
 func Test_ShareError(t *testing.T) {
-	helpers.InSection("shares").AddScenario(ShareError)
+	helpers.InSection("shares").Clear().AddScenario(ShareError)
 	helpers.RunScenarios(t)
 }
 
 func Test_SharePartialError(t *testing.T) {
-	helpers.InSection("shares").AddScenario(SharePartialError)
+	helpers.InSection("shares").Clear().AddScenario(SharePartialError)
 	helpers.RunScenarios(t)
 }
 
 func Test_UntilShare(t *testing.T) {
-	helpers.InSection("shares").AddScenario(UntilShareCreated)
+	helpers.InSection("shares").Clear().AddScenario(UntilShareCreated)
 	helpers.RunScenarios(t)
 }
 
 func Test_ShareVolumeMounted(t *testing.T) {
-	helpers.InSection("shares").AddScenario(SharePartialError)
+	helpers.InSection("shares").Clear().AddScenario(SharePartialError)
 	helpers.RunScenarios(t)
 }

@@ -26,32 +26,32 @@ import (
 )
 
 func Test_Docker(t *testing.T) {
-	helpers.InSection("features").AddScenario(Docker)
+	helpers.InSection("features").Clear().AddScenario(Docker)
 	helpers.RunScenarios(t)
 }
 
 func Test_DockerNotGateway(t *testing.T) {
-	helpers.InSection("features").AddScenario(DockerNotGateway)
+	helpers.InSection("features").Clear().AddScenario(DockerNotGateway)
 	helpers.RunScenarios(t)
 }
 
 func Test_DockerCompose(t *testing.T) {
-	helpers.InSection("features").AddScenario(DockerCompose)
+	helpers.InSection("features").Clear().AddScenario(DockerCompose)
 	helpers.RunScenarios(t)
 }
 
 func Test_RemoteDesktopOnSingleHost(t *testing.T) {
-	helpers.InSection("features").AddScenario(RemoteDesktopOnSingleHost)
+	helpers.InSection("features").Clear().AddScenario(RemoteDesktopOnSingleHost)
 	helpers.RunScenarios(t)
 }
 
 func Test_RemoteDesktopOnNormalHost(t *testing.T) {
-	helpers.InSection("features").AddScenario(RemoteDesktopOnSubnetHost)
+	helpers.InSection("features").Clear().AddScenario(RemoteDesktopOnSubnetHost)
 	helpers.RunScenarios(t)
 }
 
 func Test_ReverseProxy(t *testing.T) {
-	helpers.InSection("features").AddScenario(ReverseProxy)
+	helpers.InSection("features").Clear().AddScenario(ReverseProxy)
 	helpers.RunScenarios(t)
 }
 

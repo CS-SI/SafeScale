@@ -26,16 +26,16 @@ import (
 )
 
 func Test_ClusterK8S(t *testing.T) {
-	helpers.InSection("clusters").AddScenario(ClusterK8S)
+	helpers.InSection("clusters").Clear().AddScenario(ClusterK8S)
 	helpers.RunScenarios(t)
 }
 
 func Test_Helm(t *testing.T) {
-	helpers.InSection("clusters").AddScenario(Helm)
+	helpers.InSection("clusters").Clear().AddScenario(Helm)
 	helpers.RunScenarios(t)
 }
 
 func Test_Kubernetes(t *testing.T) {
-	helpers.InSection("clusters").AddScenario(Kubectl)
+	helpers.InSection("clusters").Clear().AddScenario(Kubectl)
 	helpers.RunScenarios(t)
 }

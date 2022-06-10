@@ -126,6 +126,12 @@ var labelCreateCommand = cli.Command{
 	Aliases:   []string{"new"},
 	Usage:     "Create a Label",
 	ArgsUsage: "LABELNAME [DEFAULTVALUE]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "value",
+			Usage: "defines the default value of the Label",
+		},
+	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())

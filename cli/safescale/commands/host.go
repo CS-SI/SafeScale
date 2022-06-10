@@ -1382,7 +1382,7 @@ var hostLabelBindCommand = cli.Command{
 	ArgsUsage: "HOSTREF LABELREF",
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
-			Name:  "value, v",
+			Name:  "value",
 			Usage: "Overrides the default value of the Label for the Host",
 		},
 	},
@@ -1457,7 +1457,7 @@ var hostLabelUpdateCommand = cli.Command{
 	ArgsUsage: "HOSTREF LABELREF",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "value, v",
+			Name:  "value",
 			Usage: "sets the new value of the Label for the Host",
 		},
 	},
