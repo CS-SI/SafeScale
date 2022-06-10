@@ -30,7 +30,7 @@ import (
 
 func TestClusterDefaults_IsNull(t *testing.T) {
 
-	var cd *ClusterDefaults = nil
+	var cd *ClusterDefaults
 	if !cd.IsNull() {
 		t.Error("ClusterDefaults nil pointer is null")
 		t.Fail()
@@ -52,7 +52,7 @@ func TestClusterDefaults_IsNull(t *testing.T) {
 }
 
 func TestClusterDefaults_Replace(t *testing.T) {
-	var cd *ClusterDefaults = nil
+	var cd *ClusterDefaults
 	cd2 := newClusterDefaults()
 	result, err := cd.Replace(cd2)
 	if err == nil {

@@ -79,7 +79,7 @@ func (f *LikeFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 
 func TestJsonProperty_IsNull(t *testing.T) {
 
-	var jp *jsonProperty = nil
+	var jp *jsonProperty
 	result := jp.IsNull()
 	require.EqualValues(t, result, true)
 
@@ -106,7 +106,7 @@ func (e *SomeClonable) GetValue() string {
 
 func TestJsonProperty_Replace(t *testing.T) {
 
-	var jp *jsonProperty = nil
+	var jp *jsonProperty
 	var data data.Clonable = nil
 
 	_, err := jp.Replace(data)
@@ -137,11 +137,10 @@ func TestJsonPropertyRealReplace(t *testing.T) {
 	assert.NotNil(t, allbad)
 
 	// @TODO fix JsonProperty::Replace, clonable.(*jsonProperty) casting makes panic
-	//d := &SomeClonable{value: "any"}
-	//jp = &jsonProperty{}
-	//result = jp.Replace(d)
-	//fmt.Println(result.(*SomeClonable).GetValue())
-
+	// d := &SomeClonable{value: "any"}
+	// jp = &jsonProperty{}
+	// result = jp.Replace(d)
+	// fmt.Println(result.(*SomeClonable).GetValue())
 }
 
 func Test_NewJSONProperties(t *testing.T) {

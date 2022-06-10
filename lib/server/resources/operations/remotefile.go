@@ -67,7 +67,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 	uploadSize := int64(0)
 	if info, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
-	} else {
+	} else { // nolint
 		uploadSize = info.Size()
 	}
 

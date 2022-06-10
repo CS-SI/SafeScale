@@ -127,7 +127,7 @@ func TestIdentifiableCache_CommitEntry(t *testing.T) {
 
 func TestIdentifiableCache_FreeEntry(t *testing.T) {
 
-	var rc *SingleCache = nil
+	var rc *SingleCache
 	err := rc.FreeEntry(context.Background(), "key")
 	if err == nil {
 		t.Error("Can't Free on nil pointer cache")
@@ -159,7 +159,7 @@ func TestIdentifiableCache_FreeEntry(t *testing.T) {
 func TestIdentifiableCache_AddEntry(t *testing.T) {
 
 	content := newReservation(context.Background(), "store", "content")
-	var rc *SingleCache = nil
+	var rc *SingleCache
 	_, err := rc.AddEntry(context.Background(), content)
 	if err == nil {
 		t.Error("Can't Add on nil pointer cache")

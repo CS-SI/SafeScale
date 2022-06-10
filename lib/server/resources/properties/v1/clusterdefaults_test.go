@@ -29,7 +29,7 @@ import (
 
 func TestClusterDefaults_IsNull(t *testing.T) {
 
-	var cd *ClusterDefaults = nil
+	var cd *ClusterDefaults
 	if !cd.IsNull() {
 		t.Error("Nil pointer ClusterDefaults is null")
 		t.Fail()
@@ -65,7 +65,7 @@ func TestClusterDefaults_IsNull(t *testing.T) {
 
 func TestClusterDefaults_Replace(t *testing.T) {
 
-	var cd *ClusterDefaults = nil
+	var cd *ClusterDefaults
 	cd2 := &ClusterDefaults{
 		GatewaySizing: abstract.HostEffectiveSizing{
 			Cores: 1,

@@ -481,7 +481,7 @@ func (e *ServiceTest) _getInternalData(path string) (string, error) {
 	}
 	serial, ok := e.internals.bucketData[path]
 	if !ok {
-		return "", errors.New(fmt.Sprintf("Key \"%s\" not found", path)) // nolint
+		return "", errors.New(fmt.Sprintf("Key \"%s\" not found", path))
 	}
 	bytes, xerr := crypt.Decrypt([]byte(serial), key)
 	if xerr != nil {
@@ -515,7 +515,7 @@ func (e *ServiceTest) _deleteInternalData(path string) error {
 	e._logf("ServiceTest::_deleteInternalData { path: \"%s\" }", path)
 	_, ok := e.internals.bucketData[path]
 	if !ok {
-		return errors.New(fmt.Sprintf("Key \"%s\" not found", path)) // nolint
+		return errors.New(fmt.Sprintf("Key \"%s\" not found", path))
 	}
 	delete(e.internals.bucketData, path)
 	return nil
@@ -565,7 +565,7 @@ func (e *ServiceTest) _getFsCacheMD5(path string) (string, fail.Error) {
 		e._errorf("ServiceTest::_getFsCacheMD5 {path: \"%s\"} not found ", path)
 		return "", fail.NotFoundError(fmt.Sprintf("fscache \"%s\"not found", path))
 	}
-	hasher := md5.New() // nolint
+	hasher := md5.New()
 	_, err := hasher.Write(b)
 	if err != nil {
 		e._errorf("ServiceTest::_getFsCacheMD5 {path: \"%s\"} not hashable", path)

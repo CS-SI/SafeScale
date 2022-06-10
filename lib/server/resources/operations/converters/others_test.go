@@ -80,7 +80,7 @@ func Test_NFSExportOptionsFromStringToProtocol(t *testing.T) {
 		nfsOpt = NFSExportOptionsFromStringToProtocol(name)
 		packed = 0
 		if nfsOpt.ReadOnly {
-			packed += 1
+			packed++
 		}
 		if nfsOpt.RootSquash {
 			packed += 2
@@ -225,7 +225,7 @@ func Test_NodeCountFromStringToInteger(t *testing.T) {
 
 func TestSizingToken_Push(t *testing.T) {
 
-	var st *sizingToken = nil
+	var st *sizingToken
 	err := st.Push("one")
 	if err == nil {
 		t.Error("Can't push in nil pointer")
@@ -331,7 +331,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 
 func TestSizingToken_String(t *testing.T) {
 
-	var st *sizingToken = nil
+	var st *sizingToken
 	var err fail.Error
 	if st.String() != "" {
 		t.Error("NIl sizingtoken can't be stringify")
@@ -740,8 +740,8 @@ func TestRequest_parseSizingString(t *testing.T) {
 }
 
 func Test_parseSizingString(t *testing.T) {
-	hear_me_roar := "template=e2-medium,gpu = -1, disk >= 22"
-	thing, err := parseSizingString(hear_me_roar)
+	aSizing := "template=e2-medium,gpu = -1, disk >= 22"
+	thing, err := parseSizingString(aSizing)
 	if err != nil {
 		t.Error(err)
 	}
@@ -756,8 +756,8 @@ func Test_parseSizingString(t *testing.T) {
 }
 
 func Test_parseSizingString_disk(t *testing.T) {
-	hear_me_roar := "template=e2-medium"
-	thing, err := parseSizingString(hear_me_roar)
+	aSizing := "template=e2-medium"
+	thing, err := parseSizingString(aSizing)
 	if err != nil {
 		t.Error(err)
 	}

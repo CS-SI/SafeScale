@@ -215,7 +215,7 @@ func (instance job) String() string {
 }
 
 // register ...
-func register(job Job) fail.Error { //nolint
+func register(job Job) fail.Error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 

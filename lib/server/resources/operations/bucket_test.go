@@ -221,7 +221,7 @@ func TestBucket_Delete(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 		require.False(t, bucket.IsNull())
 
-		xerr := bucket.Delete(nil) // nolint
+		xerr := bucket.Delete(nil)
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
 		xerr = bucket.Delete(ctx)
@@ -249,7 +249,7 @@ func TestBucket_Mount(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 		require.False(t, bucket.IsNull())
 
-		xerr := bucket.Mount(nil, "localhost", "buckets/byId/sample") // nolint
+		xerr := bucket.Mount(nil, "localhost", "buckets/byId/sample")
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
 		xerr = bucket.Mount(ctx, "", "buckets/byId/sample")

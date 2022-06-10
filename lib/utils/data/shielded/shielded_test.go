@@ -64,7 +64,7 @@ func Test_NewShileded(t *testing.T) {
 			r := recover()
 			require.NotEqual(t, r, nil)
 		}()
-		var a *SomeClonable = nil
+		var a *SomeClonable
 		_, _ = NewShielded(a)
 	}()
 
@@ -89,7 +89,7 @@ func Test_NewShileded(t *testing.T) {
 
 func TestShielded_IsNull(t *testing.T) {
 
-	var s *Shielded = nil
+	var s *Shielded
 	require.EqualValues(t, s.IsNull(), true)
 
 	a := &SomeClonable{}
@@ -113,7 +113,7 @@ func TestShielded_Clone(t *testing.T) {
 			require.NotEqual(t, r, nil)
 			fmt.Println(r)
 		}()
-		var s *Shielded = nil
+		var s *Shielded
 		_, _ = s.Clone()
 	}()
 
@@ -156,7 +156,7 @@ func TestShielded_Clone(t *testing.T) {
 
 func TestShielded_Inpect(t *testing.T) {
 
-	var a *Shielded = nil
+	var a *Shielded
 	var derr error
 
 	err := a.Inspect(func(clonable data.Clonable) fail.Error {
@@ -197,7 +197,7 @@ func TestShielded_Inpect(t *testing.T) {
 
 func TestShielded_Alter(t *testing.T) {
 
-	var a *Shielded = nil
+	var a *Shielded
 	var derr error
 
 	err := a.Alter(func(clonable data.Clonable) fail.Error {
@@ -254,7 +254,7 @@ func TestShielded_Alter(t *testing.T) {
 
 func TestShielded_Serialize(t *testing.T) {
 
-	var a *Shielded = nil
+	var a *Shielded
 	var derr error
 
 	d, err := a.Serialize()
@@ -273,7 +273,7 @@ func TestShielded_Serialize(t *testing.T) {
 
 func TestShielded_Deserialize(t *testing.T) {
 
-	var a *Shielded = nil
+	var a *Shielded
 	var derr error
 
 	err := a.Deserialize([]byte("{\"Clonable\":null}"))

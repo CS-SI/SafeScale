@@ -698,7 +698,7 @@ func TestPrettyPrintErrorWithExtraInformation(t *testing.T) {
 }
 
 func TestNilCheckCast(t *testing.T) {
-	var origin Error = generateErrTimeout() //nolint
+	var origin Error = generateErrTimeout()
 	if _, ok := origin.(*ErrTimeout); !ok {
 		t.Error("Must NOT happen")
 	}
@@ -734,7 +734,7 @@ func TestNotNilCheckCastNoProblems(t *testing.T) {
 		}
 	}()
 
-	var origin Error = noProblems() //nolint
+	var origin Error = noProblems()
 	var nilErrTimeout *ErrTimeout = nil
 	if origin != nil { // this test work well, when we return something that is NOT a pointer to an interface, no problems...
 		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
@@ -782,10 +782,6 @@ func TestValidation(t *testing.T) {
 	require.False(t, mello.Valid())
 }
 
-func up() {
-	to()
-}
-
 func to() {
 	var value error
 
@@ -823,7 +819,7 @@ func TestPanicLogs(t *testing.T) {
 }
 
 func TestPanicLogsPlayed(t *testing.T) {
-	var err error = fmt.Errorf("disaster")
+	var err error = fmt.Errorf("disaster") // nolint
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
@@ -998,7 +994,7 @@ func TestPanicLogsAlt(t *testing.T) {
 }
 
 func TestPanicLogsPlayedAlt(t *testing.T) {
-	var err error = fmt.Errorf("disaster")
+	var err error = fmt.Errorf("disaster") // nolint
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())

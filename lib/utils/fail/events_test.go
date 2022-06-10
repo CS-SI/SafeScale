@@ -35,7 +35,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-func logrus_capture(routine func()) string {
+func logrusCapture(routine func()) string {
 
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -53,29 +53,29 @@ func logrus_capture(routine func()) string {
 
 func Test_OnExitLogErrorWithLevel(t *testing.T) {
 
-	log := logrus_capture(func() {
+	log := logrusCapture(func() {
 		OnExitLogErrorWithLevel(nil, logrus.WarnLevel)
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		OnExitLogErrorWithLevel(struct{}{}, logrus.WarnLevel)
 	})
 	require.Contains(t, log, "fail.OnExitLogErrorWithLevel()")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		nerr := errors.New("Any message")
 		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
 	})
 	require.Contains(t, log, "Any message")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitLogErrorWithLevel(&nerr, 42)
 	})
 	require.Contains(t, log, "level=error")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		nerr := grpcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
 		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
 
@@ -104,7 +104,7 @@ func Test_OnExitLogErrorWithLevel(t *testing.T) {
 	}
 
 	for i := range errs {
-		log = logrus_capture(func() {
+		log = logrusCapture(func() {
 			err := func(in_err Error) (out_err error) {
 				defer OnExitLogErrorWithLevel(&in_err, logrus.WarnLevel)
 				return in_err
@@ -191,12 +191,12 @@ func Test_extractCallerName(t *testing.T) {
 
 func Test_OnExitLogError(t *testing.T) {
 
-	log := logrus_capture(func() {
+	log := logrusCapture(func() {
 		OnExitLogError(nil, "test")
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitLogError(&nerr, "test")
 	})
@@ -214,7 +214,7 @@ func Test_OnExitLogError(t *testing.T) {
 	}
 
 	for i := range errs {
-		log = logrus_capture(func() {
+		log = logrusCapture(func() {
 			err := func(in_err Error) (out_err error) {
 				defer OnExitLogError(&in_err, "test")
 				return in_err
@@ -236,12 +236,12 @@ func Test_OnExitLogError(t *testing.T) {
 
 func Test_OnExitTraceError(t *testing.T) {
 
-	log := logrus_capture(func() {
+	log := logrusCapture(func() {
 		OnExitTraceError(nil, "test")
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitTraceError(&nerr, "test")
 	})
@@ -257,7 +257,7 @@ func Test_OnExitTraceError(t *testing.T) {
 	}
 
 	for i := range errs {
-		log = logrus_capture(func() {
+		log = logrusCapture(func() {
 			err := func(in_err Error) (out_err error) {
 				defer OnExitTraceError(&in_err, "test")
 				return in_err
@@ -274,26 +274,26 @@ func Test_OnExitTraceError(t *testing.T) {
 
 func Test_OnExitWrapError(t *testing.T) {
 
-	log := logrus_capture(func() {
+	log := logrusCapture(func() {
 		OnExitWrapError(nil, "")
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		errv := NewError("Any message")
 		OnExitWrapError(&errv, "test")
 	})
 	if !strings.Contains(log, "OnExitWrapError only works when 'err' is a '*error'") {
 		t.Fail()
 	}
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		errv := WarningError(errors.New("math: can't divide by zero"), "Any message")
 		OnExitWrapError(&errv, "test")
 	})
 	if !strings.Contains(log, "unexpected type '**fail.ErrWarning'") {
 		t.Fail()
 	}
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		errv := errors.New("Any message")
 		OnExitWrapError(&errv, "test")
 	})
@@ -322,7 +322,7 @@ func Test_OnPanic(t *testing.T) {
 	}()
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
 
-	log := logrus_capture(func() {
+	log := logrusCapture(func() {
 		_ = func() (err *Error) {
 			err = nil
 			defer OnPanic(err)
@@ -331,7 +331,7 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "intercepted panic but '*err' is nil")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		_ = func() (err Error) {
 			err = NotFoundError("Any message")
 			defer OnPanic(&err)
@@ -340,7 +340,7 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "fail.OnPanic")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		_ = func() (err *error) {
 			err = nil
 			defer OnPanic(err)
@@ -349,7 +349,7 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "intercepted panic but '*err' is nil")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		_ = func() (err error) {
 			err = errors.New("Any message")
 			defer OnPanic(&err)
@@ -358,7 +358,7 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "fail.OnPanic")
 
-	log = logrus_capture(func() {
+	log = logrusCapture(func() {
 		_ = func() (err error) {
 			defer OnPanic(struct{}{})
 			panic("mayday")

@@ -28,7 +28,7 @@ import (
 
 func TestClusterNodes_IsNull(t *testing.T) {
 
-	var cn *ClusterNodes = nil
+	var cn *ClusterNodes
 	if !cn.IsNull() {
 		t.Error("Nil pointer ClusterNodes is null")
 		t.Fail()
@@ -38,7 +38,7 @@ func TestClusterNodes_IsNull(t *testing.T) {
 
 func TestClusterNodes_Replace(t *testing.T) {
 
-	var cn *ClusterNodes = nil
+	var cn *ClusterNodes
 	cn2 := &ClusterNodes{
 		Masters:          make([]*ClusterNode, 0),
 		PublicNodes:      make([]*ClusterNode, 0),

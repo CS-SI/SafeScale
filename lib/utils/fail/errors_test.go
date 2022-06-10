@@ -74,7 +74,7 @@ func Test_newError(t *testing.T) {
 
 func TestErrorCore_IsNull(t *testing.T) {
 
-	var err *errorCore = nil
+	var err *errorCore
 	require.EqualValues(t, valid.IsNil(err), true)
 	err = &errorCore{
 		message:             "houston, we have a problem",
@@ -187,7 +187,7 @@ func TestErrorCore_CauseFormatter(t *testing.T) {
 		}
 	}()
 
-	var err *errorCore = nil
+	var err *errorCore
 	_ = err.setCauseFormatter(func(e Error) string {
 		return e.Error()
 	})
@@ -321,7 +321,7 @@ func TestErrorCore_RootCauseBad(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer OnPanic(&panicked)
-		var err *errorCore = nil
+		var err *errorCore
 		_ = err.RootCause() // this panics
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)

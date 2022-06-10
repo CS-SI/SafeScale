@@ -183,7 +183,7 @@ func TestHost_DeleteFeature(t *testing.T) {
 		ohost = host.(*Host)
 
 		// Wrong ctx
-		_, xerr = ohost.DeleteFeature(nil, "ansible", data.Map{}, resources.FeatureSettings{}) // nolint
+		_, xerr = ohost.DeleteFeature(nil, "ansible", data.Map{}, resources.FeatureSettings{})
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
 		// Wrong name

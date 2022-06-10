@@ -20,7 +20,7 @@
 package operations
 
 import (
-	"context" // nolint
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -290,7 +290,7 @@ func TestHost_ForceGetState(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 		require.EqualValues(t, host.GetID(), "localhost")
 
-		_, xerr = host.ForceGetState(nil) // nolint
+		_, xerr = host.ForceGetState(nil)
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
 		_, xerr = host.ForceGetState(ctx)

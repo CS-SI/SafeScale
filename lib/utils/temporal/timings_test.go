@@ -103,7 +103,7 @@ func Test_CarryAfterYou(t *testing.T) {
 
 func TestMutableTimings_ContextTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.ContextTimeout(), 60*time.Second)
 
 	mt = NewTimings()
@@ -135,7 +135,7 @@ func TestMutableTimings_ToToml(t *testing.T) {
 
 func TestMutableTimings_ConnectionTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.ConnectionTimeout(), 60*time.Second)
 
 	mt = NewTimings()
@@ -146,7 +146,7 @@ func TestMutableTimings_ConnectionTimeout(t *testing.T) {
 
 func TestMutableTimings_ExecutionTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.ExecutionTimeout(), 8*time.Minute)
 
 	mt = NewTimings()
@@ -157,7 +157,7 @@ func TestMutableTimings_ExecutionTimeout(t *testing.T) {
 
 func TestMutableTimings_OperationTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.OperationTimeout(), 150*time.Second)
 
 	mt = NewTimings()
@@ -168,7 +168,7 @@ func TestMutableTimings_OperationTimeout(t *testing.T) {
 
 func TestMutableTimings_HostCreationTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.HostCreationTimeout(), 8*time.Minute)
 
 	mt = NewTimings()
@@ -179,7 +179,7 @@ func TestMutableTimings_HostCreationTimeout(t *testing.T) {
 
 func TestMutableTimings_HostCleanupTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.HostOperationTimeout(), 2*time.Minute)
 
 	mt = NewTimings()
@@ -190,7 +190,7 @@ func TestMutableTimings_HostCleanupTimeout(t *testing.T) {
 
 func TestMutableTimings_HostOperationTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.HostOperationTimeout(), 2*time.Minute)
 
 	mt = NewTimings()
@@ -201,7 +201,7 @@ func TestMutableTimings_HostOperationTimeout(t *testing.T) {
 
 func TestMutableTimings_CommunicationTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.CommunicationTimeout(), 3*time.Minute)
 
 	mt = NewTimings()
@@ -212,7 +212,7 @@ func TestMutableTimings_CommunicationTimeout(t *testing.T) {
 
 func TestMutableTimings_HostLongOperationTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.HostLongOperationTimeout(), 14*time.Minute)
 
 	mt = NewTimings()
@@ -223,7 +223,7 @@ func TestMutableTimings_HostLongOperationTimeout(t *testing.T) {
 
 func TestMutableTimings_SSHConnectionTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.SSHConnectionTimeout(), 3*time.Minute)
 
 	mt = NewTimings()
@@ -234,7 +234,7 @@ func TestMutableTimings_SSHConnectionTimeout(t *testing.T) {
 
 func TestMutableTimings_MetadataTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.MetadataTimeout(), 150*time.Second)
 
 	mt = NewTimings()
@@ -245,7 +245,7 @@ func TestMutableTimings_MetadataTimeout(t *testing.T) {
 
 func TestMutableTimings_MetadataReadAfterWriteTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.MetadataReadAfterWriteTimeout(), 90*time.Second)
 
 	mt = NewTimings()
@@ -256,7 +256,7 @@ func TestMutableTimings_MetadataReadAfterWriteTimeout(t *testing.T) {
 
 func TestMutableTimings_RebootTimeout(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.RebootTimeout(), 45*time.Second)
 
 	mt = NewTimings()
@@ -267,7 +267,7 @@ func TestMutableTimings_RebootTimeout(t *testing.T) {
 
 func TestMutableTimings_SmallDelay(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.SmallDelay(), 1*time.Second)
 
 	mt = NewTimings()
@@ -278,7 +278,7 @@ func TestMutableTimings_SmallDelay(t *testing.T) {
 
 func TestMutableTimings_NormalDelay(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.NormalDelay(), 10*time.Second)
 
 	mt = NewTimings()
@@ -289,7 +289,7 @@ func TestMutableTimings_NormalDelay(t *testing.T) {
 
 func TestMutableTimings_BigDelay(t *testing.T) {
 
-	var mt *MutableTimings = nil
+	var mt *MutableTimings
 	require.EqualValues(t, mt.BigDelay(), 30*time.Second)
 
 	mt = NewTimings()

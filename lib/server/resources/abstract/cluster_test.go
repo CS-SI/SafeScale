@@ -88,7 +88,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 	}
 
 	// Junk attributes (broken pointer) for makes fail json.Marshal
-	var fkp *KeyPair = nil
+	var fkp *KeyPair
 	c1 = NewClusterIdentity()
 	c1.Keypair = fkp
 	_, err = c1.Serialize()
@@ -149,7 +149,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 	}
 
 	// Empty cluster
-	var emptyCluster *ClusterIdentity = nil
+	var emptyCluster *ClusterIdentity
 	err = emptyCluster.Deserialize(serial)
 	if err == nil {
 		t.Error("Should throw a fail.InvalidInstanceError")
@@ -192,7 +192,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 
 func TestClusterIdentity_Replace(t *testing.T) {
 
-	var emptyCluster *ClusterIdentity = nil
+	var emptyCluster *ClusterIdentity
 	var emptyData data.Clonable = nil
 
 	cluster := NewClusterIdentity()

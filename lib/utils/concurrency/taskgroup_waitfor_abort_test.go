@@ -907,10 +907,8 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 			if iter == 1 {
 				previousErr = xerr
 			} else {
-				// VPL: this kind of test will lead to "before: aborted, now: aborted" and trigger error
-				// if xerr != previousErr {
 				if xerr != nil {
-					switch xerr.(type) { //nolint
+					switch xerr.(type) { // nolint
 					case *fail.ErrAborted:
 						if previousErr != nil {
 							switch previousErr.(type) {

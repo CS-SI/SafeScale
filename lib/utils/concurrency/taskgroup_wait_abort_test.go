@@ -126,7 +126,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
 			if xerr != nil {
 				t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
-				switch xerr.(type) {
+				switch xerr.(type) {                       // nolint
 				case *fail.ErrAborted:
 					switch xerr.(type) {
 					case *fail.ErrAborted:
@@ -957,9 +957,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		if iter == 1 {
 			previousErr = xerr
 		} else if xerr != nil {
-			// VPL: testing errors like this does not seem to work: with 2 errors *fail.ErrAborted, the test fails, leading to "aborted != aborted"...
-			// if xerr != previousErr {
-			switch xerr.(type) { //nolint
+			switch xerr.(type) { // nolint
 			case *fail.ErrAborted:
 				if previousErr != nil {
 					switch previousErr.(type) {

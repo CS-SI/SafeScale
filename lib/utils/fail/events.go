@@ -299,7 +299,8 @@ func SilentOnPanic(err interface{}) {
 	}
 }
 
-func IgnoreProblems(err interface{}) {
-	if x := recover(); x != nil {
+func IgnoreProblems(_ interface{}) {
+	if x := recover(); x != nil { // nolint
+		// nothing to do
 	}
 }

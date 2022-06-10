@@ -28,7 +28,7 @@ import (
 
 func TestClusterNetwork_IsNull(t *testing.T) {
 
-	var cn *ClusterNetwork = nil
+	var cn *ClusterNetwork
 	if !cn.IsNull() {
 		t.Error("Nil pointer ClusterNetwork is null")
 		t.Fail()
@@ -60,7 +60,7 @@ func TestClusterNetwork_IsNull(t *testing.T) {
 
 func TestClusterNetwork_Replace(t *testing.T) {
 
-	var cn *ClusterNetwork = nil
+	var cn *ClusterNetwork
 	cn2 := &ClusterNetwork{
 		NetworkID: "ClusterNetwork networkId",
 		GatewayID: "",

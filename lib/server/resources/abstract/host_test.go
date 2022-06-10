@@ -30,7 +30,7 @@ import (
 
 func TestKeypair_IsNull(t *testing.T) {
 
-	var emptyKeypair *KeyPair = nil
+	var emptyKeypair *KeyPair
 	if !emptyKeypair.IsNull() {
 		t.Error("No, it's null")
 		t.Fail()
@@ -172,7 +172,7 @@ func Test_NewHostEffectiveSizing(t *testing.T) {
 }
 
 func TestHostEffectiveSizing_IsNull(t *testing.T) {
-	var hse *HostEffectiveSizing = nil
+	var hse *HostEffectiveSizing
 	if !hse.IsNull() {
 		t.Error("No, is null")
 		t.Fail()
@@ -250,7 +250,7 @@ func TestHostCore_Replace(t *testing.T) {
 	hc1.Password = "HostCore Password"
 	hc1.LastState = hoststate.Unknown
 
-	var hc2 *HostCore = nil
+	var hc2 *HostCore
 	replaced, err := hc2.Replace(hc1)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -267,7 +267,7 @@ func TestHostCore_ReverseReplace(t *testing.T) {
 	hc1.Password = "HostCore Password"
 	hc1.LastState = hoststate.Unknown
 
-	var hc2 *HostCore = nil
+	var hc2 *HostCore
 	replaced, err := hc1.Replace(hc2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -277,7 +277,7 @@ func TestHostCore_ReverseReplace(t *testing.T) {
 
 func TestHostCore_Serialize(t *testing.T) {
 
-	var emptyHc *HostCore = nil
+	var emptyHc *HostCore
 	_, err := emptyHc.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
@@ -328,7 +328,7 @@ func TestHostCore_Deserialize(t *testing.T) {
 		t.Fail()
 	}
 
-	var emptyHc *HostCore = nil
+	var emptyHc *HostCore
 	err = emptyHc.Deserialize(serial)
 	if err == nil {
 		t.Error("Can't deserialize nil pointer")
@@ -347,7 +347,7 @@ func TestHostCore_Deserialize(t *testing.T) {
 
 func TestHostCore_GetName(t *testing.T) {
 
-	var hc *HostCore = nil
+	var hc *HostCore
 
 	name := hc.GetName()
 	if name != "" {
@@ -368,7 +368,7 @@ func TestHostCore_GetName(t *testing.T) {
 
 func TestHostCore_GetID(t *testing.T) {
 
-	var hc *HostCore = nil
+	var hc *HostCore
 
 	id := hc.GetID()
 	if id != "" {
@@ -410,7 +410,7 @@ func Test_NewHostFull(t *testing.T) {
 
 func TestHostFull_IsNull(t *testing.T) {
 
-	var hf *HostFull = nil
+	var hf *HostFull
 	if !hf.IsNull() {
 		t.Error("(nil) *Hostfull is null")
 		t.Fail()
@@ -463,7 +463,7 @@ func TestHostFull_GetID_ThatPanics(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
-		var hf *HostFull = nil
+		var hf *HostFull
 		id := hf.GetID() // this HAS to panic
 		_ = id
 	}()
@@ -495,7 +495,7 @@ func TestHostFull_GetName_ThatPanics(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
-		var hf *HostFull = nil
+		var hf *HostFull
 		name := hf.GetName() // this HAS to panic
 		_ = name
 	}()
@@ -527,7 +527,7 @@ func TestHostFull_SetName_ThatPanics(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
-		var hf *HostFull = nil
+		var hf *HostFull
 		hf.SetName("OhMyNilPointerName!!!") // this HAS to panic
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
@@ -548,8 +548,8 @@ func TestHostFull_SetName(t *testing.T) {
 
 func TestHostSizingRequirements_LowerThan(t *testing.T) {
 
-	var hsr1 *HostSizingRequirements = nil
-	var hsr2 *HostSizingRequirements = nil
+	var hsr1 *HostSizingRequirements
+	var hsr2 *HostSizingRequirements
 
 	_, err := hsr1.LowerThan(hsr2)
 	if err == nil {
@@ -697,8 +697,8 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 
 func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 
-	var hsr1 *HostSizingRequirements = nil
-	var hsr2 *HostSizingRequirements = nil
+	var hsr1 *HostSizingRequirements
+	var hsr2 *HostSizingRequirements
 
 	_, err := hsr1.LowerOrEqualThan(hsr2)
 	if err == nil {

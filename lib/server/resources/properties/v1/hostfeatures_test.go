@@ -28,7 +28,7 @@ import (
 
 func TestHostInstalledFeature_IsNull(t *testing.T) {
 
-	var hf *HostInstalledFeature = nil
+	var hf *HostInstalledFeature
 	if !hf.IsNull() {
 		t.Error("Nil pointer HostInstalledFeature is null")
 		t.Fail()
@@ -161,7 +161,7 @@ func TestHostFeatures_Reset(t *testing.T) {
 
 func TestHostFeatures_IsNull(t *testing.T) {
 
-	var hf *HostFeatures = nil
+	var hf *HostFeatures
 	if !hf.IsNull() {
 		t.Error("Nil pointer HostFeatures is null")
 		t.Fail()
@@ -223,7 +223,7 @@ func TestHostFeatures_Clone(t *testing.T) {
 
 func TestHostFeatures_Replace(t *testing.T) {
 
-	var hf *HostFeatures = nil
+	var hf *HostFeatures
 	hf2 := &HostFeatures{
 		Installed: map[string]*HostInstalledFeature{
 			"Feature": {

@@ -24,7 +24,7 @@ import (
 
 func Test_NewEncryptionKey(t *testing.T) {
 
-	key, err := NewEncryptionKey([]byte("")) //nolint
+	key, err := NewEncryptionKey([]byte(""))
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -34,7 +34,7 @@ func Test_NewEncryptionKey(t *testing.T) {
 		t.Fail()
 	}
 
-	key, err = NewEncryptionKey([]byte("this is one of")) //nolint
+	key, err = NewEncryptionKey([]byte("this is one of"))
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -44,7 +44,7 @@ func Test_NewEncryptionKey(t *testing.T) {
 		t.Fail()
 	}
 
-	key, err = NewEncryptionKey([]byte("this is a really too long one to be valid")) //nolint
+	key, err = NewEncryptionKey([]byte("this is a really too long one to be valid"))
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -58,7 +58,7 @@ func Test_NewEncryptionKey(t *testing.T) {
 
 func Test_Encrypt(t *testing.T) {
 
-	var key *Key = nil
+	var key *Key
 	var source []byte = []byte("This is my entering data")
 	_, err := Encrypt(source, key)
 	if err == nil {
@@ -88,7 +88,7 @@ func Test_Encrypt(t *testing.T) {
 
 func Test_Decrypt(t *testing.T) {
 
-	var key *Key = nil
+	var key *Key
 	var source []byte = []byte("")
 
 	_, err := Decrypt(source, key)

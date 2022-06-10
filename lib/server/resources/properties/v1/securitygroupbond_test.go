@@ -28,7 +28,7 @@ import (
 
 func TestSecurityGroupBond_IsNull(t *testing.T) {
 
-	var sgb *SecurityGroupBond = nil
+	var sgb *SecurityGroupBond
 	if !sgb.IsNull() {
 		t.Error("SecurityGroupBond nil pointer is null")
 		t.Fail()
@@ -47,7 +47,7 @@ func TestSecurityGroupBond_IsNull(t *testing.T) {
 
 func TestSecurityGroupBond_Replace(t *testing.T) {
 
-	var sgb *SecurityGroupBond = nil
+	var sgb *SecurityGroupBond
 	sgb2 := NewSecurityGroupBond()
 	result, err := sgb.Replace(sgb2)
 	if err == nil {
