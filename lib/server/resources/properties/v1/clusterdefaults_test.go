@@ -18,6 +18,7 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,6 +84,19 @@ func TestClusterDefaults_Replace(t *testing.T) {
 	}
 	require.Nil(t, result)
 
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := cd2.Replace(network)
+	if xerr == nil {
+		t.Error("ClusterDefaults.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *ClusterDefaults") {
+		t.Errorf("Expect error \"p is not a *ClusterDefaults\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestClusterDefaults_Clone(t *testing.T) {
@@ -95,7 +109,7 @@ func TestClusterDefaults_Clone(t *testing.T) {
 
 	cloned, err := ct.Clone()
 	if err != nil {
-		t.Error(err)
+		t.Error("Clone fail", err)
 	}
 
 	clonedCt, ok := cloned.(*ClusterDefaults)
@@ -110,7 +124,7 @@ func TestClusterDefaults_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)

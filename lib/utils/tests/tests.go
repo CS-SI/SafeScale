@@ -107,7 +107,7 @@ func MinioOnline() bool {
 	}()
 
 	return func() (status bool) {
-		resp, err := http.Get(endpoint) // nolint
+		resp, err := http.Get(endpoint)
 		if err != nil {
 			return false
 		}

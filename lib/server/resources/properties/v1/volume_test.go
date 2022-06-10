@@ -18,9 +18,11 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,6 +54,20 @@ func TestVolumeDescription_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := ssg2.Replace(network)
+	if xerr == nil {
+		t.Error("VolumeDescription.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *VolumeDescription") {
+		t.Errorf("Expect error \"p is not a *VolumeDescription\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestVolumeDescription_Clone(t *testing.T) {
@@ -67,6 +83,7 @@ func TestVolumeDescription_Clone(t *testing.T) {
 	}
 	clonedVd, ok := cloned.(*VolumeDescription)
 	if !ok {
+		t.Error("Cloned BucketMounts not castable to *BucketMounts", err)
 		t.Fail()
 	}
 
@@ -76,7 +93,7 @@ func TestVolumeDescription_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(vd, clonedVd)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, vd, clonedVd)
@@ -109,6 +126,19 @@ func TestVolumeAttachments_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := ssg2.Replace(network)
+	if xerr == nil {
+		t.Error("VolumeAttachments.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *VolumeAttachments") {
+		t.Errorf("Expect error \"p is not a *VolumeAttachments\", has \"%s\"", xerr.Error())
+	}
 }
 
 func TestVolumeAttachments_Clone(t *testing.T) {
@@ -124,6 +154,7 @@ func TestVolumeAttachments_Clone(t *testing.T) {
 
 	clonedCt, ok := cloned.(*VolumeAttachments)
 	if !ok {
+		t.Error("Cloned VolumeAttachments not castable to *VolumeAttachments", err)
 		t.Fail()
 	}
 
@@ -133,7 +164,7 @@ func TestVolumeAttachments_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)

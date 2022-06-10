@@ -887,8 +887,8 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF(t *testing.T) {
 		}()
 
 		if _, _, xerr := overlord.WaitGroupFor(5 * time.Second); xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrAborted:
+			switch xerr.(type) { //nolint
+			case *fail.ErrAborted: //nolint
 				// Wanted situation, continue
 			case *fail.ErrorList:
 				el, _ := xerr.(*fail.ErrorList)

@@ -96,7 +96,7 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 func TestObjectStorageBucket_Serialize(t *testing.T) {
 
 	var n *ObjectStorageBucket = nil
-	serial, err := n.Serialize()
+	_, err := n.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil ObjectStorageBucket")
 		t.Fail()
@@ -108,7 +108,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 	n.Host = "ObjectStorageBucket Host"
 	n.MountPoint = "ObjectStorageBucket MountPoint"
 
-	serial, err = n.Serialize()
+	serial, err := n.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()

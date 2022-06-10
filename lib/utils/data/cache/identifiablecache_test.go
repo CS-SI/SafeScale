@@ -35,6 +35,20 @@ func TestIdentifiableCache_New(t *testing.T) {
 
 }
 
+func TestIdentifiableCache_Get(t *testing.T) {
+
+	store, xerr := NewMapStore("store")
+	require.NoError(t, xerr)
+
+	c, err := NewIdentifiableCache("", store)
+	require.Error(t, err)
+
+	ctx := context.Background()
+	_, xerr = c.Get(ctx, "some")
+	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
+
+}
+
 func TestIdentifiableCache_ReserveEntry(t *testing.T) {
 
 	/*
@@ -168,6 +182,7 @@ func TestIdentifiableCache_AddEntry(t *testing.T) {
 
 func TestFreeEntry(t *testing.T) {
 	task, xerr := concurrency.NewTask()
+	require.NoError(t, xerr)
 	song := task.Context()
 
 	store, xerr := NewMapStore("store")

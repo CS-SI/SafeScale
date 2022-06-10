@@ -49,7 +49,7 @@ func TestSecurityGroupRule_IsNull(t *testing.T) {
 		t.Fail()
 	}
 	sgr.Sources = []string{}
-	sgr.Targets = append(sgr.Sources, "Target 1")
+	sgr.Targets = append(sgr.Sources, "Target 1") //nolint
 	if sgr.IsNull() {
 		t.Error("SecurityGroupRule is not null")
 		t.Fail()
@@ -396,12 +396,12 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 		Targets:     []string{"trg_a1", "trg_b1", "trg_c1"},
 	}
 
-	result, err := sgrs.IndexOfEquivalentRule(nil)
+	_, err := sgrs.IndexOfEquivalentRule(nil)
 	if err == nil {
 		t.Error("Can't find nil value")
 		t.Fail()
 	}
-	result, err = sgrs.IndexOfEquivalentRule(sgr)
+	_, err = sgrs.IndexOfEquivalentRule(sgr)
 	if err == nil {
 		t.Error("Can't find an item in empty list")
 		t.Fail()
@@ -431,7 +431,7 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
 		},
 	}
-	result, err = sgrs.IndexOfEquivalentRule(sgr)
+	_, err = sgrs.IndexOfEquivalentRule(sgr)
 	if err == nil {
 		t.Error("Can't find an item, is it not in list")
 		t.Fail()
@@ -472,7 +472,7 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
 		},
 	}
-	result, err = sgrs.IndexOfEquivalentRule(sgr)
+	result, err := sgrs.IndexOfEquivalentRule(sgr)
 	if err != nil {
 		t.Error("Shound found item in list")
 		t.Fail()
@@ -523,12 +523,12 @@ func TestSecurityGroupRules_IndexOfRuleByID(t *testing.T) {
 		},
 	}
 
-	result, err := sgrs.IndexOfRuleByID("toto")
+	_, err := sgrs.IndexOfRuleByID("toto")
 	if err == nil {
 		t.Error("Mathing item not in list")
 		t.Fail()
 	}
-	result, err = sgrs.IndexOfRuleByID("b2")
+	result, err := sgrs.IndexOfRuleByID("b2")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -735,7 +735,6 @@ func TestSecurityGroupRules_Clone(t *testing.T) {
 		t.Error(err)
 	}
 	areEqual = reflect.DeepEqual(sgrs, clone)
-	fmt.Println(sgrs, clone, areEqual)
 	if !areEqual {
 		t.Error("Clone uncomplete")
 		t.Fail()
@@ -915,8 +914,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sgcr, _ = sgc.Replace(sg)
 
 	assert.Equal(t, sgc, sgcr)
-	var clob data.Clonable
-	clob = sg
+	var clob data.Clonable = sg
 	require.EqualValues(t, clob, sgcr)
 
 	areEqual := reflect.DeepEqual(&sg, sgcr.(*SecurityGroup))
@@ -937,7 +935,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 func TestSecurityGroup_Serialize(t *testing.T) {
 
 	var sg *SecurityGroup = nil
-	serial, err := sg.Serialize()
+	_, err := sg.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
@@ -984,7 +982,7 @@ func TestSecurityGroup_Serialize(t *testing.T) {
 		},
 	}
 
-	serial, err = sg.Serialize()
+	serial, err := sg.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()

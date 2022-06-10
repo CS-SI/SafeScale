@@ -38,7 +38,7 @@ func Test_NthIncludedSubnet(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverflow")
 
 	result, err = FirstIncludedSubnet(ip, 2)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	parentLen, addrLen := result.Mask.Size()
 	require.EqualValues(t, parentLen, 26)
 	require.EqualValues(t, addrLen, 32)

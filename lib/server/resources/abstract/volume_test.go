@@ -95,7 +95,7 @@ func TestVolume_Clone(t *testing.T) {
 func TestVolume_Serialize(t *testing.T) {
 
 	var v2 *Volume = nil
-	serial, err := v2.Serialize()
+	_, err := v2.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
@@ -108,7 +108,7 @@ func TestVolume_Serialize(t *testing.T) {
 	v.Speed = volumespeed.Cold
 	v.State = volumestate.Unknown
 
-	serial, err = v.Serialize()
+	serial, err := v.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()

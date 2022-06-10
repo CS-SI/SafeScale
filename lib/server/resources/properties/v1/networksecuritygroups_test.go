@@ -18,8 +18,10 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +53,20 @@ func TestNetworkSecurityGroups_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := nsg2.Replace(network)
+	if xerr == nil {
+		t.Error("NetworkSecurityGroups.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *NetworkSecurityGroups") {
+		t.Errorf("Expect error \"p is not a *NetworkSecurityGroups\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestNetworkSecurityGroups_Clone(t *testing.T) {
@@ -71,6 +87,7 @@ func TestNetworkSecurityGroups_Clone(t *testing.T) {
 
 	clonedNsg, ok := cloned.(*NetworkSecurityGroups)
 	if !ok {
+		t.Error("Cloned BucketMounts not castable to *NetworkSecurityGroups", err)
 		t.Fail()
 	}
 
@@ -80,7 +97,7 @@ func TestNetworkSecurityGroups_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(nsg, clonedNsg)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, nsg, clonedNsg)

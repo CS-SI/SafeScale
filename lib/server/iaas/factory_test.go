@@ -18,8 +18,7 @@ func Test_getTenantsFromCfg(t *testing.T) {
 	r, _, xerr := getTenantsFromViperCfg(v)
 	require.Nil(t, xerr)
 
-	var theRecoveredTiming map[string]interface{}
-	theRecoveredTiming = r[0]["timings"].(map[string]interface{})
+	theRecoveredTiming := r[0]["timings"].(map[string]interface{})
 
 	s := temporal.MutableTimings{}
 	err := mapstructure.Decode(theRecoveredTiming, &s)

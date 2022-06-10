@@ -698,8 +698,7 @@ func TestPrettyPrintErrorWithExtraInformation(t *testing.T) {
 }
 
 func TestNilCheckCast(t *testing.T) {
-	var origin Error
-	origin = generateErrTimeout()
+	var origin Error = generateErrTimeout() //nolint
 	if _, ok := origin.(*ErrTimeout); !ok {
 		t.Error("Must NOT happen")
 	}
@@ -713,9 +712,7 @@ func TestNotNilCheckCast(t *testing.T) {
 		}
 	}()
 
-	var origin Error
-	origin = generateErrNilTimeout() // nolint
-
+	var origin Error = generateErrNilTimeout() // nolint
 	var nilErrTimeout *ErrTimeout = nil
 	if origin != nil { // working with pointers to interfaces is dangerous, here we misinterpret origin as not nil (but it is) // nolint
 		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same, the type matters, here we detect that actually is a nil, and we force the panic to prove the point
@@ -737,9 +734,7 @@ func TestNotNilCheckCastNoProblems(t *testing.T) {
 		}
 	}()
 
-	var origin Error
-	origin = noProblems()
-
+	var origin Error = noProblems() //nolint
 	var nilErrTimeout *ErrTimeout = nil
 	if origin != nil { // this test work well, when we return something that is NOT a pointer to an interface, no problems...
 		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
@@ -987,8 +982,8 @@ func TestPanicLogsAlt(t *testing.T) {
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
-			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:803`) {
-				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:803`) {
+			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:794`) {
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:794`) {
 					t.Errorf("Bad content")
 					t.FailNow()
 				}
@@ -1007,8 +1002,8 @@ func TestPanicLogsPlayedAlt(t *testing.T) {
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
-			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:803`) {
-				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:803`) {
+			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:794`) {
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:794`) {
 					t.Errorf("Bad content")
 					t.FailNow()
 				}
@@ -1027,8 +1022,8 @@ func TestPanicLogsBisAlt(t *testing.T) {
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
-			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:803`) {
-				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:803`) {
+			if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to():  [.../lib/utils/fail/old_errors_test.go:794`) {
+				if !strings.Contains(err.Error(), `panicked: in function github.com/CS-SI/SafeScale/v22/lib/utils/fail.to()`) && !strings.Contains(err.Error(), `lib/utils/fail/old_errors_test.go:794`) {
 					t.Errorf("Bad content")
 					t.FailNow()
 				}

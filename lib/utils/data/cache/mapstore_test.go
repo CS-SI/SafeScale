@@ -47,7 +47,7 @@ func TestCache_IsNull(t *testing.T) {
 	require.EqualValues(t, c.isNull(), true)
 
 	c, err = NewCache("name")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, c.isNull(), false)
 
 }
@@ -241,6 +241,7 @@ func TestMapStore_SignalChange(t *testing.T) {
 	}
 
 	err = rc2.Reserve(task.Context(), content.GetName(), 100*time.Millisecond)
+	require.Nil(t, err)
 
 	_, err = rc2.Commit(context.Background(), content.GetName(), content)
 	require.NotNil(t, err)

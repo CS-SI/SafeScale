@@ -910,7 +910,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 				// VPL: this kind of test will lead to "before: aborted, now: aborted" and trigger error
 				// if xerr != previousErr {
 				if xerr != nil {
-					switch xerr.(type) {
+					switch xerr.(type) { //nolint
 					case *fail.ErrAborted:
 						if previousErr != nil {
 							switch previousErr.(type) {
@@ -923,35 +923,31 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 							}
 						}
 					}
-				} else {
-					if previousErr != nil {
-						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-						t.Fail()
-						return
-					}
+				} else if previousErr != nil {
+					t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+					t.Fail()
+					return
 				}
 			}
 
 			// check for error inconsistencies
 			if iter == 1 {
 				previousErr = xerr
-			} else {
-				if xerr != previousErr {
-					if xerr != nil && previousErr != nil {
-						if strings.Compare(xerr.Error(), previousErr.Error()) != 0 {
-							if !strings.Contains(xerr.Error(), "aborted") || !strings.Contains(
-								previousErr.Error(), "aborted",
-							) {
-								t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-								t.Fail()
-								return
-							}
+			} else if xerr != previousErr {
+				if xerr != nil && previousErr != nil {
+					if strings.Compare(xerr.Error(), previousErr.Error()) != 0 {
+						if !strings.Contains(xerr.Error(), "aborted") || !strings.Contains(
+							previousErr.Error(), "aborted",
+						) {
+							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+							t.Fail()
+							return
 						}
-					} else {
-						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-						t.Fail()
-						return
 					}
+				} else {
+					t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+					t.Fail()
+					return
 				}
 			}
 

@@ -81,7 +81,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 
 	// Serialize empty clusterIdentity
 	c1 := NewClusterIdentity()
-	serial, err := c1.Serialize()
+	_, err := c1.Serialize()
 	if err == nil {
 		t.Error("Should throw fail.InvalidInstanceError")
 		t.FailNow()
@@ -91,7 +91,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 	var fkp *KeyPair = nil
 	c1 = NewClusterIdentity()
 	c1.Keypair = fkp
-	serial, err = c1.Serialize()
+	_, err = c1.Serialize()
 	if err == nil {
 		t.Error("Should throw a Marshal.json error")
 		t.FailNow()
@@ -107,7 +107,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 	}
 
 	// Serialize
-	serial, err = c1.Serialize()
+	serial, err := c1.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -215,6 +215,14 @@ func TestClusterIdentity_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	// Filled cluster, invalid data
+	network := NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, derr := cluster.Replace(network)
+	require.Contains(t, derr.Error(), "p is not a *ClusterIdentity")
 
 	// Filled cluster, filled data
 	cluster2 := NewClusterIdentity()

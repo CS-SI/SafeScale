@@ -18,8 +18,10 @@ package propertiesv2
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,12 +54,26 @@ func TestHostNetworking_IsNull(t *testing.T) {
 
 func TestHostNetworking_Replace(t *testing.T) {
 	var hnw *HostNetworking = nil
-	hnw2 := newClusterNodes()
+	hnw2 := NewHostNetworking()
 	result, err := hnw.Replace(hnw2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := hnw2.Replace(network)
+	if xerr == nil {
+		t.Error("HostNetworking.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostNetworking") {
+		t.Errorf("Expect error \"p is not a *HostNetworking\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestHostNetworking_Clone(t *testing.T) {
@@ -77,6 +93,7 @@ func TestHostNetworking_Clone(t *testing.T) {
 
 	clonedCt, ok := cloned.(*HostNetworking)
 	if !ok {
+		t.Error("Cloned HostNetworking not castable to *HostNetworking", err)
 		t.Fail()
 	}
 
@@ -86,7 +103,7 @@ func TestHostNetworking_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)

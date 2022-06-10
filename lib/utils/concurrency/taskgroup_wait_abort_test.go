@@ -956,21 +956,19 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		// check for error inconsistencies
 		if iter == 1 {
 			previousErr = xerr
-		} else {
+		} else if xerr != nil {
 			// VPL: testing errors like this does not seem to work: with 2 errors *fail.ErrAborted, the test fails, leading to "aborted != aborted"...
 			// if xerr != previousErr {
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAborted:
-					if previousErr != nil {
-						switch previousErr.(type) {
-						case *fail.ErrAborted:
-							// same kind of error, good
-						default:
-							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-							t.Fail()
-							return
-						}
+			switch xerr.(type) { //nolint
+			case *fail.ErrAborted:
+				if previousErr != nil {
+					switch previousErr.(type) {
+					case *fail.ErrAborted:
+						// same kind of error, good
+					default:
+						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+						t.Fail()
+						return
 					}
 				}
 			}

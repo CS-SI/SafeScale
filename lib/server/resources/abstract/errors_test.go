@@ -74,7 +74,7 @@ func TestErrors_ResourceTimeoutError(t *testing.T) {
 	ressourceNames := []string{"", "Ressource1", " A B C D E", ":ù*$,:!;,"}
 	ressourceName := ""
 	durations := []time.Duration{0 * time.Second, 30 * time.Second, 1 * time.Minute, 30 * time.Minute, 1 * time.Hour, 6 * time.Hour, 24 * time.Hour}
-	duration := 0 * time.Second
+	duration := 0 * time.Second //nolint
 	for i := range ressourceNames {
 		ressourceName = ressourceNames[i]
 		for j := range durations {
@@ -87,11 +87,9 @@ func TestErrors_ResourceTimeoutError(t *testing.T) {
 			if ressourceName != "" && !strings.Contains(fmt.Sprintf("%s", err), ressourceName) {
 				t.Error("Wrong Message Restitution, error does not contains ressource name \"" + ressourceName + " \"")
 				t.FailNow()
-			} else {
-				if !strings.Contains(fmt.Sprintf("%s", err), fmt.Sprintf("%s", duration)) {
-					t.Error("Wrong Message Restitution, error does not contains timeout duration \"" + fmt.Sprintf("%s", duration) + "\"")
-					t.FailNow()
-				}
+			} else if !strings.Contains(fmt.Sprintf("%s", err), fmt.Sprintf("%s", duration)) { //nolint
+				t.Error("Wrong Message Restitution, error does not contains timeout duration \"" + fmt.Sprintf("%s", duration) + "\"") //nolint
+				t.FailNow()
 			}
 		}
 	}

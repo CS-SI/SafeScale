@@ -105,7 +105,7 @@ func TestSubnet_Clone(t *testing.T) {
 func TestSubnet_Serialize(t *testing.T) {
 
 	var s *Subnet = nil
-	serial, err := s.Serialize()
+	_, err := s.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
@@ -127,7 +127,7 @@ func TestSubnet_Serialize(t *testing.T) {
 	s.DefaultSSHPort = 42
 	s.SingleHostCIDRIndex = 14
 
-	serial, err = s.Serialize()
+	serial, err := s.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()

@@ -36,7 +36,7 @@ func minioIsRunning() (bool, error) {
 	}
 
 	// See https://docs.min.io/minio/baremetal/monitoring/healthcheck-probe.html
-	resp, err := http.Get(value)
+	resp, err := http.Get(value) // nolint
 	if err != nil {
 		return false, err
 	}
@@ -87,7 +87,7 @@ func Test_NewLocation(t *testing.T) {
 	}
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -100,7 +100,7 @@ func TestLocation_IsNull(t *testing.T) {
 	require.Nil(t, err)
 
 	var nilLoc *location = nil
-	require.EqualValues(t, nilLoc.IsNull(), true)
+	require.True(t, nilLoc.IsNull())
 
 	cfg := Config{
 		Type:         "s3",
@@ -113,7 +113,7 @@ func TestLocation_IsNull(t *testing.T) {
 	}
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 }
 
 func TestLocation_Connect(t *testing.T) {
@@ -139,7 +139,7 @@ func TestLocation_Connect(t *testing.T) {
 	}
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 }
 
 func TestLocation_Protocol(t *testing.T) {
@@ -161,11 +161,11 @@ func TestLocation_Protocol(t *testing.T) {
 	}
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	c, err := loc.Protocol()
 	require.EqualValues(t, c, "s3")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -188,7 +188,7 @@ func TestLocation_CreateBucket(t *testing.T) {
 	}
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	if there, err := loc.FindBucket("boo"); err == nil {
 		if there {

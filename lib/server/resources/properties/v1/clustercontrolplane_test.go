@@ -18,6 +18,7 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,25 @@ func TestClusterControlplane_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	cc = &ClusterControlplane{
+		VirtualIP: &abstract.VirtualIP{
+			ID: "MyVirtualIP ID",
+		},
+	}
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := cc.Replace(network)
+	if xerr == nil {
+		t.Error("ClusterControlplane.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *ClusterControlplane") {
+		t.Errorf("Expect error \"p is not a *ClusterControlplane\", has \"%s\"", xerr.Error())
+	}
 
 }
 

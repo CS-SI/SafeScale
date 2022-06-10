@@ -18,8 +18,10 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,6 +121,19 @@ func TestClusterNodes_Replace(t *testing.T) {
 		t.Fail()
 	}
 
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := cn.Replace(network)
+	if xerr == nil {
+		t.Error("ClusterNodes.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *ClusterNodes") {
+		t.Errorf("Expect error \"p is not a *ClusterNodes\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestClusterNodes_Clone(t *testing.T) {
@@ -148,7 +163,7 @@ func TestClusterNodes_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)

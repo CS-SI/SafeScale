@@ -297,7 +297,7 @@ func TestErrorCore_Cause(t *testing.T) {
 		lock:                &sync.RWMutex{},
 	}
 	err = errCore.Cause()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	errCore = errorCore{
 		message:             "houston, we have a problem",
@@ -432,7 +432,7 @@ func TestErrorCore_Annotation(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	ann, ok := errCore.Annotation("two")
+	_, ok := errCore.Annotation("two")
 	require.EqualValues(t, ok, false)
 
 	errCore = errorCore{
@@ -445,7 +445,7 @@ func TestErrorCore_Annotation(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	ann, ok = errCore.Annotation("two")
+	_, ok = errCore.Annotation("two")
 	require.EqualValues(t, ok, false)
 
 	errCore = errorCore{
@@ -462,7 +462,7 @@ func TestErrorCore_Annotation(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	ann, ok = errCore.Annotation("two")
+	ann, ok := errCore.Annotation("two")
 	require.EqualValues(t, ok, true)
 	require.EqualValues(t, ann, "second")
 
@@ -797,7 +797,7 @@ func TestErrorCore_ToGRPCStatus(t *testing.T) {
 		lock:                &sync.RWMutex{},
 	}
 	err = errCore.ToGRPCStatus()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	errCore = errorCore{
 		message:             "houston, we have a problem",
@@ -1340,7 +1340,7 @@ func TestErrNotFound_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := notfound.Annotate("two", ann)
+	_ = notfound.Annotate("two", ann)
 
 	notfound = &ErrNotFound{
 		errorCore: &errorCore{
@@ -1354,7 +1354,7 @@ func TestErrNotFound_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = notfound.Annotate("two", ann)
+	result := notfound.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
 
 }
@@ -1560,7 +1560,7 @@ func TestErrNotAvailable_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := notavailable.Annotate("two", ann)
+	_ = notavailable.Annotate("two", ann)
 
 	notavailable = &ErrNotAvailable{
 		errorCore: &errorCore{
@@ -1574,7 +1574,7 @@ func TestErrNotAvailable_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = notavailable.Annotate("two", ann)
+	result := notavailable.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
 
 }
@@ -4691,7 +4691,7 @@ func TestErrInconsistent_GRPCCode(t *testing.T) {
 func Test_ExecutionError(t *testing.T) {
 	xerr := ExecutionError(errors.New("exit error"), "any error")
 	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrExecution")
-	require.EqualValues(t, strings.Contains(xerr.Error(), "any error"), true)
+	require.Contains(t, xerr.Error(), "any error")
 
 	var cmd *exec.Cmd
 
@@ -4714,9 +4714,9 @@ func Test_ExecutionError(t *testing.T) {
 		if reflect.TypeOf(err).String() == "*exec.ExitError" {
 			xerr = ExecutionError(err, "any error")
 			require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrExecution")
-			require.EqualValues(t, strings.Contains(xerr.Error(), "any error"), true)
+			require.Contains(t, xerr.Error(), "any error")
 			if runtime.GOOS != "windows" {
-				require.EqualValues(t, strings.Contains(xerr.Error(), "signal: killed"), true)
+				require.Contains(t, xerr.Error(), "signal: killed")
 			}
 		}
 	}

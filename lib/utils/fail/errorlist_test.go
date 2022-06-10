@@ -40,6 +40,13 @@ func Test_NewErrorList(t *testing.T) {
 
 }
 
+func TestNewErrorList_NewErrorListComplete(t *testing.T) {
+
+	list := NewErrorListComplete([]error{}, errors.New("math: square root of negative number"), []error{}, "can't resolve equation")
+	require.Contains(t, list.Error(), "can't resolve equation")
+
+}
+
 func TestNewErrorList_ToGRPCStatus(t *testing.T) {
 
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})

@@ -18,11 +18,13 @@ package propertiesv3
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 )
 
@@ -57,6 +59,20 @@ func TestClusterDefaults_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := cd2.Replace(network)
+	if xerr == nil {
+		t.Error("ClusterDefaults.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *ClusterDefaults") {
+		t.Errorf("Expect error \"p is not a *ClusterDefaults\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestClusterDefaults_Clone(t *testing.T) {
@@ -75,6 +91,7 @@ func TestClusterDefaults_Clone(t *testing.T) {
 
 	clonedCd, ok := cloned.(*ClusterDefaults)
 	if !ok {
+		t.Error("Cloned ClusterDefaults not castable to *ClusterDefaults", err)
 		t.Fail()
 	}
 
@@ -84,7 +101,7 @@ func TestClusterDefaults_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(cd, clonedCd)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, cd, clonedCd)

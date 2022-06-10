@@ -61,19 +61,19 @@ func Test_OnExitLogErrorWithLevel(t *testing.T) {
 	log = logrus_capture(func() {
 		OnExitLogErrorWithLevel(struct{}{}, logrus.WarnLevel)
 	})
-	require.EqualValues(t, strings.Contains(log, "fail.OnExitLogErrorWithLevel()"), true)
+	require.Contains(t, log, "fail.OnExitLogErrorWithLevel()")
 
 	log = logrus_capture(func() {
 		nerr := errors.New("Any message")
 		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
 	})
-	require.EqualValues(t, strings.Contains(log, "Any message"), true)
+	require.Contains(t, log, "Any message")
 
 	log = logrus_capture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitLogErrorWithLevel(&nerr, 42)
 	})
-	require.EqualValues(t, strings.Contains(log, "level=error"), true)
+	require.Contains(t, log, "level=error")
 
 	log = logrus_capture(func() {
 		nerr := grpcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
@@ -81,8 +81,8 @@ func Test_OnExitLogErrorWithLevel(t *testing.T) {
 
 		fmt.Println(nerr)
 	})
-	require.EqualValues(t, strings.Contains(log, "GRPC Error"), true)
-	require.EqualValues(t, strings.Contains(log, "FailedPrecondition"), true)
+	require.Contains(t, log, "GRPC Error")
+	require.Contains(t, log, "FailedPrecondition")
 
 	errs := []Error{
 		WarningError(errors.New("math: can't divide by zero"), "Any message"),
@@ -137,28 +137,28 @@ func OnExit_extractCallerName_deepcall(length uint, callback func() string) stri
 func Test_extractCallerName(t *testing.T) {
 
 	result := extractCallerName()
-	require.EqualValues(t, strings.Contains(result, "runtime.goexit"), true)
+	require.Contains(t, result, "runtime.goexit")
 
-	result = func() string {
+	result = func() string { // nolint
 		return extractCallerName() // nolint
 	}()
-	require.EqualValues(t, strings.Contains(result, "testing.tRunner"), true)
+	require.Contains(t, result, "testing.tRunner")
 
-	result = func() string {
+	result = func() string { // nolint
 		return func() string { // nolint
 			return extractCallerName() // nolint
 		}()
 	}()
-	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+	require.Contains(t, result, "fail.Test_extractCallerName")
 
-	result = func() string {
-		return func() string {
+	result = func() string { // nolint
+		return func() string { // nolint
 			return func() string { // nolint
 				return extractCallerName() // nolint
 			}()
 		}()
 	}()
-	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+	require.Contains(t, result, "fail.Test_extractCallerName")
 
 	result = func() string {
 		return func() string {
@@ -169,7 +169,7 @@ func Test_extractCallerName(t *testing.T) {
 			}()
 		}()
 	}()
-	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+	require.Contains(t, result, "fail.Test_extractCallerName")
 
 	result = func() string {
 		return func() string {
@@ -182,10 +182,10 @@ func Test_extractCallerName(t *testing.T) {
 			}()
 		}()
 	}()
-	require.EqualValues(t, strings.Contains(result, "fail.Test_extractCallerName"), true)
+	require.Contains(t, result, "fail.Test_extractCallerName")
 
 	result = OnExit_extractCallerName_deepcall(12, extractCallerName)
-	require.EqualValues(t, strings.Contains(result, "testing.tRunner"), true)
+	require.Contains(t, result, "testing.tRunner")
 
 }
 
@@ -329,7 +329,7 @@ func Test_OnPanic(t *testing.T) {
 			panic("mayday")
 		}()
 	})
-	require.EqualValues(t, strings.Contains(log, "intercepted panic but '*err' is nil"), true)
+	require.Contains(t, log, "intercepted panic but '*err' is nil")
 
 	log = logrus_capture(func() {
 		_ = func() (err Error) {
@@ -338,7 +338,7 @@ func Test_OnPanic(t *testing.T) {
 			panic("mayday")
 		}()
 	})
-	require.EqualValues(t, strings.Contains(log, "fail.OnPanic"), true)
+	require.Contains(t, log, "fail.OnPanic")
 
 	log = logrus_capture(func() {
 		_ = func() (err *error) {
@@ -347,7 +347,7 @@ func Test_OnPanic(t *testing.T) {
 			panic("mayday")
 		}()
 	})
-	require.EqualValues(t, strings.Contains(log, "intercepted panic but '*err' is nil"), true)
+	require.Contains(t, log, "intercepted panic but '*err' is nil")
 
 	log = logrus_capture(func() {
 		_ = func() (err error) {
@@ -356,7 +356,7 @@ func Test_OnPanic(t *testing.T) {
 			panic("mayday")
 		}()
 	})
-	require.EqualValues(t, strings.Contains(log, "fail.OnPanic"), true)
+	require.Contains(t, log, "fail.OnPanic")
 
 	log = logrus_capture(func() {
 		_ = func() (err error) {
@@ -364,6 +364,6 @@ func Test_OnPanic(t *testing.T) {
 			panic("mayday")
 		}()
 	})
-	require.EqualValues(t, strings.Contains(log, "intercepted panic but parameter 'err' is invalid"), true)
+	require.Contains(t, log, "intercepted panic but parameter 'err' is invalid")
 
 }

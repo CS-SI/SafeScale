@@ -74,7 +74,7 @@ func Test_NFSExportOptionsFromStringToProtocol(t *testing.T) {
 		"subtree_check":                  64,
 		"subtree_check,no_subtree_check": 0,
 	}
-	nfsOpt := &protocol.NFSExportOptions{}
+	nfsOpt := &protocol.NFSExportOptions{} // nolint
 	packed := 0
 	for name, value := range tests {
 		nfsOpt = NFSExportOptionsFromStringToProtocol(name)
@@ -210,16 +210,14 @@ func Test_NodeCountFromStringToInteger(t *testing.T) {
 		"disk >= 0.666":    "*fail.ErrSyntax",
 		"template <=> ;)":  "*fail.ErrSyntax",
 	}
-	for sizing, _ := range invalids {
+	for sizing := range invalids {
 		i, err = NodeCountFromStringToInteger(sizing)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
-		} else {
-			if i != 0 {
-				t.Error("Sizing has no count")
-				t.Fail()
-			}
+		} else if i != 0 {
+			t.Error("Sizing has no count")
+			t.Fail()
 		}
 	}
 
@@ -262,7 +260,7 @@ func TestSizingToken_GetKeyword(t *testing.T) {
 	var err fail.Error
 	var result string
 	st := newSizingToken()
-	result, err = st.GetKeyword()
+	_, err = st.GetKeyword()
 	if err == nil {
 		t.Error("Can't get keyword from empty sizingtoken")
 		t.Fail()
@@ -289,7 +287,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 	var err fail.Error
 	var result string
 	st := newSizingToken()
-	result, err = st.GetValue()
+	_, err = st.GetValue()
 	if err == nil {
 		t.Error("Can't get value from empty sizingtoken")
 		t.Fail()
@@ -299,7 +297,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-	result, err = st.GetValue()
+	_, err = st.GetValue()
 	if err == nil {
 		t.Error("Can't get value from not full sizingtoken")
 		t.Fail()
@@ -309,7 +307,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-	result, err = st.GetValue()
+	_, err = st.GetValue()
 	if err == nil {
 		t.Error("Can't get value from not full sizingtoken")
 		t.Fail()
@@ -659,14 +657,14 @@ func TestSizingToken_Validate(t *testing.T) {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s], expect [%s, %s]", min, max, test.expectMin, test.expectMax))
 			}
 		} else {
-			require.EqualValues(t, strings.Contains(err.Error(), test.errorExpected), true)
+			require.Contains(t, err.Error(), test.errorExpected)
 		}
 		if test.errorExpected != "" {
 			if min != test.expectMin || max != test.expectMax || !strings.Contains(err.Error(), test.errorExpected) {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s, %s], expect [%s, %s, %s]", min, max, err.Error(), test.expectMin, test.expectMax, test.errorExpected))
 			}
 		} else {
-			require.EqualValues(t, err, nil)
+			require.Nil(t, err)
 		}
 	}
 

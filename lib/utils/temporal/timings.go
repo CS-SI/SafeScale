@@ -164,6 +164,7 @@ func NewTimings() *MutableTimings {
 			Metadata:               MetadataTimeout(),
 			MetadataReadAfterWrite: MetadataReadAfterWriteTimeout(),
 			SSHConnection:          SSHConnectionTimeout(),
+			RebootTimeout:          RebootTimeout(),
 		},
 		Delays: Delays{
 			Small:  SmallDelay(),
@@ -177,50 +178,24 @@ func (t *MutableTimings) Update(a *MutableTimings) error {
 	if t == nil {
 		return fail.InvalidInstanceError()
 	}
-
 	if a == nil {
 		return nil
 	}
-
-	if t.Communication == 0 && a.Communication != 0 {
-		t.Communication = a.Communication
-	}
-	if t.Connection == 0 && a.Connection != 0 {
-		t.Connection = a.Connection
-	}
-	if t.Context == 0 && a.Context != 0 {
-		t.Context = a.Context
-	}
-	if t.HostCleanup == 0 && a.HostCleanup != 0 {
-		t.HostCleanup = a.HostCleanup
-	}
-	if t.HostCreation == 0 && a.HostCreation != 0 {
-		t.HostCreation = a.HostCreation
-	}
-	if t.HostLongOperation == 0 && a.HostLongOperation != 0 {
-		t.HostLongOperation = a.HostLongOperation
-	}
-	if t.HostOperation == 0 && a.HostOperation != 0 {
-		t.HostOperation = a.HostOperation
-	}
-	if t.Metadata == 0 && a.Metadata != 0 {
-		t.Metadata = a.Metadata
-	}
-	if t.MetadataReadAfterWrite == 0 && a.MetadataReadAfterWrite != 0 {
-		t.MetadataReadAfterWrite = a.MetadataReadAfterWrite
-	}
-	if t.Operation == 0 && a.Operation != 0 {
-		t.Operation = a.Operation
-	}
-	if t.Small == 0 && a.Small != 0 {
-		t.Small = a.Small
-	}
-	if t.Normal == 0 && a.Normal != 0 {
-		t.Normal = a.Normal
-	}
-	if t.Big == 0 && a.Big != 0 {
-		t.Big = a.Big
-	}
+	t.Timeouts.Communication = a.Timeouts.Communication
+	t.Timeouts.Connection = a.Timeouts.Connection
+	t.Timeouts.Context = a.Timeouts.Context
+	t.Timeouts.HostCreation = a.HostCreation
+	t.Timeouts.HostCleanup = a.Timeouts.HostCleanup
+	t.Timeouts.HostOperation = a.HostOperation
+	t.Timeouts.HostLongOperation = a.Timeouts.HostLongOperation
+	t.Timeouts.Operation = a.Operation
+	t.Timeouts.Metadata = a.Timeouts.Metadata
+	t.Timeouts.MetadataReadAfterWrite = a.MetadataReadAfterWrite
+	t.Timeouts.SSHConnection = a.Timeouts.SSHConnection
+	t.Timeouts.RebootTimeout = a.Timeouts.RebootTimeout
+	t.Delays.Small = a.Delays.Small
+	t.Delays.Normal = a.Delays.Normal
+	t.Delays.Big = a.Delays.Big
 
 	return nil
 }

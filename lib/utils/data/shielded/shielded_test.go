@@ -70,7 +70,7 @@ func Test_NewShileded(t *testing.T) {
 
 	a := &SomeClonable{value: "any"}
 	c, err := NewShielded(a)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = c.Inspect(func(clonable data.Clonable) fail.Error {
 
@@ -83,7 +83,7 @@ func Test_NewShileded(t *testing.T) {
 		}
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -94,12 +94,12 @@ func TestShielded_IsNull(t *testing.T) {
 
 	a := &SomeClonable{}
 	c, err := NewShielded(a)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, c.IsNull(), true)
 
 	a = &SomeClonable{value: "any"}
 	c, err = NewShielded(a)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, c.IsNull(), false)
 
 }
@@ -119,9 +119,9 @@ func TestShielded_Clone(t *testing.T) {
 
 	a := &SomeClonable{value: "any"}
 	c, err := NewShielded(a)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	r, err := c.Clone()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = c.Alter(func(data data.Clonable) fail.Error {
 		v, ok := data.(*SomeClonable)
@@ -131,7 +131,7 @@ func TestShielded_Clone(t *testing.T) {
 		v.SetValue("any 2")
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	err = c.Inspect(func(data data.Clonable) fail.Error {
 		v, ok := data.(*SomeClonable)
 		if !ok {
@@ -140,7 +140,7 @@ func TestShielded_Clone(t *testing.T) {
 		require.EqualValues(t, v.GetValue(), "any 2")
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	err = r.Inspect(func(data data.Clonable) fail.Error {
 		v, ok := data.(*SomeClonable)
 		if !ok {
@@ -150,7 +150,7 @@ func TestShielded_Clone(t *testing.T) {
 		require.EqualValues(t, v.GetValue(), "any")
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -163,35 +163,35 @@ func TestShielded_Inpect(t *testing.T) {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.EqualValues(t, strings.Contains(err.Error(), "calling method from a nil pointer"), true)
+	require.Contains(t, err.Error(), "calling method from a nil pointer")
 
 	a = &Shielded{}
 	err = a.Inspect(func(clonable data.Clonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid instance content"), true)
+	require.Contains(t, err.Error(), "invalid instance content")
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
 	var f func(clonable data.Clonable) fail.Error
 	err = a.Inspect(f)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter: inspector"), true)
+	require.Contains(t, err.Error(), "invalid parameter: inspector")
 
 	a = &Shielded{}
 	err = a.Inspect(func(clonable data.Clonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid instance content: d.witness"), true)
+	require.Contains(t, err.Error(), "invalid instance content: d.witness")
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
 	err = a.Inspect(func(clonable data.Clonable) fail.Error {
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -204,14 +204,14 @@ func TestShielded_Alter(t *testing.T) {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.EqualValues(t, strings.Contains(err.Error(), "calling method from a nil pointer"), true)
+	require.Contains(t, err.Error(), "calling method from a nil pointer")
 
 	a = &Shielded{}
 	err = a.Alter(func(clonable data.Clonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid instance content"), true)
+	require.Contains(t, err.Error(), "invalid instance content")
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
@@ -219,14 +219,14 @@ func TestShielded_Alter(t *testing.T) {
 	var f func(clonable data.Clonable) fail.Error
 	err = a.Alter(f)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter: alterer"), true)
+	require.Contains(t, err.Error(), "invalid parameter: alterer")
 
 	a = &Shielded{}
 	err = a.Alter(func(clonable data.Clonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid instance content: d.witness"), true)
+	require.Contains(t, err.Error(), "invalid instance content: d.witness")
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
@@ -239,7 +239,7 @@ func TestShielded_Alter(t *testing.T) {
 		v.SetValue("any 2")
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	err = a.Inspect(func(data data.Clonable) fail.Error {
 		v, ok := data.(*SomeClonable)
 		if !ok {
@@ -248,7 +248,7 @@ func TestShielded_Alter(t *testing.T) {
 		require.EqualValues(t, v.GetValue(), "any 2")
 		return nil
 	})
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -259,14 +259,14 @@ func TestShielded_Serialize(t *testing.T) {
 
 	d, err := a.Serialize()
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid instance: in"), true)
+	require.Contains(t, err.Error(), "invalid instance: in")
 	require.EqualValues(t, len(d), 0)
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
 
 	d, err = a.Serialize()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, string(d), "{\"Clonable\":null}")
 
 }
@@ -278,17 +278,17 @@ func TestShielded_Deserialize(t *testing.T) {
 
 	err := a.Deserialize([]byte("{\"Clonable\":null}"))
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid instance: in"), true)
+	require.Contains(t, err.Error(), "invalid instance: in")
 
 	err = a.Deserialize([]byte(""))
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.EqualValues(t, strings.Contains(err.Error(), "calling method from a nil pointer"), true)
+	require.Contains(t, err.Error(), "calling method from a nil pointer")
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
 
 	err = a.Deserialize([]byte("{\"Clonable\":null}"))
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
