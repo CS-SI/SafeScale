@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -27,21 +28,57 @@ import (
 func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	// FIXME: Wrong
 	return stacks.ConfigurationOptions{
-		DNSList:          s.Options.Compute.DNSList,
-		DefaultImage:     s.Options.Compute.DefaultImage,
-		MetadataBucket:   s.Options.Metadata.Bucket,
-		OperatorUsername: s.Options.Compute.OperatorUsername,
+		ProviderNetwork:           "",
+		DNSList:                   s.Options.Compute.DNSList,
+		UseFloatingIP:             false,
+		UseLayer3Networking:       false,
+		UseNATService:             false,
+		ProviderName:              "",
+		BuildSubnets:              false,
+		AutoHostNetworkInterfaces: true,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"standard": volumespeed.Cold,
+			"gp2":      volumespeed.Hdd,
+			"io1":      volumespeed.Ssd,
+		},
+		DefaultImage:             s.Options.Compute.DefaultImage,
+		MetadataBucket:           s.Options.Metadata.Bucket,
+		OperatorUsername:         s.Options.Compute.OperatorUsername,
+		DefaultSecurityGroupName: "",
+		DefaultNetworkName:       "",
+		DefaultNetworkCIDR:       "",
+		WhitelistTemplateRegexp:  nil,
+		BlacklistTemplateRegexp:  nil,
+		WhitelistImageRegexp:     nil,
+		BlacklistImageRegexp:     nil,
+		MaxLifeTime:              0,
+		Timings:                  nil,
 	}, nil
 }
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
-	// FIXME: Wrong
 	return stacks.AuthenticationOptions{
+		IdentityEndpoint: s.Options.Compute.URL,
+		Username:         "",
+		UserID:           "",
 		AccessKeyID:      s.Options.Identity.AccessKey,
+		Password:         "",
+		APIKey:           "",
 		SecretAccessKey:  s.Options.Identity.SecretKey,
+		DomainID:         "",
+		DomainName:       "",
+		TenantID:         "",
+		TenantName:       "",
+		ProjectName:      "",
+		ProjectID:        "",
+		AllowReauth:      false,
+		TokenID:          "",
 		Region:           s.Options.Compute.Region,
 		AvailabilityZone: s.Options.Compute.Subregion,
-		IdentityEndpoint: s.Options.Compute.URL,
+		FloatingIPPool:   "",
+		AK:               "",
+		AS:               "",
+		CK:               "",
 	}, nil
 }

@@ -197,7 +197,6 @@ func (instance *service) ChangeProvider(provider providers.Provider) fail.Error 
 	return nil
 }
 
-// FIXME: Unused ???
 // WaitHostState waits until a host achieves state 'state'
 // If host is in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
