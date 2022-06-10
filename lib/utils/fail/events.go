@@ -282,19 +282,24 @@ func SilentOnPanic(err interface{}) {
 			if v != nil {
 				recTrace := callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.LastOccurrence)
 				*v = RuntimePanicError("runtime panic occurred:\n%s", recTrace)
-				logrus.Error(RuntimePanicError("runtime panic occurred:\n%s", recTrace))
+				logCall("%s", RuntimePanicError("runtime panic occurred:\n%s", recTrace))
 			} else {
 				logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but '*err' is nil", "", 4))
 			}
 		case *error:
 			if v != nil {
 				*v = RuntimePanicError("runtime panic occurred: %+v", x)
-				logrus.Error(RuntimePanicError("runtime panic occurred: %+v", x))
+				logCall("%s", RuntimePanicError("runtime panic occurred: %+v", x))
 			} else {
 				logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but '*err' is nil", "", 4))
 			}
 		default:
 			logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but parameter 'err' is invalid", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 4))
 		}
+	}
+}
+
+func IgnoreProblems(err interface{}) {
+	if x := recover(); x != nil {
 	}
 }
