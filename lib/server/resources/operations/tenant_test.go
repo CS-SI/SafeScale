@@ -21,12 +21,26 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_CurrentTenant(t *testing.T) {
 
 	tenants, xerr := iaas.GetTenants()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrSyntax:
+			t.Log("No usable tenant found in config, skip test")
+			t.SkipNow()
+		case *fail.ErrNotFound:
+			t.Log("No usable tenant found in config, skip test")
+			t.SkipNow()
+		default:
+			t.Error(xerr)
+		}
+	}
+
 	require.Nil(t, xerr)
 	if len(tenants) == 0 {
 		t.Log("No usable tenant found in config, skip test")

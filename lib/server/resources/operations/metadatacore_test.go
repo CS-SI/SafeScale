@@ -114,7 +114,16 @@ func TestMetadataCore_IsNull(t *testing.T) {
 
 func TestMetadataCore_Service(t *testing.T) {
 
-	var amc *MetadataCore = nil
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Panic is expected")
+		} else {
+			t.Error("It should have panicked", r)
+			t.Fail()
+		}
+	}()
+
+	var amc *MetadataCore
 	require.EqualValues(t, amc.Service(), nil)
 
 	serr := NewServiceTest(t, func(svc *ServiceTest) {
@@ -130,8 +139,16 @@ func TestMetadataCore_Service(t *testing.T) {
 }
 
 func TestMetadataCore_GetID(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Panic is expected")
+		} else {
+			t.Error("It should have panicked", r)
+			t.Fail()
+		}
+	}()
 
-	var amc *MetadataCore = nil
+	var amc *MetadataCore
 	ctx := context.Background()
 
 	require.EqualValues(t, amc.GetID(), "")
@@ -156,6 +173,14 @@ func TestMetadataCore_GetID(t *testing.T) {
 }
 
 func TestMetadataCore_GetName(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Panic is expected")
+		} else {
+			t.Error("It should have panicked", r)
+			t.Fail()
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -182,9 +207,6 @@ func TestMetadataCore_GetName(t *testing.T) {
 }
 
 func TestMetadataCore_GetKind(t *testing.T) {
-
-	var amc *MetadataCore = nil
-	require.EqualValues(t, amc.GetKind(), NullMetadataKind)
 
 	network := abstract.NewNetwork()
 	network.ID = "Network ID"
