@@ -55,23 +55,12 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
+	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	targetName := instance.GetName()
 
-	var state hoststate.Enum
-	state, xerr = instance.GetState(ctx)
+	state, xerr := instance.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -80,14 +69,14 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 	outcomes, xerr = func() (resources.Results, fail.Error) {
 		// /!\ Do not cross references in alter, it makes deadlock
-		outcomes, xerr := feat.Add(task.Context(), instance, vars, settings)
+		outcomes, xerr := feat.Add(ctx, instance, vars, settings)
 		if xerr != nil {
 			return outcomes, xerr
 		}
@@ -138,26 +127,16 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
+	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Check(task.Context(), instance, vars, settings)
+	return feat.Check(ctx, instance, vars, settings)
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
