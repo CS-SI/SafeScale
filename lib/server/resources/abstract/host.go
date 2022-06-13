@@ -236,8 +236,8 @@ type HostCore struct {
 	PrivateKey        string            `json:"private_key,omitempty"`
 	SSHPort           uint32            `json:"ssh_port,omitempty"`
 	Password          string            `json:"password,omitempty"`
-	LastState         hoststate.Enum    `json:"last_state"`
-	ProvisioningState hoststate.Enum    `json:"provisioning_state"`
+	LastState         hoststate.Enum    `json:"last_state"`         // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
+	ProvisioningState hoststate.Enum    `json:"provisioning_state"` // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
 	Tags              map[string]string `json:"tags,omitempty"`
 }
 

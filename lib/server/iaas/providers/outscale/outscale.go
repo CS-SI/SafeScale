@@ -241,13 +241,13 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 
 	cfg := providers.ConfigMap{}
 	cfg.Set("DNSList", opts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", true)
-	cfg.Set("UseLayer3Networking", false)
+	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", provName)
-	cfg.Set("BuildSubnets", false)
+	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
@@ -276,9 +276,7 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 // GetCapabilities returns the capabilities of the provider
 func (p provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
-		PublicVirtualIP: false,
-		// FIXME: not tested, corresponding code inside stack is commented
-		// PrivateVirtualIP: true,
+		PublicVirtualIP:  false,
 		PrivateVirtualIP: false,
 		Layer3Networking: false,
 	}, nil

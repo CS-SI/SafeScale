@@ -64,7 +64,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 
 	v := viper.New()
 	v.SetConfigType("yaml")
-	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
+	err = v.ReadConfig(bytes.NewBuffer(tmplString))
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "syntax error in feature specification file '%s'", name)

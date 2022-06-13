@@ -126,7 +126,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
 			if xerr != nil {
 				t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
-				switch xerr.(type) {
+				switch xerr.(type) {                       // nolint
 				case *fail.ErrAborted:
 					switch xerr.(type) {
 					case *fail.ErrAborted:
@@ -956,21 +956,17 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		// check for error inconsistencies
 		if iter == 1 {
 			previousErr = xerr
-		} else {
-			// VPL: testing errors like this does not seem to work: with 2 errors *fail.ErrAborted, the test fails, leading to "aborted != aborted"...
-			// if xerr != previousErr {
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAborted:
-					if previousErr != nil {
-						switch previousErr.(type) {
-						case *fail.ErrAborted:
-							// same kind of error, good
-						default:
-							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-							t.Fail()
-							return
-						}
+		} else if xerr != nil {
+			switch xerr.(type) { // nolint
+			case *fail.ErrAborted:
+				if previousErr != nil {
+					switch previousErr.(type) {
+					case *fail.ErrAborted:
+						// same kind of error, good
+					default:
+						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+						t.Fail()
+						return
 					}
 				}
 			}

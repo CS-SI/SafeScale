@@ -72,8 +72,8 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter: waiter"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+	require.Contains(t, err.Error(), "invalid parameter: waiter")
+	require.Contains(t, err.Error(), "cannot be nil")
 
 	// no timeout
 	waitfor = retry.Randomized(50*time.Millisecond, 500*time.Millisecond)
@@ -84,9 +84,9 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrTimeout")
-	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "Hard timeout"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.Contains(t, err.Error(), "stopping retries")
+	require.Contains(t, err.Error(), "Hard timeout")
+	require.Contains(t, err.Error(), "Any error")
 
 	// Success one
 	waitfor = retry.Linear(50 * time.Millisecond)
@@ -95,7 +95,7 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 		return nil
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	// Multiple fail before success
 	waitfor = retry.Linear(10 * time.Millisecond)
@@ -104,19 +104,19 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 		return nil
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	maxTries := 8
 	tries := 0
 	callback = func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxTries {
 			return nil
 		}
 		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, tries, maxTries)
 
 	// Multiple fail before fail (retry.StopRetryError)
@@ -126,12 +126,12 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 		return nil
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	maxTries = 8
 	tries = 0
 	callback = func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxTries {
 			return fail.AbortedError(errors.New("Too much tries"), "Stop trying")
 		}
@@ -141,8 +141,8 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	require.NotEqual(t, err, nil)
 	// TODO: Here should return fail.ErrAborted but return *fail.ErrorCore
 	// require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAborted")
-	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
+	require.Contains(t, err.Error(), "stopping retries")
+	require.Contains(t, err.Error(), "Too much tries")
 	require.EqualValues(t, tries, maxTries)
 
 	// Multiple fail before fail (retry.ErrTimeout)
@@ -152,12 +152,12 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 		return nil
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	maxTries = 8
 	tries = 0
 	callback = func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxTries {
 			return fail.TimeoutError(errors.New("Too much tries"), 30*time.Second, "Stop trying")
 		}
@@ -166,8 +166,8 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrTimeout")
-	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
+	require.Contains(t, err.Error(), "stopping retries")
+	require.Contains(t, err.Error(), "Too much tries")
 	require.EqualValues(t, tries, maxTries)
 
 	// Multiple fail before fail (any)
@@ -177,12 +177,12 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 		return nil
 	}
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	maxTries = 8
 	tries = 0
 	callback = func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxTries {
 			return errors.New("Too much tries")
 		}
@@ -191,8 +191,8 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	err = WhileUnsuccessfulButRetryable(callback, waitfor, timeout)
 	require.NotEqual(t, err, nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.errorCore")
-	require.EqualValues(t, strings.Contains(err.Error(), "stopping retries"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "Too much tries"), true)
+	require.Contains(t, err.Error(), "stopping retries")
+	require.Contains(t, err.Error(), "Too much tries")
 	require.EqualValues(t, tries, maxTries)
 
 }
@@ -202,14 +202,14 @@ func Test_WhileCommunicationUnsuccessfulDelay1Second(t *testing.T) {
 	maxTries := 4
 	tries := 0
 	callback := func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxTries {
 			return nil
 		}
 		return NewRetryableError(fmt.Sprintf("Miss but retry (%d/%d)", tries, maxTries))
 	}
 	err := WhileCommunicationUnsuccessfulDelay1Second(callback, 5*time.Second)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, tries, maxTries)
 
 }

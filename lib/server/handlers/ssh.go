@@ -37,6 +37,7 @@ import (
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -59,7 +60,7 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (ssh.Connector, fail.Error)
+	GetConfig(stacks.HostParameter) (api.Connector, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -75,7 +76,7 @@ func NewSSHHandler(job server.Job) SSHHandler {
 }
 
 // GetConfig creates Profile to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ ssh.Connector, ferr fail.Error) {
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Connector, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -244,7 +245,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ ssh.Conn
 				return nil, xerr
 			}
 
-			var gwcfg ssh.Connector
+			var gwcfg api.Connector
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
@@ -285,7 +286,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ ssh.Conn
 				return nil, xerr
 			}
 
-			var gwcfg ssh.Connector
+			var gwcfg api.Connector
 			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
 				return nil, xerr
 			}
@@ -412,7 +413,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh ssh.Connector, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh api.Connector, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
 	// Create the command

@@ -19,8 +19,10 @@ package propertiesv1
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +59,19 @@ func TestHostLocalMount_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := mnt2.Replace(network)
+	if xerr == nil {
+		t.Error("HostLocalMount.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostLocalMount") {
+		t.Errorf("Expect error \"p is not a *HostLocalMount\", has \"%s\"", xerr.Error())
+	}
 
 }
 
@@ -105,7 +120,7 @@ func TestHostRemoteMount_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(hrm, clonedHrm)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, hrm, clonedHrm)
@@ -140,6 +155,20 @@ func TestHostRemoteMount_Replace(t *testing.T) {
 		t.Error("Replace does not retitute values")
 		t.Fail()
 	}
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := hrm2.Replace(network)
+	if xerr == nil {
+		t.Error("HostRemoteMount.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostRemoteMount") {
+		t.Errorf("Expect error \"p is not a *HostRemoteMount\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestHostMount_IsNull(t *testing.T) {
@@ -177,6 +206,7 @@ func TestHostMounts_Clone(t *testing.T) {
 
 	clonedMounts, ok := cloned.(*HostMounts)
 	if !ok {
+		t.Error("Cloned HostMounts not castable to *HostMounts", err)
 		t.Fail()
 	}
 
@@ -186,7 +216,7 @@ func TestHostMounts_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(mounts, clonedMounts)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, mounts, clonedMounts)
@@ -239,6 +269,19 @@ func TestHostMounts_Replace(t *testing.T) {
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
+	}
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := mnt2.Replace(network)
+	if xerr == nil {
+		t.Error("HostMounts.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostMounts") {
+		t.Errorf("Expect error \"p is not a *HostMounts\", has \"%s\"", xerr.Error())
 	}
 
 }

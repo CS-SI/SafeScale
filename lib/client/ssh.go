@@ -29,6 +29,7 @@ import (
 	"time"
 
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -86,7 +87,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 				return innerXErr
 			}
 
-			defer func(cmd ssh.CommandInterface) {
+			defer func(cmd api.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerErr != nil {
@@ -147,7 +148,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (*api.Config, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
@@ -437,7 +438,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 }
 
 // getSSHConfigFromName ...
-func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*ssh.Config, fail.Error) {
+func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*api.Config, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
@@ -535,7 +536,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 	ncfg, _ := ssh.NewConfigFrom(*acfg)
 	if ncfg.GatewayConfig == nil {
 		ncfg.GatewayConfig = ssh.NewConfig(ncfg.Hostname, ncfg.IPAddress, ncfg.Port, ncfg.User, ncfg.PrivateKey, 0, "", nil, nil)
-		ncfg.IPAddress = ssh.LocalHost
+		ncfg.IPAddress = ssh.Loopback
 	}
 
 	ngu, _ := ncfg.GatewayConfig.GetUser()

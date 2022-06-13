@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -68,7 +67,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 	uploadSize := int64(0)
 	if info, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
-	} else {
+	} else { // nolint
 		uploadSize = info.Size()
 	}
 
@@ -142,7 +141,7 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	f, xerr := ssh.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")

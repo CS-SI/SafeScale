@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Share -o mocks/mock_share.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Share -o mocks/mock_share.go
 
 // Share contains information to maintain in Object Storage a list of shared folders
 type Share interface {

@@ -18,8 +18,10 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,6 +81,20 @@ func TestHostClusterMembership_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := hcm2.Replace(network)
+	if xerr == nil {
+		t.Error("HostClusterMembership.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostClusterMembership") {
+		t.Errorf("Expect error \"p is not a *HostClusterMembership\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestHostClusterMembership_Clone(t *testing.T) {
@@ -101,7 +117,7 @@ func TestHostClusterMembership_Clone(t *testing.T) {
 	clonedCm.Cluster = "HostClusterMembership Cluster2"
 	areEqual := reflect.DeepEqual(cm, clonedCm)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, cm, clonedCm)

@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -64,15 +65,15 @@ type Profile struct {
 	PrivateKey             string     `json:"private_key"`
 	LocalPort              int        `json:"-"`
 	LocalHost              string     `json:"local_host"`
-	GatewayConfig          ssh.Config `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig ssh.Config `json:"secondary_gateway_config,omitempty"`
+	GatewayConfig          api.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig api.Config `json:"secondary_gateway_config,omitempty"`
 }
 
 func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
-func NewConnector(ac ssh.Config) (*Profile, fail.Error) {
+func NewConnector(ac api.Config) (*Profile, fail.Error) {
 	if valid.IsNil(ac) {
 		return nil, fail.InvalidParameterCannotBeNilError("ac")
 	}
@@ -90,7 +91,7 @@ func NewConnector(ac ssh.Config) (*Profile, fail.Error) {
 	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
 }
 
-func (sconf *Profile) Config() (ssh.Config, fail.Error) {
+func (sconf *Profile) Config() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -151,21 +152,21 @@ func (sconf *Profile) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf *Profile) GetPrimaryGatewayConfig() (ssh.Config, fail.Error) {
+func (sconf *Profile) GetPrimaryGatewayConfig() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf *Profile) GetSecondaryGatewayConfig() (ssh.Config, fail.Error) {
+func (sconf *Profile) GetSecondaryGatewayConfig() (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf *Profile) GetGatewayConfig(num uint) (ssh.Config, fail.Error) {
+func (sconf *Profile) GetGatewayConfig(num uint) (api.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -336,39 +337,11 @@ func getFreePort() (uint, fail.Error) {
 	return uint(port), nil
 }
 
-// CreateTempFileFromString creates a temporary file containing 'content'
-func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
-	defaultTmpDir := os.TempDir()
-
-	f, err := ioutil.TempFile(defaultTmpDir, "")
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to create temporary file")
-	}
-	_, err = f.WriteString(content)
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to wrote string to temporary file")
-	}
-
-	err = f.Chmod(filemode)
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
-	}
-
-	err = f.Close()
-	if err != nil {
-		return nil, fail.ExecutionError(err, "failed to close temporary file")
-	}
-
-	// logrus.Tracef("New temporary file %s", f.Name())
-
-	return f, nil
-}
-
 // isTunnelReady tests if the port used for the tunnel is reserved
 // If yes, the tunnel is ready, otherwise it failed
 func isTunnelReady(port int) bool {
 	// Try to create a server with the port
-	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ssh.LocalHost, port))
+	server, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ssh.Loopback, port))
 	if err != nil {
 		return true
 	}
@@ -381,7 +354,7 @@ func isTunnelReady(port int) bool {
 
 // buildTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's automatically chosen
-func buildTunnel(scfg ssh.Config) (*Tunnel, fail.Error) {
+func buildTunnel(scfg api.Config) (*Tunnel, fail.Error) {
 	if valid.IsNil(scfg) {
 		return nil, fail.InvalidParameterCannotBeNilError("scfg")
 	}
@@ -390,7 +363,7 @@ func buildTunnel(scfg ssh.Config) (*Tunnel, fail.Error) {
 
 	// Creates temporary file with private key
 	scpk, _ := gwCfg.GetPrivateKey()
-	f, err := CreateTempFileFromString(scpk, 0400)
+	f, err := utils.CreateTempFileFromString(scpk, 0400)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +401,7 @@ func buildTunnel(scfg ssh.Config) (*Tunnel, fail.Error) {
 	cmdString := fmt.Sprintf(
 		"ssh -i \"%s\" -NL %s:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
-		ssh.LocalHost,
+		ssh.Loopback,
 		localPort,
 		targetIPAddr,
 		targetPort,
@@ -870,10 +843,10 @@ func (scmd *CliCommand) Close() fail.Error {
 }
 
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
-func createConsecutiveTunnels(sc ssh.Config, tunnels *Tunnels) (*Tunnel, fail.Error) {
+func createConsecutiveTunnels(sc api.Config, tunnels *Tunnels) (*Tunnel, fail.Error) {
 	if sc != nil {
 		// determine what gateway to use
-		var gwConf ssh.Config
+		var gwConf api.Config
 
 		gwConf, xerr := sc.GetPrimaryGatewayConfig()
 		if xerr != nil {
@@ -923,7 +896,7 @@ func createConsecutiveTunnels(sc ssh.Config, tunnels *Tunnels) (*Tunnel, fail.Er
 			if tunnel != nil {
 				gateway, _ := ssh.NewConfigFrom(gwConf)
 				gateway.Port = tunnel.port
-				gateway.IPAddress = ssh.LocalHost
+				gateway.IPAddress = ssh.Loopback
 				cfg.GatewayConfig = gateway
 			}
 
@@ -997,7 +970,7 @@ func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error)
 
 	if sconf.GatewayConfig != nil {
 		sshConfig.Port = tunnel.port
-		sshConfig.IPAddress = ssh.LocalHost
+		sshConfig.IPAddress = ssh.Loopback
 	}
 	return tunnels, &sshConfig, nil
 }
@@ -1005,7 +978,7 @@ func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error)
 func createSSHCommand(
 	sconf *Profile, cmdString, username, shell string, withTty, withSudo bool,
 ) (string, *os.File, fail.Error) {
-	f, err := CreateTempFileFromString(sconf.PrivateKey, 0400)
+	f, err := utils.CreateTempFileFromString(sconf.PrivateKey, 0400)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "unable to create temporary key file")
 	}
@@ -1054,12 +1027,12 @@ func createSSHCommand(
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
-func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (ssh.CommandInterface, fail.Error) {
+func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
-func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (ssh.CommandInterface, fail.Error) {
+func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
@@ -1133,7 +1106,7 @@ func (sconf *Profile) newCopyCommand(
 
 // createSCPCommand Creates the scp command to do the copy
 func createSCPCommand(sconf *Profile, localPath, remotePath string, isUpload bool) (string, *os.File, fail.Error) {
-	f, err := CreateTempFileFromString(sconf.PrivateKey, 0400)
+	f, err := utils.CreateTempFileFromString(sconf.PrivateKey, 0400)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "unable to create temporary key file")
 	}
@@ -1187,7 +1160,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		stdout, stderr string
 	)
 
-	cmdCloseFunc := func(cmd ssh.CommandInterface, deferErr *fail.Error) {
+	cmdCloseFunc := func(cmd api.Command, deferErr *fail.Error) {
 		derr := cmd.Close()
 		if derr != nil {
 			if deferErr != nil {
@@ -1215,7 +1188,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			}
 
 			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd ssh.CommandInterface) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+			defer func(cmd api.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
@@ -1231,7 +1204,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 					}
 
 					// Do not forget to close command, ie close SSH tunnel
-					defer func(cmd ssh.CommandInterface) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+					defer func(cmd api.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {

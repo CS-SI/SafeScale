@@ -26,6 +26,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
 // Contains the function used to convert from abstract structures
@@ -259,7 +260,7 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 }
 
 // SSHConfigFromAbstractToProtocol ...
-func SSHConfigFromAbstractToProtocol(wc ssh.Config) *protocol.SshConfig {
+func SSHConfigFromAbstractToProtocol(wc api.Config) *protocol.SshConfig {
 	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
 	in, _ := ssh.NewConfigFrom(wc)
 	if in.GatewayConfig != nil {

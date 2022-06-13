@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -44,7 +45,7 @@ import (
 func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -54,12 +55,23 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
+	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	targetName := instance.GetName()
 
-	state, xerr := instance.GetState(ctx)
+	var state hoststate.Enum
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -68,41 +80,43 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		var innerXErr fail.Error
-		outcomes, innerXErr = feat.Add(ctx, instance, vars, settings)
-		if innerXErr != nil {
-			return innerXErr
+	outcomes, xerr = func() (resources.Results, fail.Error) {
+		// /!\ Do not cross references in alter, it makes deadlock
+		outcomes, xerr := feat.Add(task.Context(), instance, vars, settings)
+		if xerr != nil {
+			return outcomes, xerr
 		}
+		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// updates HostFeatures property for host
+			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
+				}
 
-		// updates HostFeatures property for host
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
-			}
+				requires, innerXErr := feat.Dependencies(ctx)
+				if innerXErr != nil {
+					return innerXErr
+				}
 
-			requires, innerXErr := feat.Dependencies(ctx)
-			if innerXErr != nil {
-				return innerXErr
-			}
+				nif := propertiesv1.NewHostInstalledFeature()
+				nif.HostContext = true
+				if requires != nil {
+					nif.Requires = requires
+				}
 
-			nif := propertiesv1.NewHostInstalledFeature()
-			nif.HostContext = true
-			if requires != nil {
-				nif.Requires = requires
-			}
-
-			hostFeaturesV1.Installed[name] = nif
-			return nil
+				hostFeaturesV1.Installed[name] = nif
+				return nil
+			})
 		})
-	})
+		return outcomes, xerr
+	}()
+
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -114,7 +128,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -124,23 +138,33 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
-	defer tracer.Exiting()
-
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Check(ctx, instance, vars, settings)
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
+	defer tracer.Exiting()
+
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return feat.Check(task.Context(), instance, vars, settings)
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
 func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -150,12 +174,23 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	targetName := instance.GetName()
 
-	state, xerr := instance.GetState(ctx)
+	var state hoststate.Enum
+	state, xerr = instance.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -164,42 +199,41 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		outcomes, innerXErr := feat.Remove(ctx, instance, vars, settings)
+	xerr = func() fail.Error {
+		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}
-
 		if !outcomes.Successful() {
 			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, instance.GetName())
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
-
-		// updates HostFeatures property for host
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
-			}
-
-			delete(hostFeaturesV1.Installed, name)
-			return nil
+		return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// updates HostFeatures property for host
+			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
+				}
+				delete(hostFeaturesV1.Installed, name)
+				return nil
+			})
 		})
-	})
+	}()
 	return nil, xerr
 }
 
 // TargetType returns the type of the target.
 // satisfies install.Targetable interface.
 func (instance *Host) TargetType() featuretargettype.Enum {
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return featuretargettype.Unknown
 	}
 
@@ -209,7 +243,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
 func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}
 
@@ -228,7 +262,7 @@ func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmeth
 func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == nil {
@@ -277,7 +311,7 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == "" {
@@ -305,7 +339,7 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -317,7 +351,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -509,7 +543,7 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 	found = false
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(instance) {
+	if instance == nil || valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {

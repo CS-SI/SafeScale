@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -80,7 +81,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    ssh.Connector
+		sshProfile                    api.Connector
 	}
 }
 
@@ -198,7 +199,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig ssh.Config
+		var primaryGatewayConfig, secondaryGatewayConfig api.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -1158,6 +1159,9 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 		}
 
 		imageRef = cfg.GetString("DefaultImage")
+		if imageRef == "" {
+			return "", "", fail.InconsistentError("DefaultImage cannot be empty")
+		}
 	}
 
 	timings, xerr := svc.Timings()
@@ -1168,9 +1172,19 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 	var img *abstract.Image
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			var innerXErr fail.Error
-			img, innerXErr = svc.SearchImage(ctx, imageRef)
-			return innerXErr
+			rimg, innerXErr := svc.SearchImage(ctx, imageRef)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					return retry.StopRetryError(innerXErr)
+				case *fail.ErrInvalidParameter:
+					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
+				}
+			}
+			img = rimg
+			return nil
 		},
 		timings.SmallDelay(),
 		timings.OperationTimeout(),
@@ -1179,7 +1193,6 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			img = nil
 			imgs, xerr := svc.ListImages(ctx, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1196,9 +1209,16 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 		default:
 		}
 	}
-	if img == nil || img.ID == "" {
+
+	if img == nil {
 		return "", "", fail.Wrap(
 			xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef,
+		)
+	}
+
+	if img.ID == "" {
+		return "", "", fail.Wrap(
+			xerr, "failed to find image ID corresponding to '%s' to use on compute resource, with img '%v'", imageRef, img,
 		)
 	}
 
@@ -2637,7 +2657,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ ssh.Connector, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ api.Connector, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {

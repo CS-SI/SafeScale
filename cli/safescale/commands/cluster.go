@@ -2907,50 +2907,47 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 			return fmt.Errorf("fail to read vault password for cluster '%s': %w", clusterName, err)
 		}
 		list = append(list, ".vault")
-	} else {
-		// Check for vault file
-		if vaultFile != "" {
-			stat, err := os.Stat(vaultFile)
-			if os.IsNotExist(err) {
-				return fmt.Errorf("playbook vault file not found for cluster '%s'", clusterName)
-			}
-			if !stat.Mode().IsRegular() {
-				return fmt.Errorf("playbook vault file is not regular file, for cluster '%s'", clusterName)
-			}
-			// Copy to tmp workdir
-			err = func(vaultFile string, tmpDirectory string) (err error) {
-				source, err := os.Open(vaultFile)
-				if err != nil {
-					return err
-				}
-				defer func(source *os.File) {
-					err := source.Close()
-					if err != nil {
-						logrus.Debugf(err.Error())
-					}
-				}(source)
-				destination, err := os.Create(fmt.Sprintf("%s/.vault", tmpDirectory))
-				if err != nil {
-					return err
-				}
-				defer func(destination *os.File) {
-					err := destination.Close()
-					if err != nil {
-						logrus.Debugf(err.Error())
-					}
-				}(destination)
-				_, err = io.Copy(destination, source)
-				if err != nil {
-					return err
-				}
-				return nil
-
-			}(vaultFile, tmpDirectory)
-			if err != nil {
-				return fmt.Errorf("playbook vault file copy failed for cluster '%s': %w", clusterName, err)
-			}
-			list = append(list, ".vault")
+	} else if vaultFile != "" { // Check for vault file
+		stat, err := os.Stat(vaultFile)
+		if os.IsNotExist(err) {
+			return fmt.Errorf("playbook vault file not found for cluster '%s'", clusterName)
 		}
+		if !stat.Mode().IsRegular() {
+			return fmt.Errorf("playbook vault file is not regular file, for cluster '%s'", clusterName)
+		}
+		// Copy to tmp workdir
+		err = func(vaultFile string, tmpDirectory string) (err error) {
+			source, err := os.Open(vaultFile)
+			if err != nil {
+				return err
+			}
+			defer func(source *os.File) {
+				err := source.Close()
+				if err != nil {
+					logrus.Debugf(err.Error())
+				}
+			}(source)
+			destination, err := os.Create(fmt.Sprintf("%s/.vault", tmpDirectory))
+			if err != nil {
+				return err
+			}
+			defer func(destination *os.File) {
+				err := destination.Close()
+				if err != nil {
+					logrus.Debugf(err.Error())
+				}
+			}(destination)
+			_, err = io.Copy(destination, source)
+			if err != nil {
+				return err
+			}
+			return nil
+
+		}(vaultFile, tmpDirectory)
+		if err != nil {
+			return fmt.Errorf("playbook vault file copy failed for cluster '%s': %w", clusterName, err)
+		}
+		list = append(list, ".vault")
 	}
 
 	// Make cleaned archive
