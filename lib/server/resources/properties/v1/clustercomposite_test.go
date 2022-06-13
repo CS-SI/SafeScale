@@ -24,6 +24,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/magiconair/properties/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestClusterCompositeV1_Clone(t *testing.T) {

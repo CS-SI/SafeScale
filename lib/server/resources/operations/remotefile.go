@@ -23,13 +23,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
-	"github.com/sirupsen/logrus"
 )
 
 // Item is a helper struct to ease the copy of local files to remote
@@ -64,11 +65,12 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 
 	// Check the local file exists first
 	uploadSize := int64(0)
-	if info, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
+	info, err := os.Stat(rfc.Local)
+	if errors.Is(err, os.ErrNotExist) {
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
-	} else { // nolint
-		uploadSize = info.Size()
 	}
+
+	uploadSize = info.Size()
 
 	uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 	timeout := 6 * uploadTime

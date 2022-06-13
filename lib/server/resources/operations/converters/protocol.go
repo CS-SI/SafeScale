@@ -241,21 +241,6 @@ func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (*a
 	return out, nil
 }
 
-// LabelFromProtocolToAbstract ...
-func LabelFromProtocolToAbstract(in *protocol.LabelInspectResponse) (*abstract.Label, fail.Error) {
-	if in == nil {
-		return &abstract.Label{}, fail.InvalidParameterCannotBeNilError("in")
-	}
-
-	out := &abstract.Label{
-		ID:           in.GetId(),
-		Name:         in.GetName(),
-		HasDefault:   in.GetHasDefault(),
-		DefaultValue: in.GetDefaultValue(),
-	}
-	return out, nil
-}
-
 // HostStateFromProtocolToEnum converts a protocol.HostState to hoststate.Enum
 func HostStateFromProtocolToEnum(in protocol.HostState) hoststate.Enum {
 	switch in {

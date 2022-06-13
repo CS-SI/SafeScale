@@ -19,9 +19,10 @@ package ssh
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func TestNewConnector(t *testing.T) {

@@ -1065,7 +1065,6 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 			switch e.ExitStatus() { // nolint
 			case 130:
 				return nil
-			default:
 			}
 		}
 		return fail.ConvertError(fmt.Errorf("sc: %s", err))

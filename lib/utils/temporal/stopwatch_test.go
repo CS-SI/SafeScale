@@ -27,6 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 )
 
 func TestFormatDuration(t *testing.T) {

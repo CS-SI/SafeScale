@@ -410,7 +410,6 @@ message Host {
 	string creation_date = 16;
 	bool managed = 17;
 	string template = 18;
-  repeated string tag_names = 19;
 }
 
 message HostStatus {
