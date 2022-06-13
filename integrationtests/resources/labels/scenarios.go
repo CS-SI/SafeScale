@@ -133,7 +133,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 
 	fmt.Println("binding Label to Host with other value")
-	out, err = helpers.GetOutput("safescale host label bind --value differentvalue" + "gw-" + names.Networks[0] + " " + names.Labels[0])
+	out, err = helpers.GetOutput("safescale host label bind --value differentvalue " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	_ = out
 	require.Nil(t, err)
 
@@ -148,7 +148,7 @@ func LabelBase(t *testing.T) {
 	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "differentvalue")
 
 	fmt.Println("unbinding Label from Host")
-	out, err = helpers.GetOutput("safescale host Label unbind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
+	out, err = helpers.GetOutput("safescale host label unbind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	_ = out
 	require.Nil(t, err)
 

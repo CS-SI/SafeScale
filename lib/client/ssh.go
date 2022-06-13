@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -75,7 +76,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		return invalid, "", "", xerr
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -118,7 +119,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 			}
 
 			if retcode == 255 { // ssh connection drop
-				hn, _ := (*sshCfg).GetHostname()
+				hn, _ := sshCfg.GetHostname()
 				return fail.NotAvailableError("Remote SSH server on Host '%s' is not available, failed to connect", hn)
 			}
 
@@ -149,7 +150,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	return retcode, stdout, stderr, nil
 }
 
-func (s sshConsumer) getHostSSHConfig(hostname string) (*ssh.Config, fail.Error) {
+func (s sshConsumer) getHostSSHConfig(hostname string) (sshapi.Config, fail.Error) {
 	hostConsumer := s.session.Host
 	cfg, err := hostConsumer.SSHConfig(hostname)
 	if err != nil {
@@ -261,7 +262,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		return invalid, "", "", xerr
 	}
 
-	sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -463,7 +464,7 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 
 	return retry.WhileUnsuccessfulWithAggregator(
 		func() error {
-			sshConn, xerr := sshfactory.NewConnector(*sshCfg)
+			sshConn, xerr := sshfactory.NewConnector(sshCfg)
 			if xerr != nil {
 				return xerr
 			}
@@ -491,7 +492,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		return xerr
 	}
 
-	ncfg, _ := ssh.NewConfigFrom(*sshCfg)
+	ncfg, _ := ssh.NewConfigFrom(sshCfg)
 
 	if ncfg.GatewayConfig == nil {
 		ncfg.GatewayConfig = ssh.NewConfig(ncfg.Hostname, ncfg.IPAddress, ncfg.Port, ncfg.User, ncfg.PrivateKey, 0, "", nil, nil)
@@ -502,7 +503,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			sshConn, xerr := sshfactory.NewConnector(*sshCfg, sshfactory.ConnectorWithCli())
+			sshConn, xerr := sshfactory.NewConnector(sshCfg, sshfactory.ConnectorWithCli())
 			if xerr != nil {
 				return xerr
 			}
@@ -531,7 +532,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 		return xerr
 	}
 
-	ncfg, _ := ssh.NewConfigFrom(*acfg)
+	ncfg, _ := ssh.NewConfigFrom(acfg)
 	if ncfg.GatewayConfig == nil {
 		ncfg.GatewayConfig = ssh.NewConfig(ncfg.Hostname, ncfg.IPAddress, ncfg.Port, ncfg.User, ncfg.PrivateKey, 0, "", nil, nil)
 		ncfg.IPAddress = ssh.Loopback

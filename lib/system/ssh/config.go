@@ -7,22 +7,22 @@ import (
 )
 
 type CommonConfig struct {
-	Hostname               string     `json:"hostname"`
-	IPAddress              string     `json:"ip_address"`
-	Port                   int        `json:"port"`
-	User                   string     `json:"user"`
-	PrivateKey             string     `json:"private_key"`
-	LocalPort              int        `json:"-"`
-	LocalHost              string     `json:"local_host"`
-	GatewayConfig          api.Config `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig api.Config `json:"secondary_gateway_config,omitempty"`
+	Hostname               string        `json:"hostname"`
+	IPAddress              string        `json:"ip_address"`
+	Port                   int           `json:"port"`
+	User                   string        `json:"user"`
+	PrivateKey             string        `json:"private_key"`
+	LocalPort              int           `json:"-"`
+	LocalHost              string        `json:"local_host"`
+	GatewayConfig          sshapi.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig sshapi.Config `json:"secondary_gateway_config,omitempty"`
 }
 
-func NewConfig(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig api.Config, secondaryGatewayConfig api.Config) *CommonConfig {
+func NewConfig(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *CommonConfig {
 	return &CommonConfig{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
-func NewConfigFrom(ac api.Config) (*CommonConfig, fail.Error) {
+func NewConfigFrom(ac sshapi.Config) (*CommonConfig, fail.Error) {
 	if valid.IsNil(ac) {
 		return nil, fail.InvalidParameterCannotBeNilError("ac")
 	}
@@ -89,21 +89,21 @@ func (sconf CommonConfig) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf CommonConfig) GetPrimaryGatewayConfig() (api.Config, fail.Error) {
+func (sconf CommonConfig) GetPrimaryGatewayConfig() (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf CommonConfig) GetSecondaryGatewayConfig() (api.Config, fail.Error) {
+func (sconf CommonConfig) GetSecondaryGatewayConfig() (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf CommonConfig) GetGatewayConfig(num uint) (api.Config, fail.Error) {
+func (sconf CommonConfig) GetGatewayConfig(num uint) (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}

@@ -245,7 +245,7 @@ func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h hostConsumer) SSHConfig(name string) (*ssh.Config, error) {
+func (h hostConsumer) SSHConfig(name string) (sshapi.Config, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 

@@ -33,8 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -508,7 +506,7 @@ var hostSSH = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 
-		out, xerr := formatSSHConfig(*resp)
+		out, xerr := formatSSHConfig(resp)
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 		}
@@ -516,7 +514,7 @@ var hostSSH = cli.Command{
 	},
 }
 
-func formatSSHConfig(in api.Config) (map[string]interface{}, fail.Error) {
+func formatSSHConfig(in sshapi.Config) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
 		return nil, fail.ConvertError(err)
@@ -1423,7 +1421,7 @@ var hostLabelBindCommand = cli.Command{
 	Usage:     "bind Label to Host",
 	ArgsUsage: "HOSTREF LABELREF",
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		cli.StringFlag{
 			Name:  "value",
 			Usage: "Overrides the default value of the Label for the Host",
 		},
@@ -1448,7 +1446,7 @@ var hostLabelBindCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("bind Label to Host: '%s' is a Tag", c.Args().First())))
 		}
 
-		err = ClientSession.Host.BindLabel(hostRef, labelRef, "", 0)
+		err = ClientSession.Host.BindLabel(hostRef, labelRef, c.String("value"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))

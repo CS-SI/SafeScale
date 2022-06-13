@@ -82,7 +82,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    api.Connector
+		sshProfile                    sshapi.Connector
 	}
 }
 
@@ -200,7 +200,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig api.Config
+		var primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -2699,7 +2699,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ api.Connector, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Connector, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {

@@ -27,11 +27,11 @@ import (
 // Client defines the structure of a Client object
 type Client struct {
 	// SshConfig contains ssh connection configuration
-	SSHConfig api.Connector
+	SSHConfig sshapi.Connector
 }
 
 // NewNFSClient creates a new NFS client instance
-func NewNFSClient(sshconfig api.Connector) (*Client, fail.Error) {
+func NewNFSClient(sshconfig sshapi.Connector) (*Client, fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
