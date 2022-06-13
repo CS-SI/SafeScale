@@ -38,6 +38,14 @@ func repairs1b(m dsl.Matcher) {
 		Report("returning the wrong error?")
 }
 
+func repairs1c(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if innerXErr != nil { return $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*innerXErr.*")).
+		Report("returning the wrong error?")
+}
+
 func repairs2(m dsl.Matcher) {
 	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
@@ -51,6 +59,14 @@ func repairs2b(m dsl.Matcher) {
 
 	m.Match("if err != nil { return nil, $b }").
 		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*err.*")).
+		Report("returning the wrong error?")
+}
+
+func repairs2c(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if innerXErr != nil { return nil, $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*innerXErr.*")).
 		Report("returning the wrong error?")
 }
 

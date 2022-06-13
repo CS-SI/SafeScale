@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -239,33 +238,12 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
 		si := &ShareIdentity{}
-		xerr = si.Deserialize(buf)
+		xerr := si.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
-		}
-
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
 		}
 
 		return callback(si.HostName, si.ShareID)
@@ -301,23 +279,9 @@ func (instance *Share) Create(
 		return fail.InvalidParameterCannotBeNilError("server")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	targetName := server.GetName()
 
-	var state hoststate.Enum
-	state, xerr = server.GetState(ctx)
+	state, xerr := server.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -360,10 +324,6 @@ func (instance *Share) Create(
 			}
 
 			for k := range serverMountsV1.RemoteMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if strings.Index(sharePath, k) == 0 {
 					return fail.InvalidRequestError("export path '%s' contains a Share mounted in '%s'", sharePath, k)
 				}
@@ -377,14 +337,10 @@ func (instance *Share) Create(
 	}
 
 	// Installs NFS getServer software if needed
-	sshConfig, xerr := server.GetSSHConfig(task.Context())
+	sshConfig, xerr := server.GetSSHConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
@@ -403,7 +359,7 @@ func (instance *Share) Create(
 
 			if len(serverSharesV1.ByID) == 0 {
 				// Host doesn't have shares yet, so install NFS
-				xerr = nfsServer.Install(task.Context())
+				xerr = nfsServer.Install(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -461,9 +417,6 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
 			if derr := nfsServer.RemoveShare(context.Background(), sharePath); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
@@ -538,7 +491,7 @@ func (instance *Share) Create(
 func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -632,19 +585,6 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	var (
 		export               string
 		targetName, targetID string
@@ -654,8 +594,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	targetName = target.GetName()
 
-	var state hoststate.Enum
-	state, xerr = target.GetState(ctx)
+	state, xerr := target.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -679,7 +618,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(task.Context())
+	rhServer, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -687,7 +626,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	// serverID = rhServer.ID()
 	// serverName = rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(task.Context())
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -715,10 +654,6 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	// Sanitize path
 	mountPath, xerr := sanitize(spath)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -742,20 +677,12 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 			}
 
 			for _, i := range targetMountsV1.LocalMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if i.Path == spath {
 					// cannot mount a Share in place of a volume (by convention, nothing technically preventing it)
 					return fail.InvalidRequestError(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, spath))
 				}
 			}
 			for _, i := range targetMountsV1.RemoteMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if strings.Index(spath, i.Path) == 0 {
 					// cannot mount a Share inside another Share (at least by convention, if not technically)
 					return fail.InvalidRequestError("there is already a Share mounted in '%s:%s'", targetName, i.Path)
@@ -776,7 +703,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	targetSSHConfig, xerr := target.GetSSHConfig(task.Context())
+	targetSSHConfig, xerr := target.GetSSHConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -919,7 +846,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -928,19 +855,6 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	if target == nil {
 		return fail.InvalidParameterCannotBeNilError("target")
 	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	var (
 		shareName, shareID string
@@ -951,8 +865,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 
 	targetName := target.GetName()
 
-	var state hoststate.Enum
-	state, xerr = target.GetState(ctx)
+	state, xerr := target.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -977,14 +890,14 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		return xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(task.Context())
+	rhServer, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	serverName := rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(task.Context())
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1026,7 +939,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 			}
 
 			// Unmount Share from client
-			sshConfig, inErr := target.GetSSHConfig(task.Context())
+			sshConfig, inErr := target.GetSSHConfig(ctx)
 			if inErr != nil {
 				return inErr
 			}
@@ -1036,7 +949,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 				return inErr
 			}
 
-			inErr = nfsClient.Unmount(task.Context(), instance.Service(), serverPrivateIP+":"+hostShare.Path)
+			inErr = nfsClient.Unmount(ctx, instance.Service(), serverPrivateIP+":"+hostShare.Path)
 			if inErr != nil {
 				return inErr
 			}
@@ -1079,25 +992,12 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	var (
 		shareID, shareName string
@@ -1106,7 +1006,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 
 	// -- Retrieve info about the Share --
 	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
-	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1121,7 +1021,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	objserver, xerr := instance.unsafeGetServer(task.Context())
+	objserver, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1163,16 +1063,12 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 			if len(hostShare.ClientsByName) > 0 {
 				var list []string
 				for k := range hostShare.ClientsByName {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					list = append(list, "'"+k+"'")
 				}
 				return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
 			}
 
-			sshConfig, xerr := objserver.GetSSHConfig(task.Context())
+			sshConfig, xerr := objserver.GetSSHConfig(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1184,9 +1080,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 
-			defer task.DisarmAbortSignal()()
-
-			xerr = nfsServer.RemoveShare(ctx, hostShare.Path)
+			xerr = nfsServer.RemoveShare(context.Background(), hostShare.Path)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1201,8 +1095,6 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-
-	defer task.DisarmAbortSignal()()
 
 	// Remove Share metadata
 	return instance.MetadataCore.Delete(ctx)
@@ -1221,7 +1113,7 @@ func sanitize(in string) (string, fail.Error) {
 func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 

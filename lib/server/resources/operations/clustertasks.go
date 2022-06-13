@@ -1380,7 +1380,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1441,7 +1441,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1494,7 +1494,7 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1565,7 +1565,7 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1621,7 +1621,7 @@ type taskCreateMastersParameters struct {
 func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1730,7 +1730,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2000,7 +2000,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2142,7 +2142,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2219,7 +2219,7 @@ type taskCreateNodesParameters struct {
 func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2312,7 +2312,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2590,7 +2590,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2720,7 +2720,7 @@ type taskConfigureNodeParameters struct {
 func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2797,7 +2797,7 @@ type taskDeleteNodeOnFailureParameters struct {
 func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2845,7 +2845,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2908,7 +2908,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2977,7 +2977,7 @@ type taskDeleteHostOnFailureParameters struct {
 func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -3026,7 +3026,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task,
 
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {

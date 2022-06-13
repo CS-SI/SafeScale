@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package share
+package ssh
 
 import (
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"

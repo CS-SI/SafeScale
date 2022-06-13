@@ -559,12 +559,6 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 
 	outcomes = &results{}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return outcomes, xerr
-	}
-
 	// 'pace' tells the order of execution
 	var (
 		pace     string
@@ -592,14 +586,14 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 	switch w.action {
 	case installaction.Add:
 		if !settings.SkipProxy {
-			xerr = w.setReverseProxy(task.Context())
+			xerr := w.setReverseProxy(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
 			}
 		}
 
-		xerr := w.setSecurity(task.Context())
+		xerr := w.setSecurity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
@@ -624,6 +618,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		// }
 	}
 
+	var xerr fail.Error
 	xerr = w.target.ComplementFeatureParameters(ctx, params)
 	if xerr != nil {
 		return nil, xerr
@@ -650,7 +645,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		// Determine list of hosts concerned by the step
 		var hostsList []resources.Host
 		if w.target.TargetType() == featuretargettype.Host {
-			hostsList, xerr = w.identifyHosts(task.Context(), map[string]string{"hosts": "1"})
+			hostsList, xerr = w.identifyHosts(ctx, map[string]string{"hosts": "1"})
 		} else {
 			stepT := stepTargets{}
 			anon, ok := stepMap[yamlTargetsKeyword]
@@ -672,7 +667,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey, yamlTargetsKeyword)
 			}
 
-			hostsList, xerr = w.identifyHosts(task.Context(), stepT)
+			hostsList, xerr = w.identifyHosts(ctx, stepT)
 		}
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -684,7 +679,7 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		}
 
 		var problem error
-		subtask, xerr := concurrency.NewTaskWithParent(task)
+		subtask, xerr := concurrency.NewTaskWithContext(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return outcomes, xerr
@@ -1123,12 +1118,6 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, f
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	const yamlKey = "feature.proxy.rules"
 	rules, ok := w.feature.Specs().Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
@@ -1140,7 +1129,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
-	rgw, xerr := w.identifyAvailableGateway(task.Context())
+	rgw, xerr := w.identifyAvailableGateway(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1210,7 +1199,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		}
 
 		for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
-			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task.Context())
+			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1239,7 +1228,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-			tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/proxy/rule/"))
+			tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/proxy/rule/"))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1285,7 +1274,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 
 			if secondaryKongController != nil {
-				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task.Context())
+				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -1543,12 +1532,6 @@ func (w *worker) setSecurity(ctx context.Context) (ferr fail.Error) {
 
 // setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
 func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	const yamlKey = "feature.security.networking"
 	if ok := w.feature.Specs().IsSet(yamlKey); !ok {
 		return nil
@@ -1560,22 +1543,22 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	}
 
 	var rs resources.Subnet
+	var xerr fail.Error
 	if w.cluster != nil {
-		var netprops *propertiesv3.ClusterNetwork
-		if netprops, xerr = w.cluster.GetNetworkConfig(ctx); xerr != nil {
+		if netprops, xerr := w.cluster.GetNetworkConfig(ctx); xerr != nil {
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		} else {
-			rs, xerr = LoadSubnet(task.Context(), w.service, netprops.NetworkID, netprops.SubnetID)
+			rs, xerr = LoadSubnet(ctx, w.service, netprops.NetworkID, netprops.SubnetID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		}
 	} else if w.host != nil {
-		rs, xerr = w.host.GetDefaultSubnet(task.Context())
+		rs, xerr = w.host.GetDefaultSubnet(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1585,14 +1568,6 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 	forFeature := " for Feature '" + w.feature.GetName() + "'"
 
 	for k, rule := range rules {
-		if task.Aborted() {
-			lerr, err := task.LastError()
-			if err != nil {
-				return fail.AbortedError(nil, "parent task killed (without last error recovered)")
-			}
-			return fail.AbortedError(lerr, "parent task killed")
-		}
-
 		r, ok := rule.(map[interface{}]interface{})
 		if !ok {
 			return fail.InvalidParameterError("rule", "should be a map[interface{}][interface{}]")
@@ -1606,7 +1581,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (ferr fail.Error) {
 				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)
 			}
 
-			gwSG, xerr := rs.InspectGatewaySecurityGroup(task.Context())
+			gwSG, xerr := rs.InspectGatewaySecurityGroup(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

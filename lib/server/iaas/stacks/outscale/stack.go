@@ -227,12 +227,12 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
+func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, _, err := s.client.RegionApi.ReadRegions(s.auth, nil)
@@ -249,13 +249,13 @@ func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s stack) ListAvailabilityZones(context.Context) (az map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)

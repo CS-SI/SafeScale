@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -173,16 +172,6 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 		return emptyList, xerr
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	if task.Aborted() {
-		return emptyList, fail.AbortedError(nil, "aborted")
-	}
-
 	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -192,10 +181,6 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 
 			list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
 			for _, v := range nodesV3.Masters {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					list[node.NumericalID] = node.ID
 				}
@@ -365,16 +350,6 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 		return emptyList, xerr
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	if task.Aborted() {
-		return emptyList, fail.AbortedError(nil, "aborted")
-	}
-
 	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -384,10 +359,6 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 
 			list = make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
 			for _, v := range nodesV3.PrivateNodes {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					list[node.NumericalID] = node.ID
 				}
@@ -406,19 +377,9 @@ func (instance *Cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 // unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
 // Note: must be used wisely
 func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node resources.Host, ferr fail.Error) {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	xerr = instance.beingRemoved(ctx)
@@ -437,10 +398,6 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 	node = nil
 	found := false
 	for _, v := range list {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "aborted")
-		}
-
 		node, xerr = LoadHost(ctx, svc, v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
