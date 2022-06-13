@@ -22,7 +22,7 @@ package share
 import (
 	"os"
 
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/bycli"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/bylib"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"

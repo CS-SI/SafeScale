@@ -24,7 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatDuration(t *testing.T) {
@@ -181,4 +183,30 @@ func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
 	if !strings.Contains(string(out), "Foo") {
 		t.Fail()
 	}
+}
+
+func TestOnExitLogWithLevel(t *testing.T) {
+
+	stowa := NewStopwatch()
+	// wrong in
+	f := stowa.OnExitLogWithLevel("", "out", logrus.TraceLevel)
+	log := tests.LogrusCapture(func() {
+		f()
+	})
+	require.EqualValues(t, log, "")
+
+	// wrong logruslevel
+	f = stowa.OnExitLogWithLevel("in", "out", 8)
+	log = tests.LogrusCapture(func() {
+		f()
+	})
+	require.Contains(t, log, "level=info msg")
+
+	// valid call
+	f = stowa.OnExitLogWithLevel("in", "out", logrus.PanicLevel)
+	log = tests.LogrusCapture(func() {
+		f()
+	})
+	require.Contains(t, log, "level=info msg")
+
 }

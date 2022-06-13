@@ -17,17 +17,23 @@
 package share
 
 import (
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/bycli"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/bylib"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+var customFactory func(sshapi.Config) (sshapi.Connector, fail.Error)
+
 type Option func(connector sshapi.Connector, conf sshapi.Config) (sshapi.Connector, fail.Error)
 
 func ConnectorWithCli() Option { // nolint
 	return func(connector sshapi.Connector, conf sshapi.Config) (sshapi.Connector, fail.Error) {
+		if customFactory != nil {
+			return customFactory(conf)
+		}
+
 		altconnector, xerr := bycli.NewConnector(conf)
 		if xerr != nil {
 			return nil, xerr
@@ -39,6 +45,10 @@ func ConnectorWithCli() Option { // nolint
 
 func ConnectorWithLib() Option { // nolint
 	return func(connector sshapi.Connector, conf sshapi.Config) (sshapi.Connector, fail.Error) {
+		if customFactory != nil {
+			return customFactory(conf)
+		}
+
 		altconnector, xerr := bylib.NewConnector(conf)
 		if xerr != nil {
 			return nil, xerr
@@ -52,6 +62,10 @@ func ConnectorWithLib() Option { // nolint
 func NewConnector(conf sshapi.Config, options ...Option) (sshapi.Connector, fail.Error) {
 	if valid.IsNull(conf) {
 		return nil, fail.InvalidParameterError("conf", "cannot be null value of 'ssh.Config'")
+	}
+
+	if customFactory != nil {
+		return customFactory(conf)
 	}
 
 	current, xerr := defaultSSHConnectorFactory(conf)
@@ -69,4 +83,8 @@ func NewConnector(conf sshapi.Config, options ...Option) (sshapi.Connector, fail
 	}
 
 	return current, nil
+}
+
+func SetCustomConnectorFactory(custom func(sshapi.Config) (sshapi.Connector, fail.Error)) {
+	customFactory = custom
 }

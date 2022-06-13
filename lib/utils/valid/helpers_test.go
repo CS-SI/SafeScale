@@ -229,20 +229,20 @@ func TestInitialized(t *testing.T) {
 
 func Test_IsNil(t *testing.T) {
 
-	var a_null Nullable
-	var a_nil Nillable
-	var p_null *Nullable = nil
-	var p_nil *Nillable = nil
+	var aNull Nullable
+	var aNil Nillable
+	var pNull *Nullable
+	var pNil *Nillable
 
 	require.EqualValues(t, valid.IsNil(nil), true)
-	require.EqualValues(t, valid.IsNil(a_null), false)
-	require.EqualValues(t, valid.IsNil(p_null), true)
+	require.EqualValues(t, valid.IsNil(aNull), false)
+	require.EqualValues(t, valid.IsNil(pNull), true)
 	require.EqualValues(t, valid.IsNil(Nullable{isnull: true}), true)
 	require.EqualValues(t, valid.IsNil(&Nullable{isnull: true}), true)
 	require.EqualValues(t, valid.IsNil(Nullable{isnull: false}), false)
 	require.EqualValues(t, valid.IsNil(&Nullable{isnull: false}), false)
-	require.EqualValues(t, valid.IsNil(a_nil), false)
-	require.EqualValues(t, valid.IsNil(p_nil), true)
+	require.EqualValues(t, valid.IsNil(aNil), false)
+	require.EqualValues(t, valid.IsNil(pNil), true)
 	require.EqualValues(t, valid.IsNil(Nillable{isnil: true}), true)
 	require.EqualValues(t, valid.IsNil(&Nillable{isnil: true}), true)
 	require.EqualValues(t, valid.IsNil(Nillable{isnil: false}), false)

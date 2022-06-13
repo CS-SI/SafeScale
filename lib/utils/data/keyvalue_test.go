@@ -112,7 +112,7 @@ func TestKeyValue_SetValue(t *testing.T) {
 		z float64
 	}{0.01, 0.43, 0.67}
 
-	var nkv *KeyValue = nil
+	var nkv *KeyValue
 	nkv.SetValue(m1)
 	require.EqualValues(t, reflect.TypeOf(nkv).String(), "*data.KeyValue")
 

@@ -18,8 +18,10 @@ package propertiesv2
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +91,19 @@ func TestHostSizing_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := hs2.Replace(network)
+	if xerr == nil {
+		t.Error("HostSizing.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostSizing") {
+		t.Errorf("Expect error \"p is not a *HostSizing\", has \"%s\"", xerr.Error())
+	}
 }
 
 func TestHostSizing_Clone(t *testing.T) {
@@ -121,6 +136,7 @@ func TestHostSizing_Clone(t *testing.T) {
 
 	clonedHs, ok := cloned.(*HostSizing)
 	if !ok {
+		t.Error("Cloned HostSizing not castable to *HostSizing", err)
 		t.Fail()
 	}
 

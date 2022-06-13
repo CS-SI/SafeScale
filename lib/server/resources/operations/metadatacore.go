@@ -43,8 +43,6 @@ const (
 	byIDFolderName = "byID"
 	// byNameFolderName tells in what MetadataFolder to store 'byName' information
 	byNameFolderName = "byName"
-
-	NullMetadataKind = "nil"
 )
 
 // MetadataCore contains the core functions of a persistent object
@@ -116,7 +114,7 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 
 // IsNull returns true if the MetadataCore instance represents the null value for MetadataCore
 func (myself *MetadataCore) IsNull() bool {
-	return myself == nil || myself.kind == "" || myself.kind == NullMetadataKind
+	return myself == nil || myself.kind == ""
 }
 
 // Service returns the iaas.Service used to create/load the persistent object

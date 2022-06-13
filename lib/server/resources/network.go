@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Network -o mocks/mock_network.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Network -o mocks/mock_network.go
 
 // Network links Object Storage folder and Network
 type Network interface {

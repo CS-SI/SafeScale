@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +52,13 @@ func TestSecurityGroupSubnets_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, err = sgs2.Replace(network)
+	require.Contains(t, err.Error(), "p is not a *SecurityGroupSubnets")
 }
 
 func TestSecurityGroupSubnets_Clone(t *testing.T) {
@@ -76,6 +84,7 @@ func TestSecurityGroupSubnets_Clone(t *testing.T) {
 
 	clonedSgs, ok := cloned.(*SecurityGroupSubnets)
 	if !ok {
+		t.Error("Cloned SecurityGroupSubnets not castable to *SecurityGroupSubnets", err)
 		t.Fail()
 	}
 
@@ -90,7 +99,7 @@ func TestSecurityGroupSubnets_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(sgs, clonedSgs)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, sgs, clonedSgs)

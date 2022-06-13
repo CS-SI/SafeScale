@@ -1002,7 +1002,7 @@ func (s stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) 
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
+func (s stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) { // nolint
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}

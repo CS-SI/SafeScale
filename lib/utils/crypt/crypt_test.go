@@ -58,9 +58,9 @@ func Test_NewEncryptionKey(t *testing.T) {
 
 func Test_Encrypt(t *testing.T) {
 
-	var key *Key = nil
+	var key *Key
 	var source []byte = []byte("This is my entering data")
-	encoded, err := Encrypt(source, key)
+	_, err := Encrypt(source, key)
 	if err == nil {
 		t.Error("Can't cypher nil Key")
 		t.Fail()
@@ -71,7 +71,7 @@ func Test_Encrypt(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-	encoded, err = Encrypt(source, key)
+	encoded, err := Encrypt(source, key)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -88,7 +88,7 @@ func Test_Encrypt(t *testing.T) {
 
 func Test_Decrypt(t *testing.T) {
 
-	var key *Key = nil
+	var key *Key
 	var source []byte = []byte("")
 
 	_, err := Decrypt(source, key)

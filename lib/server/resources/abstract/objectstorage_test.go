@@ -57,8 +57,8 @@ func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
 
 func TestObjectStorageBucket_Replace(t *testing.T) {
 
-	var o1 *ObjectStorageBucket = nil
-	var o2 *ObjectStorageBucket = nil
+	var o1 *ObjectStorageBucket
+	var o2 *ObjectStorageBucket
 	result, err := o1.Replace(o2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -95,8 +95,8 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 
 func TestObjectStorageBucket_Serialize(t *testing.T) {
 
-	var n *ObjectStorageBucket = nil
-	serial, err := n.Serialize()
+	var n *ObjectStorageBucket
+	_, err := n.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil ObjectStorageBucket")
 		t.Fail()
@@ -108,7 +108,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 	n.Host = "ObjectStorageBucket Host"
 	n.MountPoint = "ObjectStorageBucket MountPoint"
 
-	serial, err = n.Serialize()
+	serial, err := n.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -143,7 +143,7 @@ func TestObjectStorageBucket_Deserialize(t *testing.T) {
 		t.Fail()
 	}
 
-	var n2 *ObjectStorageBucket = nil
+	var n2 *ObjectStorageBucket
 	err = n2.Deserialize(serial)
 	if err == nil {
 		t.Error("Can't deserialize nil ObjectStorageBucket")

@@ -79,7 +79,7 @@ func (f *LikeFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 
 func TestJsonProperty_IsNull(t *testing.T) {
 
-	var jp *jsonProperty = nil
+	var jp *jsonProperty
 	result := jp.IsNull()
 	require.EqualValues(t, result, true)
 
@@ -106,7 +106,7 @@ func (e *SomeClonable) GetValue() string {
 
 func TestJsonProperty_Replace(t *testing.T) {
 
-	var jp *jsonProperty = nil
+	var jp *jsonProperty
 	var data data.Clonable = nil
 
 	_, err := jp.Replace(data)
@@ -137,18 +137,16 @@ func TestJsonPropertyRealReplace(t *testing.T) {
 	assert.NotNil(t, allbad)
 
 	// @TODO fix JsonProperty::Replace, clonable.(*jsonProperty) casting makes panic
-
-	//d := &SomeClonable{value: "any"}
-	//jp = &jsonProperty{}
-	//result = jp.Replace(d)
-	//fmt.Println(result.(*SomeClonable).GetValue())
-
+	// d := &SomeClonable{value: "any"}
+	// jp = &jsonProperty{}
+	// result = jp.Replace(d)
+	// fmt.Println(result.(*SomeClonable).GetValue())
 }
 
 func Test_NewJSONProperties(t *testing.T) {
 
 	_, err := NewJSONProperties("")
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be empty string"), true)
+	require.Contains(t, err.Error(), "cannot be empty string")
 
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
@@ -172,7 +170,7 @@ func TestJSONProperties_Lookup(t *testing.T) {
 	PropertyTypeRegistry.Register("any", "toto", &LikeFeatures{})
 	err := jp.Deserialize([]byte("{\"toto\":null}"))
 	require.EqualValues(t, jp.Lookup("toto"), false)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be empty"), true)
+	require.Contains(t, err.Error(), "cannot be empty")
 
 }
 
@@ -181,14 +179,14 @@ func TestJSONProperties_Clone(t *testing.T) {
 	var jp *JSONProperties = nil
 	clone, err := jp.Clone()
 	require.EqualValues(t, fmt.Sprintf("%p", clone), "0x0")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 
 	jp, _ = NewJSONProperties("clusters")
 	clone, err = jp.Clone()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	require.EqualValues(t, jp, clone)
 	require.NotEqual(t, fmt.Sprintf("%p", jp), fmt.Sprintf("%p", clone))
@@ -214,6 +212,7 @@ func TestJSONProperties_Count(t *testing.T) {
 }
 
 func TestLockForReadDoesNotChange(t *testing.T) {
+
 	PropertyTypeRegistry.Register("clusters", "first", &LikeFeatures{})
 	PropertyTypeRegistry.Register("clusters", "second", &LikeFeatures{})
 

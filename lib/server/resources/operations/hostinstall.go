@@ -85,36 +85,38 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		var innerXErr fail.Error
-		outcomes, innerXErr = feat.Add(task.Context(), instance, vars, settings)
-		if innerXErr != nil {
-			return innerXErr
+	outcomes, xerr = func() (resources.Results, fail.Error) {
+		// /!\ Do not cross references in alter, it makes deadlock
+		outcomes, xerr := feat.Add(task.Context(), instance, vars, settings)
+		if xerr != nil {
+			return outcomes, xerr
 		}
+		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// updates HostFeatures property for host
+			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
+				}
 
-		// updates HostFeatures property for host
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
-			}
+				requires, innerXErr := feat.Dependencies(ctx)
+				if innerXErr != nil {
+					return innerXErr
+				}
 
-			requires, innerXErr := feat.Dependencies(ctx)
-			if innerXErr != nil {
-				return innerXErr
-			}
+				nif := propertiesv1.NewHostInstalledFeature()
+				nif.HostContext = true
+				if requires != nil {
+					nif.Requires = requires
+				}
 
-			nif := propertiesv1.NewHostInstalledFeature()
-			nif.HostContext = true
-			if requires != nil {
-				nif.Requires = requires
-			}
-
-			hostFeaturesV1.Installed[name] = nif
-			return nil
+				hostFeaturesV1.Installed[name] = nif
+				return nil
+			})
 		})
-	})
+		return outcomes, xerr
+	}()
+
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -203,29 +205,28 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = func() fail.Error {
 		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}
-
 		if !outcomes.Successful() {
 			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, instance.GetName())
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
-
-		// updates HostFeatures property for host
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
-			}
-
-			delete(hostFeaturesV1.Installed, name)
-			return nil
+		return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// updates HostFeatures property for host
+			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
+				}
+				delete(hostFeaturesV1.Installed, name)
+				return nil
+			})
 		})
-	})
+	}()
 	return nil, xerr
 }
 

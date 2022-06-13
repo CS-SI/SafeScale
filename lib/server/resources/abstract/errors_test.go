@@ -87,11 +87,9 @@ func TestErrors_ResourceTimeoutError(t *testing.T) {
 			if ressourceName != "" && !strings.Contains(fmt.Sprintf("%s", err), ressourceName) {
 				t.Error("Wrong Message Restitution, error does not contains ressource name \"" + ressourceName + " \"")
 				t.FailNow()
-			} else {
-				if !strings.Contains(fmt.Sprintf("%s", err), fmt.Sprintf("%s", duration)) {
-					t.Error("Wrong Message Restitution, error does not contains timeout duration \"" + fmt.Sprintf("%s", duration) + "\"")
-					t.FailNow()
-				}
+			} else if !strings.Contains(fmt.Sprintf("%s", err), fmt.Sprintf("%s", duration)) {
+				t.Error("Wrong Message Restitution, error does not contains timeout duration \"" + fmt.Sprintf("%s", duration) + "\"")
+				t.FailNow()
 			}
 		}
 	}

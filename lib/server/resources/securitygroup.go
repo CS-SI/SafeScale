@@ -44,7 +44,7 @@ const (
 	KeepCurrentSecurityGroupMark    = false // Do not change current Security Group mark
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.SecurityGroup -o mocks/mock_securitygroup.go
 
 // SecurityGroup links Object Storage folder and SecurityGroup
 type SecurityGroup interface {
@@ -52,10 +52,10 @@ type SecurityGroup interface {
 	data.Identifiable
 	Consistent
 
-	AddRule(ctx context.Context, _ *abstract.SecurityGroupRule) fail.Error                                         // returns true if the host is member of a cluster
-	AddRules(ctx context.Context, _ abstract.SecurityGroupRules) fail.Error                                        // returns true if the host is member of a cluster
-	BindToHost(ctx context.Context, host Host, _ SecurityGroupActivation, _ SecurityGroupMark) fail.Error          // binds a security group to a host
-	BindToSubnet(ctx context.Context, _ Subnet, _ SecurityGroupActivation, _ SecurityGroupMark) fail.Error         // binds a security group to a network
+	AddRule(context.Context, *abstract.SecurityGroupRule) fail.Error                                               // returns true if the host is member of a cluster
+	AddRules(context.Context, abstract.SecurityGroupRules) fail.Error                                              // returns true if the host is member of a cluster
+	BindToHost(context.Context, Host, SecurityGroupActivation, SecurityGroupMark) fail.Error                       // binds a security group to a host
+	BindToSubnet(context.Context, Subnet, SecurityGroupActivation, SecurityGroupMark) fail.Error                   // binds a security group to a network
 	Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                      // browses the metadata folder of Security Groups and call the callback on each entry
 	Clear(ctx context.Context) fail.Error                                                                          // removes rules from the security group
 	Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) fail.Error // creates a new host and its metadata
@@ -65,8 +65,8 @@ type SecurityGroup interface {
 	GetBoundSubnets(ctx context.Context) ([]*propertiesv1.SecurityGroupBond, fail.Error)                           // returns a slice of bonds corresponding to networks bound to the security group
 	Reset(ctx context.Context) fail.Error                                                                          // resets the rules of the security group from the ones registered in metadata
 	ToProtocol(ctx context.Context) (*protocol.SecurityGroupResponse, fail.Error)                                  // converts a SecurityGroup to equivalent gRPC message
-	UnbindFromHost(ctx context.Context, _ Host) fail.Error                                                         // unbinds a Security Group from Host
-	UnbindFromHostByReference(ctx context.Context, _ string) fail.Error                                            // unbinds a Security Group from Host
-	UnbindFromSubnet(ctx context.Context, _ Subnet) fail.Error                                                     // unbinds a Security Group from Subnet
-	UnbindFromSubnetByReference(ctx context.Context, _ string) fail.Error                                          // unbinds a Security group from a Subnet identified by reference (ID or name)
+	UnbindFromHost(context.Context, Host) fail.Error                                                               // unbinds a Security Group from Host
+	UnbindFromHostByReference(context.Context, string) fail.Error                                                  // unbinds a Security Group from Host
+	UnbindFromSubnet(context.Context, Subnet) fail.Error                                                           // unbinds a Security Group from Subnet
+	UnbindFromSubnetByReference(context.Context, string) fail.Error                                                // unbinds a Security group from a Subnet identified by reference (ID or name)
 }

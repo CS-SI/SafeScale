@@ -47,7 +47,7 @@ func TestCache_IsNull(t *testing.T) {
 	require.EqualValues(t, c.isNull(), true)
 
 	c, err = NewCache("name")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, c.isNull(), false)
 
 }
@@ -166,7 +166,7 @@ func TestMapStore_Free(t *testing.T) {
 	task, xerr := concurrency.NewTask()
 	require.Nil(t, xerr)
 
-	var rc *mapStore = nil
+	var rc *mapStore
 	err := rc.Free(task.Context(), "key")
 	if err == nil {
 		t.Error("Can't Free on nil pointer cache")
@@ -197,7 +197,7 @@ func TestMapStore_Add(t *testing.T) {
 	require.Nil(t, xerr)
 
 	content := newReservation(task.Context(), "store", "content")
-	var rc *mapStore = nil
+	var rc *mapStore
 	_, err := rc.Add(task.Context(), content)
 	if err == nil {
 		t.Error("Can't Add on nil pointer cache")
@@ -230,7 +230,7 @@ func TestMapStore_SignalChange(t *testing.T) {
 
 	content := newReservation(task.Context(), "store", "content" /*, time.Minute*/)
 
-	var rc *mapStore = nil
+	var rc *mapStore
 	rc.SignalChange(content.GetName())
 
 	rc2, err := NewMapStore("nuka")
@@ -241,6 +241,7 @@ func TestMapStore_SignalChange(t *testing.T) {
 	}
 
 	err = rc2.Reserve(task.Context(), content.GetName(), 100*time.Millisecond)
+	require.Nil(t, err)
 
 	_, err = rc2.Commit(context.Background(), content.GetName(), content)
 	require.NotNil(t, err)
@@ -269,7 +270,7 @@ func TestMapStore_MarkAsFreed(t *testing.T) {
 
 	content := newReservation(context.Background(), "store", "content")
 
-	var rc *mapStore = nil
+	var rc *mapStore
 	rc.MarkAsFreed(content.GetName())
 
 	rc2, err := NewMapStore("nuka")
@@ -310,7 +311,7 @@ func TestMapStore_MarkAsDeleted(t *testing.T) {
 
 	content := newReservation(context.Background(), "store", "content" /*, time.Minute*/)
 
-	var rc *mapStore = nil
+	var rc *mapStore
 	rc.MarkAsDeleted(content.GetName())
 
 	rc2, err := NewMapStore("nuka")

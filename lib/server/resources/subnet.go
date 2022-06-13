@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Subnet -o mocks/mock_subnet.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Subnet -o mocks/mock_subnet.go
 
 // Subnet links Object Storage folder and Network
 type Subnet interface {
@@ -38,13 +38,13 @@ type Subnet interface {
 	Consistent
 
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                    // unlinks host ID from subnet
-	AttachHost(ctx context.Context, _ Host) fail.Error                                                                           // links Host to the Subnet
-	BindSecurityGroup(ctx context.Context, _ SecurityGroup, _ SecurityGroupActivation) fail.Error                                // binds a Security Group to the Subnet
+	AttachHost(context.Context, Host) fail.Error                                                                                 // links Host to the Subnet
+	BindSecurityGroup(context.Context, SecurityGroup, SecurityGroupActivation) fail.Error                                        // binds a Security Group to the Subnet
 	Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) fail.Error                                           // ...
 	Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a Subnet
 	Delete(ctx context.Context) fail.Error                                                                                       // deletes a Subnet
-	DisableSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                        // disables a bound Security Group on Subnet
-	EnableSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                         // enables a bound Security Group on Subnet
+	DisableSecurityGroup(context.Context, SecurityGroup) fail.Error                                                              // disables a bound Security Group on Subnet
+	EnableSecurityGroup(context.Context, SecurityGroup) fail.Error                                                               // enables a bound Security Group on Subnet
 	GetGatewayPublicIP(ctx context.Context, primary bool) (string, fail.Error)                                                   // returns the gateway related to Subnet
 	GetGatewayPublicIPs(ctx context.Context) ([]string, fail.Error)                                                              // returns the gateway IPs of the Subnet
 	GetDefaultRouteIP(ctx context.Context) (string, fail.Error)                                                                  // returns the private IP of the default route of the Subnet
@@ -60,5 +60,5 @@ type Subnet interface {
 	ListHosts(ctx context.Context) ([]Host, fail.Error)                                                                          // returns the list of Host attached to the subnet (excluding gateway)
 	ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)       // lists the security groups bound to the subnet
 	ToProtocol(ctx context.Context) (*protocol.Subnet, fail.Error)                                                               // converts the subnet to protobuf message
-	UnbindSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                         // unbinds a security group from the subnet
+	UnbindSecurityGroup(context.Context, SecurityGroup) fail.Error                                                               // unbinds a security group from the subnet
 }

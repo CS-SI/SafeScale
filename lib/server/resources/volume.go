@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Volume -o mocks/mock_volume.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Volume -o mocks/mock_volume.go
 
 // Volume links Object Storage folder and getVolumes
 type Volume interface {

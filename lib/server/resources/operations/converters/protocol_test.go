@@ -161,6 +161,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -183,6 +184,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -205,6 +207,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -227,6 +230,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -249,6 +253,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "isn't a valid number",
 		},
@@ -271,6 +276,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "'count' can only use '='",
 		},
@@ -293,6 +299,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "'count' can only use '='",
 		},
@@ -315,6 +322,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "'count' can only use '='",
 		},
@@ -337,6 +345,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -362,7 +371,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 
 func Test_SecurityGroupRuleFromProtocolToAbstract(t *testing.T) {
 
-	result, xerr := SecurityGroupRuleFromProtocolToAbstract(nil)
+	_, xerr := SecurityGroupRuleFromProtocolToAbstract(nil)
 	if xerr == nil {
 		t.Error("Can't SecurityGroupRuleFromProtocolToAbstract to nil pointer")
 		t.Fail()
@@ -377,7 +386,7 @@ func Test_SecurityGroupRuleFromProtocolToAbstract(t *testing.T) {
 		PortTo:    0,
 		Involved:  []string{"Involve1"},
 	}
-	result, xerr = SecurityGroupRuleFromProtocolToAbstract(sgr)
+	result, xerr := SecurityGroupRuleFromProtocolToAbstract(sgr)
 	if xerr != nil {
 		t.Error(xerr)
 		t.Fail()
@@ -446,10 +455,8 @@ func Test_SecurityGroupRulesFromProtocolToAbstract(t *testing.T) {
 		switch asgrs[i].Direction {
 		case securitygroupruledirection.Ingress:
 			require.EqualValues(t, asgrs[i].Sources, sgrs[i].Involved)
-			break
 		case securitygroupruledirection.Egress:
 			require.EqualValues(t, asgrs[i].Targets, sgrs[i].Involved)
-			break
 		}
 
 	}

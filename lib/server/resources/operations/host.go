@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -81,7 +82,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    ssh.Connector
+		sshProfile                    api.Connector
 	}
 }
 
@@ -199,7 +200,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig ssh.Config
+		var primaryGatewayConfig, secondaryGatewayConfig api.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -2684,7 +2685,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ ssh.Connector, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ api.Connector, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {

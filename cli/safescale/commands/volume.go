@@ -447,7 +447,7 @@ func getAllowedSpeeds() string {
 		// this message is intended for final users, showing allowed values that didn't match allowed inputs wasn't a good idea
 		k = strings.TrimPrefix(k, "VS_")
 		speeds += k
-		i = i + 1 // nolint
+		i++
 	}
 	return speeds
 }

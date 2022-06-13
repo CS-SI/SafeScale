@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 
@@ -33,19 +32,19 @@ import (
 func Test_AddConsequence(t *testing.T) {
 
 	err := AddConsequence(nil, nil)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = AddConsequence(NotFoundError("Any message"), errors.New("not good type !"))
-	require.EqualValues(t, strings.Contains(err.Error(), "Any message"), true)
+	require.Contains(t, err.Error(), "Any message")
 
 	err = AddConsequence(errors.New("Any message"), errors.New("Consequence"))
-	require.EqualValues(t, strings.Contains(err.Error(), "Any message"), true)
+	require.Contains(t, err.Error(), "Any message")
 
 	err = AddConsequence(NotFoundError("Any message"), nil)
-	require.EqualValues(t, strings.Contains(err.Error(), "Any message"), true)
+	require.Contains(t, err.Error(), "Any message")
 
 	err = AddConsequence(NotFoundError("Any message 1"), NotFoundError("Any message 2"))
-	require.EqualValues(t, strings.Contains(err.Error(), "Any message 2"), true)
+	require.Contains(t, err.Error(), "Any message 2")
 
 }
 
@@ -80,7 +79,7 @@ func Test_Annotate(t *testing.T) {
 	}{"value", true}
 
 	err := Annotate(nil, "key", v)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = Annotate(errors.New("Any error"), "key", v)
 	require.EqualValues(t, err.Annotations()["key"], v)
@@ -194,15 +193,14 @@ func Test_ToGRPCStatus(t *testing.T) {
 
 	result := ToGRPCStatus(nil)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), false)
-	require.EqualValues(t, strings.Contains(result.Error(), "code = Unknown"), false)
+	require.Contains(t, result.Error(), "cannot be nil")
 
 	err := grpcstatus.Error(codes.NotFound, "id was not found")
 	result = ToGRPCStatus(err)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
-	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "code = Unknown"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "desc = id was not found"), true)
+	require.Contains(t, result.Error(), "rpc error")
+	require.Contains(t, result.Error(), "code = Unknown")
+	require.Contains(t, result.Error(), "desc = id was not found")
 
 	errCore := &errorCore{
 		message:             "houston, we have a problem",
@@ -216,9 +214,9 @@ func Test_ToGRPCStatus(t *testing.T) {
 	}
 	result = ToGRPCStatus(errCore)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
-	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "code = DeadlineExceeded"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "desc = houston, we have a problem"), true)
+	require.Contains(t, result.Error(), "rpc error")
+	require.Contains(t, result.Error(), "code = DeadlineExceeded")
+	require.Contains(t, result.Error(), "desc = houston, we have a problem")
 
 	xerr := &ErrWarning{
 		errorCore: &errorCore{
@@ -234,16 +232,16 @@ func Test_ToGRPCStatus(t *testing.T) {
 	}
 	result = ToGRPCStatus(xerr)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
-	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "code = DeadlineExceeded"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "desc = houston, we have a problem"), true)
+	require.Contains(t, result.Error(), "rpc error")
+	require.Contains(t, result.Error(), "code = DeadlineExceeded")
+	require.Contains(t, result.Error(), "desc = houston, we have a problem")
 
 	err = errors.New("any error")
 	result = ToGRPCStatus(err)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*status.Error")
-	require.EqualValues(t, strings.Contains(result.Error(), "rpc error"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "code = Unknown"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "desc = any error"), true)
+	require.Contains(t, result.Error(), "rpc error")
+	require.Contains(t, result.Error(), "code = Unknown")
+	require.Contains(t, result.Error(), "desc = any error")
 
 }
 
@@ -256,8 +254,8 @@ func Test_Wrap(t *testing.T) {
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
 	result = Wrap(errs, "any error")
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
-	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
+	require.Contains(t, result.Error(), "square root of negative number")
+	require.Contains(t, result.Error(), "can't resolve equation")
 
 }
 
@@ -268,7 +266,7 @@ func Test_lastUnwrapOrNil(t *testing.T) {
 
 	err := errors.New("any error")
 	result = lastUnwrapOrNil(err)
-	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.Contains(t, result.Error(), "any error")
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
 
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
@@ -284,14 +282,14 @@ func Test_lastUnwrap(t *testing.T) {
 
 	err := errors.New("any error")
 	result = lastUnwrap(err)
-	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.Contains(t, result.Error(), "any error")
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
 
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
 	result = lastUnwrap(errs)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
-	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
+	require.Contains(t, result.Error(), "square root of negative number")
+	require.Contains(t, result.Error(), "can't resolve equation")
 
 }
 
@@ -302,14 +300,14 @@ func Test_Cause(t *testing.T) {
 
 	err := errors.New("any error")
 	result = Cause(err)
-	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.Contains(t, result.Error(), "any error")
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*errors.errorString")
 
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
 	result = Cause(errs)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrorList")
-	require.EqualValues(t, strings.Contains(result.Error(), "square root of negative number"), true)
-	require.EqualValues(t, strings.Contains(result.Error(), "can't resolve equation"), true)
+	require.Contains(t, result.Error(), "square root of negative number")
+	require.Contains(t, result.Error(), "can't resolve equation")
 
 	errCore := errorCore{
 		message:             "houston, we have a problem",
@@ -335,7 +333,7 @@ func Test_ConvertError(t *testing.T) {
 	err := errors.New("any error")
 	result = ConvertError(err)
 
-	require.EqualValues(t, strings.Contains(result.Error(), "any error"), true)
+	require.Contains(t, result.Error(), "any error")
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrUnqualified")
 
 }

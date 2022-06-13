@@ -108,7 +108,7 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 		return ff, nil
 	}
 
-	src, ok := p.(*FeatureFile) // nolint
+	src, ok := p.(*FeatureFile)
 	if !ok {
 		return ff, fail.InvalidParameterError("p", "must be a '*FeatureFile'")
 	}

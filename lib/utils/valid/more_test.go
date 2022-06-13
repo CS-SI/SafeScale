@@ -63,19 +63,19 @@ func Test_hasFieldWithNameAndIsNil(t *testing.T) {
 }
 
 func Test_IsNil(t *testing.T) {
-	var a_null Nullable
-	var a_nil Nillable
+	var aNull Nullable
+	var aNil Nillable
 	// var p_null *Nullable = nil
 	// var p_nil *Nillable = nil
 
 	require.EqualValues(t, IsNil(nil), true)
-	require.EqualValues(t, IsNil(a_null), false)
+	require.EqualValues(t, IsNil(aNull), false)
 	// require.EqualValues(t, IsNil(p_null), true)
 	require.EqualValues(t, IsNil(Nullable{isnull: true}), true)
 	require.EqualValues(t, IsNil(&Nullable{isnull: true}), true)
 	require.EqualValues(t, IsNil(Nullable{isnull: false}), false)
 	require.EqualValues(t, IsNil(&Nullable{isnull: false}), false)
-	require.EqualValues(t, IsNil(a_nil), false)
+	require.EqualValues(t, IsNil(aNil), false)
 	// require.EqualValues(t, IsNil(p_nil), true)
 	require.EqualValues(t, IsNil(Nillable{isnil: true}), true)
 	require.EqualValues(t, IsNil(&Nillable{isnil: true}), true)
@@ -96,19 +96,19 @@ func Test_IsNil(t *testing.T) {
 }
 
 func Test_IsNull(t *testing.T) {
-	var a_null Nullable
-	var a_nil Nillable
+	var aNull Nullable
+	var aNil Nillable
 	// var p_null *Nullable = nil
 	// var p_nil *Nillable = nil
 
 	require.EqualValues(t, IsNull(nil), true)
-	require.EqualValues(t, IsNull(a_null), false)
+	require.EqualValues(t, IsNull(aNull), false)
 	// require.EqualValues(t, IsNil(p_null), true)
 	require.EqualValues(t, IsNull(Nullable{isnull: true}), true)
 	require.EqualValues(t, IsNull(&Nullable{isnull: true}), true)
 	require.EqualValues(t, IsNull(Nullable{isnull: false}), false)
 	require.EqualValues(t, IsNull(&Nullable{isnull: false}), false)
-	require.EqualValues(t, IsNull(a_nil), false)
+	require.EqualValues(t, IsNull(aNil), false)
 	// require.EqualValues(t, IsNil(p_nil), true)
 	require.EqualValues(t, IsNull(Nillable{isnil: true}), true)
 	require.EqualValues(t, IsNull(&Nillable{isnil: true}), true)

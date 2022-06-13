@@ -18,15 +18,17 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestClusterNetwork_IsNull(t *testing.T) {
 
-	var cn *ClusterNetwork = nil
+	var cn *ClusterNetwork
 	if !cn.IsNull() {
 		t.Error("Nil pointer ClusterNetwork is null")
 		t.Fail()
@@ -58,7 +60,7 @@ func TestClusterNetwork_IsNull(t *testing.T) {
 
 func TestClusterNetwork_Replace(t *testing.T) {
 
-	var cn *ClusterNetwork = nil
+	var cn *ClusterNetwork
 	cn2 := &ClusterNetwork{
 		NetworkID: "ClusterNetwork networkId",
 		GatewayID: "",
@@ -71,6 +73,19 @@ func TestClusterNetwork_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := cn2.Replace(network)
+	if xerr == nil {
+		t.Error("ClusterNetwork.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *ClusterNetwork") {
+		t.Errorf("Expect error \"p is not a *ClusterNetwork\", has \"%s\"", xerr.Error())
+	}
 
 }
 
@@ -94,7 +109,7 @@ func TestClusterNetwork_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)
