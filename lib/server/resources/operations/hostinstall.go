@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -140,36 +139,28 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (instance *Host) DeleteFeature(inctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
+	tracer := debug.NewTracerFromCtx(ctx, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	targetName := instance.GetName()
 
-	var state hoststate.Enum
-	state, xerr = instance.GetState(ctx)
+	state, xerr := instance.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -178,14 +169,14 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(task.Context(), instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = func() fail.Error {
-		outcomes, innerXErr := feat.Remove(task.Context(), instance, vars, settings)
+		outcomes, innerXErr := feat.Remove(ctx, instance, vars, settings)
 		if innerXErr != nil {
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}

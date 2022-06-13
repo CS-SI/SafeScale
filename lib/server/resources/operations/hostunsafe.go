@@ -53,16 +53,6 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
-	}
-
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
@@ -77,12 +67,12 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	)
 
 	hostName := instance.GetName()
-	sshProfile, xerr := instance.GetSSHConfig(task.Context())
+	sshProfile, xerr := instance.GetSSHConfig(ctx)
 	if xerr != nil {
 		return retCode, stdOut, stdErr, xerr
 	}
 
-	retCode, stdOut, stdErr, xerr = run(task.Context(), sshProfile, cmd, outs, connTimeout+execTimeout)
+	retCode, stdOut, stdErr, xerr = run(ctx, sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -214,16 +204,6 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
-	}
-
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
@@ -244,7 +224,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		stdout, stderr string
 	)
 	retcode := -1
-	sshProfile, xerr := instance.GetSSHConfig(task.Context())
+	sshProfile, xerr := instance.GetSSHConfig(ctx)
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
@@ -255,7 +235,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		func() error {
 			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 
-			copyCtx, cancel := context.WithTimeout(task.Context(), uploadTime)
+			copyCtx, cancel := context.WithTimeout(ctx, uploadTime)
 			defer cancel()
 
 			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, uploadTime)
@@ -276,7 +256,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			}
 
 			crcCheck := func() fail.Error {
-				crcCtx, cancelCrc := context.WithTimeout(task.Context(), uploadTime)
+				crcCtx, cancelCrc := context.WithTimeout(ctx, uploadTime)
 				defer cancelCrc()
 
 				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, uploadTime)
@@ -348,7 +328,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(task.Context(), sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(ctx, sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)

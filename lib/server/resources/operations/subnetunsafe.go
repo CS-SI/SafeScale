@@ -208,21 +208,21 @@ func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkI
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
-	defer instance.undoCreateSecurityGroup(&ferr, keepOnFailure, subnetGWSG)
+	defer instance.undoCreateSecurityGroup(ctx, &ferr, keepOnFailure, subnetGWSG)
 
 	subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, networkID, networkName, keepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
-	defer instance.undoCreateSecurityGroup(&ferr, keepOnFailure, subnetPublicIPSG)
+	defer instance.undoCreateSecurityGroup(ctx, &ferr, keepOnFailure, subnetPublicIPSG)
 
 	subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, networkID, networkName, keepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
-	defer instance.undoCreateSecurityGroup(&ferr, keepOnFailure, subnetInternalSG)
+	defer instance.undoCreateSecurityGroup(ctx, &ferr, keepOnFailure, subnetInternalSG)
 
 	xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -402,7 +402,7 @@ func (instance *Subnet) createPublicIPSecurityGroup(
 }
 
 // Starting from here, delete the Security Group if exiting with error
-func (instance *Subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
+func (instance *Subnet) undoCreateSecurityGroup(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
 	if errorPtr == nil {
 		logrus.Errorf("trying to undo an action based on the content of a nil fail.Error; undo cannot be run") // FIXME: return error
 		return
@@ -448,7 +448,7 @@ func (instance *Subnet) createInternalSecurityGroup(
 		}
 	}()
 
-	// adds rules that depends on Security Group ID
+	// adds rules that depend on Security Group ID
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: fmt.Sprintf("[egress][ipv4][all] Allow all from %s", cidr),
