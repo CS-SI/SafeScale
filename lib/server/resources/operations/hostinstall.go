@@ -45,7 +45,7 @@ import (
 func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -128,7 +128,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -164,7 +164,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -233,7 +233,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 // TargetType returns the type of the target.
 // satisfies install.Targetable interface.
 func (instance *Host) TargetType() featuretargettype.Enum {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return featuretargettype.Unknown
 	}
 
@@ -243,7 +243,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
 func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}
 
@@ -262,7 +262,7 @@ func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmeth
 func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == nil {
@@ -311,7 +311,7 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == "" {
@@ -339,7 +339,7 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -351,7 +351,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -543,7 +543,7 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 	found = false
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {

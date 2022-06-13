@@ -59,7 +59,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
 func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -106,7 +106,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) []string {
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
 func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -241,7 +241,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == nil {
@@ -281,7 +281,7 @@ func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Fea
 func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if feat == "" {
@@ -309,7 +309,7 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -352,7 +352,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	defer fail.OnPanic(&ferr)
 
 	var emptySlice []resources.Feature
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -392,7 +392,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 // AddFeature installs a feature on the Cluster
 func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -413,7 +413,7 @@ func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.
 
 // CheckFeature tells if a feature is installed on the Cluster
 func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -434,7 +434,7 @@ func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars dat
 
 // RemoveFeature uninstalls a feature from the Cluster
 func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -461,7 +461,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if tmplName == "" {
