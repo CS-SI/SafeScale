@@ -4063,6 +4063,13 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		}
 	}()
 
+	if value == "" {
+		value, xerr = labelInstance.DefaultValue(ctx)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			hostLabelsV1, ok := clonable.(*propertiesv1.HostLabels)

@@ -81,18 +81,24 @@ func LabelBase(t *testing.T) {
 
 	fmt.Println("Binding Label to Host with default value")
 	out, err = helpers.GetOutput("safescale host label bind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
-	require.Nil(t, err)
 	_ = out
+	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale host label bind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
-	require.Nil(t, err)
+	out, err = helpers.GetOutput("safescale host label bind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	_ = out
+	require.Nil(t, err)
 
 	out, err = helpers.GetOutput("safescale host label list " + "gw-" + names.Networks[0])
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
 	require.True(t, len(result.([]interface{})) == 1)
+
+	out, err = helpers.GetOutput("safescale host label inspect " + "gw-" + names.Networks[0] + " " + names.Labels[0])
+	require.Nil(t, err)
+	result, err = helpers.ExtractResult(out)
+	require.Nil(t, err)
+	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
 
 	fmt.Println("Updating value of Label for Host")
 	out, err = helpers.GetOutput("safescale host label update --value newvalue " + "gw-" + names.Networks[0] + " " + names.Labels[0])
@@ -103,7 +109,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, result.(map[string]interface{})["value"].(string) == "newvalue")
+	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "newvalue")
 
 	fmt.Println("Resetting value of Label for Host")
 	out, err = helpers.GetOutput("safescale host label reset " + "gw-" + names.Networks[0] + " " + names.Labels[0])
@@ -114,15 +120,15 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, result.(map[string]interface{})["value"].(string) == "labelvalue")
+	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
 
 	fmt.Println("deleting still bound Label")
 	out, err = helpers.GetOutput("safescale label delete " + names.Labels[0])
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "Label still bound to hosts"))
+	require.True(t, strings.Contains(strings.ToLower(out), "still bound to hosts"))
 
 	fmt.Println("Unbinding Label from Host")
-	out, err = helpers.GetOutput("safescale host Label unbind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
+	out, err = helpers.GetOutput("safescale host label unbind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	_ = out
 	require.Nil(t, err)
 
@@ -139,10 +145,10 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
-	require.True(t, result.(map[string]interface{})["value"].(string) == "differentvalue")
+	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "differentvalue")
 
 	fmt.Println("unbinding Label from Host")
-	out, err = helpers.GetOutput("safescale host Label unbind " + "gw-" + names.Networks[0] + " " + names.Tags[0])
+	out, err = helpers.GetOutput("safescale host Label unbind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	_ = out
 	require.Nil(t, err)
 

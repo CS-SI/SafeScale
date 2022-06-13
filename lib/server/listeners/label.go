@@ -120,14 +120,6 @@ func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequ
 	return labelInstance.ToProtocol(job.Context())
 }
 
-func kindToString(state bool) string {
-	if state {
-		return "Tag"
-	}
-
-	return "Label"
-}
-
 // Delete a Label
 func (s *LabelListener) Delete(ctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)

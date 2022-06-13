@@ -35,11 +35,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
-	labelfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/label"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -978,41 +976,75 @@ func (s *HostListener) ListLabels(ctx context.Context, in *protocol.LabelBoundsR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Review(job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
-			hlV1, ok := clonable.(*propertiesv1.HostLabels)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			for k := range hlV1.ByID {
-				labelInstance, innerXErr := labelfactory.Load(ctx, job.Service(), k)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				item, innerXErr := labelInstance.ToProtocol(ctx)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				list = append(list, item)
-			}
-			return nil
-		})
-	})
+	hostHandler := handlers.NewHostHandler(job)
+	list, xerr := hostHandler.ListLabels(hostRef, kind)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	out := &protocol.LabelListResponse{
 		Labels: list,
+	}
+	return out, nil
+}
+
+func kindToString(state bool) string {
+	if state {
+		return "Tag"
+	}
+
+	return "Label"
+}
+
+// InspectLabel inspects a Label of a Host
+func (s *HostListener) InspectLabel(ctx context.Context, in *protocol.HostLabelRequest) (_ *protocol.HostLabelResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect Label of Host")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx").ToGRPCStatus()
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
+	if labelRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/bind", hostRef, labelRef))
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostHandler := handlers.NewHostHandler(job)
+	labelInstance, hostValue, xerr := hostHandler.InspectLabel(hostRef, labelRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	outLabel, xerr := labelInstance.ToProtocol(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &protocol.HostLabelResponse{
+		Label: outLabel,
+		Value: hostValue,
 	}
 	return out, nil
 }
@@ -1053,17 +1085,9 @@ func (s *HostListener) BindLabel(ctx context.Context, in *protocol.LabelBindRequ
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	hostHandler := handlers.NewHostHandler(job)
+	xerr = hostHandler.BindLabel(hostRef, labelRef, in.GetValue())
 	if xerr != nil {
-		return empty, xerr
-	}
-
-	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	if xerr = hostInstance.BindLabel(job.Context(), labelInstance, in.GetValue()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -1107,17 +1131,9 @@ func (s *HostListener) UnbindLabel(ctx context.Context, in *protocol.LabelBindRe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	hostHandler := handlers.NewHostHandler(job)
+	xerr = hostHandler.UnbindLabel(hostRef, labelRef)
 	if xerr != nil {
-		return empty, xerr
-	}
-
-	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	if xerr = hostInstance.UnbindLabel(job.Context(), labelInstance); xerr != nil {
 		return empty, xerr
 	}
 
@@ -1161,17 +1177,9 @@ func (s *HostListener) UpdateLabel(ctx context.Context, in *protocol.LabelBindRe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	hostHandler := handlers.NewHostHandler(job)
+	xerr = hostHandler.UpdateLabel(hostRef, labelRef, in.GetValue())
 	if xerr != nil {
-		return empty, xerr
-	}
-
-	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	if xerr = hostInstance.UpdateLabel(job.Context(), labelInstance, in.GetValue()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -1215,20 +1223,12 @@ func (s *HostListener) ResetLabel(ctx context.Context, in *protocol.LabelBindReq
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(job.Context(), job.Service(), hostRef)
+	hostHandler := handlers.NewHostHandler(job)
+	xerr = hostHandler.ResetLabel(hostRef, labelRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(job.Context(), job.Service(), labelRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	if xerr = hostInstance.ResetLabel(job.Context(), labelInstance); xerr != nil {
-		return empty, xerr
-	}
-
-	tracer.Trace("Label %s successfully unbound from Host %s", hostRefLabel, labelRefLabel)
+	tracer.Trace("Value of Label %s for Host %s successfully reset to Label default value", hostRefLabel, labelRefLabel)
 	return empty, nil
 }

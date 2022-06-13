@@ -1398,7 +1398,7 @@ var hostLabelInspectCommand = cli.Command{
 		}
 
 		if !result.Label.GetHasDefault() {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("cannot nspect Host Label: '%s' is a Tag", c.Args().First())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("cannot inspect Host Label: '%s' is a Tag", c.Args().First())))
 		}
 
 		out := map[string]interface{}{
@@ -1407,7 +1407,9 @@ var hostLabelInspectCommand = cli.Command{
 				"id":            result.Label.GetId(),
 				"default_value": result.Label.GetDefaultValue(),
 			},
-			"value": result.Value,
+			"host": map[string]string{
+				"value": result.Value,
+			},
 		}
 		return clitools.SuccessResponse(out)
 	},
