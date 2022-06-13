@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package share
+package ssh
 
 import (
 	"os"
