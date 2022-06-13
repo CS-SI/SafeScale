@@ -835,7 +835,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 				normalizeError,
 			)
 			if innerXErr != nil {
-				return normalizeError(err)
+				return normalizeError(innerXErr)
 			}
 			subnet, err = respGet.Extract()
 			if err != nil {
