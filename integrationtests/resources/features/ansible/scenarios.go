@@ -49,7 +49,7 @@ func Ansible(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, name, res)
 
-	out, err = helpers.GetOutput(fmt.Sprintf("safescale host add-feature gw-%s ansible", name))
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale host feature add gw-%s ansible", name))
 	require.Nil(t, err)
 	res, err = helpers.RunJq(out, "-r .status")
 	require.Nil(t, err)
