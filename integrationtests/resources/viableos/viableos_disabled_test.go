@@ -25,5 +25,5 @@ import (
 )
 
 func Test_Nop(t *testing.T) {
-	t.Skip("network tests disabled")
+	t.Skip("viableos tests disabled")
 }

@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 

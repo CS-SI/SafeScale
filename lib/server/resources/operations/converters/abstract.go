@@ -26,7 +26,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
 // Contains the function used to convert from abstract structures

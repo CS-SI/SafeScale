@@ -30,7 +30,7 @@ import (
 )
 
 func CreateCentosNetwork(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -64,7 +64,7 @@ func CreateCentosNetwork(t *testing.T) {
 }
 
 func CreateDebianNetwork(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -98,7 +98,7 @@ func CreateDebianNetwork(t *testing.T) {
 }
 
 func CreateUbuntuNetwork(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -132,4 +132,8 @@ func CreateUbuntuNetwork(t *testing.T) {
 }
 
 func init() {
+	helpers.InSection("viableos").
+		AddScenario(CreateCentosNetwork).
+		AddScenario(CreateDebianNetwork).
+		AddScenario(CreateUbuntuNetwork)
 }

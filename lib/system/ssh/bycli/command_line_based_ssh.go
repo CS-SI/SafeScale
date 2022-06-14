@@ -33,7 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"

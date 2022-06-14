@@ -30,7 +30,7 @@ import (
 	"time"
 
 	ssh2 "github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/sshtunnel"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"

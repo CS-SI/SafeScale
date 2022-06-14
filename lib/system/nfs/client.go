@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 

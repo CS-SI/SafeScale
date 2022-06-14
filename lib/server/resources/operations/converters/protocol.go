@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 

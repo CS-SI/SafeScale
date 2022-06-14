@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )

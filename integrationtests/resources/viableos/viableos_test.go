@@ -25,7 +25,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
-func Test_NetworkCreate(t *testing.T) {
-	helpers.InSection("viableos").AddScenario(CreateCentosNetwork).AddScenario(CreateDebianNetwork).AddScenario(CreateUbuntuNetwork)
+func Test_ViableosCreate(t *testing.T) {
+	helpers.InSection("viableos").Clear().
+		AddScenario(CreateCentosNetwork).
+		AddScenario(CreateDebianNetwork).
+		AddScenario(CreateUbuntuNetwork)
 	helpers.RunScenarios(t)
 }

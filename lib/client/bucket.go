@@ -82,7 +82,7 @@ func (c bucketConsumer) Create(name string, timeout time.Duration) error {
 	return err
 }
 
-// Create ...
+// Download ...
 func (c bucketConsumer) Download(name string, timeout time.Duration) (*protocol.BucketDownloadResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()

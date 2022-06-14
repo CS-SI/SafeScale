@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -52,7 +53,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -2545,7 +2546,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			// Unbind Security Groups from Host
 			var errors []error
 			for k := range hlV1.ByID {
-				labelInstance, derr := LoadLabel(task.Context(), svc, k)
+				labelInstance, derr := LoadLabel(ctx, svc, k)
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
@@ -2557,7 +2558,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					continue
 				}
 
-				derr = labelInstance.UnbindFromHost(task.Context(), instance)
+				derr = labelInstance.UnbindFromHost(ctx, instance)
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:

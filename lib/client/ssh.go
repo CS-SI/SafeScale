@@ -28,8 +28,6 @@ import (
 	"strings"
 	"time"
 
-	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -89,7 +87,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 				return innerXErr
 			}
 
-			defer func(cmd api.Command) {
+			defer func(cmd sshapi.Command) {
 				derr := cmd.Close()
 				if derr != nil {
 					if innerErr != nil {
@@ -437,7 +435,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 }
 
 // getSSHConfigFromName ...
-func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (*api.Config, fail.Error) {
+func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (sshapi.Config, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
 
