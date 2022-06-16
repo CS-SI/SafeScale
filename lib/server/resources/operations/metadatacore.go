@@ -473,7 +473,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 	}
 
 	if !isID && !isName {
-		return fail.NotFoundError("nor %s nor %s were found in the bucket", myself.folder.absolutePath(byNameFolderName, ref), myself.folder.absolutePath(byIDFolderName, ref))
+		return fail.NotFoundError("neither %s nor %s were found in the bucket", myself.folder.absolutePath(byNameFolderName, ref), myself.folder.absolutePath(byIDFolderName, ref))
 	}
 
 	myself.loaded = true

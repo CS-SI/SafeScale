@@ -20,15 +20,16 @@
 package helpers
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/integrationtests/providers"
 	"github.com/itchyny/gojq"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 )
 
 // HostInfo ...
@@ -97,6 +98,32 @@ func GetOutput(command string) (string, error) {
 	}
 
 	return string(out), nil
+}
+
+// JSONToMap converts a slice of byte containing JSON code to a map
+func JSONToMap(in string) (map[string]interface{}, error) {
+	var out map[string]interface{}
+	err := json.Unmarshal(([]byte)(in), &out)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func ExtractResult(in string) (interface{}, error) {
+	jsoned, err := JSONToMap(in)
+	if err != nil {
+		fmt.Printf("JSONToMap failed: %v\n", err)
+		return nil, err
+	}
+
+	result, ok := jsoned["result"]
+	if !ok || result == nil {
+		return nil, nil
+	}
+
+	return result, nil
 }
 
 // RunOnlyInIntegrationTest ...

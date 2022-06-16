@@ -1,6 +1,6 @@
-//go:build !(allintegration || (integration && ostests))
+//go:build !(allintegration || (integration && labeltests))
 // +build !allintegration
-// +build !integration !ostests
+// +build !integration !labeltests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -18,12 +18,12 @@
  * limitations under the License.
  */
 
-package viableos
+package labels
 
 import (
 	"testing"
 )
 
 func Test_Nop(t *testing.T) {
-	t.Skip("network tests disabled")
+	t.Skip("label tests disabled")
 }

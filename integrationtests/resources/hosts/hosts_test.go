@@ -26,21 +26,21 @@ import (
 )
 
 func Test_BasicPublicHosts(t *testing.T) {
-	helpers.InSection("hosts").AddScenario(BasicPublicHosts)
+	helpers.InSection("hosts").Clear().AddScenario(BasicPublicHosts)
 	helpers.RunScenarios(t)
 }
 
 func Test_BasicNormalHosts(t *testing.T) {
-	helpers.InSection("hosts").AddScenario(BasicNormalHosts)
+	helpers.InSection("hosts").Clear().AddScenario(BasicNormalHosts)
 	helpers.RunScenarios(t)
 }
 
 func Test_ReadyToSSH(t *testing.T) {
-	helpers.InSection("hosts").AddScenario(ReadyToSSH)
+	helpers.InSection("hosts").Clear().AddScenario(ReadyToSSH)
 	helpers.RunScenarios(t)
 }
 
 func Test_StopStartReadyToSSH(t *testing.T) {
-	helpers.InSection("hosts").AddScenario(StopStart)
+	helpers.InSection("hosts").Clear().AddScenario(StopStart)
 	helpers.RunScenarios(t)
 }

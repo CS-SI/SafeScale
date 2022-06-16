@@ -33,14 +33,14 @@ import (
 
 // var sshCfgCache = cache.NewMapCache()
 
-// securityGroup is the SafeScale client part handling security groups
-type securityGroup struct {
+// securityGroupConsumer is the SafeScale client part handling security groups
+type securityGroupConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
 // List ...
-func (sg securityGroup) List(all bool, timeout time.Duration) (*protocol.SecurityGroupListResponse, error) {
+func (sg securityGroupConsumer) List(all bool, timeout time.Duration) (*protocol.SecurityGroupListResponse, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -66,7 +66,7 @@ func (sg securityGroup) List(all bool, timeout time.Duration) (*protocol.Securit
 }
 
 // Inspect ...
-func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.SecurityGroupResponse, error) {
+func (sg securityGroupConsumer) Inspect(ref string, timeout time.Duration) (*protocol.SecurityGroupResponse, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -92,7 +92,7 @@ func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.Se
 }
 
 // Create creates a new security group
-func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, timeout time.Duration) (*abstract.SecurityGroup, error) {
+func (sg securityGroupConsumer) Create(networkRef string, req abstract.SecurityGroup, timeout time.Duration) (*abstract.SecurityGroup, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -129,7 +129,7 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 }
 
 // Delete deletes several hosts at the same time in goroutines
-func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration) error {
+func (sg securityGroupConsumer) Delete(names []string, force bool, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -183,7 +183,7 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 }
 
 // Clear ...
-func (sg securityGroup) Clear(ref string, timeout time.Duration) error {
+func (sg securityGroupConsumer) Clear(ref string, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -209,7 +209,7 @@ func (sg securityGroup) Clear(ref string, timeout time.Duration) error {
 }
 
 // Reset ...
-func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
+func (sg securityGroupConsumer) Reset(ref string, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -235,7 +235,7 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 }
 
 // AddRule ...
-func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
+func (sg securityGroupConsumer) AddRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -265,7 +265,7 @@ func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, 
 }
 
 // DeleteRule ...
-func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
+func (sg securityGroupConsumer) DeleteRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -295,7 +295,7 @@ func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRul
 }
 
 // Bonds ...
-func (sg securityGroup) Bonds(group, kind string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+func (sg securityGroupConsumer) Bonds(group, kind string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 

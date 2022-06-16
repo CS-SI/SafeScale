@@ -28,13 +28,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// share is the part of the safescale client handling Shares
-type share struct {
+// shareConsumer is the part of the safescale client handling Shares
+type shareConsumer struct {
 	session *Session
 }
 
 // Create ...
-func (n share) Create(def *protocol.ShareDefinition, timeout time.Duration) error {
+func (n shareConsumer) Create(def *protocol.ShareDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -59,7 +59,7 @@ func (n share) Create(def *protocol.ShareDefinition, timeout time.Duration) erro
 }
 
 // Delete deletes a share
-func (n share) Delete(names []string, timeout time.Duration) error {
+func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 
@@ -110,7 +110,7 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 }
 
 // List ...
-func (n share) List(timeout time.Duration) (*protocol.ShareList, error) {
+func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -135,7 +135,7 @@ func (n share) List(timeout time.Duration) (*protocol.ShareList, error) {
 }
 
 // Mount ...
-func (n share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
+func (n shareConsumer) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -160,7 +160,7 @@ func (n share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) 
 }
 
 // Unmount ...
-func (n share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
+func (n shareConsumer) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -185,7 +185,7 @@ func (n share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration
 }
 
 // Inspect ...
-func (n share) Inspect(name string, timeout time.Duration) (*protocol.ShareMountList, error) {
+func (n shareConsumer) Inspect(name string, timeout time.Duration) (*protocol.ShareMountList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)

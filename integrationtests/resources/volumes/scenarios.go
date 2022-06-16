@@ -145,7 +145,7 @@ import (
 // }
 
 func VolumeError(t *testing.T) {
-	names := helpers.GetNames("VolumeError", 0, 1, 1, 1, 1, 0)
+	names := helpers.GetNames("VolumeError", 0, 1, 1, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -190,7 +190,7 @@ func VolumeError(t *testing.T) {
 }
 
 func DeleteVolumeMounted(t *testing.T) {
-	names := helpers.GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1, 0)
+	names := helpers.GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -267,7 +267,7 @@ func DeleteVolumeMounted(t *testing.T) {
 
 // UntilVolumeCreated creates everything until a volume is created
 func UntilVolumeCreated(t *testing.T) {
-	names := helpers.GetNames("UntilVolume", 0, 1, 1, 2, 1, 0)
+	names := helpers.GetNames("UntilVolume", 0, 1, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 

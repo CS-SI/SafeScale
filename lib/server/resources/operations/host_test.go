@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
@@ -47,7 +49,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_host_IsNull_Empty(t *testing.T) {

@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -42,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/labelproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
@@ -52,6 +53,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -81,7 +83,7 @@ type Host struct {
 		sync.RWMutex
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
-		sshProfile                    api.Connector
+		sshProfile                    sshapi.Connector
 	}
 }
 
@@ -199,7 +201,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig api.Config
+		var primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -216,10 +218,14 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			if instance.localCache.publicIP == "" {
 				instance.localCache.publicIP = hnV2.PublicIPv6
 			}
-			if instance.localCache.publicIP != "" {
-				instance.localCache.accessIP = instance.localCache.publicIP
-			} else {
+
+			// FIXME: find a better way to handle the use case (adjust SG? something else?)
+			// Workaround for a specific use: safescaled inside a cluster, to force access to host using internal IP
+			from_inside := os.Getenv("SAFESCALED_FROM_INSIDE")
+			if instance.localCache.publicIP == "" || from_inside == "true" {
 				instance.localCache.accessIP = instance.localCache.privateIP
+			} else {
+				instance.localCache.accessIP = instance.localCache.publicIP
 			}
 
 			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
@@ -1211,24 +1217,18 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 	}
 
 	if img == nil {
-		return "", "", fail.Wrap(
-			xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef,
-		)
+		return "", "", fail.Wrap(xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef)
 	}
 
 	if img.ID == "" {
-		return "", "", fail.Wrap(
-			xerr, "failed to find image ID corresponding to '%s' to use on compute resource, with img '%v'", imageRef, img,
-		)
+		return "", "", fail.Wrap(xerr, "failed to find image ID corresponding to '%s' to use on compute resource, with img '%v'", imageRef, img)
 	}
 
 	return imageRef, img.ID, nil
 }
 
 // setSecurityGroups sets the Security Groups for the host
-func (instance *Host) setSecurityGroups(
-	ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet,
-) fail.Error {
+func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet) fail.Error {
 	svc := instance.Service()
 	if req.Single {
 		hostID := instance.GetID()
@@ -2536,6 +2536,49 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
 		}
 
+		// Unbind labels from Host
+		innerXErr = props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hlV1, ok := clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// Unbind Security Groups from Host
+			var errors []error
+			for k := range hlV1.ByID {
+				labelInstance, derr := LoadLabel(ctx, svc, k)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						debug.IgnoreError(derr)
+					default:
+						errors = append(errors, derr)
+					}
+					continue
+				}
+
+				derr = labelInstance.UnbindFromHost(ctx, instance)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						debug.IgnoreError(derr)
+					default:
+						errors = append(errors, derr)
+					}
+				}
+			}
+			if len(errors) > 0 {
+				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
+			}
+
+			return nil
+		})
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+		}
+
 		// Delete Host
 		waitForDeletion := true
 		innerXErr = retry.WhileUnsuccessful(
@@ -2657,7 +2700,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ api.Connector, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Connector, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -3928,4 +3971,302 @@ func inBackground() bool {
 	default:
 		return true
 	}
+}
+
+// ListTags lists tags bound to Host
+func (instance *Host) ListTags(ctx context.Context) (_ map[string]string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	// instance.Lock()
+	// defer instance.Unlock()
+
+	var tagsV1 *propertiesv1.HostLabels
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			tagsV1, ok = clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return tagsV1.ByName, nil
+}
+
+// BindLabel binds a Label to Host
+func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Label, value string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if labelInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("label")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	labelName := labelInstance.GetName()
+	labelID := labelInstance.GetID()
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	// Inform Label we want it bound to Host (updates its metadata)
+	xerr = labelInstance.BindToHost(ctx, instance, value)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+	defer func() {
+		if ferr != nil {
+			derr := labelInstance.UnbindFromHost(ctx, instance)
+			if derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure"))
+			}
+		}
+	}()
+
+	if value == "" {
+		value, xerr = labelInstance.DefaultValue(ctx)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hostLabelsV1, ok := clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// If the host already has this tag, consider it a success
+			_, ok = hostLabelsV1.ByID[labelID]
+			if !ok {
+				hostLabelsV1.ByID[labelID] = value
+				hostLabelsV1.ByName[labelName] = value
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// UnbindLabel removes a Label from Host
+func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.Label) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if labelInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("labelInstance")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	labelName := labelInstance.GetName()
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hostLabelsV1, ok := clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			labelID := labelInstance.GetID()
+			// If the host is not bound to this Label, consider it a success
+			if _, ok = hostLabelsV1.ByID[labelID]; ok {
+				delete(hostLabelsV1.ByID, labelID)
+				delete(hostLabelsV1.ByName, labelInstance.GetName())
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = labelInstance.UnbindFromHost(ctx, instance)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// ResetLabel resets the value of Label bound with Host to default value of Label
+func (instance *Host) ResetLabel(ctx context.Context, labelInstance resources.Label) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if labelInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("tag")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	defaultValue, xerr := labelInstance.DefaultValue(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	return instance.UpdateLabel(ctx, labelInstance, defaultValue)
+}
+
+// UpdateLabel resets the value of the Label bound to Host to default value of Label
+func (instance *Host) UpdateLabel(ctx context.Context, labelInstance resources.Label, value string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if instance == nil || valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if labelInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("labelInstance")
+	}
+
+	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	labelName := labelInstance.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	var alabel *abstract.Label
+	hostID := instance.GetID()
+	hostName := instance.GetName()
+	xerr = labelInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		var ok bool
+		alabel, ok = clonable.(*abstract.Label)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// If the tag does not have this host, consider it a success
+			if _, ok = labelHostsV1.ByID[hostID]; !ok {
+				return fail.NotFoundError("failed to find bind of Host %s with Label %s", alabel.Name, hostName)
+			}
+
+			labelHostsV1.ByID[hostID] = value
+			labelHostsV1.ByName[hostName] = value
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hostLabelsV1, ok := clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// If the host is not bound to this Label, consider it a success
+			if _, ok = hostLabelsV1.ByID[alabel.ID]; !ok {
+				return fail.NotFoundError("failed to find bind of Label %s with Host %s", hostName, alabel.Name)
+			}
+
+			hostLabelsV1.ByID[alabel.ID] = value
+			hostLabelsV1.ByName[alabel.Name] = value
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }

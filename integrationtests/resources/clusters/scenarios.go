@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package clusters // Package clusters contains integration tests
+package clusters // Package clusters this package contains integration tests of clusters
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ import (
 )
 
 func ClusterK8S(t *testing.T) {
-	names := helpers.GetNames("ClusterK8S", 0, 0, 0, 0, 0, 1)
+	names := helpers.GetNames("ClusterK8S", 0, 0, 0, 0, 0, 1, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 

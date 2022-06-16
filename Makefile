@@ -432,6 +432,7 @@ vettest:
 	@cd integrationtests && $(GO) vet -tags volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags sharetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags labeltests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags integration,buckettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags integration,clustertests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags integration,networktests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
@@ -441,6 +442,7 @@ vettest:
 	@cd integrationtests && $(GO) vet -tags integration,volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags integration,sharetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@cd integrationtests && $(GO) vet -tags integration,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,labeltests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
 	@mv ./integrationtests/integration_vet_results.log .
 	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_vet_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then exit 1;fi;
@@ -461,6 +463,7 @@ validtest: vettest
 	@cd integrationtests && (echo "tags=volumetests:" && $(GO) test -v -tags volumetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=sharetests:" && $(GO) test -v -tags sharetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=securitygrouptests:" && $(GO) test -v -tags securitygrouptests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=labeltests:" && $(GO) test -v -tags labeltests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=integration,buckettests:" && $(GO) test -v -tags integration,buckettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=integration,clustertests:" && $(GO) test -v -tags integration,clustertests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=integration,networktests:" && $(GO) test -v -tags integration,networktests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
@@ -470,6 +473,7 @@ validtest: vettest
 	@cd integrationtests && (echo "tags=integration,volumetests:" && $(GO) test -v -tags integration,volumetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=integration,sharetests:" && $(GO) test -v -tags integration,sharetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@cd integrationtests && (echo "tags=integration,securitygrouptests:" && $(GO) test -v -tags integration,securitygrouptests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,labeltests:" && $(GO) test -v -tags integration,labeltests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
 	@mv ./integrationtests/integration_results.log .
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;

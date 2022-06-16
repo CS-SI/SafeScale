@@ -59,7 +59,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 
 	var hostInstance *protocol.Host
 	if instanciate {
-		Session, xerr := client.New(c.String("server"))
+		Session, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}

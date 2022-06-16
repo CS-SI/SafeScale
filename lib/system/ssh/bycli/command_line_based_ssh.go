@@ -30,11 +30,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -46,6 +45,7 @@ import (
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
@@ -58,22 +58,22 @@ const (
 
 // Profile helper to manage ssh session
 type Profile struct {
-	Hostname               string     `json:"hostname"`
-	IPAddress              string     `json:"ip_address"`
-	Port                   int        `json:"port"`
-	User                   string     `json:"user"`
-	PrivateKey             string     `json:"private_key"`
-	LocalPort              int        `json:"-"`
-	LocalHost              string     `json:"local_host"`
-	GatewayConfig          api.Config `json:"primary_gateway_config,omitempty"`
-	SecondaryGatewayConfig api.Config `json:"secondary_gateway_config,omitempty"`
+	Hostname               string        `json:"hostname"`
+	IPAddress              string        `json:"ip_address"`
+	Port                   int           `json:"port"`
+	User                   string        `json:"user"`
+	PrivateKey             string        `json:"private_key"`
+	LocalPort              int           `json:"-"`
+	LocalHost              string        `json:"local_host"`
+	GatewayConfig          sshapi.Config `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig sshapi.Config `json:"secondary_gateway_config,omitempty"`
 }
 
 func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
-func NewConnector(ac api.Config) (*Profile, fail.Error) {
+func NewConnector(ac sshapi.Config) (*Profile, fail.Error) {
 	if valid.IsNil(ac) {
 		return nil, fail.InvalidParameterCannotBeNilError("ac")
 	}
@@ -91,7 +91,7 @@ func NewConnector(ac api.Config) (*Profile, fail.Error) {
 	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
 }
 
-func (sconf *Profile) Config() (api.Config, fail.Error) {
+func (sconf *Profile) Config() (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -152,21 +152,21 @@ func (sconf *Profile) GetPrivateKey() (string, fail.Error) {
 	return sconf.PrivateKey, nil
 }
 
-func (sconf *Profile) GetPrimaryGatewayConfig() (api.Config, fail.Error) {
+func (sconf *Profile) GetPrimaryGatewayConfig() (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.GatewayConfig, nil
 }
 
-func (sconf *Profile) GetSecondaryGatewayConfig() (api.Config, fail.Error) {
+func (sconf *Profile) GetSecondaryGatewayConfig() (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
 	return sconf.SecondaryGatewayConfig, nil
 }
 
-func (sconf *Profile) GetGatewayConfig(num uint) (api.Config, fail.Error) {
+func (sconf *Profile) GetGatewayConfig(num uint) (sshapi.Config, fail.Error) {
 	if valid.IsNil(sconf) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -354,7 +354,7 @@ func isTunnelReady(port int) bool {
 
 // buildTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's automatically chosen
-func buildTunnel(scfg api.Config) (*Tunnel, fail.Error) {
+func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	if valid.IsNil(scfg) {
 		return nil, fail.InvalidParameterCannotBeNilError("scfg")
 	}
@@ -843,10 +843,10 @@ func (scmd *CliCommand) Close() fail.Error {
 }
 
 // createConsecutiveTunnels creates recursively all the SSH tunnels hops needed to reach the remote
-func createConsecutiveTunnels(sc api.Config, tunnels *Tunnels) (*Tunnel, fail.Error) {
+func createConsecutiveTunnels(sc sshapi.Config, tunnels *Tunnels) (*Tunnel, fail.Error) {
 	if sc != nil {
 		// determine what gateway to use
-		var gwConf api.Config
+		var gwConf sshapi.Config
 
 		gwConf, xerr := sc.GetPrimaryGatewayConfig()
 		if xerr != nil {
@@ -1027,12 +1027,12 @@ func createSSHCommand(
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
-func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
+func (sconf *Profile) NewCommand(ctx context.Context, cmdString string) (sshapi.Command, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
-func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (api.Command, fail.Error) {
+func (sconf *Profile) NewSudoCommand(ctx context.Context, cmdString string) (sshapi.Command, fail.Error) {
 	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
@@ -1160,7 +1160,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		stdout, stderr string
 	)
 
-	cmdCloseFunc := func(cmd api.Command, deferErr *fail.Error) {
+	cmdCloseFunc := func(cmd sshapi.Command, deferErr *fail.Error) {
 		derr := cmd.Close()
 		if derr != nil {
 			if deferErr != nil {
@@ -1188,7 +1188,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			}
 
 			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd api.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+			defer func(cmd sshapi.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
@@ -1204,7 +1204,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 					}
 
 					// Do not forget to close command, ie close SSH tunnel
-					defer func(cmd api.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+					defer func(cmd sshapi.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {

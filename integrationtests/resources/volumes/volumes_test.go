@@ -26,16 +26,16 @@ import (
 )
 
 func Test_VolumeError(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
+	helpers.InSection("volumes").Clear().AddScenario(VolumeError)
 	helpers.RunScenarios(t)
 }
 
 func Test_DeleteVolumeMounted(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
+	helpers.InSection("volumes").Clear().AddScenario(VolumeError)
 	helpers.RunScenarios(t)
 }
 
 func Test_UntilVolume(t *testing.T) {
-	helpers.InSection("volumes").AddScenario(VolumeError)
+	helpers.InSection("volumes").Clear().AddScenario(VolumeError)
 	helpers.RunScenarios(t)
 }

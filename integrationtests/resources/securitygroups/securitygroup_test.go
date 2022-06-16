@@ -25,6 +25,6 @@ import (
 
 func Test_SecurityGroupCreate(t *testing.T) {
 	t.Skip("not implemented")
-	// helpers.InSection("securitygroups").AddScenario(CreateNetwork)
+	// helpers.InSection("securitygroups").Clear().AddScenario(CreateNetwork)
 	// helpers.RunScenarios(t)
 }

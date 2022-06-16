@@ -123,6 +123,7 @@ func work(c *cli.Context) {
 	protocol.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
 	protocol.RegisterTenantServiceServer(s, &listeners.TenantListener{})
 	protocol.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
+	protocol.RegisterLabelServiceServer(s, &listeners.LabelListener{})
 
 	// enable heartbeat
 	go heartbeat.RunHeartbeatService(":10102")

@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/system"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/system"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
@@ -44,7 +44,7 @@ var nfsScripts embed.FS
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 func executeScript(
-	ctx context.Context, timings temporal.Timings, sshconfig api.Connector, name string,
+	ctx context.Context, timings temporal.Timings, sshconfig sshapi.Connector, name string,
 	data map[string]interface{},
 ) (string, fail.Error) {
 	currentCtx, cancel := context.WithCancel(ctx)

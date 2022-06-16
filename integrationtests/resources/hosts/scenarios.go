@@ -33,7 +33,7 @@ import (
 )
 
 func BasicPublicHosts(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 1, 1, 2, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 1, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -110,7 +110,7 @@ func BasicPublicHosts(t *testing.T) {
 }
 
 func BasicNormalHosts(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 1, 1, 2, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 1, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -283,7 +283,7 @@ func BasicNormalHosts(t *testing.T) {
 }
 
 func ReadyToSSH(t *testing.T) {
-	names := helpers.GetNames("ReadyToSSH", 0, 0, 0, 1, 1, 0)
+	names := helpers.GetNames("ReadyToSSH", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -310,7 +310,7 @@ func ReadyToSSH(t *testing.T) {
 }
 
 func StopStart(t *testing.T) {
-	names := helpers.GetNames("StopStart", 0, 1, 1, 1, 1, 0)
+	names := helpers.GetNames("StopStart", 0, 1, 1, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 

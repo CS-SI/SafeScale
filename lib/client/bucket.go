@@ -28,14 +28,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// bucket is the part of the safescale client handling buckets
-type bucket struct {
+// bucketConsumer is the part of the safescale client handling buckets
+type bucketConsumer struct {
 	// session is not used currently.
 	session *Session
 }
 
 // List ...
-func (c bucket) List(all bool, timeout time.Duration) (*protocol.BucketListResponse, error) {
+func (c bucketConsumer) List(all bool, timeout time.Duration) (*protocol.BucketListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
@@ -60,7 +60,7 @@ func (c bucket) List(all bool, timeout time.Duration) (*protocol.BucketListRespo
 }
 
 // Create ...
-func (c bucket) Create(name string, timeout time.Duration) error {
+func (c bucketConsumer) Create(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -82,8 +82,8 @@ func (c bucket) Create(name string, timeout time.Duration) error {
 	return err
 }
 
-// Create ...
-func (c bucket) Download(name string, timeout time.Duration) (*protocol.BucketDownloadResponse, error) {
+// Download ...
+func (c bucketConsumer) Download(name string, timeout time.Duration) (*protocol.BucketDownloadResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -106,7 +106,7 @@ func (c bucket) Download(name string, timeout time.Duration) (*protocol.BucketDo
 }
 
 // Delete ...
-func (c bucket) Delete(names []string, timeout time.Duration) error {
+func (c bucketConsumer) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
@@ -155,7 +155,7 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 }
 
 // Inspect ...
-func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketResponse, error) {
+func (c bucketConsumer) Inspect(name string, timeout time.Duration) (*protocol.BucketResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
@@ -176,7 +176,7 @@ func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketRes
 }
 
 // Mount ...
-func (c bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Duration) error {
+func (c bucketConsumer) Mount(bucketName, hostName, mountPoint string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
@@ -202,7 +202,7 @@ func (c bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dura
 }
 
 // Unmount ...
-func (c bucket) Unmount(bucketName, hostName string, timeout time.Duration) error {
+func (c bucketConsumer) Unmount(bucketName, hostName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)

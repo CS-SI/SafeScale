@@ -30,24 +30,21 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a ssh.Profile
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *api.Config {
-	var pgw, sgw api.Config
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) sshapi.Config {
+	var pgw, sgw sshapi.Config
 	if from.Gateway != nil {
-		pgw = *SSHConfigFromProtocolToSystem(from.Gateway)
+		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
 	}
 	if from.SecondaryGateway != nil {
-		sgw = *SSHConfigFromProtocolToSystem(from.SecondaryGateway)
+		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
 
-	cfg := ssh.NewConfig(from.HostName, from.Host, int(from.Port), from.User, from.PrivateKey, 0, "", pgw, sgw)
-
-	var acfg api.Config = *cfg
-	return &acfg
+	return ssh.NewConfig(from.HostName, from.Host, int(from.Port), from.User, from.PrivateKey, 0, "", pgw, sgw)
 }
 
 // FeatureSettingsFromProtocolToResource ...

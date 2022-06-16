@@ -26,11 +26,11 @@ import (
 )
 
 func Test_NetworkCreate(t *testing.T) {
-	helpers.InSection("networks").AddScenario(CreateNetwork)
+	helpers.InSection("networks").Clear().AddScenario(CreateNetwork)
 	helpers.RunScenarios(t)
 }
 
 func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-	helpers.InSection("networks").AddScenario(CreateNetworkWithoutSubnet)
+	helpers.InSection("networks").Clear().AddScenario(CreateNetworkWithoutSubnet)
 	helpers.RunScenarios(t)
 }

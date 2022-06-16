@@ -33,7 +33,7 @@ import (
 )
 
 func Standard(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 1, 2, 1, 0)
+	names := helpers.GetNames("BasicTest", 0, 0, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -133,7 +133,7 @@ func Standard(t *testing.T) {
 }
 
 func SharePartialError(t *testing.T) {
-	names := helpers.GetNames("SharePartialError", 0, 0, 1, 1, 1, 0)
+	names := helpers.GetNames("SharePartialError", 0, 0, 1, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -182,7 +182,7 @@ func SharePartialError(t *testing.T) {
 }
 
 func ShareError(t *testing.T) {
-	names := helpers.GetNames("ShareError", 0, 1, 1, 1, 1, 0)
+	names := helpers.GetNames("ShareError", 0, 1, 1, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -277,7 +277,7 @@ func ShareError(t *testing.T) {
 
 // UntilShareCreated creates everything until the share
 func UntilShareCreated(t *testing.T) {
-	names := helpers.GetNames("UntilShare", 0, 1, 1, 2, 1, 0)
+	names := helpers.GetNames("UntilShare", 0, 1, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -331,7 +331,7 @@ func UntilShareCreated(t *testing.T) {
 }
 
 func ShareVolumeMounted(t *testing.T) {
-	names := helpers.GetNames("ShareVolumeMounted", 0, 1, 1, 2, 1, 0)
+	names := helpers.GetNames("ShareVolumeMounted", 0, 1, 1, 2, 1, 0, 0, 0)
 	names.TearDown()
 	// defer names.TearDown()
 

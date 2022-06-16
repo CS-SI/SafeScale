@@ -42,4 +42,4 @@ The Security Group is registered as used by the Host, and its rules are applied 
 
 You can also bind other Security Group you have created.
 
-When a Security Group is bound to a Host, the rules contained in the Security Group are applied on the Host.S
+When a Security Group is bound to a Host, the rules contained in the Security Group are applied on the Host.

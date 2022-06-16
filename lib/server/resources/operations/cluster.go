@@ -309,6 +309,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if xerr != nil {
 		return xerr
 	}
+
 	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
 		return xerr

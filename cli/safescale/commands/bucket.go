@@ -121,7 +121,7 @@ var bucketDownload = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("output file should have .zip suffix"))
 		}
 
-		clientSession, xerr := client.New(c.String("server"))
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
 		if xerr != nil {
 			return clitools.FailureResponse(xerr)
 		}

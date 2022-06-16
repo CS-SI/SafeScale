@@ -175,7 +175,7 @@ func main() {
 			appwide.Debug = true
 		}
 
-		commands.ClientSession, err = client.New(c.String("server"))
+		commands.ClientSession, err = client.New(c.String("server"), c.String("tenant"))
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -231,6 +231,12 @@ func main() {
 
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
+
+	app.Commands = append(app.Commands, commands.LabelCommand)
+	sort.Sort(cli.CommandsByName(commands.LabelCommand.Subcommands))
+
+	app.Commands = append(app.Commands, commands.TagCommand)
+	sort.Sort(cli.CommandsByName(commands.TagCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 
