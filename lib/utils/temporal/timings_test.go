@@ -136,7 +136,7 @@ func TestMutableTimings_ToToml(t *testing.T) {
 func TestMutableTimings_ConnectionTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.ConnectionTimeout(), 60*time.Second)
+	require.EqualValues(t, mt.ConnectionTimeout(), 120*time.Second)
 
 	mt = NewTimings()
 	mt.Timeouts.Connection = 42 * time.Second
@@ -257,7 +257,7 @@ func TestMutableTimings_MetadataReadAfterWriteTimeout(t *testing.T) {
 func TestMutableTimings_RebootTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.RebootTimeout(), 45*time.Second)
+	require.EqualValues(t, mt.RebootTimeout(), 100*time.Second)
 
 	mt = NewTimings()
 	mt.Timeouts.RebootTimeout = 42 * time.Second
