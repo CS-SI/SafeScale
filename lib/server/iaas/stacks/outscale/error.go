@@ -116,33 +116,39 @@ func normalizeError(err error) fail.Error {
 	if err != nil {
 		switch realErr := err.(type) {
 		case outscaleError:
-			normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
-			if normalized != nil {
-				if _, ok := normalized.(*fail.ErrUnknown); ok {
-					errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
-					if xerr != nil { // we failed using the http return code, so send the normalized error
-						debug.IgnoreError(xerr)
-						return normalized
+			if _, ok := realErr.operationError.(osc.GenericOpenAPIError); ok {
+				normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
+				if normalized != nil {
+					if _, ok := normalized.(*fail.ErrUnknown); ok {
+						errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
+						if xerr != nil { // we failed using the http return code, so send the normalized error
+							debug.IgnoreError(xerr)
+							return normalized
+						}
+						return errFromHTTP // we got something
 					}
-					return errFromHTTP // we got something
+					return normalized
 				}
-				return normalized
+				return nil
 			}
-			return nil
+			return fail.UnknownErrorWithCause(err, nil, "unknown error not properly mapped yet")
 		case *outscaleError:
-			normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
-			if normalized != nil {
-				if _, ok := normalized.(*fail.ErrUnknown); ok {
-					errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
-					if xerr != nil { // we failed using the http return code, so send the normalized error
-						debug.IgnoreError(xerr)
-						return normalized
+			if _, ok := realErr.operationError.(osc.GenericOpenAPIError); ok {
+				normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
+				if normalized != nil {
+					if _, ok := normalized.(*fail.ErrUnknown); ok {
+						errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
+						if xerr != nil { // we failed using the http return code, so send the normalized error
+							debug.IgnoreError(xerr)
+							return normalized
+						}
+						return errFromHTTP // we got something
 					}
-					return errFromHTTP // we got something
+					return normalized
 				}
-				return normalized
+				return nil
 			}
-			return nil
+			return fail.UnknownErrorWithCause(err, nil, "unknown error not properly mapped yet")
 		case osc.GenericOpenAPIError:
 			return normalizeOpenAPIError(realErr)
 		default:

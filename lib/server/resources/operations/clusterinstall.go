@@ -75,9 +75,9 @@ func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installm
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *Cluster) InstalledFeatures(ctx context.Context) []string {
-	if instance == nil {
-		return []string{}
+func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.Error) {
+	if valid.IsNull(instance) {
+		return []string{}, fail.InvalidInstanceError()
 	}
 
 	var out []string
@@ -96,10 +96,9 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) []string {
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Error(xerr.Error())
-		return []string{}
+		return []string{}, xerr
 	}
-	return out
+	return out, nil
 }
 
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
@@ -358,7 +357,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures(ctx)
+	list, _ := instance.InstalledFeatures(ctx)
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
 	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {

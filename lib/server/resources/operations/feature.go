@@ -136,28 +136,21 @@ func (instance *Feature) Replace(p data.Clonable) (data.Clonable, error) {
 
 // GetName returns the display name of the Feature, with error handling
 func (instance *Feature) GetName() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
-
 	return instance.file.displayName
 }
 
 // GetID ...
 func (instance *Feature) GetID() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
 	return instance.GetName()
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling
-func (instance *Feature) GetFilename(ctx context.Context) string {
+func (instance *Feature) GetFilename(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
-		return ""
+		return "", fail.InvalidInstanceError()
 	}
 
-	return instance.file.fileName
+	return instance.file.fileName, nil
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling

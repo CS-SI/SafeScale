@@ -184,12 +184,18 @@ func executeScript(
 
 		xerr = retry.Action(
 			func() error {
-				sshCmd, innerXErr := sshconfig.NewSudoCommand(currentCtx, cmd)
+				var sshCmd sshapi.Command
+				var innerXErr fail.Error
+				defer func() {
+					if sshCmd != nil {
+						_ = sshCmd.Close()
+					}
+				}()
+
+				sshCmd, innerXErr = sshconfig.NewSudoCommand(currentCtx, cmd)
 				if innerXErr != nil {
 					return fail.ExecutionError(xerr)
 				}
-				defer func() { _ = sshCmd.Close() }()
-
 				if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(currentCtx, outputs.COLLECT, timings.ConnectionTimeout()+timings.HostOperationTimeout()); innerXErr != nil {
 					return fail.Wrap(innerXErr, "ssh operation failed")
 				}

@@ -148,18 +148,49 @@ func (tunnel *SSHTunnel) GetLogger() Printfer {
 	return tunnel.log
 }
 
-func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn) (err error) {
-	defer OnPanic(&err)
-	conn, err := listener.Accept()
-	if err != nil {
-		err = convertErrorToTunnelError(err)
-		return fmt.Errorf("error in listener waiting for a connection: %w", err)
+func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn, end chan interface{}) (ferr error) {
+	defer OnPanic(&ferr)
+
+	type result struct {
+		cha net.Conn
+		err error
 	}
-	if tunnel.withKeepAlive {
-		conn, _ = setConnectionDeadlines(conn, tunnel.timeKeepAliveRead, tunnel.timeKeepAliveWrite)
+
+	rCh := make(chan result)
+
+	go func() {
+		defer close(rCh)
+		conn, err := listener.Accept()
+		if err != nil {
+			err = convertErrorToTunnelError(err)
+			rCh <- result{
+				nil,
+				fmt.Errorf("error in listener waiting for a connection: %w", err),
+			}
+			return
+		}
+		if tunnel.withKeepAlive {
+			conn, _ = setConnectionDeadlines(conn, tunnel.timeKeepAliveRead, tunnel.timeKeepAliveWrite)
+		}
+		rCh <- result{
+			cha: conn,
+			err: nil,
+		}
+	}()
+
+	select {
+	case <-end:
+		tunnel.logf("connection waiting is over")
+		_ = listener.Close()
+		<-rCh // drain channel
+		return nil
+	case kc := <-rCh:
+		if kc.err != nil {
+			return kc.err
+		}
+		c <- kc.cha
+		return nil
 	}
-	c <- conn
-	return nil
 }
 
 func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout time.Duration) (
@@ -241,7 +272,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	tunnel.mu.Unlock() // nolint
 
 	defer func() {
-		tunnel.closerFw <- struct{}{}
 		close(tunnel.closerFw)
 	}()
 
@@ -260,14 +290,16 @@ func (tunnel *SSHTunnel) Start() (err error) {
 
 		errCh := make(chan error)
 		connCh := make(chan net.Conn)
+
 		go func() {
 			var crash error
 			defer SilentOnPanic(&crash)
 
-			cwErr := tunnel.newConnectionWaiter(listener, connCh)
+			defer close(errCh)
+
+			cwErr := tunnel.newConnectionWaiter(listener, connCh, tunnel.closer)
 			if cwErr != nil {
 				cwErr = convertErrorToTunnelError(cwErr)
-				defer close(errCh)
 				errCh <- cwErr
 			}
 			return // nolint
@@ -353,6 +385,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		return fmt.Errorf("error closing the listener: %w", err)
 	}
 
+	tunnel.logf("exiting tunnel Start")
 	return nil
 }
 
@@ -556,38 +589,37 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 				if ignored {
 					tunnel.logf("io.Copy [%s] ended with warnings", copier)
 				}
-				endCopy <- false
 				select {
 				case <-tunnel.closerFw:
 					return
 				case <-stopUpdown:
 					return
 				default:
+					endCopy <- false
 					updown <- true
 				}
 				return
 			}
 			tunnel.logf("io.Copy [%s] ended without error", copier)
-			endCopy <- true
 			select {
 			case <-tunnel.closerFw:
 				return
 			case <-stopUpdown:
 				return
 			default:
+				endCopy <- true
 				updown <- true
 			}
+			tunnel.logf("quitting copy routine")
 			return // nolint
 		}()
 		select {
 		case <-endCopy:
-			return
 		case <-stopUpdown:
-			return
 		case <-tunnel.closerFw:
 			tunnel.logf("tunnel is closing, stopping copies")
-			return
 		}
+		tunnel.logf("quitting copyconn")
 	}
 
 	// Both goroutines should end almost in the same second one after another, if not we can consider the tunnel dead...

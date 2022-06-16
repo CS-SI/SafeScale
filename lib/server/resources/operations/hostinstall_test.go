@@ -383,7 +383,8 @@ func TestHost_ListEligibleFeatures(t *testing.T) {
 		require.Nil(t, xerr)
 		require.Greater(t, len(list), 0)
 		for index := range list {
-			t.Logf("[%d] %s > %s", index, list[index].GetName(), list[index].GetFilename(ctx))
+			fn, _ := list[index].GetFilename(ctx)
+			t.Logf("[%d] %s > %s", index, list[index].GetName(), fn)
 		}
 	})
 	require.Nil(t, err)
@@ -452,7 +453,7 @@ func TestHost_InstalledFeatures(t *testing.T) {
 	require.Nil(t, xerr)
 
 	var ohost *Host = nil
-	results := ohost.InstalledFeatures(ctx)
+	results, _ := ohost.InstalledFeatures(ctx)
 	require.EqualValues(t, len(results), 0)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -476,7 +477,7 @@ func TestHost_InstalledFeatures(t *testing.T) {
 		require.Nil(t, xerr)
 		ohost := host.(*Host)
 
-		results = ohost.InstalledFeatures(ctx)
+		results, _ = ohost.InstalledFeatures(ctx)
 		require.EqualValues(t, len(results), 0)
 
 		xerr = host.Start(ctx)
@@ -487,7 +488,7 @@ func TestHost_InstalledFeatures(t *testing.T) {
 		_, xerr = ohost.AddFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 		require.Nil(t, xerr)
 
-		results = ohost.InstalledFeatures(ctx)
+		results, _ = ohost.InstalledFeatures(ctx)
 		require.EqualValues(t, len(results), 1)
 		require.EqualValues(t, results[0], "ansible")
 
