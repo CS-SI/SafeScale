@@ -223,15 +223,9 @@ func TestSubnet_GetID(t *testing.T) {
 
 func TestSubnet_GetCIDR(t *testing.T) {
 
-	var s *Subnet
-	cidr := s.GetCIDR()
-	if cidr != "" {
-		t.Error("Can't get cidr from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.ID = "Subnet ID"
-	cidr = s.GetCIDR()
+	cidr := s.GetCIDR()
 	if cidr != s.CIDR {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -241,12 +235,7 @@ func TestSubnet_GetCIDR(t *testing.T) {
 
 func TestVirtualIP_IsNull(t *testing.T) {
 
-	var v *VirtualIP = nil
-	if !v.IsNull() {
-		t.Error("Nil pointer virtual ip is null")
-		t.Fail()
-	}
-	v = NewVirtualIP()
+	v := NewVirtualIP()
 	if !v.IsNull() {
 		t.Error("Virtual ip without ID or Name is null")
 		t.Fail()
