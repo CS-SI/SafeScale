@@ -142,15 +142,9 @@ func TestVolume_Deserialize(t *testing.T) {
 
 func TestVolume_GetName(t *testing.T) {
 
-	var v *Volume = nil
-	name := v.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	v = NewVolume()
+	v := NewVolume()
 	v.Name = "Volume Name"
-	name = v.GetName()
+	name := v.GetName()
 	if name != v.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -160,15 +154,9 @@ func TestVolume_GetName(t *testing.T) {
 
 func TestVolume_GetID(t *testing.T) {
 
-	var v *Volume = nil
-	id := v.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	v = NewVolume()
+	v := NewVolume()
 	v.ID = "Volume ID"
-	id = v.GetID()
+	id := v.GetID()
 	if id != v.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

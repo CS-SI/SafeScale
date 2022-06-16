@@ -345,18 +345,12 @@ func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName returns the name of the host
 // Satisfies interface data.Identifiable
 func (hc *HostCore) GetName() string {
-	if hc == nil {
-		return ""
-	}
 	return hc.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
 func (hc *HostCore) GetID() string {
-	if hc == nil {
-		return ""
-	}
 	return hc.ID
 }
 

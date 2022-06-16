@@ -199,15 +199,9 @@ func TestVirtualIP_Clone(t *testing.T) {
 
 func TestSubnet_GetName(t *testing.T) {
 
-	var s *Subnet
-	name := s.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.Name = "Subnet Name"
-	name = s.GetName()
+	name := s.GetName()
 	if name != s.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -217,15 +211,9 @@ func TestSubnet_GetName(t *testing.T) {
 
 func TestSubnet_GetID(t *testing.T) {
 
-	var s *Subnet
-	id := s.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.ID = "Subnet ID"
-	id = s.GetID()
+	id := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

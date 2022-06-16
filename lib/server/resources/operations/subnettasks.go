@@ -227,7 +227,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
+	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 
 	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
 		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)

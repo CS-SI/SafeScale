@@ -627,16 +627,9 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 
 func TestSecurityGroup_SetID(t *testing.T) {
 
-	var sg *SecurityGroup
+	sg := NewSecurityGroup()
 	sg.SetID("toto")
 	id := sg.GetID()
-	if id != "" {
-		t.Error("Can set id to nil SecurityGroup")
-		t.Fail()
-	}
-	sg = NewSecurityGroup()
-	sg.SetID("toto")
-	id = sg.GetID()
 	if id != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -646,16 +639,9 @@ func TestSecurityGroup_SetID(t *testing.T) {
 
 func TestSecurityGroup_SetName(t *testing.T) {
 
-	var sg *SecurityGroup
+	sg := NewSecurityGroup()
 	sg.SetName("toto")
 	name := sg.GetName()
-	if name != "" {
-		t.Error("Can set name to nil SecurityGroup")
-		t.Fail()
-	}
-	sg = NewSecurityGroup()
-	sg.SetName("toto")
-	name = sg.GetName()
 	if name != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -665,16 +651,9 @@ func TestSecurityGroup_SetName(t *testing.T) {
 
 func TestSecurityGroup_SetNetworkID(t *testing.T) {
 
-	var sg *SecurityGroup
+	sg := NewSecurityGroup()
 	sg.SetNetworkID("toto")
 	network := sg.GetNetworkID()
-	if network != "" {
-		t.Error("Can set network to nil SecurityGroup")
-		t.Fail()
-	}
-	sg = NewSecurityGroup()
-	sg.SetNetworkID("toto")
-	network = sg.GetNetworkID()
 	if network != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()

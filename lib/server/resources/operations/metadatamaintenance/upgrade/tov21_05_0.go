@@ -830,9 +830,10 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 						return inErr
 					}
 
+					fn, _ := feat.GetFilename(ctx)
 					featuresV1.Installed[featName] = &propertiesv1.ClusterInstalledFeature{
 						Name:     featName,
-						FileName: feat.GetFilename(ctx),
+						FileName: fn,
 						Requires: requires,
 					}
 					return nil

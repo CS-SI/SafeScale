@@ -126,10 +126,6 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 
 // GetName returns the display name of the Feature, with error handling
 func (ff *FeatureFile) GetName() string {
-	if ff.IsNull() {
-		return ""
-	}
-
 	return ff.displayName
 }
 
