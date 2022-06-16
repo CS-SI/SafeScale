@@ -386,10 +386,4 @@ func ShareVolumeMounted(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("shares").
-		AddScenario(Standard).
-		AddScenario(ShareError).
-		AddScenario(SharePartialError).
-		AddScenario(UntilShareCreated).
-		AddScenario(SharePartialError)
 }
