@@ -368,9 +368,4 @@ func StopStart(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("hosts").
-		AddScenario(BasicPublicHosts).
-		AddScenario(BasicNormalHosts).
-		AddScenario(ReadyToSSH).
-		AddScenario(StopStart)
 }

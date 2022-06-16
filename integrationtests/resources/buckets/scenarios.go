@@ -45,5 +45,4 @@ func allBucketScenarios() {
 }
 
 func init() {
-	allBucketScenarios()
 }
