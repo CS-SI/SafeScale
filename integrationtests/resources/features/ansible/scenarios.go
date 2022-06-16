@@ -61,6 +61,4 @@ func Ansible(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("features").
-		AddScenario(Ansible)
 }
