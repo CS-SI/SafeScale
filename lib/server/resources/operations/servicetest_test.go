@@ -61,7 +61,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -82,9 +81,9 @@ type ServiceTestInternals struct {
 	t          *testing.T
 	tmpdir     string            // Temporary directory
 	bucketData map[string]string // Contains local data
-	cache      map[string]cache.Store
-	fsCache    map[string][]byte
-	loglevel   uint
+	// cache      map[string]cache.Store
+	fsCache  map[string][]byte
+	loglevel uint
 }
 type ServiceTestMemory struct {
 	keypairs map[string]*abstract.KeyPair
@@ -384,7 +383,6 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 		internals: ServiceTestInternals{
 			t:        t,
 			tmpdir:   dir,
-			cache:    make(map[string]cache.Store),
 			loglevel: 2,
 		},
 		memory: ServiceTestMemory{
@@ -405,7 +403,7 @@ func (e *ServiceTest) _reset() {
 	e._log("ServiceTest::_reset")
 	e.internals.bucketData = make(map[string]string) // Empty bucket data
 
-	e.internals.cache = make(map[string]cache.Store)
+	// e.internals.cache = make(map[string]cache.Store)
 	e.internals.fsCache = make(map[string][]byte)
 
 	e.options.candisablesecuritygroup = true
@@ -777,6 +775,7 @@ func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum,
 	return nil, nil
 }
 
+/*
 func (e *ServiceTest) GetCache(ctx context.Context, name string) (cache.Cache, fail.Error) {
 	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", name, e.options.enablecache)
 
@@ -826,6 +825,7 @@ func (e *ServiceTest) _cache_FreeEntry(ctx context.Context, cachename string, ke
 	}
 	return store.Free(ctx, key)
 }
+
 func (e *ServiceTest) _cache_AddEntry(ctx context.Context, cachename string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
 	e._surveyf("ServiceTest::_cache_AddEntry { cache: \"%s\" } (not implemented)", cachename)
 	store, ok := e.internals.cache[cachename]
@@ -834,6 +834,7 @@ func (e *ServiceTest) _cache_AddEntry(ctx context.Context, cachename string, con
 	}
 	return store.Add(ctx, content)
 }
+*/
 
 // api.Stack
 func (e *ServiceTest) GetStackName() (string, fail.Error) {
@@ -2689,7 +2690,7 @@ func (e *ServiceTest) GetMetadataKey() (*crypt.Key, fail.Error) {
 }
 
 // ------------------------------------------------------------------------------------------------------
-
+/*
 type CacheTest struct {
 	name  string
 	svc   *ServiceTest
@@ -2723,7 +2724,7 @@ func (e *CacheTest) AddEntry(ctx context.Context, content cache.Cacheable) (ce *
 	e.svc._logf("CacheTest::AddEntry")
 	return e.svc._cache_AddEntry(ctx, e.name, content)
 }
-
+*/
 // ------------------------------------------------------------------------------------------------------
 
 type SSHConnectorTest struct {
