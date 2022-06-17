@@ -57,10 +57,15 @@ with-soft:
 	@echo "go easy running semgrep"
 	@$(eval CERR = "default")
 
-ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep style metalint
+with-race:
+	@echo "force datarace detection"
+	@$(eval RACE_CHECK_TEST = "-race")
+	@$(eval RACE_CHECK = "-race")
+
+ci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock err vet with-soft semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-rawci: logclean ground getdevdeps mod sdk generate lib cli
+rawci: logclean ground getdevdeps mod sdk generate with-race lib cli
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
@@ -117,9 +122,17 @@ volumetests:
 	@echo "settings go build tags for volumetests"
 	@$(eval BUILD_TAGS = "volumetests,$(BUILD_TAGS)")
 
+ostests:
+	@echo "settings go build tags for ostests"
+	@$(eval BUILD_TAGS = "ostests,$(BUILD_TAGS)")
+
 securitygrouptests:
 	@echo "settings go build tags for securitygrouptests"
 	@$(eval BUILD_TAGS = "securitygrouptests,$(BUILD_TAGS)")
+
+sharetests:
+	@echo "settings go build tags for sharetests"
+	@$(eval BUILD_TAGS = "sharetests,$(BUILD_TAGS)")
 
 ifeq ($(OS),Windows_NT)
 releasearchive:

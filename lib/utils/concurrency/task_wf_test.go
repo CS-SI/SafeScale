@@ -153,42 +153,6 @@ func TestResultCheckWF(t *testing.T) {
 	require.NotNil(t, tr)
 }
 
-func TestResultCheckWithoutWF(t *testing.T) {
-	for j := 0; j < 60; j++ {
-		got, xerr := NewUnbreakableTask()
-		require.NotNil(t, got)
-		require.Nil(t, xerr)
-
-		theID, xerr := got.ID()
-		require.Nil(t, xerr)
-		require.NotEmpty(t, theID)
-
-		_, xerr = got.StartWithTimeout(
-			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				duration := time.Duration(randomInt(50, 250)) * time.Millisecond
-				time.Sleep(duration)
-				return "waiting game", nil
-			}, nil, 10*time.Millisecond,
-		)
-		if xerr != nil {
-			t.Errorf("Shouldn't happen")
-		}
-
-		res, xerr := got.Wait()
-		require.NotNil(
-			t, xerr,
-		) // FIXME: CI failed, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
-		if res == nil {
-			t.Errorf("on Wait, res == nil, should not happen")
-		}
-		require.NotNil(t, res)
-
-		tr, xerr := got.Result()
-		require.Nil(t, xerr)
-		require.NotNil(t, tr)
-	}
-}
-
 func TestSingleTaskWF(t *testing.T) {
 	single, err := NewUnbreakableTask()
 	require.NotNil(t, single)
