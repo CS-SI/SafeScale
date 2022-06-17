@@ -1076,10 +1076,10 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		require.NotNil(t, xerr)
 		end := time.Since(begin)
 
-		if end >= (time.Millisecond * 300) { // this is 6x the maximum time...
+		if end >= (time.Millisecond * 400) { // this is 8x the maximum time...
 			t.Logf("Abort() lasted %v\n", end)
 			t.Logf("Wait() lasted %v\n", end)
-			t.Errorf("It should have finished near 300 ms but it didn't!!")
+			t.Errorf("It should have finished near 400 ms but it didn't!!")
 			t.FailNow()
 		}
 	}
