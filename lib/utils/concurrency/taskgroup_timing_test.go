@@ -143,3 +143,45 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 }
+
+func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
+	for j := 0; j < 100; j++ {
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
+
+		theID, xerr := overlord.GetID()
+		require.Nil(t, xerr)
+		require.NotEmpty(t, theID)
+
+		for ind := 0; ind < 10; ind++ {
+			_, xerr := overlord.Start(taskgen(30, 50, 10, 0, 0, 0, false), nil)
+			if xerr != nil {
+				t.Errorf("Unexpected error: %v", xerr)
+				t.FailNow()
+			}
+		}
+
+		time.Sleep(10 * time.Millisecond)
+		begin := time.Now()
+		xerr = overlord.Abort()
+		require.Nil(t, xerr)
+
+		// did we abort ?
+		aborted := overlord.Aborted()
+		if !aborted {
+			t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+		}
+
+		_, _, xerr = overlord.WaitFor(5 * time.Second)
+		require.NotNil(t, xerr)
+		end := time.Since(begin)
+
+		if end >= (time.Millisecond * 400) { // this is 8x the maximum time...
+			t.Logf("Abort() lasted %v\n", end)
+			t.Logf("Wait() lasted %v\n", end)
+			t.Errorf("It should have finished near 400 ms but it didn't!!")
+			t.FailNow()
+		}
+	}
+}
