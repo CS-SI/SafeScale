@@ -95,7 +95,7 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 
 func TestObjectStorageBucket_Serialize(t *testing.T) {
 
-	var n *ObjectStorageBucket
+	var n *ObjectStorageBucket = nil
 	_, err := n.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil ObjectStorageBucket")

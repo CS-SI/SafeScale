@@ -135,7 +135,7 @@ func TestMutableTimings_ToToml(t *testing.T) {
 
 func TestMutableTimings_ConnectionTimeout(t *testing.T) {
 
-	var mt *MutableTimings
+	var mt *MutableTimings = nil
 	require.EqualValues(t, mt.ConnectionTimeout(), 120*time.Second)
 
 	mt = NewTimings()
@@ -179,12 +179,12 @@ func TestMutableTimings_HostCreationTimeout(t *testing.T) {
 
 func TestMutableTimings_HostCleanupTimeout(t *testing.T) {
 
-	var mt *MutableTimings
-	require.EqualValues(t, mt.HostOperationTimeout(), 2*time.Minute)
+	var mt *MutableTimings = nil
+	require.EqualValues(t, mt.HostCleanupTimeout(), 5*time.Minute)
 
 	mt = NewTimings()
-	mt.Timeouts.HostOperation = 42 * time.Second
-	require.EqualValues(t, mt.HostOperationTimeout(), 42*time.Second)
+	mt.Timeouts.HostCleanup = 42 * time.Second
+	require.EqualValues(t, mt.HostCleanupTimeout(), 42*time.Second)
 
 }
 
@@ -223,7 +223,7 @@ func TestMutableTimings_HostLongOperationTimeout(t *testing.T) {
 
 func TestMutableTimings_SSHConnectionTimeout(t *testing.T) {
 
-	var mt *MutableTimings
+	var mt *MutableTimings = nil
 	require.EqualValues(t, mt.SSHConnectionTimeout(), 3*time.Minute)
 
 	mt = NewTimings()
@@ -256,7 +256,7 @@ func TestMutableTimings_MetadataReadAfterWriteTimeout(t *testing.T) {
 
 func TestMutableTimings_RebootTimeout(t *testing.T) {
 
-	var mt *MutableTimings
+	var mt *MutableTimings = nil
 	require.EqualValues(t, mt.RebootTimeout(), 100*time.Second)
 
 	mt = NewTimings()
@@ -286,6 +286,19 @@ func TestMutableTimings_NormalDelay(t *testing.T) {
 	require.EqualValues(t, mt.NormalDelay(), 42*time.Second)
 
 }
+
+/*
+func TestMutableTimings_DefaultDelay(t *testing.T) {
+
+	var mt *MutableTimings = nil
+	require.EqualValues(t, mt.DefaultDelay(), 10*time.Second)
+
+	mt = NewTimings()
+	mt.Delays.Normal = 42 * time.Second
+	require.EqualValues(t, mt.DefaultDelay(), 42*time.Second)
+
+}
+*/
 
 func TestMutableTimings_BigDelay(t *testing.T) {
 

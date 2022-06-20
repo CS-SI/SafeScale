@@ -1,6 +1,3 @@
-//go:build ut
-// +build ut
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -85,7 +82,7 @@ func Test_LoadBucket(t *testing.T) {
 		// Load not existing bucket
 		bucket, err = LoadBucket(ctx, svc, "mybucket")
 		require.Nil(t, bucket, nil)
-		require.Contains(t, err.Error(), "nor buckets/byName/mybucket nor buckets/byID/mybucket were found in the bucket")
+		require.Contains(t, err.Error(), "neither buckets/byName/mybucket nor buckets/byID/mybucket were found in the bucket")
 
 		svc._reset()
 
@@ -146,6 +143,8 @@ func TestBucket_IsNull(t *testing.T) {
 
 }
 
+// func TestBucket_Carry(t *testing.T) {} // Private, unreachable
+
 func TestBucket_Browse(t *testing.T) {
 
 	var callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error
@@ -197,6 +196,10 @@ func TestBucket_Browse(t *testing.T) {
 
 }
 
+// func TestBucket_GetHost(t *testing.T) {} // Private, unreachable
+
+// func TestBucket_GetMountPoint(t *testing.T) {} // Private, unreachable
+
 func TestBucket_Create(t *testing.T) {
 
 	ctx := context.Background()
@@ -233,7 +236,7 @@ func TestBucket_Delete(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 		require.False(t, bucket.IsNull())
 
-		xerr := bucket.Delete(nil)
+		xerr := bucket.Delete(nil) // nolint
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
 		xerr = bucket.Delete(ctx)
@@ -261,23 +264,16 @@ func TestBucket_Mount(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 		require.False(t, bucket.IsNull())
 
-		xerr := bucket.Mount(nil, "localhost", "buckets/byId/sample")
+		xerr := bucket.Mount(nil, "localhost", "buckets/byID/sample") // nolint
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
-		xerr = bucket.Mount(ctx, "", "buckets/byId/sample")
+		xerr = bucket.Mount(ctx, "", "buckets/byID/sample")
 		require.Contains(t, xerr.Error(), "invalid parameter: hostName")
 
 		xerr = bucket.Mount(ctx, "localhost", "")
 		require.Contains(t, xerr.Error(), "invalid parameter: path")
 
-		xerr = bucket.Mount(ctx, "localhost", "buckets/byId/sample")
-		require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
-
-		task, xerr := concurrency.NewTaskWithContext(ctx)
-		ctx = context.WithValue(ctx, "task", task)
-		require.Nil(t, xerr)
-
-		xerr = bucket.Mount(ctx, "localhost", "buckets/byId/sample")
+		xerr = bucket.Mount(ctx, "localhost", "buckets/byID/sample")
 		require.Contains(t, xerr.Error(), "failed to mount bucket 'mybucket' on Host 'localhost'")
 
 		_, _, xerr = svc.CreateHost(ctx, abstract.HostRequest{

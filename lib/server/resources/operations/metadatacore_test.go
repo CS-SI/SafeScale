@@ -1,6 +1,3 @@
-//go:build ut
-// +build ut
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -126,7 +123,7 @@ func TestMetadataCore_Service(t *testing.T) {
 		}
 	}()
 
-	var amc *MetadataCore
+	var amc *MetadataCore = nil
 	require.EqualValues(t, amc.Service(), nil)
 
 	serr := NewServiceTest(t, func(svc *ServiceTest) {
@@ -151,7 +148,7 @@ func TestMetadataCore_GetID(t *testing.T) {
 		}
 	}()
 
-	var amc *MetadataCore
+	var amc *MetadataCore = nil
 	ctx := context.Background()
 
 	require.EqualValues(t, amc.GetID(), "")
