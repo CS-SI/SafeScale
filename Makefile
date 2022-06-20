@@ -65,7 +65,7 @@ with-race:
 ci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock err vet with-soft semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-rawci: logclean ground getdevdeps mod sdk generate with-race lib cli
+rawci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
