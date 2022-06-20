@@ -126,7 +126,7 @@ func TestNetwork_Clone_DNS(t *testing.T) {
 
 func TestNetwork_Serialize(t *testing.T) {
 
-	var n *Network
+	var n *Network = nil
 	_, err := n.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")

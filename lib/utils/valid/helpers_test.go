@@ -37,6 +37,8 @@ func TestIsNull(t *testing.T) {
 	var err error
 	var ptrerr *error
 	var dblptrerr **error
+	var nullableNil *Nullable = nil
+	var nilableNil *Nillable = nil
 
 	var ourErr fail.Error
 	var ptrOurErr *fail.Error
@@ -57,6 +59,8 @@ func TestIsNull(t *testing.T) {
 		want bool
 	}{
 		{"nil", args{nil}, true},
+		{"nil nullable", args{nullableNil}, true},
+		{"nil nilable", args{nilableNil}, true},
 		{"raw errors 1", args{err}, true},
 		{"raw errors 2", args{ptrerr}, true},
 		{"raw errors 3", args{dblptrerr}, true},
@@ -152,7 +156,8 @@ func TestNotNulls(t *testing.T) {
 		{"array of string", args{[]string{"whatever"}}, false},
 		{"array of string empty", args{[]string{}}, false},
 		{"array of string empty not initialized", args{emptyStrArray}, false},
-		{"struct", args{brand{}}, true},
+		{"struct 1", args{brand{}}, true},                // an empty struct is not nil, it's empty, so -> isnil -> false (it don't works !)
+		{"struct 2", args{brand{content: "any"}}, false}, // an empty struct is not nil, it's empty, so -> isnil -> false (it don't works !)
 		{"ptr struct", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},
@@ -205,8 +210,10 @@ func TestInitialized(t *testing.T) {
 		{"array of string", args{[]string{"whatever"}}, false},
 		{"array of string empty", args{[]string{}}, false},
 		{"array of string empty not initialized", args{emptyStrArray}, true},
-		{"struct", args{brand{}}, true},
+		{"struct", args{brand{content: "some"}}, false},
+		{"struct filled", args{brand{content: "some"}}, false},
 		{"ptr struct", args{&brand{}}, false},
+		{"ptr struct filled", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},
 		{"raw errors 3", args{dblptrerr}, false},

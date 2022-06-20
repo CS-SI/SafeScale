@@ -104,7 +104,7 @@ func TestSubnet_Clone(t *testing.T) {
 
 func TestSubnet_Serialize(t *testing.T) {
 
-	var s *Subnet
+	var s *Subnet = nil
 	_, err := s.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")

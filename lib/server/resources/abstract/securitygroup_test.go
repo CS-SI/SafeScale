@@ -49,7 +49,7 @@ func TestSecurityGroupRule_IsNull(t *testing.T) {
 		t.Fail()
 	}
 	sgr.Sources = []string{}
-	sgr.Targets = append(sgr.Targets, "Target 1")
+	sgr.Targets = append(sgr.Sources, "Target 1") //nolint
 	if sgr.IsNull() {
 		t.Error("SecurityGroupRule is not null")
 		t.Fail()
@@ -913,7 +913,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 
 func TestSecurityGroup_Serialize(t *testing.T) {
 
-	var sg *SecurityGroup
+	var sg *SecurityGroup = nil
 	_, err := sg.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")

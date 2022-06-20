@@ -14,33 +14,32 @@
  * limitations under the License.
  */
 
-package system
+package retry
 
 import (
-	"reflect"
 	"testing"
+	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_BuildBashLibraryDefinition(t *testing.T) {
+func Test_NotifyByLog(t *testing.T) {
 
-	v := temporal.NewTimings()
-	result, err := BuildBashLibraryDefinition(v)
-	require.Nil(t, err)
-	require.EqualValues(t, reflect.TypeOf(result).String(), "*system.BashLibraryDefinition")
+	logrus.SetLevel(logrus.DebugLevel)
 
-}
-func TestBashLibraryDefinition_ToMap(t *testing.T) {
+	try := Try{
+		Start: time.Now(),
+		Count: 1,
+		Err:   nil,
+	}
+	ver := verdict.Retry
 
-	v := temporal.NewTimings()
-	result, err := BuildBashLibraryDefinition(v)
-	require.Nil(t, err)
-	require.EqualValues(t, reflect.TypeOf(result).String(), "*system.BashLibraryDefinition")
-
-	m, err := result.ToMap()
-	require.Nil(t, err)
-	require.EqualValues(t, reflect.TypeOf(m).String(), "map[string]interface {}")
+	log := tests.LogrusCapture(func() {
+		NotifyByLog(try, ver)
+	})
+	require.Contains(t, log, "try #1: verdict=Retry")
 
 }

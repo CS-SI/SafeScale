@@ -19,8 +19,6 @@ package fail
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -28,6 +26,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -35,47 +34,44 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-func logrusCapture(routine func()) string {
-
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	logrus.SetOutput(w)
-
-	routine()
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-	return string(out)
-
+func createErrorCore(message string) *errorCore {
+	return &errorCore{
+		message:             message,
+		cause:               nil,
+		consequences:        []error{},
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.Unknown,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
 }
 
 func Test_OnExitLogErrorWithLevel(t *testing.T) {
 
-	log := logrusCapture(func() {
+	log := tests.LogrusCapture(func() {
 		OnExitLogErrorWithLevel(nil, logrus.WarnLevel)
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		OnExitLogErrorWithLevel(struct{}{}, logrus.WarnLevel)
 	})
 	require.Contains(t, log, "fail.OnExitLogErrorWithLevel()")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		nerr := errors.New("Any message")
 		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
 	})
 	require.Contains(t, log, "Any message")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitLogErrorWithLevel(&nerr, 42)
 	})
 	require.Contains(t, log, "level=error")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		nerr := grpcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
 		OnExitLogErrorWithLevel(&nerr, logrus.WarnLevel)
 
@@ -104,7 +100,7 @@ func Test_OnExitLogErrorWithLevel(t *testing.T) {
 	}
 
 	for i := range errs {
-		log = logrusCapture(func() {
+		log = tests.LogrusCapture(func() {
 			err := func(in_err Error) (out_err error) {
 				defer OnExitLogErrorWithLevel(&in_err, logrus.WarnLevel)
 				return in_err
@@ -191,12 +187,12 @@ func Test_extractCallerName(t *testing.T) {
 
 func Test_OnExitLogError(t *testing.T) {
 
-	log := logrusCapture(func() {
+	log := tests.LogrusCapture(func() {
 		OnExitLogError(nil, "test")
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitLogError(&nerr, "test")
 	})
@@ -214,7 +210,7 @@ func Test_OnExitLogError(t *testing.T) {
 	}
 
 	for i := range errs {
-		log = logrusCapture(func() {
+		log = tests.LogrusCapture(func() {
 			err := func(in_err Error) (out_err error) {
 				defer OnExitLogError(&in_err, "test")
 				return in_err
@@ -236,12 +232,12 @@ func Test_OnExitLogError(t *testing.T) {
 
 func Test_OnExitTraceError(t *testing.T) {
 
-	log := logrusCapture(func() {
+	log := tests.LogrusCapture(func() {
 		OnExitTraceError(nil, "test")
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		nerr := fmt.Errorf("Any message")
 		OnExitTraceError(&nerr, "test")
 	})
@@ -257,7 +253,7 @@ func Test_OnExitTraceError(t *testing.T) {
 	}
 
 	for i := range errs {
-		log = logrusCapture(func() {
+		log = tests.LogrusCapture(func() {
 			err := func(in_err Error) (out_err error) {
 				defer OnExitTraceError(&in_err, "test")
 				return in_err
@@ -274,26 +270,26 @@ func Test_OnExitTraceError(t *testing.T) {
 
 func Test_OnExitWrapError(t *testing.T) {
 
-	log := logrusCapture(func() {
+	log := tests.LogrusCapture(func() {
 		OnExitWrapError(nil, "")
 	})
 	require.EqualValues(t, log, "")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		errv := NewError("Any message")
 		OnExitWrapError(&errv, "test")
 	})
 	if !strings.Contains(log, "OnExitWrapError only works when 'err' is a '*error'") {
 		t.Fail()
 	}
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		errv := WarningError(errors.New("math: can't divide by zero"), "Any message")
 		OnExitWrapError(&errv, "test")
 	})
 	if !strings.Contains(log, "unexpected type '**fail.ErrWarning'") {
 		t.Fail()
 	}
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		errv := errors.New("Any message")
 		OnExitWrapError(&errv, "test")
 	})
@@ -322,7 +318,7 @@ func Test_OnPanic(t *testing.T) {
 	}()
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
 
-	log := logrusCapture(func() {
+	log := tests.LogrusCapture(func() {
 		_ = func() (err *Error) {
 			err = nil
 			defer OnPanic(err)
@@ -331,16 +327,7 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "intercepted panic but '*err' is nil")
 
-	log = logrusCapture(func() {
-		_ = func() (err Error) {
-			err = NotFoundError("Any message")
-			defer OnPanic(&err)
-			panic("mayday")
-		}()
-	})
-	require.Contains(t, log, "fail.OnPanic")
-
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
 		_ = func() (err *error) {
 			err = nil
 			defer OnPanic(err)
@@ -349,7 +336,15 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "intercepted panic but '*err' is nil")
 
-	log = logrusCapture(func() {
+	log = tests.LogrusCapture(func() {
+		_ = func() (err error) {
+			defer OnPanic(struct{}{})
+			panic("mayday")
+		}()
+	})
+	require.Contains(t, log, "intercepted panic but parameter 'err' is invalid")
+
+	log = tests.LogrusCapture(func() {
 		_ = func() (err error) {
 			err = errors.New("Any message")
 			defer OnPanic(&err)
@@ -358,12 +353,48 @@ func Test_OnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "fail.OnPanic")
 
-	log = logrusCapture(func() {
-		_ = func() (err error) {
-			defer OnPanic(struct{}{})
-			panic("mayday")
-		}()
-	})
-	require.Contains(t, log, "intercepted panic but parameter 'err' is invalid")
+	testlist := []struct {
+		name     string
+		err      Error
+		contains string
+	}{
+		{name: "ErrorList", err: NewErrorList([]error{errors.New("Any message")})},
+		{name: "NotFoundError", err: NotFoundError("Any message")},
+		{name: "ErrUnqualified", err: NewError("Any message")},
+		{name: "ErrWarning", err: &ErrWarning{errorCore: createErrorCore("Any message")}},
+		{name: "ErrTimeout", err: &ErrTimeout{errorCore: createErrorCore("Any message")}},
+		{name: "ErrAborted", err: &ErrAborted{errorCore: createErrorCore("Any message")}},
+		{name: "ErrRuntimePanic", err: &ErrRuntimePanic{errorCore: createErrorCore("Any message")}},
+		{name: "ErrNotAvailable", err: &ErrNotAvailable{errorCore: createErrorCore("Any message")}},
+		{name: "ErrDuplicate", err: &ErrDuplicate{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidRequest", err: &ErrInvalidRequest{errorCore: createErrorCore("Any message")}},
+		{name: "ErrSyntax", err: &ErrSyntax{errorCore: createErrorCore("Any message")}},
+		{name: "ErrNotAuthenticated", err: &ErrNotAuthenticated{errorCore: createErrorCore("Any message")}},
+		{name: "ErrForbidden", err: &ErrForbidden{errorCore: createErrorCore("Any message")}},
+		{name: "ErrOverflow", err: &ErrOverflow{errorCore: createErrorCore("Any message")}},
+		{name: "ErrOverload", err: &ErrOverload{errorCore: createErrorCore("Any message")}},
+		{name: "ErrNotImplemented", err: &ErrNotImplemented{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidInstance", err: &ErrInvalidInstance{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidParameter", err: &ErrInvalidParameter{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidInstanceContent", err: &ErrInvalidInstanceContent{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInconsistent", err: &ErrInconsistent{errorCore: createErrorCore("Any message")}},
+		{name: "ErrExecution", err: &ErrExecution{errorCore: createErrorCore("Any message")}},
+		{name: "ErrAlteredNothing", err: &ErrAlteredNothing{errorCore: createErrorCore("Any message")}},
+		{name: "ErrUnknown", err: &ErrUnknown{errorCore: createErrorCore("Any message")}},
+	}
+
+	for i := range testlist {
+		t.Run(testlist[i].name, func(t *testing.T) {
+
+			log = tests.LogrusCapture(func() {
+				_ = func() (err Error) {
+					err = testlist[i].err
+					defer OnPanic(&err)
+					panic("mayday")
+				}()
+			})
+			require.Contains(t, log, "fail.OnPanic")
+		})
+	}
 
 }

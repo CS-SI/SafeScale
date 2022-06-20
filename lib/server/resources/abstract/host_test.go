@@ -83,6 +83,20 @@ func TestKeyPair_NewKeyPair(t *testing.T) {
 
 }
 
+func Test_almostEqual(t *testing.T) {
+
+	require.False(t, almostEqual(14, 15))
+	require.True(t, almostEqual(14, 14+1e-7))
+
+}
+
+func Test_almostEqual64(t *testing.T) {
+
+	require.False(t, almostEqual64(14, 15))
+	require.True(t, almostEqual64(14, 14+1e-7))
+
+}
+
 func TestHostSizingRequirements_Equals(t *testing.T) {
 
 	hsr1 := HostSizingRequirements{

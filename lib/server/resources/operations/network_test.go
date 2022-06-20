@@ -1,6 +1,3 @@
-//go:build ut
-// +build ut
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -85,7 +82,7 @@ func Test_LoadNetwork(t *testing.T) {
 
 		network, xerr = LoadNetwork(ctx, svc, "mynetwork")
 		require.EqualValues(t, network, nil)
-		require.Contains(t, xerr.Error(), "nor networks/byName/mynetwork nor networks/byID/mynetwork were found in the bucket")
+		require.Contains(t, xerr.Error(), "neither networks/byName/mynetwork nor networks/byID/mynetwork were found in the bucket")
 
 		svc._reset()
 		svc._updateOption("timingsErr", fail.NotFoundError("no timings !"))
@@ -132,7 +129,7 @@ func TestNetwork_Create(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.EqualValues(t, network, nil)
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotFound")
-		require.Contains(t, err.Error(), "nor networks/byName/mynetwork nor networks/byID/mynetwork were found in the bucket")
+		require.Contains(t, err.Error(), "neither networks/byName/mynetwork nor networks/byID/mynetwork were found in the bucket")
 
 		xerr := onetwork.Create(ctx, abstract.NetworkRequest{
 			Name:          "mynetwork",
@@ -304,15 +301,17 @@ func TestNetwork_Browse(t *testing.T) {
 		xerr = network.Browse(ctx, callback)
 		require.Contains(t, xerr.Error(), "invalid parameter: callback")
 
-		xerr = network.Browse(ctx, func(network *abstract.Network) fail.Error {
-			require.EqualValues(t, reflect.TypeOf(network).String(), "*abstract.Network")
-			return nil
-		})
-		require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
+		/*
+			xerr = network.Browse(ctx, func(network *abstract.Network) fail.Error {
+				require.EqualValues(t, reflect.TypeOf(network).String(), "*abstract.Network")
+				return nil
+			})
+			require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
 
-		task, err := concurrency.NewTaskWithContext(ctx)
-		ctx = context.WithValue(ctx, "task", task)
-		require.Nil(t, err)
+			task, err := concurrency.NewTaskWithContext(ctx)
+			ctx = context.WithValue(ctx, "task", task)
+			require.Nil(t, err)
+		*/
 
 		xerr = network.Browse(ctx, func(network *abstract.Network) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(network).String(), "*abstract.Network")
