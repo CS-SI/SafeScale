@@ -50,10 +50,10 @@ func Test_NewConnector(t *testing.T) {
 	SetCustomConnectorFactory(nil)
 
 	// Invalid default factory
-	config = ssh.NewConfig("", "", 0, "", "", 0, "", nil, nil)
-	connector, xerr = NewConnector(config, ConnectorWithCli())
+	var nilcfg api.Config
+	connector, xerr = NewConnector(nilcfg, ConnectorWithCli())
 	require.Nil(t, connector)
-	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
+	require.Contains(t, xerr.Error(), "cannot be null")
 
 	// Invalid option
 	config = ssh.NewConfig("HostName", "ipAdress", 22, "User", "PrivateKey", 0, "", nil, nil)
