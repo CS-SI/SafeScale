@@ -255,32 +255,6 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 
 }
 
-func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
-
-	log := tests.LogrusCapture(func() {
-		err := WhileUnsuccessfulWithHardTimeout(
-			func() error {
-				return nil
-			},
-			800*time.Millisecond,
-			400*time.Millisecond,
-		)
-		require.Nil(t, err)
-	})
-
-	require.Contains(t, log, "'delay' greater than 'timeout'")
-
-	err := WhileUnsuccessfulWithHardTimeout(
-		func() error {
-			return nil
-		},
-		600*time.Millisecond,
-		-1*time.Second,
-	)
-	require.Nil(t, err)
-
-}
-
 func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 
 	log := tests.LogrusCapture(func() {
