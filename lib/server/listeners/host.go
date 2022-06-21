@@ -1037,14 +1037,17 @@ func (s *HostListener) InspectLabel(ctx context.Context, in *protocol.HostLabelR
 		return nil, xerr
 	}
 
-	outLabel, xerr := labelInstance.ToProtocol(ctx, false)
+	pbLabel, xerr := labelInstance.ToProtocol(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	out := &protocol.HostLabelResponse{
-		Label: outLabel,
-		Value: hostValue,
+		Id:           pbLabel.Id,
+		Name:         pbLabel.Name,
+		HasDefault:   pbLabel.HasDefault,
+		DefaultValue: pbLabel.DefaultValue,
+		Value:        hostValue,
 	}
 	return out, nil
 }
