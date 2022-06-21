@@ -203,16 +203,18 @@ var hostInspect = cli.Command{
 
 		tags := make([]map[string]interface{}, 0)
 		labels := make([]map[string]interface{}, 0)
-		for _, v := range output["labels"].([]interface{}) {
-			item := v.(map[string]interface{})
-			hasDefault, ok := item["has_default"].(bool)
-			delete(item, "has_default")
-			if ok && hasDefault {
-				labels = append(labels, item)
-			} else {
-				delete(item, "value")
-				delete(item, "default_value")
-				tags = append(tags, item)
+		if items, ok := output["labels"].([]interface{}); ok && len(items) > 0 {
+			for _, v := range items {
+				item := v.(map[string]interface{})
+				hasDefault, ok := item["has_default"].(bool)
+				delete(item, "has_default")
+				if ok && hasDefault {
+					labels = append(labels, item)
+				} else {
+					delete(item, "value")
+					delete(item, "default_value")
+					tags = append(tags, item)
+				}
 			}
 		}
 		output["labels"] = labels
@@ -1286,18 +1288,23 @@ var hostTagListCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "tag of host", false).Error())))
 		}
 
-		var output []map[string]interface{}
+		var list []map[string]interface{}
 		jsoned, xerr := json.Marshal(result.Labels)
 		if xerr == nil {
-			xerr = json.Unmarshal(jsoned, &output)
+			xerr = json.Unmarshal(jsoned, &list)
 		}
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 		}
 
-		for _, v := range output {
-			delete(v, "has_default")
-			delete(v, "default_value")
+		var output []map[string]interface{}
+		for _, v := range list {
+			hasDefault, ok := v["has_default"].(bool)
+			if !ok || !hasDefault {
+				delete(v, "has_default")
+				delete(v, "default_value")
+				output = append(output, v)
+			}
 		}
 		return clitools.SuccessResponse(output)
 	},

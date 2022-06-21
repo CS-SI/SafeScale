@@ -99,12 +99,19 @@ var labelInspectCommand = cli.Command{
 		}
 
 		output := map[string]interface{}{
-			"name":          labelInfo.Name,
 			"id":            labelInfo.Id,
+			"name":          labelInfo.Name,
 			"default_value": labelInfo.DefaultValue,
-			"hosts":         labelInfo.Hosts,
+			"hosts":         make([]interface{}, 0),
 		}
-
+		for _, v := range labelInfo.Hosts {
+			item := map[string]string{
+				"id":    v.Host.Id,
+				"name":  v.Host.Name,
+				"value": v.Value,
+			}
+			output["hosts"] = append(output["hosts"].([]interface{}), item)
+		}
 		return clitools.SuccessResponse(output)
 	},
 }
@@ -236,7 +243,20 @@ var tagInspectCommand = cli.Command{
 		if tagInfo.HasDefault {
 			return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("inspection of Tag: '%s' is a Label", c.Args().First())))
 		}
-		return clitools.SuccessResponse(tagInfo)
+
+		output := map[string]interface{}{
+			"id":    tagInfo.Id,
+			"name":  tagInfo.Name,
+			"hosts": make([]interface{}, 0),
+		}
+		for _, v := range tagInfo.Hosts {
+			item := map[string]string{
+				"id":   v.Host.Id,
+				"name": v.Host.Name,
+			}
+			output["hosts"] = append(output["hosts"].([]interface{}), item)
+		}
+		return clitools.SuccessResponse(output)
 	},
 }
 
