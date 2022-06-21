@@ -1262,7 +1262,7 @@ func TestStartWithTimeoutAbortedWithCauseTask(t *testing.T) {
 }
 
 func TestLikeBeforeWithoutAbort(t *testing.T) {
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 4; i++ {
 		single, xerr := NewTask()
 		require.NotNil(t, single)
 		require.Nil(t, xerr)

@@ -369,67 +369,6 @@ func TestTimingOnlyOne(t *testing.T) {
 	funk(53, 1, 230, 250, 40, 50, 1)
 }
 
-func TestChildrenWaitingGameEnoughTimeAfter(t *testing.T) {
-	funk := func(index int, rounds int, lower int, upper int, latency int, margin int, gcpressure int) {
-		failures := 0
-		for iter := 0; iter < rounds; iter++ {
-			overlord, xerr := NewTaskGroupWithParent(nil)
-			require.NotNil(t, overlord)
-			require.Nil(t, xerr)
-			xerr = overlord.SetID("/parent")
-			require.Nil(t, xerr)
-
-			theID, xerr := overlord.GetID()
-			require.Nil(t, xerr)
-			require.NotEmpty(t, theID)
-
-			begin := time.Now()
-			for ind := 0; ind < gcpressure; ind++ {
-				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
-				if xerr != nil {
-					t.Errorf("Test %d: Unexpected: %s", index, xerr)
-					t.FailNow()
-					return
-				}
-			}
-			childrenStartDuration := time.Since(begin)
-
-			upbound := int(math.Ceil(float64(upper)/float64(latency)) * float64(latency))
-			timeout := time.Duration(upbound+margin) * time.Millisecond
-			// Waits that all children have started to access max safely
-			begin = time.Now()
-			res, xerr := overlord.Wait()
-			waitForRealDuration := time.Since(begin)
-			if waitForRealDuration > timeout {
-				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
-					t.Logf("Launching children took %v", childrenStartDuration)
-				}
-				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
-				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
-				failures++
-				if failures > (75 * rounds / 100) {
-					t.Errorf("Test %d: too many failures", index)
-					t.FailNow()
-					return
-				}
-			} else {
-				require.Nil(t, xerr)
-				require.NotEmpty(t, res)
-			}
-		}
-	}
-
-	// Look at the pressure supported by GC
-	funk(1, 10, 50, 250, 20, 40, 20)
-
-	// time.Sleep(50 * time.Millisecond)
-	// funk(2, 10, 50, 250, 20, 40, 20)
-	// time.Sleep(50 * time.Millisecond)
-	// funk(3, 10, 50, 250, 20, 40, 20)
-	// time.Sleep(50 * time.Millisecond)
-	// funk(4, 10, 50, 250, 20, 40, 20)
-}
-
 func TestStates(t *testing.T) { // FIXME: CI failed
 	for j := 0; j < 60; j++ {
 		overlord, xerr := NewTaskGroup()

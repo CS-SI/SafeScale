@@ -262,8 +262,8 @@ func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 			func() error {
 				return nil
 			},
-			600*time.Millisecond,
-			240*time.Millisecond,
+			800*time.Millisecond,
+			400*time.Millisecond,
 		)
 		require.Nil(t, err)
 	})
@@ -1127,8 +1127,8 @@ func TestErrCheckTimeout(t *testing.T) {
 			innerXErr := genHappy()
 			return innerXErr
 		},
+		50*time.Millisecond,
 		1*time.Second,
-		5*time.Second,
 	)
 	if xerr == nil {
 		t.Errorf("the while.. HAS to fail")
@@ -1263,8 +1263,8 @@ func TestErrCheckNoTimeout(t *testing.T) {
 			innerXErr := genSad()
 			return innerXErr
 		},
-		time.Second,
-		5*time.Second,
+		50*time.Millisecond,
+		1*time.Second,
 	)
 	if xerr == nil {
 		t.Errorf("the while.. HAS to fail")
@@ -1329,8 +1329,8 @@ func TestCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(
 		genHappy,
-		PrevailRetry(Successful(), Timeout(6*time.Second)),
-		Constant(1*time.Second),
+		PrevailRetry(Successful(), Timeout(1*time.Second)),
+		Constant(500*time.Millisecond),
 		nil, nil, nil,
 	)
 	if xerr == nil {
@@ -1342,7 +1342,7 @@ func TestCustomActionWithTimeout(t *testing.T) {
 	}
 
 	delta := time.Since(begin)
-	if delta < 6*time.Second {
+	if delta < 1*time.Second {
 		t.Errorf("retry timing didn't work well")
 		t.FailNow()
 	}

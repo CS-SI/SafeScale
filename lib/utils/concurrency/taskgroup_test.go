@@ -363,10 +363,10 @@ func TestChildrenWaitingGameEnoughTimeAfterWF(t *testing.T) {
 	}
 
 	// Look at the pressure supported by GC
-	funk(1, 40, 50, 250, 20, 40, 20)
-	funk(2, 40, 50, 250, 20, 40, 20)
-	funk(3, 40, 50, 250, 20, 40, 20)
-	funk(4, 40, 50, 250, 20, 40, 20)
+	funk(1, 4, 50, 250, 20, 40, 20)
+	funk(2, 4, 50, 250, 20, 40, 20)
+	funk(3, 4, 50, 250, 20, 40, 20)
+	funk(4, 4, 50, 250, 20, 40, 20)
 }
 
 func TestStatesWF(t *testing.T) {
