@@ -18,13 +18,10 @@ package utils
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func OriginalAbsPathify(inPath string) string {
@@ -49,7 +46,7 @@ func OriginalAbsPathify(inPath string) string {
 	return ""
 }
 
-func Test_AbsPathify(t *testing.T) {
+func TestAbsPathify(t *testing.T) {
 	pwd, _ := os.Getwd()
 	user := os.Getenv("USER")
 
@@ -82,56 +79,6 @@ func Test_AbsPathify(t *testing.T) {
 			})
 		}
 	}
-
-	t.Run("fourth", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				fmt.Println("The code did not panic, :)")
-			} else {
-				t.Errorf("Horrible failure")
-			}
-		}()
-		result := AbsPathify("{}")
-		require.Contains(t, result, "{}")
-	})
-
-	t.Run("5th", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				fmt.Println("The code did not panic, :)")
-			} else {
-				t.Errorf("Horrible failure")
-			}
-		}()
-		result := AbsPathify("${HOME}")
-		require.NotContains(t, result, "${HOME}")
-	})
-
-	t.Run("6th", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				fmt.Println("The code did not panic, :)")
-			} else {
-				t.Errorf("Horrible failure")
-			}
-		}()
-		result := AbsPathify("${HOME}///////////notfound")
-		require.NotContains(t, result, "${HOME}")
-		require.NotContains(t, result, "//")
-	})
-
-	t.Run("7th", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				fmt.Println("The code did not panic, :)")
-			} else {
-				t.Errorf("Horrible failure")
-			}
-		}()
-		result := AbsPathify("${MANY}/some")
-		require.EqualValues(t, result, "/some")
-	})
-
 }
 
 func TestOriginalAbsPathify(t *testing.T) {
@@ -167,37 +114,4 @@ func TestOriginalAbsPathify(t *testing.T) {
 			})
 		}
 	}
-}
-
-func Test_ExtractRetCode(t *testing.T) {
-
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("timeout", "1")
-	} else {
-		cmd = exec.Command("bash", "-c", "sleep 1")
-	}
-	if err := cmd.Start(); err != nil {
-		t.Error(err)
-		t.Fail()
-	} else {
-		err := cmd.Process.Kill()
-		if err != nil {
-			t.FailNow()
-		}
-		err = cmd.Wait()
-
-		fmt.Println(err)
-
-		defer func() {
-			r := recover()
-			fmt.Println(r)
-		}()
-
-		result, ret, xerr := ExtractRetCode(err)
-
-		fmt.Println(result, ret, xerr.Error())
-
-	}
-
 }
