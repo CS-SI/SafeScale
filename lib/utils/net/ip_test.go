@@ -41,7 +41,7 @@ func Test_IPv4ToUInt32(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 
-		_, err := rand.Read(token)
+		_, err := rand.Read(token) //nolint
 		if err != nil {
 			t.FailNow()
 		}

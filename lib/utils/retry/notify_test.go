@@ -1,6 +1,3 @@
-//go:build (integration && securitygrouptests) || allintegration
-// +build integration,securitygrouptests allintegration
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -17,19 +14,32 @@
  * limitations under the License.
  */
 
-package securitygroups
+package retry
 
 import (
 	"testing"
+	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
-func SecurityGroupLife(t *testing.T) {
-	// FIXME: implement this test
-}
+func Test_NotifyByLog(t *testing.T) {
 
-func AddRuleToExistingSecurityGroup(t *testing.T) {
-	// FIXME: implement this test
-}
+	logrus.SetLevel(logrus.DebugLevel)
 
-func init() {
+	try := Try{
+		Start: time.Now(),
+		Count: 1,
+		Err:   nil,
+	}
+	ver := verdict.Retry
+
+	log := tests.LogrusCapture(func() {
+		NotifyByLog(try, ver)
+	})
+	require.Contains(t, log, "try #1: verdict=Retry")
+
 }

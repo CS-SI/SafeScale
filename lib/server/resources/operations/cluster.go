@@ -1080,7 +1080,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, xerr
 	}
 
-	timeout := 2 * timings.HostCreationTimeout() // More than enough
+	timeout := 3 * timings.HostCreationTimeout() // More than enough
 
 	tg, xerr := concurrency.NewTaskGroupWithContext(
 		ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)),

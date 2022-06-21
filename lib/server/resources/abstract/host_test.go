@@ -83,6 +83,20 @@ func TestKeyPair_NewKeyPair(t *testing.T) {
 
 }
 
+func Test_almostEqual(t *testing.T) {
+
+	require.False(t, almostEqual(14, 15))
+	require.True(t, almostEqual(14, 14+1e-7))
+
+}
+
+func Test_almostEqual64(t *testing.T) {
+
+	require.False(t, almostEqual64(14, 15))
+	require.True(t, almostEqual64(14, 14+1e-7))
+
+}
+
 func TestHostSizingRequirements_Equals(t *testing.T) {
 
 	hsr1 := HostSizingRequirements{
@@ -347,18 +361,10 @@ func TestHostCore_Deserialize(t *testing.T) {
 
 func TestHostCore_GetName(t *testing.T) {
 
-	var hc *HostCore
-
-	name := hc.GetName()
-	if name != "" {
-		t.Error("(nil) *HostCore has no name")
-		t.Fail()
-	}
-
-	hc = &HostCore{
+	hc := &HostCore{
 		Name: "HostCore Name",
 	}
-	name = hc.GetName()
+	name := hc.GetName()
 	if name != hc.Name {
 		t.Error("Wrong GetName value restitution")
 		t.Fail()
@@ -368,18 +374,10 @@ func TestHostCore_GetName(t *testing.T) {
 
 func TestHostCore_GetID(t *testing.T) {
 
-	var hc *HostCore
-
-	id := hc.GetID()
-	if id != "" {
-		t.Error("(nil) *HostCore has no id")
-		t.Fail()
-	}
-
-	hc = &HostCore{
+	hc := &HostCore{
 		ID: "HostCore ID",
 	}
-	id = hc.GetID()
+	id := hc.GetID()
 	if id != hc.ID {
 		t.Error("Wrong GetID value restitution")
 		t.Fail()

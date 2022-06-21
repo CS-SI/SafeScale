@@ -258,21 +258,23 @@ feature:
                             }
                             EOF
                             else
-                            # VPL: these options seems to trouble docker in some cases. Need further analysis.
-                            #    "exec-opts": [
-                            #        "native.cgroupdriver=${DRIVER}"
-                            #    ],
                                 cat > /etc/docker/daemon.json <<-EOF
                             {
+                                "exec-opts": [
+                                    "native.cgroupdriver=${DRIVER}"
+                                ],
                                 "no-new-privileges": false,
                                 "log-driver": "json-file",
-                                "log-level":"info",
+                                "log-level": "info",
                                 "log-opts": {
                                     "max-size": "100m"
                                 },
                                 "experimental": true,
                                 "metrics-addr": "0.0.0.0:9323",
-                                "storage-driver": "overlay2"
+                                "storage-driver": "overlay2",
+                                "storage-opts": [
+                                    "overlay2.override_kernel_check=true"
+                                ]
                             }
                             EOF
                             fi
@@ -288,7 +290,7 @@ feature:
                             # First once dockerd, allowing it to create needed firewalld zone docker...
                             sfFirewallReload || sfFail 208 "failed to reload firewalld, ensuring it works correctly"
                             sfService restart docker || sfFail 209 "failed to restart dockerd for the first time"
-
+                            
                             # ... and if no such zone is created, create needed firewalld rules
                             # FIXME: it should be better to create a configuration identical to the one created by docker 20.10+...
                             sfFirewall --info-zone=docker 2>&1 >/dev/null || {
@@ -343,10 +345,10 @@ feature:
                         run: |
                             sfService disable docker
                             sfService stop docker
-
+                            
                             sfFirewallAdd --zone=trusted --remove-interface=docker0 --remove-interface=docker_gwbridge
                             sfFirewallReload || sfFail 192 "Firewall problem"
-
+                            
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     dpkg --purge --force-remove-reinstreq docker-ce*

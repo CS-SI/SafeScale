@@ -77,7 +77,7 @@ func TestAbortNotStartedTask(t *testing.T) {
 }
 
 func TestAbortStartedTaskWithChildren(t *testing.T) {
-	iter := 8
+	iter := 2
 	for i := 0; i < iter; i++ {
 		fmt.Println("--- NEXT ---")
 
@@ -145,7 +145,7 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 
 // Taskgroups work well instead
 func TestAbortFatherTaskGroup(t *testing.T) {
-	iter := 8
+	iter := 2
 	for i := 0; i < iter; i++ {
 		fmt.Println("--- NEXT ---")
 

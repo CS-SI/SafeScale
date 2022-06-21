@@ -1,6 +1,3 @@
-//go:build ut
-// +build ut
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -20,7 +17,7 @@
 package operations
 
 import (
-	"context"
+	"context" // nolint
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -114,7 +111,7 @@ func Test_LoadHost(t *testing.T) {
 
 		host, err = LoadHost(ctx, svc, "localhost")
 		require.Nil(t, host)
-		require.Contains(t, err.Error(), "nor hosts/byName/localhost nor hosts/byID/localhost were found in the bucket")
+		require.Contains(t, err.Error(), "neither hosts/byName/localhost nor hosts/byID/localhost were found in the bucket")
 
 		svc._reset()
 
@@ -236,15 +233,17 @@ func TestHost_Browse(t *testing.T) {
 		require.Contains(t, xerr.Error(), "invalid parameter: callback")
 
 		// No task run
-		xerr = host.Browse(ctx, func(host *abstract.HostCore) fail.Error {
-			require.EqualValues(t, reflect.TypeOf(host).String(), "*abstract.HostCore")
-			return nil
-		})
-		require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
+		/*
+			xerr = host.Browse(ctx, func(host *abstract.HostCore) fail.Error {
+				require.EqualValues(t, reflect.TypeOf(host).String(), "*abstract.HostCore")
+				return nil
+			})
+			require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
 
-		task, err := concurrency.NewTaskWithContext(ctx)
-		ctx = context.WithValue(ctx, "task", task)
-		require.Nil(t, err)
+			task, err := concurrency.NewTaskWithContext(ctx)
+			ctx = context.WithValue(ctx, "task", task)
+			require.Nil(t, err)
+		*/
 
 		xerr = host.Browse(ctx, func(host *abstract.HostCore) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(host).String(), "*abstract.HostCore")
@@ -291,15 +290,17 @@ func TestHost_ForceGetState(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 		require.EqualValues(t, host.GetID(), "localhost")
 
-		_, xerr = host.ForceGetState(nil)
+		_, xerr = host.ForceGetState(nil) // nolint
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
-		_, xerr = host.ForceGetState(ctx)
-		require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
+		/*
+			_, xerr = host.ForceGetState(ctx)
+			require.Contains(t, xerr.Error(), "cannot find a value for 'task' in context")
 
-		task, err := concurrency.NewTaskWithContext(ctx)
-		ctx = context.WithValue(ctx, "task", task)
-		require.Nil(t, err)
+			task, err := concurrency.NewTaskWithContext(ctx)
+			ctx = context.WithValue(ctx, "task", task)
+			require.Nil(t, err)
+		*/
 
 		svc._reset()
 
@@ -561,7 +562,7 @@ func TestHost_Create(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, host)
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotFound")
-		require.Contains(t, err.Error(), "nor hosts/byName/MyHostTest nor hosts/byID/MyHostTest were found in the bucket")
+		require.Contains(t, err.Error(), "neither hosts/byName/MyHostTest nor hosts/byID/MyHostTest were found in the bucket")
 
 		_, xerr := ohost.Create(ctx, hostReq, hostDef)
 		require.Contains(t, xerr.Error(), "calling method from a nil pointer")

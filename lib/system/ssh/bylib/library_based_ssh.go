@@ -201,7 +201,7 @@ type LibCommand struct {
 }
 
 func (sc *LibCommand) closeTunneling() error {
-	logrus.Debugf("Closing tunnels")
+	logrus.Tracef("Closing tunnels")
 
 	if sc.tunnels != nil {
 		sc.tunnels.Close()
@@ -256,7 +256,7 @@ func (sc *LibCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 	}
 
 	xerr := retry.WhileUnsuccessful(func() error { // retry only if we have a tunnel problem
-		tu, _, err := sc.cfg.CreateTunneling()
+		tu, _, err := sc.cfg.CreateTunneling(ctx)
 		if err != nil {
 			return fail.NewError("failure creating tunnel: %w", err)
 		}
@@ -525,11 +525,11 @@ func (sc *LibCommand) cleanup() error {
 
 // Close this function exists only to provide compatibility with previous SSH api
 func (sc *LibCommand) Close() fail.Error {
-	return nil
+	return fail.ConvertError(sc.cleanup())
 }
 
 // CreateTunneling ...
-func (sconf *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) {
+func (sconf *Profile) CreateTunneling(ctx context.Context) (*sshtunnel.SSHTunnel, *Profile, error) {
 	var tu *sshtunnel.SSHTunnel
 
 	if sconf.LocalHost == "" {
@@ -620,17 +620,18 @@ func (sconf *Profile) CreateTunneling() (*sshtunnel.SSHTunnel, *Profile, error) 
 		}
 	}
 
-	var tsErr error
 	go func() {
-		tsErr = tu.Start()
+		tsErr := tu.Start()
 		if tsErr != nil {
-			tu.Close()
+			logrus.Tracef("tunnel Start goroutine failed: %s", tsErr.Error())
 		}
+		logrus.Tracef("quitting tunnel Start goroutine")
+		tu.Close()
 	}()
 
 	tunnelReady := <-tu.Ready()
 	if !tunnelReady {
-		return nil, nil, fmt.Errorf("unable to establish tunnel: %w", tsErr)
+		return nil, nil, fmt.Errorf("unable to establish tunnel")
 	}
 
 	return tu, sconf, nil
@@ -820,7 +821,7 @@ func closeAndIgnore(in io.Closer) { // nolint
 
 // Copy copies a file/directory from/to local to/from remote
 func (sconf *Profile) copy(ctx context.Context, remotePath string, localPath string, isUpload bool) (int, string, string, fail.Error) {
-	tu, sshConfig, err := sconf.CreateTunneling()
+	tu, sshConfig, err := sconf.CreateTunneling(ctx)
 	if err != nil {
 		return -1, "", "", fail.NewError("unable to create tunnels : %s", err.Error())
 	}
@@ -971,7 +972,7 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 		sshUsername = sconf.User
 	}
 
-	tu, sshConfig, err := sconf.CreateTunneling()
+	tu, sshConfig, err := sconf.CreateTunneling(context.Background())
 	if err != nil {
 		return fail.ConvertError(fmt.Errorf("unable to create tunnels : %s", err.Error()))
 	}

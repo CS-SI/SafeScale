@@ -77,13 +77,10 @@ feature:
           description: |-
               tells if hardening is wanted (default: true)
         - name: KubeVersion
-          value: 1.20.9
+          value: 1.23.0
           description: defines the Kubernetes version to use
-        #- name: CalicoVersion
-        #  value: 3.19.1
-        #  description: defines the Calico version to use
         - name: FlannelVersion
-          value: v0.13.0
+          value: v0.18.0
           description: defines the Flannel version to use
         - OIDCClientName=default
         - OIDCGroupName=user_groups
@@ -165,7 +162,7 @@ feature:
                                 echo $i >>/etc/modules-load.d/kubernetes.conf
                                 modprobe $i 2>/dev/null || sfFail 201 "Error enabling kernel module $i, error code $?"
                             done
-    
+                            
                             op=-1
                             for i in nf_conntrack_ipv4 nf_conntrack; do
                                 echo $i >>/etc/modules
@@ -536,7 +533,7 @@ feature:
 
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta2
+                            apiVersion: kubeadm.k8s.io/v1beta3
                             kind: ClusterConfiguration
                             controlPlaneEndpoint: "${CP_ENDPOINT_IP}:6443"
                             kubernetesVersion: ${KUBE_VERSION}
@@ -579,7 +576,7 @@ feature:
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta2
+                            apiVersion: kubeadm.k8s.io/v1beta3
                             kind: InitConfiguration
                             localAPIEndpoint:
                                 bindPort: ${LOCAL_PORT}

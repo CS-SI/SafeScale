@@ -141,17 +141,11 @@ func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName ...
 // satisfies interface data.Identifiable
 func (n *Network) GetName() string {
-	if n == nil {
-		return ""
-	}
 	return n.Name
 }
 
 // GetID ...
 // satisfies interface data.Identifiable
 func (n *Network) GetID() string {
-	if n == nil {
-		return ""
-	}
 	return n.ID
 }

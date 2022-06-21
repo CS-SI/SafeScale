@@ -80,7 +80,4 @@ func AnsibleGoodZipPlaylist(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("features").
-		AddScenario(AnsibleWrongZipPlaylist).
-		AddScenario(AnsibleGoodZipPlaylist)
 }

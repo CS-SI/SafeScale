@@ -126,7 +126,7 @@ func TestNetwork_Clone_DNS(t *testing.T) {
 
 func TestNetwork_Serialize(t *testing.T) {
 
-	var n *Network
+	var n *Network = nil
 	_, err := n.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
@@ -187,15 +187,9 @@ func TestNetwork_Deserialize(t *testing.T) {
 
 func TestNetwork_GetName(t *testing.T) {
 
-	var n *Network
-	name := n.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	n = NewNetwork()
+	n := NewNetwork()
 	n.Name = "Network Name"
-	name = n.GetName()
+	name := n.GetName()
 	if name != n.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -205,15 +199,9 @@ func TestNetwork_GetName(t *testing.T) {
 
 func TestNetwork_GetID(t *testing.T) {
 
-	var n *Network
-	id := n.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	n = NewNetwork()
+	n := NewNetwork()
 	n.ID = "Network Name"
-	id = n.GetID()
+	id := n.GetID()
 	if id != n.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

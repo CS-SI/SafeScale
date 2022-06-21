@@ -254,9 +254,9 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 						return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 					}
 
-					ip, xerr := castedGW.GetAccessIP(ctx)
-					if xerr != nil {
-						return xerr
+					ip, inXErr := castedGW.GetAccessIP(ctx)
+					if inXErr != nil {
+						return inXErr
 					}
 
 					primaryGatewayConfig = ssh.NewConfig(gwahc.Name, ip, int(gwahc.SSHPort), opUser, gwahc.PrivateKey, 0, "", nil, nil)
@@ -289,9 +289,9 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 							return fail.InconsistentError("failed to cast gwInstance to '*Host'")
 						}
 
-						ip, xerr := castedGW.GetAccessIP(ctx)
-						if xerr != nil {
-							return xerr
+						ip, inXErr := castedGW.GetAccessIP(ctx)
+						if inXErr != nil {
+							return inXErr
 						}
 
 						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(gwahc.SSHPort), opUser, gwahc.PrivateKey, 0, "", nil, nil)
@@ -1964,7 +1964,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		}
 	}
 
-	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
+	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 	// If the script doesn't reboot, we force a reboot
 	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
 		logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
@@ -3106,13 +3106,37 @@ func (instance *Host) Reboot(ctx context.Context, soft bool) (ferr fail.Error) {
 	return nil
 }
 
-func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
+func (instance *Host) sync(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
+	}
+
+	// Sync Host
+	logrus.Infof("Host '%s': sync", instance.GetName())
+	command := `sync`
+	_, _, _, xerr = instance.unsafeRun(ctx, command, outputs.COLLECT, timings.NormalDelay(), 30*time.Second) // nolint
+	if xerr != nil {
+		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+	}
+
+	return nil
+}
+
+func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	waitingTime := 24 * timings.RebootTimeout() / 10 // by default, near 4 min
+	minWaitFor := timings.NormalDelay()
+	if minWaitFor > waitingTime {
+		minWaitFor = waitingTime
 	}
 
 	// Reboot Host
@@ -3120,11 +3144,12 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 	command := `echo "sleep 4 ; sync ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
+	_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, timings.NormalDelay(), waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
-	time.Sleep(timings.NormalDelay())
+
+	time.Sleep(minWaitFor)
 	return nil
 }
 
@@ -3956,7 +3981,7 @@ func getPhase4Timeout(timings temporal.Timings) time.Duration {
 	theType, _ := getDefaultConnectorType()
 	switch theType {
 	case "cli":
-		waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
+		waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 		return waitingTime
 	default:
 		return 30 * time.Second

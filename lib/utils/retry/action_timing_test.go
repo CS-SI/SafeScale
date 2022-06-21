@@ -1,5 +1,5 @@
-//go:build (integration && securitygrouptests) || allintegration
-// +build integration,securitygrouptests allintegration
+//go:build alltests
+// +build alltests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,19 +17,38 @@
  * limitations under the License.
  */
 
-package securitygroups
+package retry
 
 import (
 	"testing"
+	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
+	"github.com/stretchr/testify/require"
 )
 
-func SecurityGroupLife(t *testing.T) {
-	// FIXME: implement this test
-}
+func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 
-func AddRuleToExistingSecurityGroup(t *testing.T) {
-	// FIXME: implement this test
-}
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithHardTimeout(
+			func() error {
+				return nil
+			},
+			800*time.Millisecond,
+			400*time.Millisecond,
+		)
+		require.Nil(t, err)
+	})
 
-func init() {
+	require.Contains(t, log, "'delay' greater than 'timeout'")
+
+	err := WhileUnsuccessfulWithHardTimeout(
+		func() error {
+			return nil
+		},
+		600*time.Millisecond,
+		-1*time.Second,
+	)
+	require.Nil(t, err)
+
 }

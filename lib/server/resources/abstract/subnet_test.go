@@ -104,7 +104,7 @@ func TestSubnet_Clone(t *testing.T) {
 
 func TestSubnet_Serialize(t *testing.T) {
 
-	var s *Subnet
+	var s *Subnet = nil
 	_, err := s.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
@@ -199,15 +199,9 @@ func TestVirtualIP_Clone(t *testing.T) {
 
 func TestSubnet_GetName(t *testing.T) {
 
-	var s *Subnet
-	name := s.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.Name = "Subnet Name"
-	name = s.GetName()
+	name := s.GetName()
 	if name != s.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -217,15 +211,9 @@ func TestSubnet_GetName(t *testing.T) {
 
 func TestSubnet_GetID(t *testing.T) {
 
-	var s *Subnet
-	id := s.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.ID = "Subnet ID"
-	id = s.GetID()
+	id := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -235,15 +223,9 @@ func TestSubnet_GetID(t *testing.T) {
 
 func TestSubnet_GetCIDR(t *testing.T) {
 
-	var s *Subnet
-	cidr := s.GetCIDR()
-	if cidr != "" {
-		t.Error("Can't get cidr from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.ID = "Subnet ID"
-	cidr = s.GetCIDR()
+	cidr := s.GetCIDR()
 	if cidr != s.CIDR {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -253,12 +235,7 @@ func TestSubnet_GetCIDR(t *testing.T) {
 
 func TestVirtualIP_IsNull(t *testing.T) {
 
-	var v *VirtualIP = nil
-	if !v.IsNull() {
-		t.Error("Nil pointer virtual ip is null")
-		t.Fail()
-	}
-	v = NewVirtualIP()
+	v := NewVirtualIP()
 	if !v.IsNull() {
 		t.Error("Virtual ip without ID or Name is null")
 		t.Fail()

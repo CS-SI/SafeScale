@@ -1,6 +1,3 @@
-//go:build ut
-// +build ut
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -33,6 +30,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,6 +41,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
@@ -50,26 +50,50 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
+
+	//"github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 )
+
+var SHORTEN_TIMINGS *temporal.MutableTimings = &temporal.MutableTimings{
+	Timeouts: temporal.Timeouts{
+		Communication:          100 * time.Millisecond,
+		Connection:             100 * time.Millisecond,
+		Context:                100 * time.Millisecond,
+		HostCreation:           4 * time.Second, // 100ms too fast for concurrency, makes break clustertasks
+		HostCleanup:            100 * time.Millisecond,
+		HostOperation:          100 * time.Millisecond,
+		HostLongOperation:      100 * time.Millisecond,
+		Operation:              100 * time.Millisecond,
+		Metadata:               100 * time.Millisecond,
+		MetadataReadAfterWrite: 100 * time.Millisecond,
+		SSHConnection:          100 * time.Millisecond,
+		RebootTimeout:          100 * time.Millisecond,
+	},
+	Delays: temporal.Delays{
+		Small:  100 * time.Millisecond,
+		Normal: 100 * time.Millisecond,
+		Big:    100 * time.Millisecond,
+	},
+}
 
 type ServiceTest struct {
 	iaas.Service
@@ -78,13 +102,29 @@ type ServiceTest struct {
 	options   ServiceTestOptions
 }
 
+type ServiceTestBucketData struct {
+	data map[string]string
+	mu   sync.Mutex
+}
+
+type ServiceTestCacheData struct {
+	//data map[string]cache.Store
+	data map[string]interface{}
+	mu   sync.Mutex
+}
+
+type ServiceTestFsData struct {
+	data map[string][]byte
+	mu   sync.Mutex
+}
+
 type ServiceTestInternals struct {
 	t          *testing.T
-	tmpdir     string            // Temporary directory
-	bucketData map[string]string // Contains local data
-	cache      map[string]cache.Store
-	fsCache    map[string][]byte
-	loglevel   uint
+	tmpdir     string                // Temporary directory
+	bucketData ServiceTestBucketData // Contains bucket data (emulated local)
+	cache      ServiceTestCacheData  // Contains cache data (emulated local)
+	fsCache    ServiceTestFsData     // Contains file data (emulated local)
+	loglevel   uint                  // 0: none, 1: no data details, 2: full data vision
 }
 type ServiceTestMemory struct {
 	keypairs map[string]*abstract.KeyPair
@@ -380,11 +420,24 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 	if err != nil {
 		return err
 	}
+
 	svc := &ServiceTest{
 		internals: ServiceTestInternals{
-			t:        t,
-			tmpdir:   dir,
-			cache:    make(map[string]cache.Store),
+			t:      t,
+			tmpdir: dir,
+			bucketData: ServiceTestBucketData{
+				data: make(map[string]string),
+				mu:   sync.Mutex{},
+			},
+			cache: ServiceTestCacheData{
+				//data: make(map[string]cache.Store),
+				data: make(map[string]interface{}),
+				mu:   sync.Mutex{},
+			},
+			fsCache: ServiceTestFsData{
+				data: make(map[string][]byte),
+				mu:   sync.Mutex{},
+			},
 			loglevel: 2,
 		},
 		memory: ServiceTestMemory{
@@ -394,19 +447,30 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 	}
 	svc._reset()
 
-	SSHConnectorTest_Overload(svc, routine)
-
+	xerr := svc._shortenTimings(func() fail.Error {
+		SSHConnectorTest_Overload(svc, routine)
+		return nil
+	})
 	_ = os.RemoveAll(dir)
-	return nil
+	return xerr
 }
 
 /*** Special methods for tests ***/
 func (e *ServiceTest) _reset() {
 	e._log("ServiceTest::_reset")
-	e.internals.bucketData = make(map[string]string) // Empty bucket data
 
-	e.internals.cache = make(map[string]cache.Store)
-	e.internals.fsCache = make(map[string][]byte)
+	e.internals.bucketData.mu.Lock()
+	e.internals.bucketData.data = make(map[string]string) // Empty bucket data
+	e.internals.bucketData.mu.Unlock()
+
+	e.internals.cache.mu.Lock()
+	//e.internals.cache.data = make(map[string]cache.Store)
+	e.internals.cache.data = make(map[string]interface{})
+	e.internals.cache.mu.Unlock()
+
+	e.internals.fsCache.mu.Lock()
+	e.internals.fsCache.data = make(map[string][]byte)
+	e.internals.fsCache.mu.Unlock()
 
 	e.options.candisablesecuritygroup = true
 	e.options.enablecache = false
@@ -474,20 +538,45 @@ func (e *ServiceTest) _updateOption(name string, value interface{}) {
 		}
 	}
 }
+
+func (e *ServiceTest) _getRawInternalData(path string) (string, error) {
+
+	e.internals.bucketData.mu.Lock()
+	serial, ok := e.internals.bucketData.data[path]
+	e.internals.bucketData.mu.Unlock()
+
+	if !ok {
+		return "", errors.New(fmt.Sprintf("Key \"%s\" not found", path)) // nolint
+	}
+	return serial, nil
+}
 func (e *ServiceTest) _getInternalData(path string) (string, error) {
 	key, err := crypt.NewEncryptionKey([]byte(e.options.metadatakey))
 	if err != nil {
 		return "", err
 	}
-	serial, ok := e.internals.bucketData[path]
+	e.internals.bucketData.mu.Lock()
+	serial, ok := e.internals.bucketData.data[path]
+	e.internals.bucketData.mu.Unlock()
 	if !ok {
-		return "", errors.New(fmt.Sprintf("Key \"%s\" not found", path))
+		return "", errors.New(fmt.Sprintf("Key \"%s\" not found", path)) // nolint
 	}
 	bytes, xerr := crypt.Decrypt([]byte(serial), key)
 	if xerr != nil {
 		return "", xerr
 	}
 	return string(bytes), nil
+}
+func (e *ServiceTest) _getInternalDataKeys(prefix string) []string {
+	keys := make([]string, 0)
+	e.internals.bucketData.mu.Lock()
+	for k := range e.internals.bucketData.data {
+		if prefix == "" || (len(k) >= len(prefix) && k[:len(prefix)] == prefix) {
+			keys = append(keys, k)
+		}
+	}
+	e.internals.bucketData.mu.Unlock()
+	return keys
 }
 func (e *ServiceTest) _setInternalData(path string, v interface{}) error {
 	serial, err := e._encodeItem(v)
@@ -504,20 +593,28 @@ func (e *ServiceTest) _setInternalData(path string, v interface{}) error {
 	}
 
 	e._logf("ServiceTest::_setInternalData { path: \"%s\", value: %s }", path, dataValue)
-	e.internals.bucketData[path] = serial
+	e.internals.bucketData.mu.Lock()
+	e.internals.bucketData.data[path] = serial
+	e.internals.bucketData.mu.Unlock()
 	return nil
 }
 func (e *ServiceTest) _hasInternalData(path string) bool {
-	_, ok := e.internals.bucketData[path]
+	e.internals.bucketData.mu.Lock()
+	_, ok := e.internals.bucketData.data[path]
+	e.internals.bucketData.mu.Unlock()
 	return ok
 }
 func (e *ServiceTest) _deleteInternalData(path string) error {
 	e._logf("ServiceTest::_deleteInternalData { path: \"%s\" }", path)
-	_, ok := e.internals.bucketData[path]
+	e.internals.bucketData.mu.Lock()
+	_, ok := e.internals.bucketData.data[path]
+	e.internals.bucketData.mu.Unlock()
 	if !ok {
-		return errors.New(fmt.Sprintf("Key \"%s\" not found", path))
+		return errors.New(fmt.Sprintf("Key \"%s\" not found", path)) // nolint
 	}
-	delete(e.internals.bucketData, path)
+	e.internals.bucketData.mu.Lock()
+	delete(e.internals.bucketData.data, path)
+	e.internals.bucketData.mu.Unlock()
 	return nil
 }
 func (e *ServiceTest) _encodeItem(v interface{}) (string, error) {
@@ -551,21 +648,26 @@ func (e *ServiceTest) _decodeItem(serial string) (string, error) {
 	}
 	return string(decoded), nil
 }
+
 func (e *ServiceTest) _getFsCache(path string) ([]byte, fail.Error) {
 	e._logf("ServiceTest::_getFsCache {path: \"%s\"} ", path)
-	b, ok := e.internals.fsCache[path]
+	e.internals.fsCache.mu.Lock()
+	b, ok := e.internals.fsCache.data[path]
+	e.internals.fsCache.mu.Unlock()
 	if !ok {
 		return []byte{}, fail.NotFoundError(fmt.Sprintf("fscache \"%s\"not found", path))
 	}
 	return b, nil
 }
 func (e *ServiceTest) _getFsCacheMD5(path string) (string, fail.Error) {
-	b, ok := e.internals.fsCache[path]
+	e.internals.fsCache.mu.Lock()
+	b, ok := e.internals.fsCache.data[path]
+	e.internals.fsCache.mu.Unlock()
 	if !ok {
 		e._errorf("ServiceTest::_getFsCacheMD5 {path: \"%s\"} not found ", path)
 		return "", fail.NotFoundError(fmt.Sprintf("fscache \"%s\"not found", path))
 	}
-	hasher := md5.New()
+	hasher := md5.New() // nolint
 	_, err := hasher.Write(b)
 	if err != nil {
 		e._errorf("ServiceTest::_getFsCacheMD5 {path: \"%s\"} not hashable", path)
@@ -585,10 +687,12 @@ func (e *ServiceTest) _setFsCache(path string, data []byte) fail.Error {
 	if path == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
-	e.internals.fsCache[path] = data
+	e.internals.fsCache.mu.Lock()
+	e.internals.fsCache.data[path] = data
+	e.internals.fsCache.mu.Unlock()
 	return nil
 }
-func (e *ServiceTest) _shortcutTimings(routine func() fail.Error) (ferr fail.Error) {
+func (e *ServiceTest) _shortenTimings(routine func() fail.Error) (ferr fail.Error) {
 
 	defer func() {
 		r := recover()
@@ -609,38 +713,21 @@ func (e *ServiceTest) _shortcutTimings(routine func() fail.Error) (ferr fail.Err
 		}
 	}()
 
-	err := e.options.timings.Update(&temporal.MutableTimings{
-		Timeouts: temporal.Timeouts{
-			Communication:          100 * time.Millisecond,
-			Connection:             100 * time.Millisecond,
-			Context:                100 * time.Millisecond,
-			HostCreation:           4 * time.Second, // 100ms too fast for concurrency, makes break clustertasks
-			HostCleanup:            100 * time.Millisecond,
-			HostOperation:          100 * time.Millisecond,
-			HostLongOperation:      100 * time.Millisecond,
-			Operation:              100 * time.Millisecond,
-			Metadata:               100 * time.Millisecond,
-			MetadataReadAfterWrite: 100 * time.Millisecond,
-			SSHConnection:          100 * time.Millisecond,
-			RebootTimeout:          100 * time.Millisecond,
-		},
-		Delays: temporal.Delays{
-			Small:  100 * time.Millisecond,
-			Normal: 100 * time.Millisecond,
-			Big:    100 * time.Millisecond,
-		},
-	})
+	err := e.options.timings.Update(SHORTEN_TIMINGS)
 	if err != nil {
 		ferr = fail.Wrap(err)
 	} else {
 		ferr = routine()
 	}
-	err = e.options.timings.Update(temporal.NewTimings())
-	if err != nil {
-		ferr = fail.Wrap(err)
-	}
+	defer func() {
+		err = e.options.timings.Update(temporal.NewTimings())
+		if err != nil {
+			ferr = fail.Wrap(err)
+		}
+	}()
 	return ferr
 }
+
 func (e *ServiceTest) _cramp(msg string, length int) string { // nolint
 	output := msg
 	if len(output) > length {
@@ -758,53 +845,66 @@ func (e *ServiceTest) WaitHostState(ctx context.Context, name string, state host
 
 	e._surveyf("ServiceTest::WaitHostState { name: \"%s\", state: \"%s\" } (emulated)", name, state.String())
 
-	ahf, xerr := e.InspectHostByName(ctx, name)
+	host, xerr := LoadHost(ctx, e, name)
 	if xerr != nil {
 		return xerr
 	}
-	if ahf.CurrentState == state {
-		return nil
-	}
-	/*
-		if ahf.Core.LastState == state {
-			return nil
+
+	xerr = host.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-	*/
-	return fail.TimeoutError(errors.New("timeout"), timeout, "host has not start in time")
+		ahc.LastState = state
+		return nil
+	})
+
+	return nil // fail.TimeoutError(errors.New("timeout"), timeout, "host has not start in time")
 }
 func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error) {
 	e._survey("ServiceTest::WaitVolumeState (not implemented)")
 	return nil, nil
 }
 
-func (e *ServiceTest) GetCache(ctx context.Context, name string) (cache.Cache, fail.Error) {
+//func (e *ServiceTest) GetCache(ctx context.Context, name string) (cache.Cache, fail.Error) {
+func (e *ServiceTest) GetCache(ctx context.Context, name string) (interface{}, fail.Error) {
 	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", name, e.options.enablecache)
-
-	if name == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
-	}
-	if e.options.enablecache {
-		return NewCacheTest(name, e), nil
-	}
-	var c cache.Cache = NewCacheTest("name", e)
-	return c, fail.NotAvailableError("No cache available !")
+	/*
+		if name == "" {
+			return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+		}
+		if e.options.enablecache {
+			return NewCacheTest(name, e), nil
+		}
+		var c cache.Cache = NewCacheTest("name", e)
+	*/
+	return nil, fail.NotAvailableError("No cache available !")
 }
 
+/*
 func (e *ServiceTest) _cache_Get(ctx context.Context, cachename string, key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) { // nolint
 	e._surveyf("ServiceTest::_cache_Get { cache: \"%s\", key: \"%s\" } (not implemented)", cachename, key)
-	store, ok := e.internals.cache[cachename]
+
+	e.internals.cache.mu.Lock()
+	store, ok := e.internals.cache.data[cachename]
+	e.internals.cache.mu.Unlock()
 	if !ok {
 		store, xerr = cache.NewMapStore(cachename)
 		if xerr != nil {
 			return nil, xerr
 		}
-		e.internals.cache[cachename] = store
+		e.internals.cache.mu.Lock()
+		e.internals.cache.data[cachename] = store
+		e.internals.cache.mu.Unlock()
 	}
+	e.internals.cache.mu.Unlock()
 	return store.Entry(ctx, key)
 }
 func (e *ServiceTest) _cache_ReserveEntry(ctx context.Context, cachename string, key string, timeout time.Duration) fail.Error {
 	e._surveyf("ServiceTest::_cache_ReserveEntry { cache: \"%s\", key: \"%s\" }(not implemented)", cachename, key)
-	store, ok := e.internals.cache[cachename]
+	e.internals.cache.mu.Lock()
+	store, ok := e.internals.cache.data[cachename]
+	e.internals.cache.mu.Unlock()
 	if !ok {
 		return fail.NotFoundError("Cache \"%s\" not found", cachename)
 	}
@@ -812,7 +912,9 @@ func (e *ServiceTest) _cache_ReserveEntry(ctx context.Context, cachename string,
 }
 func (e *ServiceTest) _cache_CommitEntry(ctx context.Context, cachename string, key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
 	e._surveyf("ServiceTest::_cache_CommitEntry { cache: \"%s\", key: \"%s\", content: \"%s\" } (not implemented)", cachename, key, reflect.TypeOf(content).String())
-	store, ok := e.internals.cache[cachename]
+	e.internals.cache.mu.Lock()
+	store, ok := e.internals.cache.data[cachename]
+	e.internals.cache.mu.Unlock()
 	if !ok {
 		return nil, fail.NotFoundError("Cache \"%s\" not found", cachename)
 	}
@@ -820,21 +922,26 @@ func (e *ServiceTest) _cache_CommitEntry(ctx context.Context, cachename string, 
 }
 func (e *ServiceTest) _cache_FreeEntry(ctx context.Context, cachename string, key string) fail.Error {
 	e._surveyf("ServiceTest::_cache_FreeEntry { cache: \"%s\", key: \"%s\" } (not implemented)", cachename, key)
-	store, ok := e.internals.cache[cachename]
+	e.internals.cache.mu.Lock()
+	store, ok := e.internals.cache.data[cachename]
+	e.internals.cache.mu.Unlock()
 	if !ok {
 		return fail.NotFoundError("Cache \"%s\" not found", cachename)
 	}
 	return store.Free(ctx, key)
 }
+
 func (e *ServiceTest) _cache_AddEntry(ctx context.Context, cachename string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
 	e._surveyf("ServiceTest::_cache_AddEntry { cache: \"%s\" } (not implemented)", cachename)
-	store, ok := e.internals.cache[cachename]
+	e.internals.cache.mu.Lock()
+	store, ok := e.internals.cache.data[cachename]
+	e.internals.cache.mu.Unlock()
 	if !ok {
 		return nil, fail.NotFoundError("Cache \"%s\" not found", cachename)
 	}
 	return store.Add(ctx, content)
 }
-
+*/
 // api.Stack
 func (e *ServiceTest) GetStackName() (string, fail.Error) {
 	if e.options.stacknameErr != nil {
@@ -1439,41 +1546,41 @@ func (e *ServiceTest) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 	xerr = subnet.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 
 		/*
-			xerr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+			 xerr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 
-				ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+				 ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
+				 if !ok {
+					 return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				 }
 
-				ssgV1.ByName[hostName] = hostID // <<< link to sgr
-				ssgV1.ByID[hostID] = hostName // <<< link to sgr
+				 ssgV1.ByName[hostName] = hostID // <<< link to sgr
+				 ssgV1.ByID[hostID] = hostName // <<< link to sgr
 
 
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
+				 return nil
+			 })
+			 if xerr != nil {
+				 return xerr
+			 }
 		*/
 
 		/*
-			xerr = props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			 xerr = props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 
-				subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+				 subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
+				 if !ok {
+					 return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				 }
 
-				subnetHostsV1.ByName[hostName] = hostID // <<< link to host
-				subnetHostsV1.ByID[hostID] = hostName // <<< link to host
-				return nil
+				 subnetHostsV1.ByName[hostName] = hostID // <<< link to host
+				 subnetHostsV1.ByID[hostID] = hostName // <<< link to host
+				 return nil
 
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
+				 return nil
+			 })
+			 if xerr != nil {
+				 return xerr
+			 }
 		*/
 
 		xerr = props.Alter(subnetproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
@@ -1794,27 +1901,35 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			ResourceName: fmt.Sprintf("gw-%s", name),
 			HostName:     fmt.Sprintf("gw-%s", name),
 			ImageID:      request.ImageID,
+			ImageRef:     "",
 			PublicIP:     false,
 			Single:       true,
 			Subnets:      make([]*abstract.Subnet, 0),
 			// Subnets:        []*abstract.Subnet{request.Subnets[0]},
-			DefaultRouteIP: ip4,
+			DefaultRouteIP: ip6,
 			DiskSize:       64,
-			TemplateID:     request.TemplateID,
-			IsGateway:      true,
+			SSHPort:        22,
+			// KeyPair		: ,
+			TemplateID:  request.TemplateID,
+			TemplateRef: "",
+			IsGateway:   true,
 		})
 		_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
 			ResourceName: fmt.Sprintf("gw2-%s", name),
 			HostName:     fmt.Sprintf("gw2-%s", name),
 			ImageID:      request.ImageID,
+			ImageRef:     "",
 			PublicIP:     false,
 			Single:       true,
 			Subnets:      make([]*abstract.Subnet, 0),
 			// Subnets:        []*abstract.Subnet{request.Subnets[0]},
-			DefaultRouteIP: ip4,
+			DefaultRouteIP: ip6,
 			DiskSize:       64,
-			TemplateID:     request.TemplateID,
-			IsGateway:      true,
+			SSHPort:        22,
+			// KeyPair		: ,
+			TemplateID:  request.TemplateID,
+			TemplateRef: "",
+			IsGateway:   true,
 		})
 	}
 
@@ -1927,7 +2042,6 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 	e._logf("ServiceTest::InspectHostByName { name: \"%s\" }", name)
 
 	ahf = abstract.NewHostFull()
-
 	serial, err := e._getInternalData(fmt.Sprintf("hosts/byID/%s", name))
 	if err != nil {
 		serial, err = e._getInternalData(fmt.Sprintf("hosts/byName/%s", name))
@@ -1970,6 +2084,8 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 			ahf.Sizing.GPUNumber = hostSizingV2.AllocatedSize.GPUNumber
 			ahf.Sizing.GPUType = hostSizingV2.AllocatedSize.GPUType
 			ahf.Sizing.CPUFreq = hostSizingV2.AllocatedSize.CPUFreq
+			ahf.Sizing.ImageID = ""
+			ahf.Sizing.Replaceable = false
 			return nil
 		})
 		if xerr != nil {
@@ -1981,14 +2097,16 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			ahf.Networking.IsGateway = network.IsGateway
+			ahf.Networking.DefaultGatewayID = fmt.Sprintf("gw-%s", name)
+			ahf.Networking.DefaultGatewayPrivateIP = network.PublicIPv6
 			ahf.Networking.DefaultSubnetID = network.DefaultSubnetID
-			ahf.Networking.PublicIPv4 = network.PublicIPv4
-			ahf.Networking.PublicIPv6 = network.PublicIPv6
 			ahf.Networking.SubnetsByID = network.SubnetsByID
 			ahf.Networking.SubnetsByName = network.SubnetsByName
+			ahf.Networking.PublicIPv4 = network.PublicIPv4
+			ahf.Networking.PublicIPv6 = network.PublicIPv6
 			ahf.Networking.IPv4Addresses = network.IPv4Addresses
 			ahf.Networking.IPv6Addresses = network.IPv6Addresses
-			ahf.Networking.IsGateway = network.IsGateway
 			return nil
 		})
 		if xerr != nil {
@@ -2070,21 +2188,22 @@ func (e *ServiceTest) StopHost(ctx context.Context, params stacks.HostParameter,
 		return fail.NotFoundError(fmt.Sprintf("host \"%s\" not found", name))
 	}
 	e._surveyf("ServiceTest::StopHost { name: \"%s\" } (emulated)", name)
-	ahf, xerr = e.InspectHostByName(ctx, name)
+
+	// Update state
+	rhost, xerr := LoadHost(ctx, e, name)
 	if xerr != nil {
 		return xerr
 	}
-	ahf.Core.LastState = hoststate.Stopped
-
-	fmt.Println("############################################### HERE")
-
-	err := e._setInternalData(fmt.Sprintf("hosts/byID/%s", name), ahf.Core)
-	if err != nil {
-		return fail.Wrap(err)
-	}
-	err = e._setInternalData(fmt.Sprintf("hosts/byName/%s", name), ahf.Core)
-	if err != nil {
-		return fail.Wrap(err)
+	xerr = rhost.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ahc.LastState = hoststate.Stopped
+		return nil
+	})
+	if xerr != nil {
+		return xerr
 	}
 
 	return nil
@@ -2106,20 +2225,21 @@ func (e *ServiceTest) StartHost(ctx context.Context, params stacks.HostParameter
 		return fail.NotFoundError(fmt.Sprintf("host \"%s\" not found", name))
 	}
 	e._surveyf("ServiceTest::StartHost { name: \"%s\" } (emulated)", name)
-	ahf, xerr = e.InspectHostByName(ctx, name)
+
+	// Update state
+	rhost, xerr := LoadHost(ctx, e, name)
 	if xerr != nil {
 		return xerr
 	}
-	ahf.Core.LastState = hoststate.Started
-	err := e._setInternalData(fmt.Sprintf("hosts/byID/%s", name), ahf.Core)
-	if err != nil {
-		return fail.Wrap(err)
-	}
-	err = e._setInternalData(fmt.Sprintf("hosts/byName/%s", name), ahf.Core)
-	if err != nil {
-		return fail.Wrap(err)
-	}
-	return nil
+	return rhost.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ahc.LastState = hoststate.Started
+		return nil
+	})
+
 }
 func (e *ServiceTest) RebootHost(context.Context, stacks.HostParameter) fail.Error {
 	e._survey("ServiceTest::RebootHost (not implemented)")
@@ -2135,7 +2255,7 @@ func (e *ServiceTest) WaitHostReady(ctx context.Context, hostParam stacks.HostPa
 }
 
 /* Cluster */
-func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.ClusterRequest) (*abstract.ClusterIdentity, fail.Error) { // nolint
+func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.ClusterRequest, shorten bool) (*abstract.ClusterIdentity, fail.Error) { // nolint
 
 	var (
 		name string
@@ -2181,30 +2301,158 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		},
 	}
 
-	xerr = e._shortcutTimings(func() fail.Error {
+	// Cluster network
+	if !e._hasInternalData(fmt.Sprintf("networks/ByID/%s", request.NetworkID)) {
+		_, xerr = e.CreateNetwork(ctx, abstract.NetworkRequest{
+			Name:          request.NetworkID,
+			CIDR:          request.CIDR,
+			DNSServers:    []string{"8.8.8.8", "8.8.4.4"},
+			KeepOnFailure: false,
+		})
+		if xerr != nil {
+			return aci, xerr
+		}
+	}
+	network, xerr := e.InspectNetwork(ctx, request.NetworkID)
+	if xerr != nil {
+		return aci, xerr
+	}
 
-		// Cluster network
-		if !e._hasInternalData(fmt.Sprintf("networks/ByID/%s", request.NetworkID)) {
-			_, xerr = e.CreateNetwork(ctx, abstract.NetworkRequest{
-				Name:          request.NetworkID,
-				CIDR:          request.CIDR,
-				DNSServers:    []string{"8.8.8.8", "8.8.4.4"},
-				KeepOnFailure: false,
+	// Cluster subnet
+	if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s", name)) {
+		_, xerr := e.CreateSubnet(ctx, abstract.SubnetRequest{
+			NetworkID:      network.ID,
+			Name:           name,
+			IPVersion:      network.IPVersion,
+			CIDR:           network.CIDR,
+			DNSServers:     network.DNSServers,
+			Domain:         request.Domain,
+			HA:             false,
+			ImageRef:       "",
+			DefaultSSHPort: 22,
+			KeepOnFailure:  false,
+		})
+		if xerr != nil {
+			return aci, xerr
+		}
+	}
+	subnet, xerr := e.InspectSubnet(ctx, name)
+	if xerr != nil {
+		return aci, xerr
+	}
+
+	// Cluster securityGroups
+	sgNames := []string{"PublicIPSecurityGroupID", "GWSecurityGroupID", "InternalSecurityGroupID"}
+	for _, sgName := range sgNames {
+		if !e._hasInternalData(fmt.Sprintf("security-groups/byID/%s.%s", network.ID, sgName)) {
+			_, xerr := e.CreateSecurityGroup(ctx, network.ID, sgName, fmt.Sprintf("Sg desc %s", sgName), abstract.SecurityGroupRules{
+				&abstract.SecurityGroupRule{
+					IDs:         make([]string, 0),
+					Description: "",
+					EtherType:   ipversion.IPv4,
+					Direction:   securitygroupruledirection.Ingress,
+					Protocol:    "icmp",
+					PortFrom:    0,
+					PortTo:      0,
+					Sources:     make([]string, 0),
+					Targets:     make([]string, 0),
+				},
+				&abstract.SecurityGroupRule{
+					IDs:         make([]string, 0),
+					Description: "",
+					EtherType:   ipversion.IPv4,
+					Direction:   securitygroupruledirection.Ingress,
+					Protocol:    "tcp",
+					PortFrom:    0,
+					PortTo:      0,
+					Sources:     make([]string, 0),
+					Targets:     make([]string, 0),
+				},
+				&abstract.SecurityGroupRule{
+					IDs:         make([]string, 0),
+					Description: "",
+					EtherType:   ipversion.IPv4,
+					Direction:   securitygroupruledirection.Ingress,
+					Protocol:    "udp",
+					PortFrom:    0,
+					PortTo:      0,
+					Sources:     make([]string, 0),
+					Targets:     make([]string, 0),
+				},
 			})
 			if xerr != nil {
-				return xerr
+				return aci, xerr
 			}
 		}
-		network, xerr := e.InspectNetwork(ctx, request.NetworkID)
-		if xerr != nil {
-			return xerr
-		}
+	}
 
-		// Cluster subnet
-		if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s", name)) {
+	// Cluster gateway
+	if !e._hasInternalData(fmt.Sprintf("hosts/ByID/gw-%s", name)) {
+		_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
+			ResourceName:   fmt.Sprintf("gw-%s", name),
+			HostName:       fmt.Sprintf("gw-%s", name),
+			Subnets:        []*abstract.Subnet{subnet},
+			DefaultRouteIP: "192.168.0.1",
+			TemplateID:     request.GatewaysDef.Template,
+			// TemplateRef
+			ImageID: request.GatewaysDef.Image,
+			// ImageRef
+			KeyPair:       kp,
+			SSHPort:       22,
+			Password:      cladmPassword,
+			DiskSize:      64,
+			Single:        false,
+			PublicIP:      true,
+			IsGateway:     true,
+			KeepOnFailure: false,
+			Preemptible:   false,
+			SecurityGroupIDs: map[string]struct{}{
+				"PublicIPSecurityGroupID": {},
+				"GWSecurityGroupID":       {},
+				"InternalSecurityGroupID": {},
+			},
+		})
+		if xerr != nil {
+			return aci, xerr
+		}
+	}
+	if !e._hasInternalData(fmt.Sprintf("hosts/ByID/gw2-%s", name)) {
+		_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
+			ResourceName:   fmt.Sprintf("gw2-%s", name),
+			HostName:       fmt.Sprintf("gw2-%s", name),
+			Subnets:        []*abstract.Subnet{subnet},
+			DefaultRouteIP: "192.168.0.2",
+			TemplateID:     request.GatewaysDef.Template,
+			// TemplateRef
+			ImageID: request.GatewaysDef.Image,
+			// ImageRef
+			KeyPair:       kp,
+			SSHPort:       22,
+			Password:      cladmPassword,
+			DiskSize:      64,
+			Single:        false,
+			PublicIP:      true,
+			IsGateway:     true,
+			KeepOnFailure: false,
+			Preemptible:   false,
+			SecurityGroupIDs: map[string]struct{}{
+				"PublicIPSecurityGroupID": {},
+				"GWSecurityGroupID":       {},
+				"InternalSecurityGroupID": {},
+			},
+		})
+		if xerr != nil {
+			return aci, xerr
+		}
+	}
+
+	if shorten { // To make cluster.Create result without have to folow procedure
+
+		// Cluster master subnet
+		if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s-master-1", name)) {
 			_, xerr := e.CreateSubnet(ctx, abstract.SubnetRequest{
 				NetworkID:      network.ID,
-				Name:           name,
+				Name:           fmt.Sprintf("%s-master-1", name),
 				IPVersion:      network.IPVersion,
 				CIDR:           network.CIDR,
 				DNSServers:     network.DNSServers,
@@ -2215,77 +2463,116 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				KeepOnFailure:  false,
 			})
 			if xerr != nil {
-				return xerr
+				return aci, xerr
 			}
-		}
-		subnet, xerr := e.InspectSubnet(ctx, name)
-		if xerr != nil {
-			return xerr
-		}
-
-		// Cluster securityGroups
-		sgNames := []string{"PublicIPSecurityGroupID", "GWSecurityGroupID", "InternalSecurityGroupID"}
-		for _, sgName := range sgNames {
-			if !e._hasInternalData(fmt.Sprintf("security-groups/byID/%s.%s", network.ID, sgName)) {
-				_, xerr := e.CreateSecurityGroup(ctx, network.ID, sgName, fmt.Sprintf("Sg desc %s", sgName), abstract.SecurityGroupRules{
-					&abstract.SecurityGroupRule{
-						IDs:         make([]string, 0),
-						Description: "",
-						EtherType:   ipversion.IPv4,
-						Direction:   securitygroupruledirection.Ingress,
-						Protocol:    "icmp",
-						PortFrom:    0,
-						PortTo:      0,
-						Sources:     make([]string, 0),
-						Targets:     make([]string, 0),
-					},
-					&abstract.SecurityGroupRule{
-						IDs:         make([]string, 0),
-						Description: "",
-						EtherType:   ipversion.IPv4,
-						Direction:   securitygroupruledirection.Ingress,
-						Protocol:    "tcp",
-						PortFrom:    0,
-						PortTo:      0,
-						Sources:     make([]string, 0),
-						Targets:     make([]string, 0),
-					},
-					&abstract.SecurityGroupRule{
-						IDs:         make([]string, 0),
-						Description: "",
-						EtherType:   ipversion.IPv4,
-						Direction:   securitygroupruledirection.Ingress,
-						Protocol:    "udp",
-						PortFrom:    0,
-						PortTo:      0,
-						Sources:     make([]string, 0),
-						Targets:     make([]string, 0),
-					},
-				})
-				if xerr != nil {
-					return xerr
+			rsubnet, xerr := LoadSubnet(ctx, e, request.NetworkID, fmt.Sprintf("%s-master-1", name))
+			if xerr != nil {
+				return aci, xerr
+			}
+			xerr = rsubnet.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+				as.GatewayIDs = []string{fmt.Sprintf("gw-%s", name), fmt.Sprintf("gw2-%s", name)}
+				return nil
+			})
+			if xerr != nil {
+				return aci, xerr
+			}
+		}
+		mastersubnet, xerr := e.InspectSubnet(ctx, name)
+		if xerr != nil {
+			return aci, xerr
+		}
+
+		// Cluster master
+		if !e._hasInternalData(fmt.Sprintf("hosts/ByID/%s-master-1", name)) {
+			_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
+				ResourceName:   fmt.Sprintf("%s-master-1", name),
+				HostName:       fmt.Sprintf("%s-master-1", name),
+				Subnets:        []*abstract.Subnet{mastersubnet},
+				DefaultRouteIP: "192.168.0.3",
+				TemplateID:     request.MastersDef.Template,
+				// TemplateRef
+				ImageID: request.MastersDef.Image,
+				// ImageRef
+				KeyPair:       kp,
+				SSHPort:       22,
+				Password:      cladmPassword,
+				DiskSize:      64,
+				Single:        false,
+				PublicIP:      false,
+				IsGateway:     false,
+				KeepOnFailure: false,
+				Preemptible:   false,
+				SecurityGroupIDs: map[string]struct{}{
+					"PublicIPSecurityGroupID": {},
+					"GWSecurityGroupID":       {},
+					"InternalSecurityGroupID": {},
+				},
+			})
+			if xerr != nil {
+				return aci, xerr
 			}
 		}
 
-		// Cluster gateway
-		if !e._hasInternalData(fmt.Sprintf("hosts/ByID/gw-%s", name)) {
+		// Cluster node subnet
+		if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s-node-1", name)) {
+			_, xerr := e.CreateSubnet(ctx, abstract.SubnetRequest{
+				NetworkID:      network.ID,
+				Name:           fmt.Sprintf("%s-node-1", name),
+				IPVersion:      network.IPVersion,
+				CIDR:           network.CIDR,
+				DNSServers:     network.DNSServers,
+				Domain:         request.Domain,
+				HA:             false,
+				ImageRef:       "",
+				DefaultSSHPort: 22,
+				KeepOnFailure:  false,
+			})
+			if xerr != nil {
+				return aci, xerr
+			}
+			rsubnet, xerr := LoadSubnet(ctx, e, request.NetworkID, fmt.Sprintf("%s-node-1", name))
+			if xerr != nil {
+				return aci, xerr
+			}
+			xerr = rsubnet.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				as.GatewayIDs = []string{fmt.Sprintf("gw-%s", name), fmt.Sprintf("gw2-%s", name)}
+				return nil
+			})
+			if xerr != nil {
+				return aci, xerr
+			}
+		}
+		nodesubnet, xerr := e.InspectSubnet(ctx, name)
+		if xerr != nil {
+			return aci, xerr
+		}
+
+		// Cluster node
+		if !e._hasInternalData(fmt.Sprintf("hosts/ByID/%s-node-1", name)) {
 			_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
-				ResourceName:   fmt.Sprintf("gw-%s", name),
-				HostName:       fmt.Sprintf("gw-%s", name),
-				Subnets:        []*abstract.Subnet{subnet},
-				DefaultRouteIP: "192.168.0.1",
-				TemplateID:     request.GatewaysDef.Template,
+				ResourceName:   fmt.Sprintf("%s-node-1", name),
+				HostName:       fmt.Sprintf("%s-node-1", name),
+				Subnets:        []*abstract.Subnet{nodesubnet},
+				DefaultRouteIP: "192.168.0.4",
+				TemplateID:     request.MastersDef.Template,
 				// TemplateRef
-				ImageID: request.GatewaysDef.Image,
+				ImageID: request.MastersDef.Image,
 				// ImageRef
 				KeyPair:       kp,
 				SSHPort:       22,
 				Password:      cladmPassword,
 				DiskSize:      64,
-				Single:        false,
-				PublicIP:      true,
-				IsGateway:     true,
+				Single:        true,
+				PublicIP:      false,
+				IsGateway:     false,
 				KeepOnFailure: false,
 				Preemptible:   false,
 				SecurityGroupIDs: map[string]struct{}{
@@ -2295,50 +2582,134 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				},
 			})
 			if xerr != nil {
-				return xerr
+				return aci, xerr
 			}
 		}
-		if !e._hasInternalData(fmt.Sprintf("hosts/ByID/gw2-%s", name)) {
-			_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
-				ResourceName:   fmt.Sprintf("gw2-%s", name),
-				HostName:       fmt.Sprintf("gw2-%s", name),
-				Subnets:        []*abstract.Subnet{subnet},
-				DefaultRouteIP: "192.168.0.2",
-				TemplateID:     request.GatewaysDef.Template,
-				// TemplateRef
-				ImageID: request.GatewaysDef.Image,
-				// ImageRef
-				KeyPair:       kp,
-				SSHPort:       22,
-				Password:      cladmPassword,
-				DiskSize:      64,
-				Single:        false,
-				PublicIP:      true,
-				IsGateway:     true,
-				KeepOnFailure: false,
-				Preemptible:   false,
-				SecurityGroupIDs: map[string]struct{}{
-					"PublicIPSecurityGroupID": {},
-					"GWSecurityGroupID":       {},
-					"InternalSecurityGroupID": {},
-				},
+
+		// Cluster
+		if !e._hasInternalData(fmt.Sprintf("clusters/%s", name)) {
+			e._setInternalData(fmt.Sprintf("clusters/%s", name), aci)
+		}
+
+		// Props
+		cluster, xerr := LoadCluster(ctx, e, name)
+		if xerr != nil {
+			return aci, xerr
+		}
+		ocluster, ok := cluster.(*Cluster)
+		if !ok {
+			return aci, fail.ConvertError(errors.New("resource.Cluster not castable to operation.Cluster"))
+		}
+		xerr = ocluster.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = props.Alter(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+
+				networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
+				networkV3.NetworkID = request.NetworkID
+				networkV3.CreatedNetwork = true
+				networkV3.SubnetID = name
+				networkV3.CIDR = request.CIDR
+				networkV3.GatewayID = fmt.Sprintf("gw-%s", name)
+				networkV3.GatewayIP = "192.168.0.1"
+				networkV3.SecondaryGatewayID = fmt.Sprintf("gw2-%s", name)
+				networkV3.SecondaryGatewayIP = "192.168.0.2"
+				networkV3.DefaultRouteIP = "192.168.0.1"
+				networkV3.PrimaryPublicIP = "192.168.0.1"
+				networkV3.SecondaryPublicIP = "192.168.0.2"
+				networkV3.EndpointIP = "192.168.0.1"
+				networkV3.SubnetState = subnetstate.Ready
+				networkV3.Domain = request.Domain
+
+				return nil
 			})
 			if xerr != nil {
 				return xerr
 			}
-		}
+
+			xerr = props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+				stateV1, ok := clonable.(*propertiesv1.ClusterState)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				stateV1.State = clusterstate.Nominal
+				return nil
+			})
+			if xerr != nil {
+				return xerr
+			}
+
+			innerXErr := props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
+				nodesV3.ByNumericalID = map[uint]*propertiesv3.ClusterNode{
+					0: {
+						ID:          fmt.Sprintf("gw-%s", name),
+						NumericalID: 0,
+						Name:        fmt.Sprintf("gw-%s", name),
+						PublicIP:    "192.168.0.1",
+						PrivateIP:   "192.168.0.1",
+					},
+					1: {
+						ID:          fmt.Sprintf("gw2-%s", name),
+						NumericalID: 0,
+						Name:        fmt.Sprintf("gw2-%s", name),
+						PublicIP:    "192.168.0.2",
+						PrivateIP:   "192.168.0.2",
+					},
+					2: {
+						ID:          fmt.Sprintf("%s-master-1", name),
+						NumericalID: 0,
+						Name:        fmt.Sprintf("%s-master-1", name),
+						PublicIP:    "192.168.0.3",
+						PrivateIP:   "192.168.0.3",
+					},
+					3: {
+						ID:          fmt.Sprintf("%s-node-1", name),
+						NumericalID: 0,
+						Name:        fmt.Sprintf("%s-node-1", name),
+						PublicIP:    "192.168.0.4",
+						PrivateIP:   "192.168.0.4",
+					},
+				}
+				nodesV3.PrivateNodeByID = map[string]uint{
+					fmt.Sprintf("gw-%s", name):       0,
+					fmt.Sprintf("gw2-%s", name):      1,
+					fmt.Sprintf("%s-master-1", name): 2,
+					fmt.Sprintf("%s-node-1", name):   3,
+				}
+				nodesV3.Masters = []uint{2}
+				nodesV3.PrivateNodes = []uint{3}
+
+				return nil
+			})
+			if innerXErr != nil {
+				return fail.Wrap(innerXErr, "failed to get list of hosts")
+			}
+
+			return nil
+		})
+
+	} else {
 
 		// Create Cluster
 		cluster, xerr := NewCluster(ctx, e)
 		if xerr != nil {
-			return xerr
+			return aci, xerr
 		}
 		xerr = cluster.Create(ctx, request)
 		if xerr != nil {
-			return xerr
+			return aci, xerr
 		}
-		return nil
-	})
+
+	}
 
 	return aci, xerr
 
@@ -2494,10 +2865,12 @@ func (e *ServiceTest) ListBuckets(string) ([]string, fail.Error) {
 }
 func (e *ServiceTest) FindBucket(name string) (bool, fail.Error) {
 	e._logf("ServiceTest::FindBucket { name: \"%s\"}", name)
-	_, ok := e.internals.bucketData[fmt.Sprintf("buckets/byID/%s", name)]
+	e.internals.bucketData.mu.Lock()
+	_, ok := e.internals.bucketData.data[fmt.Sprintf("buckets/byID/%s", name)]
 	if !ok {
-		_, ok = e.internals.bucketData[fmt.Sprintf("buckets/byName/%s", name)]
+		_, ok = e.internals.bucketData.data[fmt.Sprintf("buckets/byName/%s", name)]
 	}
+	e.internals.bucketData.mu.Unlock()
 	return ok, nil
 }
 func (e *ServiceTest) InspectBucket(name string) (abstract.ObjectStorageBucket, fail.Error) {
@@ -2524,26 +2897,26 @@ func (e *ServiceTest) CreateBucket(name string) (abstract.ObjectStorageBucket, f
 	}
 
 	/*
-		bucket, xerr := NewCore(e, "bucket", "buckets", &b)
-		if xerr != nil {
-			return b, xerr
-		}
-		xerr = bucket.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-				mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				mountsV1.ByHostID
-				mountsV1.ByHostName
-				return nil
-			})
+		 bucket, xerr := NewCore(e, "bucket", "buckets", &b)
+		 if xerr != nil {
+			 return b, xerr
+		 }
+		 xerr = bucket.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			 return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+				 mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
+				 if !ok {
+					 return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				 }
+				 mountsV1.ByHostID
+				 mountsV1.ByHostName
+				 return nil
+			 })
 
-			return nil
-		})
-		if xerr != nil {
-			return b, xerr
-		}
+			 return nil
+		 })
+		 if xerr != nil {
+			 return b, xerr
+		 }
 	*/
 
 	return b, nil
@@ -2569,12 +2942,7 @@ func (e *ServiceTest) ListObjects(bucketname string, path string, prefix string)
 		e._logf("ServiceTest::ListObjects { bucketname: \"%s\", path: \"%s\", prefix: \"%s\"} forced error \"%s\"\n", bucketname, path, prefix, e.options.listobjectsErr.Error())
 		return []string{}, e.options.listobjectsErr
 	}
-	keys := make([]string, 0)
-	for k := range e.internals.bucketData {
-		if path == "" || (len(k) >= len(path) && k[:len(path)] == path) {
-			keys = append(keys, k)
-		}
-	}
+	keys := e._getInternalDataKeys(path)
 	if len(keys) > 0 {
 		e._logf("ServiceTest::ListObjects { bucketname: \"%s\", path: \"%s\", prefix: \"%s\", results: {\"%s\"}}\n", bucketname, path, prefix, strings.Join(keys, "\",\""))
 	} else {
@@ -2625,7 +2993,9 @@ func (e *ServiceTest) ReadObject(bucketname string, path string, buffer io.Write
 		}
 		length = int64(len(e.options.version)) // nolint
 	default:
-		if val, ok := e.internals.bucketData[path]; ok {
+
+		val, err := e._getRawInternalData(path)
+		if err == nil {
 			dataValue := "[Serial]"
 			if e.internals.loglevel > 1 {
 				dataValue, _ = e._getInternalData(path)
@@ -2658,7 +3028,9 @@ func (e *ServiceTest) WriteObject(bucketname string, path string, buffer io.Read
 		dataValue, _ = e._decodeItem(string(tmp))
 	}
 	e._logf("ServiceTest::WriteObject { bucketname: \"%s\", path: \"%s\", value: \"%s\"}\n", bucketname, path, dataValue)
-	e.internals.bucketData[path] = string(tmp)
+	e.internals.bucketData.mu.Lock()
+	e.internals.bucketData.data[path] = string(tmp)
+	e.internals.bucketData.mu.Unlock()
 	return abstract.ObjectStorageItem{}, nil
 }
 func (e *ServiceTest) DeleteObject(bucketname string, path string) fail.Error {
@@ -2689,7 +3061,7 @@ func (e *ServiceTest) GetMetadataKey() (*crypt.Key, fail.Error) {
 }
 
 // ------------------------------------------------------------------------------------------------------
-
+/*
 type CacheTest struct {
 	name  string
 	svc   *ServiceTest
@@ -2723,7 +3095,7 @@ func (e *CacheTest) AddEntry(ctx context.Context, content cache.Cacheable) (ce *
 	e.svc._logf("CacheTest::AddEntry")
 	return e.svc._cache_AddEntry(ctx, e.name, content)
 }
-
+*/
 // ------------------------------------------------------------------------------------------------------
 
 type SSHConnectorTest struct {
@@ -2738,21 +3110,15 @@ var (
 
 func SSHConnectorTest_Overload(svc *ServiceTest, routine func(svc *ServiceTest)) {
 	currentSVCSSHConnectorTest = svc
-	// this forces using a custom factory
 	sshfactory.SetCustomConnectorFactory(SSHConnectorTestFactory) // nolint
 	routine(currentSVCSSHConnectorTest)
-	// that restores normal behaviour -> no custom factory, normal usage
-	sshfactory.SetCustomConnectorFactory(nil) // nolint
+	sshfactory.SetCustomConnectorFactory(nil)
 }
 
 func SSHConnectorTestFactory(config sshapi.Config) (sshapi.Connector, fail.Error) {
-	cfg, xerr := ssh.NewConfigFrom(config)
-	if xerr != nil {
-		return nil, xerr
-	}
 	conn := &SSHConnectorTest{
 		svc:    currentSVCSSHConnectorTest,
-		config: cfg,
+		config: config,
 	}
 	return conn, nil
 }
@@ -2829,10 +3195,14 @@ func (e *SSHConnectorTest) Enter(username string, shell string) (ferr fail.Error
 }
 func (e *SSHConnectorTest) NewCommand(ctx context.Context, cmdString string) (sshapi.Command, fail.Error) {
 	e.svc._logf("SSHConnectorTest::NewCommand { cmd: \"%s\"} (emulated)", e.svc._cramp(cmdString, 64))
-	hn, _ := e.config.GetHostname()
+
+	hostname, xerr := e.config.GetHostname()
+	if xerr != nil {
+		return nil, xerr
+	}
 	cmd := &SSHCommandTest{
 		svc:          e.svc,
-		hostname:     hn,
+		hostname:     hostname,
 		runCmdString: cmdString,
 		output:       "",
 	}
@@ -2874,7 +3244,10 @@ func (e *SSHConnectorTest) WaitServerReady(ctx context.Context, phase string, de
 
 	stdout = "23:59:59 up 0 days, 23:59, 1 user, load average: 0,99"
 
-	hostname, _ := e.config.GetHostname()
+	hostname, xerr := e.config.GetHostname()
+	if xerr != nil {
+		hostname = "<???>"
+	}
 	logrus.Debugf("[emulated] sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase)
 	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", hostname, originalPhase, temporal.FormatDuration(0), stdout)
 

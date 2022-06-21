@@ -172,15 +172,9 @@ func TestLabel_Deserialize(t *testing.T) {
 }
 
 func TestLabel_GetName(t *testing.T) {
-	var s *Label = nil
-	name := s.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	s = NewLabel()
+	s := NewLabel()
 	s.Name = "Label Name"
-	name = s.GetName()
+	name := s.GetName()
 	if name != s.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -188,15 +182,9 @@ func TestLabel_GetName(t *testing.T) {
 }
 
 func TestLabel_GetID(t *testing.T) {
-	var s *Label = nil
-	id := s.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	s = NewLabel()
+	s := NewLabel()
 	s.ID = "Label ID"
-	id = s.GetID()
+	id := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
