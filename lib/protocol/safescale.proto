@@ -469,7 +469,7 @@ message HostLabelRequest {
 
 message HostLabelResponse {
 	LabelInspectResponse Label = 1;
-	string value = 2;
+	string value = 4;
 }
 
 message HostTemplate {
@@ -1187,7 +1187,7 @@ message LabelInspectRequest {
 message LabelInspectResponse {
 	string id = 1;
 	string name = 2;
-	repeated Host hosts = 3;
+	repeated LabelHostResponse hosts = 3;
 	bool has_default = 4;
 	string default_value = 5;
 }
@@ -1199,6 +1199,11 @@ message LabelListRequest {
 
 message LabelListResponse {
 	repeated LabelInspectResponse labels = 1;
+}
+
+message LabelHostResponse {
+	Reference host = 1;
+	string value = 2;
 }
 
 message LabelBindRequest {

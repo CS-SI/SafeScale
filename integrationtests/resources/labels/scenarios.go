@@ -100,6 +100,15 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
 
+	fmt.Println("Checking host inspect display Labels...")
+	out, err = helpers.GetOutput("safescale host inspect " + "gw-" + names.Networks[0])
+	require.Nil(t, err)
+	result, err = helpers.ExtractResult(out)
+	require.Nil(t, err)
+	require.True(t, len(result.(map[string]interface{})["labels"]) > 0)
+	// FIXME: check content of Label from safescale host inspect
+	// require.True(t, result.(map[string]interface{})["labels"].([]map[string]interface{})[0][""] > 0))
+
 	fmt.Println("Updating value of Label for Host")
 	out, err = helpers.GetOutput("safescale host label update --value newvalue " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	_ = out

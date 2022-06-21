@@ -1037,7 +1037,7 @@ func (s *HostListener) InspectLabel(ctx context.Context, in *protocol.HostLabelR
 		return nil, xerr
 	}
 
-	outLabel, xerr := labelInstance.ToProtocol(ctx)
+	outLabel, xerr := labelInstance.ToProtocol(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}

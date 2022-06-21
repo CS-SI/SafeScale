@@ -62,7 +62,20 @@ var labelListCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Labels", false).Error())))
 		}
-		return clitools.SuccessResponse(list.Labels)
+
+		var output []map[string]interface{}
+		jsoned, xerr := json.Marshal(list.Labels)
+		if xerr == nil {
+			xerr = json.Unmarshal(jsoned, &output)
+		}
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+		}
+
+		for _, v := range output {
+			delete(v, "has_default")
+		}
+		return clitools.SuccessResponse(output)
 	},
 }
 
@@ -89,7 +102,9 @@ var labelInspectCommand = cli.Command{
 			"name":          labelInfo.Name,
 			"id":            labelInfo.Id,
 			"default_value": labelInfo.DefaultValue,
+			"hosts":         labelInfo.Hosts,
 		}
+
 		return clitools.SuccessResponse(output)
 	},
 }

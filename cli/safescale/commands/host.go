@@ -1372,7 +1372,19 @@ var hostLabelListCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list Labels bound to Host", false).Error())))
 		}
 
-		return clitools.SuccessResponse(result.Labels)
+		var output []map[string]interface{}
+		jsoned, xerr := json.Marshal(result.Labels)
+		if xerr == nil {
+			xerr = json.Unmarshal(jsoned, &output)
+		}
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+		}
+
+		for _, v := range output {
+			delete(v, "has_default")
+		}
+		return clitools.SuccessResponse(output)
 	},
 }
 
