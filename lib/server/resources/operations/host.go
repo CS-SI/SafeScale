@@ -3496,14 +3496,11 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.RLock()
-	// defer instance.RUnlock()
-
 	var (
 		ahc           *abstract.HostCore
 		hostSizingV2  *propertiesv2.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
-		volumes       []string
+		hostLabelsV1  *propertiesv1.HostLabels
 	)
 
 	publicIP, _ := instance.GetPublicIP(ctx)   // There may be no public ip, but the returned value is pertinent in this case, no need to handle error
@@ -3521,6 +3518,19 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String)
 			}
+
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hostLabelsV1, ok = clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String)
+			}
+
 			return nil
 		})
 		if innerXErr != nil {
@@ -3533,16 +3543,40 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String)
 			}
 
-			volumes = make([]string, 0, len(hostVolumesV1.VolumesByName))
-			for k := range hostVolumesV1.VolumesByName {
-				volumes = append(volumes, k)
-			}
 			return nil
 		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	volumes := make([]string, 0, len(hostVolumesV1.VolumesByName))
+	for k := range hostVolumesV1.VolumesByName {
+		volumes = append(volumes, k)
+	}
+
+	labels := make([]*protocol.HostLabelResponse, 0, len(hostLabelsV1.ByID))
+	svc := instance.Service()
+	for k, v := range hostLabelsV1.ByID {
+		labelInstance, xerr := LoadLabel(ctx, svc, k)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		pbLabel, xerr := labelInstance.ToProtocol(ctx, false)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		item := &protocol.HostLabelResponse{
+			Id:           pbLabel.Id,
+			Name:         pbLabel.Name,
+			HasDefault:   pbLabel.HasDefault,
+			DefaultValue: pbLabel.DefaultValue,
+			Value:        v,
+		}
+		labels = append(labels, item)
 	}
 
 	ph = &protocol.Host{
@@ -3560,6 +3594,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
 		Template:            hostSizingV2.Template,
+		Labels:              labels,
 	}
 	return ph, nil
 }
@@ -3998,8 +4033,8 @@ func inBackground() bool {
 	}
 }
 
-// ListTags lists tags bound to Host
-func (instance *Host) ListTags(ctx context.Context) (_ map[string]string, ferr fail.Error) {
+// ListLabels lists Labels bound to Host
+func (instance *Host) ListLabels(ctx context.Context) (_ map[string]string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || valid.IsNil(instance) {
@@ -4022,14 +4057,11 @@ func (instance *Host) ListTags(ctx context.Context) (_ map[string]string, ferr f
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// instance.Lock()
-	// defer instance.Unlock()
-
-	var tagsV1 *propertiesv1.HostLabels
+	var labelsV1 *propertiesv1.HostLabels
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
-			tagsV1, ok = clonable.(*propertiesv1.HostLabels)
+			labelsV1, ok = clonable.(*propertiesv1.HostLabels)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -4042,7 +4074,7 @@ func (instance *Host) ListTags(ctx context.Context) (_ map[string]string, ferr f
 		return nil, xerr
 	}
 
-	return tagsV1.ByName, nil
+	return labelsV1.ByID, nil
 }
 
 // BindLabel binds a Label to Host
@@ -4101,7 +4133,7 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			hostLabelsV1, ok := clonable.(*propertiesv1.HostLabels)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostTags' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// If the host already has this tag, consider it a success

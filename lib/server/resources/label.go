@@ -32,12 +32,12 @@ type Label interface {
 	Metadata
 	data.Identifiable
 
-	BindToHost(ctx context.Context, hostInstance Host, value string) fail.Error               // instructs Label to be bound to Host with overrided value (if not a Tag)
-	Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) fail.Error         // walks through all the metadata objects in labels
-	Create(ctx context.Context, name string, hasDefault bool, defaultValue string) fail.Error // creates a Label
-	Delete(ctx context.Context) fail.Error                                                    // deletes a Label
-	IsTag(ctx context.Context) (bool, fail.Error)                                             // tells if the label is a Tag (ie a Label that does not carry a value)
-	DefaultValue(ctx context.Context) (string, fail.Error)                                    // returns the default value of the Label
-	ToProtocol(ctx context.Context) (*protocol.LabelInspectResponse, fail.Error)              // converts Label to equivalent protocol message
-	UnbindFromHost(ctx context.Context, hostInstance Host) fail.Error                         // instructs Label to unbind Host from it
+	BindToHost(ctx context.Context, hostInstance Host, value string) fail.Error                  // instructs Label to be bound to Host with overrided value (if not a Tag)
+	Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) fail.Error            // walks through all the metadata objects in labels
+	Create(ctx context.Context, name string, hasDefault bool, defaultValue string) fail.Error    // creates a Label
+	Delete(ctx context.Context) fail.Error                                                       // deletes a Label
+	IsTag(ctx context.Context) (bool, fail.Error)                                                // tells if the label is a Tag (ie a Label that does not carry a value)
+	DefaultValue(ctx context.Context) (string, fail.Error)                                       // returns the default value of the Label
+	ToProtocol(ctx context.Context, withHosts bool) (*protocol.LabelInspectResponse, fail.Error) // converts Label to equivalent protocol message
+	UnbindFromHost(ctx context.Context, hostInstance Host) fail.Error                            // instructs Label to unbind Host from it
 }

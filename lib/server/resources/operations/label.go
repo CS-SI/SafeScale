@@ -334,13 +334,14 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 }
 
 // ToProtocol converts the label to protocol message LabelInspectResponse
-func (instance *label) ToProtocol(ctx context.Context) (*protocol.LabelInspectResponse, fail.Error) {
+func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protocol.LabelInspectResponse, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
+	var labelHostsV1 *propertiesv1.LabelHosts
 	out := &protocol.LabelInspectResponse{}
-	return out, instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -351,8 +352,7 @@ func (instance *label) ToProtocol(ctx context.Context) (*protocol.LabelInspectRe
 		out.HasDefault = alabel.HasDefault
 		out.DefaultValue = alabel.DefaultValue
 
-		var labelHostsV1 *propertiesv1.LabelHosts
-		innerXErr := props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			labelHostsV1, ok = clonable.(*propertiesv1.LabelHosts)
 			if !ok {
@@ -361,20 +361,29 @@ func (instance *label) ToProtocol(ctx context.Context) (*protocol.LabelInspectRe
 
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
-		}
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
 
-		hosts := make([]*protocol.Host, 0)
-		for k, v := range labelHostsV1.ByName {
-			hosts = append(hosts, &protocol.Host{
-				Name: k,
-				Id:   v,
+	if withHosts {
+		hosts := make([]*protocol.LabelHostResponse, 0)
+		for k, v := range labelHostsV1.ByID {
+			hostInstance, xerr := LoadHost(ctx, instance.Service(), k)
+			if xerr != nil {
+				return nil, xerr
+			}
+			hosts = append(hosts, &protocol.LabelHostResponse{
+				Host: &protocol.Reference{
+					Id:   k,
+					Name: hostInstance.GetName(),
+				},
+				Value: v,
 			})
 		}
 		out.Hosts = hosts
-		return nil
-	})
+	}
+	return out, nil
 }
 
 // IsTag tells of the Label represents a Tag (ie a Label that does not carry a defaut value)
