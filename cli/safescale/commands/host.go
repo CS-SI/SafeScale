@@ -192,7 +192,38 @@ var hostInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
 
-		return clitools.SuccessResponse(resp)
+		var output map[string]interface{}
+		jsoned, xerr := json.Marshal(resp)
+		if xerr == nil {
+			xerr = json.Unmarshal(jsoned, &output)
+		}
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+		}
+
+		tags := make([]map[string]interface{}, 0)
+		labels := make([]map[string]interface{}, 0)
+		if items, ok := output["labels"].([]interface{}); ok && len(items) > 0 {
+			for _, v := range items {
+				item, ok := v.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				hasDefault, ok := item["has_default"].(bool)
+				delete(item, "has_default")
+				if ok && hasDefault {
+					labels = append(labels, item)
+				} else {
+					delete(item, "value")
+					delete(item, "default_value")
+					tags = append(tags, item)
+				}
+			}
+		}
+		output["labels"] = labels
+		output["tags"] = tags
+		return clitools.SuccessResponse(output)
 	},
 }
 
@@ -1260,7 +1291,26 @@ var hostTagListCommand = cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "tag of host", false).Error())))
 		}
-		return clitools.SuccessResponse(result.Labels)
+
+		var list []map[string]interface{}
+		jsoned, xerr := json.Marshal(result.Labels)
+		if xerr == nil {
+			xerr = json.Unmarshal(jsoned, &list)
+		}
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+		}
+
+		var output []map[string]interface{}
+		for _, v := range list {
+			hasDefault, ok := v["has_default"].(bool)
+			if !ok || !hasDefault {
+				delete(v, "has_default")
+				delete(v, "default_value")
+				output = append(output, v)
+			}
+		}
+		return clitools.SuccessResponse(output)
 	},
 }
 
@@ -1372,7 +1422,19 @@ var hostLabelListCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list Labels bound to Host", false).Error())))
 		}
 
-		return clitools.SuccessResponse(result.Labels)
+		var output []map[string]interface{}
+		jsoned, xerr := json.Marshal(result.Labels)
+		if xerr == nil {
+			xerr = json.Unmarshal(jsoned, &output)
+		}
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+		}
+
+		for _, v := range output {
+			delete(v, "has_default")
+		}
+		return clitools.SuccessResponse(output)
 	},
 }
 
@@ -1397,19 +1459,15 @@ var hostLabelInspectCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspect Host Label", false).Error())))
 		}
 
-		if !result.Label.GetHasDefault() {
+		if !result.GetHasDefault() {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("cannot inspect Host Label: '%s' is a Tag", c.Args().First())))
 		}
 
 		out := map[string]interface{}{
-			"label": map[string]string{
-				"name":          result.Label.GetName(),
-				"id":            result.Label.GetId(),
-				"default_value": result.Label.GetDefaultValue(),
-			},
-			"host": map[string]string{
-				"value": result.Value,
-			},
+			"name":          result.GetName(),
+			"id":            result.GetId(),
+			"default_value": result.GetDefaultValue(),
+			"value":         result.Value,
 		}
 		return clitools.SuccessResponse(out)
 	},

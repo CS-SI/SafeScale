@@ -82,7 +82,7 @@ func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
 	}
 }
 
-// NewTracer creates a new Tracer instance
+// NewTracerFromCtx creates a new Tracer instance
 func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
@@ -106,7 +106,7 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	}
 	t.callerParams = strings.TrimSpace(message)
 
-	if pc, file, _, ok := runtime.Caller(1); ok {
+	if pc, file, _, ok := runtime.Caller(2); ok {
 		t.fileName = callstack.SourceFilePathUpdater()(file)
 		if f := runtime.FuncForPC(pc); f != nil {
 			t.funcName = filepath.Base(f.Name())
@@ -122,7 +122,7 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	return &t
 }
 
-// NewTracer creates a new Tracer instance
+// NewTracerFromTask creates a new Tracer instance
 func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
@@ -137,7 +137,7 @@ func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) T
 	}
 	t.callerParams = strings.TrimSpace(message)
 
-	if pc, file, _, ok := runtime.Caller(1); ok {
+	if pc, file, _, ok := runtime.Caller(2); ok {
 		t.fileName = callstack.SourceFilePathUpdater()(file)
 		if f := runtime.FuncForPC(pc); f != nil {
 			t.funcName = filepath.Base(f.Name())
@@ -197,6 +197,7 @@ func (instance *tracer) ExitingMessage() string {
 	if valid.IsNil(instance) {
 		return ""
 	}
+
 	return goingOutPrefix + instance.buildMessage(0)
 }
 

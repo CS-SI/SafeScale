@@ -21,8 +21,6 @@ package securitygroups
 
 import (
 	"testing"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
 func SecurityGroupLife(t *testing.T) {
@@ -34,7 +32,4 @@ func AddRuleToExistingSecurityGroup(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("securitygroups").
-		AddScenario(SecurityGroupLife).
-		AddScenario(AddRuleToExistingSecurityGroup)
 }

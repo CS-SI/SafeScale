@@ -3471,14 +3471,11 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.RLock()
-	// defer instance.RUnlock()
-
 	var (
 		ahc           *abstract.HostCore
 		hostSizingV2  *propertiesv2.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
-		volumes       []string
+		hostLabelsV1  *propertiesv1.HostLabels
 	)
 
 	publicIP, _ := instance.GetPublicIP(ctx)   // There may be no public ip, but the returned value is pertinent in this case, no need to handle error
@@ -3496,6 +3493,19 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String)
 			}
+
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+			hostLabelsV1, ok = clonable.(*propertiesv1.HostLabels)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String)
+			}
+
 			return nil
 		})
 		if innerXErr != nil {
@@ -3508,16 +3518,40 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String)
 			}
 
-			volumes = make([]string, 0, len(hostVolumesV1.VolumesByName))
-			for k := range hostVolumesV1.VolumesByName {
-				volumes = append(volumes, k)
-			}
 			return nil
 		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	volumes := make([]string, 0, len(hostVolumesV1.VolumesByName))
+	for k := range hostVolumesV1.VolumesByName {
+		volumes = append(volumes, k)
+	}
+
+	labels := make([]*protocol.HostLabelResponse, 0, len(hostLabelsV1.ByID))
+	svc := instance.Service()
+	for k, v := range hostLabelsV1.ByID {
+		labelInstance, xerr := LoadLabel(ctx, svc, k)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		pbLabel, xerr := labelInstance.ToProtocol(ctx, false)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		item := &protocol.HostLabelResponse{
+			Id:           pbLabel.Id,
+			Name:         pbLabel.Name,
+			HasDefault:   pbLabel.HasDefault,
+			DefaultValue: pbLabel.DefaultValue,
+			Value:        v,
+		}
+		labels = append(labels, item)
 	}
 
 	ph = &protocol.Host{
@@ -3535,6 +3569,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		CreationDate:        ahc.Tags["CreationDate"],
 		AttachedVolumeNames: volumes,
 		Template:            hostSizingV2.Template,
+		Labels:              labels,
 	}
 	return ph, nil
 }

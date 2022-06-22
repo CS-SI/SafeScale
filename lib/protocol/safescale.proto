@@ -410,6 +410,7 @@ message Host {
 	string creation_date = 16;
 	bool managed = 17;
 	string template = 18;
+	repeated HostLabelResponse labels = 19;
 }
 
 message HostStatus {
@@ -468,8 +469,11 @@ message HostLabelRequest {
 }
 
 message HostLabelResponse {
-	LabelInspectResponse Label = 1;
-	string value = 2;
+	string id = 1;
+	string name = 2;
+	bool has_default = 3;
+	string default_value = 4;
+	string value = 5;
 }
 
 message HostTemplate {
@@ -1187,7 +1191,7 @@ message LabelInspectRequest {
 message LabelInspectResponse {
 	string id = 1;
 	string name = 2;
-	repeated Host hosts = 3;
+	repeated LabelHostResponse hosts = 3;
 	bool has_default = 4;
 	string default_value = 5;
 }
@@ -1199,6 +1203,11 @@ message LabelListRequest {
 
 message LabelListResponse {
 	repeated LabelInspectResponse labels = 1;
+}
+
+message LabelHostResponse {
+	Reference host = 1;
+	string value = 2;
 }
 
 message LabelBindRequest {
