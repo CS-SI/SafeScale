@@ -82,24 +82,18 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 	// Create the command
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() (innerErr error) {
-			sshCmd, innerXErr := sshConn.NewCommand(ctx, command)
+			var sshCmd sshapi.Command
+			var innerXErr fail.Error
+			defer func() {
+				if sshCmd != nil {
+					_ = sshCmd.Close()
+				}
+			}()
+
+			sshCmd, innerXErr = sshConn.NewCommand(ctx, command)
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			defer func(cmd sshapi.Command) {
-				derr := cmd.Close()
-				if derr != nil {
-					if innerErr != nil {
-						innerXErr = fail.ConvertError(innerErr)
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-						innerErr = innerXErr
-						return
-					}
-					innerErr = derr
-				}
-			}(sshCmd)
-
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(
 				ctx, outs, executionTimeout,
 			)
@@ -309,12 +303,22 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 					defer cancelCrc()
 
 					if upload {
-						crcCmd, finnerXerr := sshConn.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
+						var crcCmd sshapi.Command
+						var finnerXerr fail.Error
+						defer func() {
+							if crcCmd != nil {
+								_ = crcCmd.Close()
+							}
+						}()
+
+						crcCmd, finnerXerr = sshConn.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
 						if finnerXerr != nil {
 							return finnerXerr
 						}
 
-						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
+						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
+							crcCtx, outputs.COLLECT, executionTimeout,
+						)
 						finnerXerr = debug.InjectPlannedFail(finnerXerr)
 						if finnerXerr != nil {
 							finnerXerr.Annotate("retcode", fretcode)
@@ -376,12 +380,21 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
 					defer cancelCrc()
 
-					crcCmd, finnerXerr := sshConn.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
+					var crcCmd sshapi.Command
+					var finnerXerr fail.Error
+					defer func() {
+						if crcCmd != nil {
+							_ = crcCmd.Close()
+						}
+					}()
+
+					crcCmd, finnerXerr = sshConn.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
 					if finnerXerr != nil {
 						return fail.WarningError(finnerXerr, "failure creating md5 command")
 					}
-
-					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
+						crcCtx, outputs.COLLECT, executionTimeout,
+					)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
 						finnerXerr.Annotate("retcode", fretcode)

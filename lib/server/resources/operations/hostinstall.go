@@ -22,8 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/featuretargettype"
@@ -235,6 +233,9 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if feat == nil {
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
@@ -284,6 +285,9 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
@@ -328,7 +332,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list := instance.InstalledFeatures(ctx)
+	list, _ := instance.InstalledFeatures(ctx)
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
 		item, xerr := NewFeature(ctx, instance.Service(), v)
@@ -344,9 +348,12 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 
 // InstalledFeatures returns a slice of installed features
 // satisfies interface resources.Targetable
-func (instance *Host) InstalledFeatures(ctx context.Context) []string {
-	if instance == nil {
-		return []string{}
+func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Error) {
+	if valid.IsNull(instance) {
+		return []string{}, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return []string{}, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	var out []string
@@ -364,10 +371,9 @@ func (instance *Host) InstalledFeatures(ctx context.Context) []string {
 		})
 	})
 	if xerr != nil {
-		logrus.Error(xerr.Error())
-		return []string{}
+		return []string{}, xerr
 	}
-	return out
+	return out, nil
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target

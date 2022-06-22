@@ -57,10 +57,15 @@ with-soft:
 	@echo "go easy running semgrep"
 	@$(eval CERR = "default")
 
-ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep style metalint
+with-race:
+	@echo "force datarace detection"
+	@$(eval RACE_CHECK_TEST = "-race")
+	@$(eval RACE_CHECK = "-race")
+
+ci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock err vet with-soft semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-rawci: logclean ground getdevdeps mod sdk generate lib cli
+rawci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
@@ -117,9 +122,17 @@ volumetests:
 	@echo "settings go build tags for volumetests"
 	@$(eval BUILD_TAGS = "volumetests,$(BUILD_TAGS)")
 
+ostests:
+	@echo "settings go build tags for ostests"
+	@$(eval BUILD_TAGS = "ostests,$(BUILD_TAGS)")
+
 securitygrouptests:
 	@echo "settings go build tags for securitygrouptests"
 	@$(eval BUILD_TAGS = "securitygrouptests,$(BUILD_TAGS)")
+
+sharetests:
+	@echo "settings go build tags for sharetests"
+	@$(eval BUILD_TAGS = "sharetests,$(BUILD_TAGS)")
 
 ifeq ($(OS),Windows_NT)
 releasearchive:
@@ -485,15 +498,9 @@ checkforpr: testclean validtest
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/fail/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -502,15 +509,9 @@ mintest: begin
 precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/fail/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -520,9 +521,9 @@ test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true

@@ -123,18 +123,12 @@ func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName name returns the name of the host
 // Satisfies interface data.Identifiable
 func (instance ObjectStorageBucket) GetName() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
 	return instance.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
 func (instance ObjectStorageBucket) GetID() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
 	return instance.ID
 }
 

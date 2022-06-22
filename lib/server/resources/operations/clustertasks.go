@@ -1665,7 +1665,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 
 	logrus.Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
-	timeout := 2 * timings.HostCreationTimeout()
+	timeout := 3 * timings.HostCreationTimeout()
 	var collectedErs []error
 
 	for i := uint(1); i <= p.count; i++ {
@@ -2262,7 +2262,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		return nil, xerr
 	}
 
-	timeout := 2 * timings.HostCreationTimeout()
+	timeout := 3 * timings.HostCreationTimeout()
 	for i := uint(1); i <= p.count; i++ {
 		captured := i
 		_, xerr := tg.StartWithTimeout(

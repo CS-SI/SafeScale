@@ -65,7 +65,7 @@ type Host interface {
 	ListEligibleFeatures(ctx context.Context) ([]Feature, fail.Error)                                                      // returns the list of eligible features for the Cluster
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                                     // returns the list of installed features on the Cluster
 	ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error) // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
-	ListTags(ctx context.Context) (list map[string]string, err fail.Error)
+	ListLabels(ctx context.Context) (list map[string]string, err fail.Error)
 	Pull(ctx context.Context, target, source string, timeout time.Duration) (int, string, string, fail.Error)              // downloads a file from host
 	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error) // uploads a file to host
 	PushStringToFile(ctx context.Context, content string, filename string) fail.Error                                      // creates a file 'filename' on remote 'host' with the content 'content'

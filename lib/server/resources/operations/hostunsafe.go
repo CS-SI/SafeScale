@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -98,7 +98,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile sshapi.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
@@ -121,27 +121,22 @@ func run(ctx context.Context, sshProfile sshapi.Connector, cmd string, outs outp
 		func() error {
 			iterations++
 			// Create the command
-			sshCmd, innerXErr := sshProfile.NewCommand(ctx, cmd)
+			var sshCmd api.Command
+			var innerXErr fail.Error
+			defer func() {
+				var ignored error
+				defer fail.IgnoreProblems(&ignored)
+
+				if sshCmd != nil {
+					_ = sshCmd.Close()
+				}
+			}()
+
+			sshCmd, innerXErr = sshProfile.NewCommand(ctx, cmd)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(acmd sshapi.Command) {
-				var ignored error
-				defer fail.IgnoreProblems(&ignored)
-
-				derr := acmd.Close()
-				if derr != nil {
-					if innerXErr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-					} else {
-						innerXErr = derr
-					}
-				}
-			}(sshCmd)
-
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {
 				innerXErr.Annotate("retcode", retcode)

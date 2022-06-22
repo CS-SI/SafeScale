@@ -40,6 +40,7 @@ lib/utils/valid/consts.go
 
 #ignore coverage files
 cover.goconvey
+profile.goconvey
 
 # ignore pipfile.lock
 lib/Pipfile.lock

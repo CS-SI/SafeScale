@@ -105,20 +105,12 @@ func (t *Label) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName returns the name of the tag
 // Satisfies interface data.Identifiable
 func (t *Label) GetName() string {
-	if t == nil {
-		return ""
-	}
-
 	return t.Name
 }
 
 // GetID returns the ID of the tag
 // Satisfies interface data.Identifiable
 func (t *Label) GetID() string {
-	if t == nil {
-		return ""
-	}
-
 	return t.ID
 }
 

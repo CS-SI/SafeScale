@@ -101,6 +101,10 @@ func Test_IsEmpty(t *testing.T) {
 			expect: false,
 		},
 		{
+			value:  make([]string, 0),
+			expect: true,
+		},
+		{
 			value:  "one",
 			expect: false,
 		},

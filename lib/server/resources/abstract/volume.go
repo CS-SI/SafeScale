@@ -114,19 +114,13 @@ func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 
 // GetName returns the name of the volume
 // Satisfies interface data.Identifiable
-func (v *Volume) GetName() string {
-	if v == nil {
-		return ""
-	}
+func (v Volume) GetName() string {
 	return v.Name
 }
 
 // GetID returns the ID of the volume
 // Satisfies interface data.Identifiable
-func (v *Volume) GetID() string {
-	if v == nil {
-		return ""
-	}
+func (v Volume) GetID() string {
 	return v.ID
 }
 

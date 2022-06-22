@@ -32,7 +32,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_FeatureSettingsFromProtocolToResource(t *testing.T) {
+func Test_SSHConfigFromProtocolToSystem(t *testing.T) {
+
+	sc := &protocol.SshConfig{
+		User:       "User",
+		HostName:   "HostName",
+		Host:       "127.0.0.1",
+		PrivateKey: "PrivateKey",
+		Port:       0,
+		Gateway: &protocol.SshConfig{
+			User:       "Gateway User",
+			HostName:   "Gateway HostName",
+			Host:       "127.0.0.1",
+			PrivateKey: "Gateway PrivateKey",
+			Port:       0,
+		},
+		SecondaryGateway: &protocol.SshConfig{
+			User:       "SecondaryGateway User",
+			HostName:   "SecondaryGateway HostName",
+			Host:       "127.0.0.1",
+			PrivateKey: "SecondaryGateway PrivateKey",
+			Port:       0,
+		},
+	}
+
+	ssc := SSHConfigFromProtocolToSystem(sc)
+	user, xerr := ssc.GetUser()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.User, user)
+	host, xerr := ssc.GetHostname()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.HostName, host)
+	ipaddr, xerr := ssc.GetIPAddress()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.Host, ipaddr)
+	pkey, xerr := ssc.GetPrivateKey()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.PrivateKey, pkey)
+	port, xerr := ssc.GetPort()
+	require.Nil(t, xerr)
+	require.EqualValues(t, 0, port)
 
 	rfs := FeatureSettingsFromProtocolToResource(nil)
 	require.EqualValues(t, reflect.TypeOf(rfs).String(), "resources.FeatureSettings")

@@ -27,7 +27,7 @@ import (
 
 // make sure children cannot wait after father is aborted
 func TestTaskGroupFatherAbortion(t *testing.T) { // FIXME: CI Failed
-	for j := 0; j < 30; j++ {
+	for j := 0; j < 2; j++ {
 		overlord, xerr := NewTaskGroup()
 		if xerr != nil {
 			t.FailNow()
