@@ -86,7 +86,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 					return innerXErr
 				}
 
-				item, innerXErr := labelInstance.ToProtocol(handler.job.Context())
+				item, innerXErr := labelInstance.ToProtocol(handler.job.Context(), false)
 				if innerXErr != nil {
 					return innerXErr
 				}

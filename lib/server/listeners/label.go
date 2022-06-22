@@ -73,11 +73,12 @@ func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest)
 	// Map resources.Tag to protocol.Tag
 	var outList []*protocol.LabelInspectResponse
 	for _, v := range list {
-		item, xerr := v.ToProtocol(job.Context())
+		item, xerr := v.ToProtocol(job.Context(), false)
 		if xerr != nil {
 			return nil, xerr
 		}
 
+		item.Hosts = nil // We do not need Hosts in this response
 		outList = append(outList, item)
 	}
 	out := &protocol.LabelListResponse{Labels: outList}
@@ -117,7 +118,7 @@ func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequ
 	}
 
 	tracer.Trace("%s '%s' created", kindToString(in.GetHasDefault()), name)
-	return labelInstance.ToProtocol(job.Context())
+	return labelInstance.ToProtocol(job.Context(), true)
 }
 
 // Delete a Label
@@ -202,5 +203,5 @@ func (s *LabelListener) Inspect(ctx context.Context, in *protocol.LabelInspectRe
 		return nil, fail.NotFoundError("failed to find %s '%s'", kindToString(istag), ref)
 	}
 
-	return instance.ToProtocol(job.Context())
+	return instance.ToProtocol(job.Context(), true)
 }
