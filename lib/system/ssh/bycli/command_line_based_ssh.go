@@ -1160,20 +1160,6 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		stdout, stderr string
 	)
 
-	cmdCloseFunc := func(cmd sshapi.Command, deferErr *fail.Error) {
-		derr := cmd.Close()
-		if derr != nil {
-			if deferErr != nil {
-				if *deferErr != nil {
-					*deferErr = fail.ConvertError(*deferErr)
-					_ = (*deferErr).AddConsequence(derr)
-				} else {
-					*deferErr = derr
-				}
-			}
-		}
-	}
-
 	retcode := -1
 	iterations := 0
 	begins := time.Now()
@@ -1181,15 +1167,19 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		func() (innerErr error) {
 			iterations++
 
+			var sshCmd sshapi.Command
+			var innerXErr fail.Error
+			defer func() {
+				if sshCmd != nil {
+					_ = sshCmd.Close()
+				}
+			}()
+
 			// -- Try to see if 'phase' file exists... --
-			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
+			sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd sshapi.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
-
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
 				return innerXErr
@@ -1197,14 +1187,19 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			if retcode != 0 { // nolint
 				switch phase {
 				case "final":
+					var sshCmd sshapi.Command
+					var innerXErr fail.Error
+					defer func() {
+						if sshCmd != nil {
+							_ = sshCmd.Close()
+						}
+					}()
+
 					// Before v21.05.0, final provisioning state is stored in user_data.phase2.done file, so try to see if legacy file exists...
 					sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.phase2.done", utils.VarFolder))
 					if innerXErr != nil {
 						return innerXErr
 					}
-
-					// Do not forget to close command, ie close SSH tunnel
-					defer func(cmd sshapi.Command) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {

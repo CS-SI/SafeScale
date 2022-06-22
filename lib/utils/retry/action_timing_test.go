@@ -1,3 +1,6 @@
+//go:build alltests
+// +build alltests
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -14,33 +17,38 @@
  * limitations under the License.
  */
 
-package system
+package retry
 
 import (
-	"reflect"
 	"testing"
+	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_BuildBashLibraryDefinition(t *testing.T) {
+func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
 
-	v := temporal.NewTimings()
-	result, err := BuildBashLibraryDefinition(v)
+	log := tests.LogrusCapture(func() {
+		err := WhileUnsuccessfulWithHardTimeout(
+			func() error {
+				return nil
+			},
+			800*time.Millisecond,
+			400*time.Millisecond,
+		)
+		require.Nil(t, err)
+	})
+
+	require.Contains(t, log, "'delay' greater than 'timeout'")
+
+	err := WhileUnsuccessfulWithHardTimeout(
+		func() error {
+			return nil
+		},
+		600*time.Millisecond,
+		-1*time.Second,
+	)
 	require.Nil(t, err)
-	require.EqualValues(t, reflect.TypeOf(result).String(), "*system.BashLibraryDefinition")
-
-}
-func TestBashLibraryDefinition_ToMap(t *testing.T) {
-
-	v := temporal.NewTimings()
-	result, err := BuildBashLibraryDefinition(v)
-	require.Nil(t, err)
-	require.EqualValues(t, reflect.TypeOf(result).String(), "*system.BashLibraryDefinition")
-
-	m, err := result.ToMap()
-	require.Nil(t, err)
-	require.EqualValues(t, reflect.TypeOf(m).String(), "map[string]interface {}")
 
 }

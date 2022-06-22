@@ -35,7 +35,7 @@ type Targetable interface {
 
 	ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error                                // adds parameters corresponding to the Target in preparation of feature installation
 	UnregisterFeature(ctx context.Context, feat string) fail.Error                                         // unregisters a Feature from Target in metadata
-	InstalledFeatures(ctx context.Context) []string                                                        // returns a list of installed features
+	InstalledFeatures(ctx context.Context) ([]string, fail.Error)                                          // returns a list of installed features
 	InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error)                         // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 	RegisterFeature(ctx context.Context, feat Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
 	Service() iaas.Service                                                                                 // returns the iaas.Service used by the target
@@ -51,7 +51,7 @@ type Feature interface {
 	Applicable(ctx context.Context, tg Targetable) (bool, fail.Error)                               // tells if the feature is installable on the target
 	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // check if feature is installed on target
 	GetDisplayFilename(ctx context.Context) string                                                  // displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetFilename(ctx context.Context) string                                                         // returns the filename of the feature
+	GetFilename(ctx context.Context) (string, fail.Error)                                           // returns the filename of the feature
 	Dependencies(ctx context.Context) (map[string]struct{}, fail.Error)                             // returns the other features needed as requirements
 	ListParametersWithControl(ctx context.Context) []string                                         // returns a list of parameter containing version information
 	Remove(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // uninstalls the feature from the target

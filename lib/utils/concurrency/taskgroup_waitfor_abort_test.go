@@ -501,7 +501,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 3 {
+			if iter > 1 {
 				break
 			}
 			if enough {
@@ -710,7 +710,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater(t *testin
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 1 {
 				break
 			}
 			if enough {

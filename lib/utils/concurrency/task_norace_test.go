@@ -37,7 +37,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaitingWF
 
 	for !enough {
 		iter++
-		if iter > 8 {
+		if iter > 2 {
 			break
 		}
 
@@ -134,7 +134,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 
 	for !enough {
 		iter++
-		if iter > 8 {
+		if iter > 2 {
 			break
 		}
 

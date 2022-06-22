@@ -125,6 +125,22 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	if !(strings.Contains(res, "0.03") || strings.Contains(res, "0.04")) {
 		t.Errorf("This should be near 30 ms and it isn't: %s", res)
 	}
+
+	stowa.Start()
+	time.Sleep(10 * time.Millisecond)
+	stowa.Pause()
+	stowa.Pause() // Double call have to do nothing
+
+	time.Sleep(time.Second)
+	stowa.Start()
+	time.Sleep(20 * time.Millisecond)
+	stowa.Stop()
+
+	res = FormatDuration(stowa.GetDuration())
+	if !(strings.Contains(res, "0.03") || strings.Contains(res, "0.04")) {
+		t.Errorf("This should be near 30 ms and it isn't: %s", res)
+	}
+
 }
 
 func TestStartStopDurationWithPauseDefaultFormatting(t *testing.T) {

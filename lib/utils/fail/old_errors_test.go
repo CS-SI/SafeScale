@@ -734,7 +734,7 @@ func TestNotNilCheckCastNoProblems(t *testing.T) {
 		}
 	}()
 
-	var origin Error = noProblems()
+	var origin Error = noProblems() //nolint
 	var nilErrTimeout *ErrTimeout = nil
 	if origin != nil { // this test work well, when we return something that is NOT a pointer to an interface, no problems...
 		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same

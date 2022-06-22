@@ -74,7 +74,11 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	}
 
 	var present bool
-	installedFeatures := addressedGateway.InstalledFeatures(ctx)
+	installedFeatures, xerr := addressedGateway.InstalledFeatures(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	for _, v := range installedFeatures {
 		if v == "edgeproxy4subnet" || v == "reverseproxy" {
 			present = true

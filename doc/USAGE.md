@@ -239,6 +239,7 @@ where:
         <li><code>gpu</code> (<a href="SCANNER.md">scanner</a> needed)</li>
         <li><code>ram</code></li>
         <li><code>disk</code>
+        <li><code>template</code>
       </ul>
   </li><br>
   <li><code>&lt;operator&gt;</code> can be:
@@ -266,6 +267,7 @@ Each <code>&lt;component&gt;</code> accepts <code>&lt;value&gt;</code> following
   <li><code>&lt;gpu&gt;</code> is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li>
   <li><code>&lt;ram&gt;</code> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li>
   <li><code>&lt;disk&gt;</code> is expecting an integer as system disk size in GB</li>
+  <li><code>&lt;template&gt;</code> is expecting the name of a template, example: <code>"template=e2-medium"</code></li>
 </ul>
 <u>examples</u>:
 <ul>
