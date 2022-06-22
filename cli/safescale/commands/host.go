@@ -205,7 +205,11 @@ var hostInspect = cli.Command{
 		labels := make([]map[string]interface{}, 0)
 		if items, ok := output["labels"].([]interface{}); ok && len(items) > 0 {
 			for _, v := range items {
-				item := v.(map[string]interface{})
+				item, ok := v.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
 				hasDefault, ok := item["has_default"].(bool)
 				delete(item, "has_default")
 				if ok && hasDefault {
