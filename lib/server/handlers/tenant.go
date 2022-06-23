@@ -143,6 +143,8 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.TenantHandler -o mocks/mock_tenant.go
+
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
 	Scan(string, bool, []string) (_ *protocol.ScanResultList, ferr fail.Error)

@@ -24,9 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ImageHandler
-
-// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ImageHandler -o mocks/mock_image.go
 
 // ImageHandler defines API to manipulate images
 type ImageHandler interface {

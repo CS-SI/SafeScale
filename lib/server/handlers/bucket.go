@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.BucketHandler -o ../mocks/mock_bucketapi.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.BucketHandler -o mocks/mock_bucket.go
 
 // BucketHandler defines interface to manipulate buckets
 type BucketHandler interface {

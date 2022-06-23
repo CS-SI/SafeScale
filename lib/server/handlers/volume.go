@@ -39,16 +39,16 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
-//go:generate minimock -o ../mocks/mock_volumeapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.VolumeHandler
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.VolumeHandler -o mocks/mock_volume.go
 
 // VolumeHandler defines API to manipulate hosts
 type VolumeHandler interface {
-	Delete(ref string) fail.Error
-	List(all bool) ([]resources.Volume, fail.Error)
-	Inspect(ref string) (resources.Volume, fail.Error)
-	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, fail.Error)
 	Attach(volume string, host string, path string, format string, doNotFormat bool, doNotMount bool) fail.Error
+	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, fail.Error)
 	Detach(volume string, host string) fail.Error
+	Delete(ref string) fail.Error
+	Inspect(ref string) (resources.Volume, fail.Error)
+	List(all bool) ([]resources.Volume, fail.Error)
 }
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
@@ -65,7 +65,7 @@ func NewVolumeHandler(job server.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 
-// List returns the network list
+// List returns the list of Volumes
 func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -81,21 +81,24 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	objv, xerr := volumefactory.New(handler.job.Service())
+	browseInstance, xerr := volumefactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = objv.Browse(task.Context(), func(volume *abstract.Volume) fail.Error {
-		rv, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID)
+
+	xerr = browseInstance.Browse(task.Context(), func(volume *abstract.Volume) fail.Error {
+		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
-		volumes = append(volumes, rv)
+
+		volumes = append(volumes, volumeInstance)
 		return nil
 	})
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return volumes, nil
 }
 
@@ -173,14 +176,14 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	objv, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
 		}
 		return nil, xerr
 	}
-	return objv, nil
+	return volumeInstance, nil
 }
 
 // Create a volume
