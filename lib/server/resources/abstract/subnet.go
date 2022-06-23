@@ -149,17 +149,17 @@ func (s *Subnet) Deserialize(buf []byte) (ferr fail.Error) {
 
 // GetName ...
 // satisfies interface data.Identifiable
-func (s Subnet) GetName() string {
+func (s *Subnet) GetName() string {
 	return s.Name
 }
 
 // GetID ...
 // satisfies interface data.Identifiable
-func (s Subnet) GetID() string {
+func (s *Subnet) GetID() string {
 	return s.ID
 }
 
-func (s Subnet) GetCIDR() string {
+func (s *Subnet) GetCIDR() string {
 	return s.CIDR
 }
 

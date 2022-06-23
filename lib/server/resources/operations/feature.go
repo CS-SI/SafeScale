@@ -135,12 +135,12 @@ func (instance *Feature) Replace(p data.Clonable) (data.Clonable, error) {
 }
 
 // GetName returns the display name of the Feature, with error handling
-func (instance Feature) GetName() string {
+func (instance *Feature) GetName() string {
 	return instance.file.displayName
 }
 
 // GetID ...
-func (instance Feature) GetID() string {
+func (instance *Feature) GetID() string {
 	return instance.GetName()
 }
 
