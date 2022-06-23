@@ -1,4 +1,4 @@
-VERSION=develop
+VERSION=22.06.0-wip
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)

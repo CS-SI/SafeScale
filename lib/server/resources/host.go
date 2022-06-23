@@ -28,10 +28,11 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	_ "github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Host -o mocks/mock_host.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Host -o mocks/mock_host.go
 
 // Host links Object Storage folder and Host
 type Host interface {
