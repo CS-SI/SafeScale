@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Label -o mocks/mock_label.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Label -o mocks/mock_label.go
 
 // Label links Object Storage folder and getTags
 type Label interface {

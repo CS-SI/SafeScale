@@ -147,14 +147,14 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (ferr fail.Error) {
 			return innerXErr
 		}
 
-		innerXErr = tv.upgradeNetworkMetadataIfNeeded(owningInstance, networkInstance)
+		innerXErr = tv.upgradeNetworkMetadataIfNeeded(svc, owningInstance, networkInstance)
 		innerXErr = debug.InjectPlannedFail(innerXErr)
 		return innerXErr
 	})
 }
 
 // upgradeNetworkMetadataIfNeeded upgrades properties to most recent version
-func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInstance resources.Network) fail.Error {
+func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(svc iaas.Service, owningInstance resources.Network, currentInstance resources.Network) fail.Error {
 	var (
 		networkName, subnetName, subnetID string
 		gatewayIDs                        []string
@@ -164,7 +164,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		networkName = owningInstance.GetName()
 	}
 	subnetName = currentInstance.GetName()
-	svc := currentInstance.Service()
 
 	ctx := context.Background()
 
@@ -243,7 +242,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 
 			// -- huaweicloud stack driver needs special treatment here ... --
 			{ // It only does something for huaweicloud
-				stack, xerr := currentInstance.Service().GetStack()
+				stack, xerr := svc.GetStack()
 				if xerr != nil {
 					return xerr
 				}
@@ -447,7 +446,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 
 		// -- GCP stack driver needs special treatment... --
 		{ // It only does something for gcp
-			stack, xerr := currentInstance.Service().GetStack()
+			stack, xerr := svc.GetStack()
 			if xerr != nil {
 				return xerr
 			}

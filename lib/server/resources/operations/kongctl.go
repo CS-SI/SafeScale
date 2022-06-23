@@ -53,6 +53,7 @@ type KongController struct {
 	gateway          resources.Host
 	gatewayPrivateIP string
 	gatewayPublicIP  string
+	service          iaas.Service
 }
 
 // NewKongController creates a controller for Kong
@@ -135,6 +136,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	ctrl := &KongController{
 		subnet:  subnet,
 		gateway: addressedGateway,
+		service: svc,
 	}
 	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -430,7 +432,7 @@ func (k *KongController) addSourceControl(ctx context.Context,
 }
 
 func (k *KongController) get(ctx context.Context, name, url string) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -457,7 +459,7 @@ func (k *KongController) get(ctx context.Context, name, url string) (map[string]
 
 // post creates a rule
 func (k *KongController) post(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -492,7 +494,7 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 
 // put updates or creates a rule
 func (k *KongController) put(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -527,7 +529,7 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 
 // patch updates an existing rule
 func (k *KongController) patch(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
