@@ -503,18 +503,20 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 		return xerr
 	}
 
-	ncfg, _ := ssh.NewConfigFrom(sshCfg)
+	ncfg, xerr := ssh.NewConfigFrom(sshCfg)
+	if xerr != nil {
+		return xerr
+	}
 
 	if ncfg.GatewayConfig == nil {
 		ncfg.GatewayConfig = ssh.NewConfig(ncfg.Hostname, ncfg.IPAddress, ncfg.Port, ncfg.User, ncfg.PrivateKey, 0, "", nil, nil)
 	}
-	ncfg.IPAddress = "127.0.0.1"
 	ncfg.Port = remotePort
 	ncfg.LocalPort = localPort
 
 	return retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			sshConn, xerr := sshfactory.NewConnector(sshCfg, sshfactory.ConnectorWithCli())
+			sshConn, xerr := sshfactory.NewConnector(ncfg, sshfactory.ConnectorWithCli())
 			if xerr != nil {
 				return xerr
 			}

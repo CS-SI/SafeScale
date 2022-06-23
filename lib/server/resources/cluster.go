@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -o mocks/mock_cluster.go -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Cluster
+//go:generate minimock -o mocks/mock_cluster.go -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Cluster
 
 // IndexedListOfClusterNodes ...
 type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode

@@ -913,7 +913,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 
 func TestSecurityGroup_Serialize(t *testing.T) {
 
-	var sg *SecurityGroup
+	var sg *SecurityGroup = nil
 	_, err := sg.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
