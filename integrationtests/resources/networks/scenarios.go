@@ -123,4 +123,7 @@ func CreateNetworkWithoutSubnet(t *testing.T) {
 }
 
 func init() {
+	helpers.InSection("networks").Clear().
+		AddScenario(CreateNetwork).
+		AddScenario(CreateNetworkWithoutSubnet)
 }

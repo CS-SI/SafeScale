@@ -132,7 +132,7 @@ func CreateUbuntuNetwork(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("viableos").
+	helpers.InSection("viableos").Clear().
 		AddScenario(CreateCentosNetwork).
 		AddScenario(CreateDebianNetwork).
 		AddScenario(CreateUbuntuNetwork)
