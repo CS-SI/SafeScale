@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -33,13 +34,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
-func (s stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
+func (s stack) rpcGetHostByID(ctx context.Context, id string) (*servers.Server, fail.Error) {
 	if id == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	var server *servers.Server
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			server, err = servers.Get(s.ComputeClient, id).Extract()
 			return err
@@ -52,14 +53,14 @@ func (s stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 	return server, nil
 }
 
-func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
+func (s stack) rpcGetHostByName(ctx context.Context, name string) (*servers.Server, fail.Error) {
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, r.Err = s.ComputeClient.Get(
 				s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
@@ -109,14 +110,14 @@ func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 }
 
 // rpcGetMetadataOfInstance returns the metadata associated with the instance
-func (s stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Error) {
+func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
 	emptyMap := map[string]string{}
 	if id = strings.TrimSpace(id); id == "" {
 		return emptyMap, fail.InvalidParameterError("id", "cannpt be empty string")
 	}
 
 	var out map[string]string
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			res := servers.Metadata(s.ComputeClient, id)
 			out, innerErr = res.Extract()
@@ -139,9 +140,9 @@ func (s stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Erro
 }
 
 // rpcListServers lists servers
-func (s stack) rpcListServers() ([]*servers.Server, fail.Error) {
+func (s stack) rpcListServers(ctx context.Context) ([]*servers.Server, fail.Error) {
 	var resp []*servers.Server
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			allPages, innerErr := servers.List(s.ComputeClient, nil).AllPages()
 			if innerErr != nil {
@@ -162,7 +163,7 @@ func (s stack) rpcListServers() ([]*servers.Server, fail.Error) {
 }
 
 // rpcCreateServer calls openstack to create a server
-func (s stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, diskSize int, userdata []byte, az string) (*servers.Server, fail.Error) {
+func (s stack) rpcCreateServer(ctx context.Context, name string, networks []servers.Network, templateID, imageID string, diskSize int, userdata []byte, az string) (*servers.Server, fail.Error) {
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
@@ -202,7 +203,7 @@ func (s stack) rpcCreateServer(name string, networks []servers.Network, template
 	}
 
 	var server *servers.Server
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			server, innerErr = bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
@@ -219,12 +220,12 @@ func (s stack) rpcCreateServer(name string, networks []servers.Network, template
 }
 
 // rpcDeleteServer calls openstack to delete a server
-func (s stack) rpcDeleteServer(id string) fail.Error {
+func (s stack) rpcDeleteServer(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return servers.Delete(s.ComputeClient, id).ExtractErr()
 		},
@@ -233,8 +234,8 @@ func (s stack) rpcDeleteServer(id string) fail.Error {
 }
 
 // rpcCreatePort creates a port
-func (s stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, ferr fail.Error) {
-	xerr := stacks.RetryableRemoteCall(
+func (s stack) rpcCreatePort(ctx context.Context, req ports.CreateOpts) (port *ports.Port, ferr fail.Error) {
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
 			return innerErr
@@ -249,12 +250,12 @@ func (s stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, ferr fail.
 }
 
 // rpcDeletePort deletes a port
-func (s stack) rpcDeletePort(id string) fail.Error {
+func (s stack) rpcDeletePort(ctx context.Context, id string) fail.Error {
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			return ports.Delete(s.NetworkClient, id).ExtractErr()
 		},
@@ -263,12 +264,12 @@ func (s stack) rpcDeletePort(id string) fail.Error {
 }
 
 // rpcListPorts lists all ports available
-func (s stack) rpcListPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
+func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var (
 		emptyList []ports.Port
 		allPages  pagination.Page
 	)
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
 			return innerErr
@@ -287,12 +288,12 @@ func (s stack) rpcListPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
 }
 
 // rpcUpdatePort updates the settings of a port
-func (s stack) rpcUpdatePort(id string, options ports.UpdateOpts) fail.Error {
+func (s stack) rpcUpdatePort(ctx context.Context, id string, options ports.UpdateOpts) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
 			_ = resp
@@ -303,12 +304,12 @@ func (s stack) rpcUpdatePort(id string, options ports.UpdateOpts) fail.Error {
 }
 
 // rpcGetPort returns port information from its ID
-func (s stack) rpcGetPort(id string) (port *ports.Port, ferr fail.Error) {
+func (s stack) rpcGetPort(ctx context.Context, id string) (port *ports.Port, ferr fail.Error) {
 	if id == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
 			return innerErr
@@ -323,9 +324,9 @@ func (s stack) rpcGetPort(id string) (port *ports.Port, ferr fail.Error) {
 }
 
 // rpcCreateFloatingIP creates a floating IP
-func (s stack) rpcCreateFloatingIP() (*floatingips.FloatingIP, fail.Error) {
+func (s stack) rpcCreateFloatingIP(ctx context.Context) (*floatingips.FloatingIP, fail.Error) {
 	var resp *floatingips.FloatingIP
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			resp, innerErr = floatingips.Create(
 				s.ComputeClient, floatingips.CreateOpts{
@@ -343,12 +344,12 @@ func (s stack) rpcCreateFloatingIP() (*floatingips.FloatingIP, fail.Error) {
 }
 
 // rpcDeleteFloatingIP deletes a floating IP
-func (s stack) rpcDeleteFloatingIP(id string) fail.Error {
+func (s stack) rpcDeleteFloatingIP(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return floatingips.Delete(s.ComputeClient, id).ExtractErr()
 		},

@@ -17,6 +17,8 @@
 package stacks
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -25,7 +27,7 @@ import (
 
 // RetryableRemoteCall calls a remote API with tolerance to communication failures
 // Remote API is done inside 'callback' parameter and returns remote error if necessary that 'convertError' function convert to SafeScale error
-func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error, options ...retry.Option) (ferr fail.Error) {
+func RetryableRemoteCall(ctx context.Context, callback func() error, convertError func(error) fail.Error, options ...retry.Option) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if callback == nil {

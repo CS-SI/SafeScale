@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -143,7 +144,7 @@ func (s stack) ListFloatingIPs() (pagination.Pager, fail.Error) {
 }
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
-func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
+func (s stack) GetFloatingIP(ctx context.Context, id string) (*FloatingIP, fail.Error) {
 	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
@@ -154,7 +155,7 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, err := s.Driver.Request("GET", url, &opts) // nolint
@@ -176,14 +177,14 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 }
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
-func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
+func (s stack) FindFloatingIPByIP(ctx context.Context, ipAddress string) (*FloatingIP, error) {
 	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
 	found := false
 	fip := FloatingIP{}
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			floats, innerErr := s.ListFloatingIPs()
 			if innerErr != nil {
@@ -217,7 +218,7 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
+func (s stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	if valid.IsNil(s) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
@@ -255,7 +256,7 @@ func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
@@ -276,7 +277,7 @@ func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 }
 
 // DeleteFloatingIP deletes a floating IP
-func (s stack) DeleteFloatingIP(id string) fail.Error {
+func (s stack) DeleteFloatingIP(ctx context.Context, id string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -287,7 +288,7 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, r.Err = s.Driver.Request("DELETE", url, &opts) // nolint
@@ -300,12 +301,12 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 }
 
 // AssociateFloatingIP associates a floating ip to a host
-func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+func (s stack) AssociateFloatingIP(ctx context.Context, host *abstract.HostCore, id string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
-	fip, xerr := s.GetFloatingIP(id)
+	fip, xerr := s.GetFloatingIP(ctx, id)
 	if xerr != nil {
 		return xerr
 	}
@@ -316,7 +317,7 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 		},
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			r := servers.ActionResult{}
@@ -329,12 +330,12 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 }
 
 // DissociateFloatingIP from host
-func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+func (s stack) DissociateFloatingIP(ctx context.Context, host *abstract.HostCore, id string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
-	fip, xerr := s.GetFloatingIP(id)
+	fip, xerr := s.GetFloatingIP(ctx, id)
 	if xerr != nil {
 		return xerr
 	}
@@ -345,7 +346,7 @@ func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 		},
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			r := servers.ActionResult{}

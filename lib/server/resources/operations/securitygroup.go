@@ -378,6 +378,12 @@ func deleteProviderSecurityGroup(ctx context.Context, svc iaas.Service, abstract
 	// FIXME: communication failure handled at service level, not necessary anymore to retry here
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if innerXErr := svc.DeleteSecurityGroup(ctx, abstractSG); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1079,7 +1085,7 @@ func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(ctx context.Contex
 // unbindFromHostsAttachedToSubnet unbinds (ie remove) the security group from Hosts in a Subnet
 func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(task concurrency.Task, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
 	if len(subnetHosts.ByID) > 0 {
-		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		tg, xerr := concurrency.NewTaskGroupWithContext(task.Context(), concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to create a TaskGroup to disable Security Group '%s' on Hosts", instance.GetName())

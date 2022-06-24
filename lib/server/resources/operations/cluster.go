@@ -155,7 +155,7 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 }
 
 // LoadCluster loads cluster information from metadata
-func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
+func LoadCluster(inctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -165,81 +165,151 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string, options ...
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+	// FIXME: OPP Begin here
 
-	var (
-		clusterInstance *Cluster
-		ok              bool
-	)
-	if clusterInstance, ok = anon.(*Cluster); !ok {
-		return nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)
+	type result struct {
+		rTr  resources.Cluster
+		rErr fail.Error
 	}
-	if clusterInstance == nil {
-		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
-	}
+	chRes := make(chan result)
 
-	if clusterInstance.randomDelayCh == nil {
-		xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
+	go func() {
+		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) }
+		anon, xerr := cacheMissLoader()
 		if xerr != nil {
-			return nil, xerr
+			chRes <- result{nil, xerr}
+			return
 		}
-	}
 
-	return clusterInstance, nil
+		var (
+			clusterInstance *Cluster
+			ok              bool
+		)
+		if clusterInstance, ok = anon.(*Cluster); !ok {
+			chRes <- result{nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)}
+			return
+		}
+		if clusterInstance == nil {
+			chRes <- result{nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)}
+			return
+		}
+
+		if clusterInstance.randomDelayCh == nil {
+			xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return
+			}
+		}
+
+		chRes <- result{clusterInstance, nil}
+		return
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
-func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (data.Identifiable, fail.Error) {
-	clusterInstance, xerr := NewCluster(ctx, svc)
-	if xerr != nil {
-		return nil, xerr
-	}
+func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (data.Identifiable, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+	// FIXME: OPP Begin here
 
-	if xerr = clusterInstance.Read(ctx, name); xerr != nil {
-		return nil, xerr
+	type result struct {
+		rTr  resources.Cluster
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		clusterInstance, xerr := NewCluster(ctx, svc)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
 
-	flavor, xerr := clusterInstance.GetFlavor(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
+		if xerr = clusterInstance.Read(ctx, name); xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
 
-	xerr = clusterInstance.bootstrap(flavor)
-	if xerr != nil {
-		return nil, xerr
-	}
+		flavor, xerr := clusterInstance.GetFlavor(ctx)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
 
-	xerr = clusterInstance.updateCachedInformation(ctx)
-	if xerr != nil {
-		return nil, xerr
+		xerr = clusterInstance.bootstrap(flavor)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		xerr = clusterInstance.updateCachedInformation(ctx)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		chRes <- result{clusterInstance, nil}
+		return
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-	return clusterInstance, nil
 }
 
 // updateCachedInformation updates information cached in the instance
-func (instance *Cluster) updateCachedInformation(ctx context.Context) fail.Error {
-	instance.localCache.Lock()
-	defer instance.localCache.Unlock()
+func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Error {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	var index uint8
-	flavor, err := instance.unsafeGetFlavor(ctx)
-	if err != nil {
-		return err
+	type result struct {
+		rErr fail.Error
 	}
-	if flavor == clusterflavor.K8S {
+	chRes := make(chan result)
+	go func() {
+		instance.localCache.Lock()
+		defer instance.localCache.Unlock()
+
+		var index uint8
+		flavor, err := instance.unsafeGetFlavor(ctx)
+		if err != nil {
+			chRes <- result{err}
+			return
+		}
+		if flavor == clusterflavor.K8S {
+			index++
+			instance.localCache.installMethods.Store(index, installmethod.Helm)
+		}
+
 		index++
-		instance.localCache.installMethods.Store(index, installmethod.Helm)
+		instance.localCache.installMethods.Store(index, installmethod.Bash)
+		index++
+		instance.localCache.installMethods.Store(index, installmethod.None)
+		chRes <- result{nil}
+		return
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-
-	index++
-	instance.localCache.installMethods.Store(index, installmethod.Bash)
-	index++
-	instance.localCache.installMethods.Store(index, installmethod.None)
-	return nil
 }
 
 // IsNull tells if the instance should be considered as a null value
@@ -543,6 +613,12 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 		// If the Cluster is in state Starting, wait for it to finish its start procedure
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				state, innerErr := instance.unsafeGetState(ctx)
 				if innerErr != nil {
 					return innerErr
@@ -799,6 +875,12 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	case clusterstate.Stopping:
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				state, innerErr := instance.unsafeGetState(ctx)
 				if innerErr != nil {
 					return innerErr
@@ -2166,6 +2248,12 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				innerXErr := subnetInstance.Delete(ctx)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
@@ -2205,6 +2293,12 @@ func (instance *Cluster) delete(ctx context.Context) (ferr fail.Error) {
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				innerXErr := networkInstance.Delete(ctx)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
@@ -2307,9 +2401,9 @@ func containsClusterNode(list []uint, numericalID uint) (bool, int) {
 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
-func (instance *Cluster) configureCluster(ctx context.Context, req abstract.ClusterRequest) (ferr fail.Error) {
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
-	defer tracer.Exiting()
+func (instance *Cluster) configureCluster(inctx context.Context, req abstract.ClusterRequest) (ferr fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	logrus.Infof("[Cluster %s] configuring Cluster...", instance.GetName())
 	defer func() {
@@ -2320,41 +2414,63 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 		}
 	}()
 
-	// Install reverse-proxy feature on Cluster (gateways)
-	parameters := ExtractFeatureParameters(req.FeatureParameters)
-	xerr := instance.installReverseProxy(ctx, parameters)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
+		defer tracer.Exiting()
 
-	// Install remote-desktop feature on Cluster (all masters)
-	xerr = instance.installRemoteDesktop(ctx, parameters)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
-		if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
-			return xerr
+		// Install reverse-proxy feature on Cluster (gateways)
+		parameters := ExtractFeatureParameters(req.FeatureParameters)
+		xerr := instance.installReverseProxy(ctx, parameters)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
-	}
 
-	// Install ansible feature on Cluster (all masters)
-	xerr = instance.installAnsible(ctx, parameters)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+		// Install remote-desktop feature on Cluster (all masters)
+		xerr = instance.installRemoteDesktop(ctx, parameters)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+			if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+				chRes <- result{xerr}
+				return
+			}
+		}
 
-	// configure what has to be done Cluster-wide
-	instance.localCache.RLock()
-	makers := instance.localCache.makers
-	instance.localCache.RUnlock() // nolint
-	if makers.ConfigureCluster != nil {
-		return makers.ConfigureCluster(ctx, instance, parameters)
-	}
+		// Install ansible feature on Cluster (all masters)
+		xerr = instance.installAnsible(ctx, parameters)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
 
-	// Not finding a callback isn't an error, so return nil in this case
-	return nil
+		// configure what has to be done Cluster-wide
+		instance.localCache.RLock()
+		makers := instance.localCache.makers
+		instance.localCache.RUnlock() // nolint
+		if makers.ConfigureCluster != nil {
+			chRes <- result{makers.ConfigureCluster(ctx, instance, parameters)}
+			return
+		}
+
+		// Not finding a callback isn't an error, so return nil in this case
+		chRes <- result{nil}
+		return
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
 }
 
 func (instance *Cluster) determineRequiredNodes(ctx context.Context) (uint, uint, uint, fail.Error) {
@@ -2404,124 +2520,109 @@ func realizeTemplate(tmplName string, adata map[string]interface{}, fileName str
 var ansibleScripts embed.FS
 
 // Regenerate ansible inventory
-func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.Error {
-	logrus.Infof("[Cluster %s] Update ansible inventory", instance.GetName())
-
+func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fail.Error {
 	// Check incoming parameters
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	// Collect data
-	featureAnsibleInventoryInstalled := false
-	var masters []resources.Host
-	var params = map[string]interface{}{
-		"ClusterName":          "",
-		"ClusterAdminUsername": "cladm",
-		"ClusterAdminPassword": "",
-		"PrimaryGatewayName":   fmt.Sprintf("gw-%s", instance.GetName()),
-		"PrimaryGatewayIP":     "",
-		"PrimaryGatewayPort":   "22",
-		"SecondaryGatewayName": fmt.Sprintf("gw2-%s", instance.GetName()),
-		"SecondaryGatewayIP":   "",
-		"SecondaryGatewayPort": "22",
-		"ClusterMasters":       resources.IndexedListOfClusterNodes{},
-		"ClusterNodes":         resources.IndexedListOfClusterNodes{},
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		logrus.Infof("[Cluster %s] Update ansible inventory", instance.GetName())
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Check if feature ansible is installed
-		innerXErr := props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("`propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			_, featureAnsibleInventoryInstalled = featuresV1.Installed["ansible-for-cluster"]
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-		if !featureAnsibleInventoryInstalled {
-			return nil
-		}
-
-		// Collect get network config
-		var networkCfg *propertiesv3.ClusterNetwork
-		innerXErr = props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if networkV3 == nil {
-				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", "nil")
-			}
-			networkCfg = networkV3
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
+		// Collect data
+		featureAnsibleInventoryInstalled := false
+		var masters []resources.Host
+		var params = map[string]interface{}{
+			"ClusterName":          "",
+			"ClusterAdminUsername": "cladm",
+			"ClusterAdminPassword": "",
+			"PrimaryGatewayName":   fmt.Sprintf("gw-%s", instance.GetName()),
+			"PrimaryGatewayIP":     "",
+			"PrimaryGatewayPort":   "22",
+			"SecondaryGatewayName": fmt.Sprintf("gw2-%s", instance.GetName()),
+			"SecondaryGatewayIP":   "",
+			"SecondaryGatewayPort": "22",
+			"ClusterMasters":       resources.IndexedListOfClusterNodes{},
+			"ClusterNodes":         resources.IndexedListOfClusterNodes{},
 		}
 
-		// Collect template data, list masters hosts
-		aci, ok := clonable.(*abstract.ClusterIdentity)
-		if !ok {
-			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		if aci == nil {
-			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", "nil")
-		}
-		if reflect.TypeOf(aci.Name).Kind() != reflect.String && aci.Name == "" {
-			return fail.InconsistentError("Cluster name must be a not empty string")
-		}
-
-		params["Clustername"] = aci.Name
-		params["ClusterAdminUsername"] = "cladm"
-		params["ClusterAdminPassword"] = aci.AdminPassword
-		params["PrimaryGatewayIP"] = networkCfg.GatewayIP
-		if networkCfg.SecondaryGatewayIP != "" {
-			params["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-		}
-
-		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if nodesV3 == nil {
-				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", "nil")
-			}
-
-			// Template params: gateways
-			rh, err := LoadHost(ctx, instance.Service(), networkCfg.GatewayID)
-			if err != nil {
-				return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
-			}
-			err = rh.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				ahc, ok := clonable.(*abstract.HostCore)
+		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// Check if feature ansible is installed
+			innerXErr := props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 				if !ok {
-					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentError("`propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				if ahc == nil {
-					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
-				}
-				params["PrimaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
-				if ahc.Name != "" {
-					params["PrimaryGatewayName"] = ahc.Name
-				}
+				_, featureAnsibleInventoryInstalled = featuresV1.Installed["ansible-for-cluster"]
 				return nil
 			})
-			if err != nil {
-				return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
+			if innerXErr != nil {
+				return innerXErr
+			}
+			if !featureAnsibleInventoryInstalled {
+				return nil
 			}
 
+			// Collect get network config
+			var networkCfg *propertiesv3.ClusterNetwork
+			innerXErr = props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+				networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				if networkV3 == nil {
+					return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", "nil")
+				}
+				networkCfg = networkV3
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// Collect template data, list masters hosts
+			aci, ok := clonable.(*abstract.ClusterIdentity)
+			if !ok {
+				return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			if aci == nil {
+				return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", "nil")
+			}
+			if reflect.TypeOf(aci.Name).Kind() != reflect.String && aci.Name == "" {
+				return fail.InconsistentError("Cluster name must be a not empty string")
+			}
+
+			params["Clustername"] = aci.Name
+			params["ClusterAdminUsername"] = "cladm"
+			params["ClusterAdminPassword"] = aci.AdminPassword
+			params["PrimaryGatewayIP"] = networkCfg.GatewayIP
 			if networkCfg.SecondaryGatewayIP != "" {
-				rh, err = LoadHost(ctx, instance.Service(), networkCfg.SecondaryGatewayID)
+				params["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+			}
+
+			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				if nodesV3 == nil {
+					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", "nil")
+				}
+
+				// Template params: gateways
+				rh, err := LoadHost(ctx, instance.Service(), networkCfg.GatewayID)
 				if err != nil {
-					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
+					return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
 				}
 				err = rh.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
@@ -2531,130 +2632,185 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 					if ahc == nil {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
 					}
-					params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+					params["PrimaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
 					if ahc.Name != "" {
-						params["SecondaryGatewayName"] = ahc.Name
+						params["PrimaryGatewayName"] = ahc.Name
 					}
 					return nil
 				})
 				if err != nil {
-					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
+					return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
 				}
-			}
 
-			// Template params: masters
-			nodes := make(resources.IndexedListOfClusterNodes, len(nodesV3.Masters))
-			for _, v := range nodesV3.Masters {
-				if node, found := nodesV3.ByNumericalID[v]; found {
-					nodes[node.NumericalID] = node
-					master, err := LoadHost(ctx, instance.Service(), node.ID)
+				if networkCfg.SecondaryGatewayIP != "" {
+					rh, err = LoadHost(ctx, instance.Service(), networkCfg.SecondaryGatewayID)
 					if err != nil {
-						return fail.InconsistentError("Fail to load master '%s'", node.ID)
+						return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
 					}
-					masters = append(masters, master)
+					err = rh.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+						ahc, ok := clonable.(*abstract.HostCore)
+						if !ok {
+							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+						if ahc == nil {
+							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
+						}
+						params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+						if ahc.Name != "" {
+							params["SecondaryGatewayName"] = ahc.Name
+						}
+						return nil
+					})
+					if err != nil {
+						return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
+					}
 				}
-			}
-			params["ClusterMasters"] = nodes
 
-			// Template params: nodes
-			nodes = make(resources.IndexedListOfClusterNodes, len(nodesV3.PrivateNodes))
-			for _, v := range nodesV3.PrivateNodes {
-				if node, found := nodesV3.ByNumericalID[v]; found {
-					nodes[node.NumericalID] = node
+				// Template params: masters
+				nodes := make(resources.IndexedListOfClusterNodes, len(nodesV3.Masters))
+				for _, v := range nodesV3.Masters {
+					if node, found := nodesV3.ByNumericalID[v]; found {
+						nodes[node.NumericalID] = node
+						master, err := LoadHost(ctx, instance.Service(), node.ID)
+						if err != nil {
+							return fail.InconsistentError("Fail to load master '%s'", node.ID)
+						}
+						masters = append(masters, master)
+					}
 				}
-			}
-			params["ClusterNodes"] = nodes
-			return nil
+				params["ClusterMasters"] = nodes
 
+				// Template params: nodes
+				nodes = make(resources.IndexedListOfClusterNodes, len(nodesV3.PrivateNodes))
+				for _, v := range nodesV3.PrivateNodes {
+					if node, found := nodesV3.ByNumericalID[v]; found {
+						nodes[node.NumericalID] = node
+					}
+				}
+				params["ClusterNodes"] = nodes
+				return nil
+
+			})
 		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	prerr := fmt.Sprintf("[Cluster %s] Update ansible inventory: ", instance.GetName())
-
-	// Feature ansible found ?
-	if !featureAnsibleInventoryInstalled {
-		logrus.Infof("%snothing to update (feature not installed)", prerr)
-		return nil
-	}
-	// Has at least one master ?
-	if len(masters) == 0 {
-		logrus.Infof("%s nothing to update (no masters in cluster)", prerr)
-		return nil
-	}
-
-	tmplString, err := ansibleScripts.ReadFile("scripts/ansible_inventory.py")
-	if err != nil {
-		return fail.Wrap(err, "%s failed to load template 'ansible_inventory.py'", prerr)
-	}
-
-	// --------- Build ansible inventory --------------
-	fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
-	tmplCmd, err := template.Parse(fileName, string(tmplString))
-	if err != nil {
-		return fail.Wrap(err, "%s failed to parse template 'ansible_inventory.py'", prerr)
-	}
-
-	dataBuffer := bytes.NewBufferString("")
-	ferr := tmplCmd.Execute(dataBuffer, params)
-	if ferr != nil {
-		return fail.Wrap(ferr, "%s failed to execute template 'ansible_inventory.py'", prerr)
-	}
-
-	// --------- Upload file for each master and test it (parallelized) --------------
-	tg, xerr := concurrency.NewTaskGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	xerr = tg.SetID(fileName)
-	if xerr != nil {
-		return xerr
-	}
-
-	var errors []error
-	for master := range masters {
-		logrus.Infof("%s Update master %s", prerr, masters[master].GetName())
-
-		_, xerr = tg.Start(
-			instance.taskUpdateClusterInventoryMaster,
-			taskUpdateClusterInventoryMasterParameters{
-				ctx:           ctx,
-				master:        masters[master],
-				inventoryData: dataBuffer.String(),
-			},
-			concurrency.InheritParentIDOption,
-			concurrency.AmendID(fmt.Sprintf("/cluster/%s/master/%s/update_inventory", instance.GetName(), masters[master].GetName())),
-		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			errors = append(errors, xerr)
-			abErr := tg.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.Warnf("%s there was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
+			ar := result{xerr}
+			chRes <- ar
+			return
+		}
+
+		prerr := fmt.Sprintf("[Cluster %s] Update ansible inventory: ", instance.GetName())
+
+		// Feature ansible found ?
+		if !featureAnsibleInventoryInstalled {
+			logrus.Infof("%snothing to update (feature not installed)", prerr)
+			ar := result{nil}
+			chRes <- ar
+			return
+		}
+		// Has at least one master ?
+		if len(masters) == 0 {
+			logrus.Infof("%s nothing to update (no masters in cluster)", prerr)
+			ar := result{nil}
+			chRes <- ar
+			return
+		}
+
+		tmplString, err := ansibleScripts.ReadFile("scripts/ansible_inventory.py")
+		if err != nil {
+			ar := result{fail.Wrap(err, "%s failed to load template 'ansible_inventory.py'", prerr)}
+			chRes <- ar
+			return
+		}
+
+		// --------- Build ansible inventory --------------
+		fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
+		tmplCmd, err := template.Parse(fileName, string(tmplString))
+		if err != nil {
+			ar := result{fail.Wrap(err, "%s failed to parse template 'ansible_inventory.py'", prerr)}
+			chRes <- ar
+			return
+		}
+
+		dataBuffer := bytes.NewBufferString("")
+		ferr := tmplCmd.Execute(dataBuffer, params)
+		if ferr != nil {
+			ar := result{fail.Wrap(ferr, "%s failed to execute template 'ansible_inventory.py'", prerr)}
+			chRes <- ar
+			return
+		}
+
+		// --------- Upload file for each master and test it (parallelized) --------------
+		tg, xerr := concurrency.NewTaskGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			ar := result{xerr}
+			chRes <- ar
+			return
+		}
+		xerr = tg.SetID(fileName)
+		if xerr != nil {
+			ar := result{xerr}
+			chRes <- ar
+			return
+		}
+
+		var errors []error
+		for master := range masters {
+			logrus.Infof("%s Update master %s", prerr, masters[master].GetName())
+
+			_, xerr = tg.Start(
+				instance.taskUpdateClusterInventoryMaster,
+				taskUpdateClusterInventoryMasterParameters{
+					ctx:           ctx,
+					master:        masters[master],
+					inventoryData: dataBuffer.String(),
+				},
+				concurrency.InheritParentIDOption,
+				concurrency.AmendID(fmt.Sprintf("/cluster/%s/master/%s/update_inventory", instance.GetName(), masters[master].GetName())),
+			)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				errors = append(errors, xerr)
+				abErr := tg.AbortWithCause(xerr)
+				if abErr != nil {
+					logrus.Warnf("%s there was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
+				}
+				break
 			}
-			break
 		}
-	}
 
-	var tgr concurrency.TaskGroupResult
-	tgr, xerr = tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		if withTimeout(xerr) {
-			logrus.Warnf("%s Timeouts ansible update inventory", prerr)
+		var tgr concurrency.TaskGroupResult
+		tgr, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			if withTimeout(xerr) {
+				logrus.Warnf("%s Timeouts ansible update inventory", prerr)
+			}
+			ar := result{xerr}
+			chRes <- ar
+			return
 		}
-	}
-	if len(errors) != 0 {
-		return fail.NewError("%s failed to update inventory: %s", prerr, fail.NewErrorList(errors))
-	}
-	logrus.Debugf("%s update inventory successful: %v", prerr, tgr)
 
-	return nil
+		if len(errors) != 0 {
+			ar := result{fail.NewError("%s failed to update inventory: %s", prerr, fail.NewErrorList(errors))}
+			chRes <- ar
+			return
+		}
+		logrus.Debugf("%s update inventory successful: %v", prerr, tgr)
 
+		ar := result{nil}
+		chRes <- ar
+		return
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
 }
 
 // configureNodesFromList configures nodes from a list
@@ -2788,7 +2944,7 @@ func (instance *Cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+	tg, xerr := concurrency.NewTaskGroupWithContext(task.Context(), concurrency.InheritParentIDOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3106,35 +3262,68 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 }
 
 // IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
-func (instance *Cluster) IsFeatureInstalled(ctx context.Context, name string) (found bool, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) (_ bool, gerr fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	found = false
-	if valid.IsNil(instance) {
-		return false, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return false, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-	if name = strings.TrimSpace(name); name == "" {
-		return false, fail.InvalidParameterCannotBeEmptyStringError("name")
+	type result struct {
+		rTr  bool
+		rErr fail.Error
 	}
 
-	xerr := instance.beingRemoved(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer fail.OnPanic(&ferr)
 
-	return found, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("`propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+		found := false
+		if valid.IsNil(instance) {
+			ar := result{false, fail.InvalidInstanceError()}
+			chRes <- ar
+			return ar.rErr
+		}
+		if ctx == nil {
+			ar := result{false, fail.InvalidParameterCannotBeNilError("ctx")}
+			chRes <- ar
+			return ar.rErr
+		}
+		if name = strings.TrimSpace(name); name == "" {
+			ar := result{false, fail.InvalidParameterCannotBeEmptyStringError("name")}
+			chRes <- ar
+			return ar.rErr
+		}
 
-			_, found = featuresV1.Installed[name]
-			return nil
+		xerr := instance.beingRemoved(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			ar := result{false, xerr}
+			chRes <- ar
+			return ar.rErr
+		}
+
+		xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("`propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				_, found = featuresV1.Installed[name]
+				return nil
+			})
 		})
-	})
+
+		ar := result{found, xerr}
+		chRes <- ar
+		return ar.rErr
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		<-chRes
+		return false, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes
+		return false, fail.ConvertError(inctx.Err())
+	}
 }

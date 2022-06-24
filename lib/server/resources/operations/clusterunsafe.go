@@ -37,18 +37,39 @@ import (
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
-func (instance *Cluster) unsafeGetIdentity(ctx context.Context) (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.ClusterIdentity, ferr fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		aci, ok := clonable.(*abstract.ClusterIdentity)
-		if !ok {
-			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		clusterIdentity = *aci
-		return nil
-	})
-	return clusterIdentity, xerr
+	type result struct {
+		rTr  abstract.ClusterIdentity
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer fail.OnPanic(&ferr)
+
+		var clusterIdentity abstract.ClusterIdentity
+		xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			aci, ok := clonable.(*abstract.ClusterIdentity)
+			if !ok {
+				return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			clusterIdentity = *aci
+			return nil
+		})
+
+		chRes <- result{clusterIdentity, xerr}
+		return
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return abstract.ClusterIdentity{}, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return abstract.ClusterIdentity{}, fail.ConvertError(inctx.Err())
+	}
 }
 
 // unsafeGetFlavor returns the flavor of the Cluster

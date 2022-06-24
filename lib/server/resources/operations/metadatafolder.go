@@ -209,6 +209,12 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 	var goodBuffer bytes.Buffer
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var buffer bytes.Buffer
 			bucket, iErr := instance.getBucket(ctx)
 			if iErr != nil {
@@ -330,6 +336,12 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 	// Outer retry will write the metadata at most 3 times
 	xerr = retry.Action(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var innerXErr fail.Error
 			source := bytes.NewBuffer(data)
 			// sourceHash := md5.New()
@@ -342,6 +354,12 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 			// inner retry does read-after-write; if timeout consider write has failed, then retry write
 			innerXErr = retry.Action(
 				func() error {
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
 					var target bytes.Buffer
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
 					if innerErr := instance.service.ReadObject(bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {

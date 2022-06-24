@@ -45,7 +45,7 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 
 	var list []*abstract.SecurityGroup
 	opts := secgroups.ListOpts{}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			list = []*abstract.SecurityGroup{}
 			return secgroups.List(s.NetworkClient, opts).EachPage(func(page pagination.Page) (bool, error) {
@@ -104,7 +104,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		Name:        name,
 		Description: description,
 	}
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
 			r, innerErr := secgroups.Create(s.NetworkClient, createOpts).Extract()
 			if innerErr != nil {
@@ -163,7 +163,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 	var xerr fail.Error
 	// delete security group rules
 	for _, v := range asg.Rules {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				for _, id := range v.IDs {
 					if innerErr := secrules.Delete(s.NetworkClient, id).ExtractErr(); innerErr != nil {
@@ -180,7 +180,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 	}
 
 	// delete security group
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return secgroups.Delete(s.NetworkClient, asg.ID).ExtractErr()
 		},
@@ -199,7 +199,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 	}
 
 	var r *secgroups.SecGroup
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			var id string
 			switch {
@@ -262,7 +262,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 
 	// delete security group rules
 	for _, v := range asg.Rules {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				for _, id := range v.IDs {
 					if innerErr := secrules.Delete(s.NetworkClient, id).ExtractErr(); innerErr != nil {
@@ -461,7 +461,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		for _, v := range involved {
 			createOpts.RemoteGroupID = v
 			createOpts.Description = rule.Description + " (" + v + ")"
-			xerr = stacks.RetryableRemoteCall(
+			xerr = stacks.RetryableRemoteCall(ctx,
 				func() error {
 					r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
 					if innerErr != nil {
@@ -480,7 +480,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		for _, v := range involved {
 			createOpts.RemoteIPPrefix = v
 			createOpts.Description = rule.Description + " (" + v + ")"
-			xerr = stacks.RetryableRemoteCall(
+			xerr = stacks.RetryableRemoteCall(ctx,
 				func() error {
 					r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
 					if innerErr != nil {
@@ -529,7 +529,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 	}
 	ruleIDs := asg.Rules[index].IDs
 
-	return asg, stacks.RetryableRemoteCall(
+	return asg, stacks.RetryableRemoteCall(ctx,
 		func() error {
 			for k, v := range ruleIDs {
 				innerErr := secrules.Delete(s.NetworkClient, v).ExtractErr()

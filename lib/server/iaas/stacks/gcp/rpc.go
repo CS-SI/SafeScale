@@ -166,13 +166,13 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 	return nil
 }
 
-func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
+func (s stack) rpcGetSubnetByID(ctx context.Context, id string) (*compute.Subnetwork, fail.Error) {
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	var resp *compute.Subnetwork
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, id).Do()
 			if err != nil {
@@ -200,11 +200,11 @@ func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcGetSubnetByName(subnetName string) (*compute.Subnetwork, fail.Error) {
-	return s.rpcGetSubnetByNameAndRegion(subnetName, s.GcpConfig.Region)
+func (s stack) rpcGetSubnetByName(ctx context.Context, subnetName string) (*compute.Subnetwork, fail.Error) {
+	return s.rpcGetSubnetByNameAndRegion(ctx, subnetName, s.GcpConfig.Region)
 }
 
-func (s stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.Subnetwork, fail.Error) {
+func (s stack) rpcGetSubnetByNameAndRegion(ctx context.Context, subnetName string, region string) (*compute.Subnetwork, fail.Error) {
 	if subnetName == "" {
 		return &compute.Subnetwork{}, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
@@ -213,7 +213,7 @@ func (s stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.
 	}
 
 	filter := `selfLink eq "` + s.selfLinkPrefix + `/regions/` + region + `/subnetworks/` + subnetName + `"`
-	resp, xerr := s.rpcListSubnets(filter)
+	resp, xerr := s.rpcListSubnets(ctx, filter)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -228,7 +228,7 @@ func (s stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.
 	return resp[0], nil
 }
 
-func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
+func (s stack) rpcDeleteSubnetByName(ctx context.Context, name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -239,7 +239,7 @@ func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
 	}
 
 	var op *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Subnetworks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
 			if err != nil {
@@ -268,7 +268,7 @@ func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, timings.SmallDelay(), timings.HostCleanupTimeout())
 }
 
-func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.Subnetwork, fail.Error) {
+func (s stack) rpcCreateSubnet(ctx context.Context, subnetName string, networkName, cidr string) (*compute.Subnetwork, fail.Error) {
 	if subnetName = strings.TrimSpace(subnetName); subnetName == "" {
 		return &compute.Subnetwork{}, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
@@ -291,7 +291,7 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 		Region:      s.GcpConfig.Region,
 	}
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Subnetworks.Insert(
 				s.GcpConfig.ProjectID, s.GcpConfig.Region, &request,
@@ -323,16 +323,16 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 		return &compute.Subnetwork{}, normalizeError(err)
 	}
 
-	return s.rpcGetSubnetByName(subnetName)
+	return s.rpcGetSubnetByName(ctx, subnetName)
 }
 
-func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error) {
+func (s stack) rpcListSubnets(ctx context.Context, filter string) ([]*compute.Subnetwork, fail.Error) {
 	var (
 		out  []*compute.Subnetwork
 		resp *compute.SubnetworkList
 	)
 	for token := ""; ; {
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Subnetworks.List(
 					s.GcpConfig.ProjectID, s.GcpConfig.Region,
@@ -368,13 +368,13 @@ func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error)
 	return out, nil
 }
 
-func (s stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Error) {
+func (s stack) rpcGetFirewallRuleByName(ctx context.Context, name string) (*compute.Firewall, fail.Error) {
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var resp *compute.Firewall
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Firewalls.Get(s.GcpConfig.ProjectID, name).Do()
 			if err != nil {
@@ -402,14 +402,14 @@ func (s stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Er
 	return resp, nil
 }
 
-func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error) {
+func (s stack) rpcGetFirewallRuleByID(ctx context.Context, id string) (*compute.Firewall, fail.Error) {
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	filter := `id eq "` + id + `"`
 	var resp *compute.FirewallList
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Firewalls.List(s.GcpConfig.ProjectID).Filter(filter).Do()
 			if err != nil {
@@ -444,7 +444,7 @@ func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error)
 	return resp.Items[0], nil
 }
 
-func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, direction string, sourcesUseGroups bool, sources []string, targetsUseGroups bool, targets []string, allowed []*compute.FirewallAllowed, denied []*compute.FirewallDenied) (*compute.Firewall, fail.Error) {
+func (s stack) rpcCreateFirewallRule(ctx context.Context, ruleName string, networkName, description, direction string, sourcesUseGroups bool, sources []string, targetsUseGroups bool, targets []string, allowed []*compute.FirewallAllowed, denied []*compute.FirewallDenied) (*compute.Firewall, fail.Error) {
 	if ruleName == "" {
 		return nil, fail.InvalidParameterError("ruleName", "cannot be empty string")
 	}
@@ -490,7 +490,7 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 	}
 
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Insert(s.GcpConfig.ProjectID, &request).Do()
 			if err != nil {
@@ -521,10 +521,10 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 		return nil, xerr
 	}
 
-	return s.rpcGetFirewallRuleByName(ruleName)
+	return s.rpcGetFirewallRuleByName(ctx, ruleName)
 }
 
-func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute.Firewall, fail.Error) {
+func (s stack) rpcListFirewallRules(ctx context.Context, networkRef string, ids []string) ([]*compute.Firewall, fail.Error) {
 	if networkRef == "" && len(ids) == 0 {
 		return []*compute.Firewall{}, fail.InvalidParameterError(
 			"networkRef", "cannot be empty string if 'ids' is an empty slice",
@@ -551,7 +551,7 @@ func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute
 		out  []*compute.Firewall
 	)
 	for token := ""; ; {
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Firewalls.List(s.GcpConfig.ProjectID).Filter(filter).PageToken(token).Do()
 				if err != nil {
@@ -586,7 +586,7 @@ func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute
 	return out, nil
 }
 
-func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
+func (s stack) rpcDeleteFirewallRuleByID(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -597,7 +597,7 @@ func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 	}
 
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Delete(s.GcpConfig.ProjectID, id).Do()
 			if err != nil {
@@ -626,7 +626,7 @@ func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, timings.SmallDelay(), timings.HostOperationTimeout())
 }
 
-func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
+func (s stack) rpcEnableFirewallRuleByName(ctx context.Context, name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -640,7 +640,7 @@ func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 		Disabled: false,
 	}
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Patch(s.GcpConfig.ProjectID, name, &request).Do()
 			if err != nil {
@@ -669,7 +669,7 @@ func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, timings.SmallDelay(), 2*timings.ContextTimeout())
 }
 
-func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
+func (s stack) rpcDisableFirewallRuleByName(ctx context.Context, name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -683,7 +683,7 @@ func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 		Disabled: true,
 	}
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Patch(s.GcpConfig.ProjectID, name, &request).Do()
 			if err != nil {
@@ -712,13 +712,13 @@ func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, timings.SmallDelay(), 2*timings.ContextTimeout())
 }
 
-func (s stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
+func (s stack) rpcGetNetworkByID(ctx context.Context, id string) (*compute.Network, fail.Error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var resp *compute.Network
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, id).Do()
 			if err != nil {
@@ -739,13 +739,13 @@ func (s stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
+func (s stack) rpcGetNetworkByName(ctx context.Context, name string) (*compute.Network, fail.Error) {
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var resp *compute.Network
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			ans, err := s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, name).Do()
 			if err != nil {
@@ -774,7 +774,7 @@ func (s stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
+func (s stack) rpcCreateNetwork(ctx context.Context, name string) (*compute.Network, fail.Error) {
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -786,7 +786,7 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 		ForceSendFields:       []string{"AutoCreateSubnetworks"},
 	}
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Networks.Insert(
 				s.GcpConfig.ProjectID, &request,
@@ -819,7 +819,7 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	}
 
 	var out *compute.Network
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			out, err = s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, name).Do()
 			if err != nil {
@@ -847,13 +847,13 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
+func (s stack) rpcGetRouteByName(ctx context.Context, name string) (*compute.Route, fail.Error) {
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var resp *compute.Route
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Routes.Get(s.GcpConfig.ProjectID, name).Do()
 			if err != nil {
@@ -881,7 +881,7 @@ func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*compute.Route, fail.Error) {
+func (s stack) rpcCreateRoute(ctx context.Context, networkName, subnetID, subnetName string) (*compute.Route, fail.Error) {
 	if networkName == "" {
 		return nil, fail.InvalidParameterError("networkName", "cannot be empty string")
 	}
@@ -908,7 +908,7 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 		Tags:            []string{fmt.Sprintf(NATRouteTagFormat, subnetID)},
 	}
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Routes.Insert(s.GcpConfig.ProjectID, &request).Do()
 			if err != nil {
@@ -939,10 +939,10 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 		return nil, xerr
 	}
 
-	return s.rpcGetRouteByName(routeName)
+	return s.rpcGetRouteByName(ctx, routeName)
 }
 
-func (s stack) rpcDeleteRoute(name string) fail.Error {
+func (s stack) rpcDeleteRoute(ctx context.Context, name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -953,7 +953,7 @@ func (s stack) rpcDeleteRoute(name string) fail.Error {
 	}
 
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Routes.Delete(s.GcpConfig.ProjectID, name).Do()
 			if err != nil {
@@ -986,7 +986,7 @@ var imageFamilies = []string{
 	"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud", "suse-sap-cloud",
 }
 
-func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
+func (s stack) rpcListImages(ctx context.Context) ([]*compute.Image, fail.Error) {
 	var (
 		out  []*compute.Image
 		resp *compute.ImageList
@@ -994,7 +994,7 @@ func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
 	filter := `deprecated.replacement ne .*images.*`
 	for _, f := range imageFamilies {
 		for token := ""; ; {
-			xerr := stacks.RetryableRemoteCall(
+			xerr := stacks.RetryableRemoteCall(ctx,
 				func() (err error) {
 					resp, err = s.ComputeService.Images.List(f).Filter(filter).PageToken(token).Do()
 					if err != nil {
@@ -1028,7 +1028,7 @@ func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
+func (s stack) rpcGetImageByID(ctx context.Context, id string) (*compute.Image, fail.Error) {
 	if id == "" {
 		return &compute.Image{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1040,7 +1040,7 @@ func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
 	filter := `id eq "` + id + `"`
 	for _, f := range imageFamilies {
 		for token := ""; ; {
-			xerr := stacks.RetryableRemoteCall(
+			xerr := stacks.RetryableRemoteCall(ctx,
 				func() (err error) {
 					resp, err = s.ComputeService.Images.List(f).Filter(filter).PageToken(token).Do()
 					if err != nil {
@@ -1080,14 +1080,14 @@ func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
 	return out[0], nil
 }
 
-func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
+func (s stack) rpcListMachineTypes(ctx context.Context) ([]*compute.MachineType, fail.Error) {
 	var (
 		out  []*compute.MachineType
 		resp *compute.MachineTypeList
 	)
 	for token := ""; ; {
 		var zero []*compute.MachineType
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.MachineTypes.List(
 					s.GcpConfig.ProjectID, s.GcpConfig.Zone,
@@ -1122,14 +1122,14 @@ func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
+func (s stack) rpcGetMachineType(ctx context.Context, id string) (*compute.MachineType, fail.Error) {
 	if id == "" {
 		return &compute.MachineType{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	var resp *compute.MachineType
 	zero := &compute.MachineType{}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.MachineTypes.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
 			if err != nil {
@@ -1157,14 +1157,14 @@ func (s stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
+func (s stack) rpcListInstances(ctx context.Context) ([]*compute.Instance, fail.Error) {
 	var (
 		out  []*compute.Instance
 		resp *compute.InstanceList
 	)
 	for token := ""; ; {
 		var zero []*compute.Instance
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Instances.List(
 					s.GcpConfig.ProjectID, s.GcpConfig.Zone,
@@ -1201,7 +1201,7 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
 	var xerr fail.Error
 	var tags []string
 	for k := range sgs {
@@ -1219,7 +1219,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 		tags = append(tags, fmt.Sprintf(NATRouteNameFormat, subnetID))
 
 		// Create static regional external address
-		publicIP, xerr = s.rpcCreateExternalAddress("publicip-"+name, false)
+		publicIP, xerr = s.rpcCreateExternalAddress(ctx, "publicip-"+name, false)
 		if xerr != nil {
 			return &compute.Instance{}, fail.Wrap(xerr, "failed to create public IP of instance")
 		}
@@ -1308,7 +1308,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 
 	var op *compute.Operation
 	zero := &compute.Instance{}
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, &request).Do()
 			if err != nil {
@@ -1337,7 +1337,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteInstance(name); derr != nil {
+			if derr := s.rpcDeleteInstance(ctx, name); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
 			}
 		}
@@ -1350,7 +1350,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	}
 
 	var resp *compute.Instance
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(
 				s.GcpConfig.ProjectID, s.GcpConfig.Zone, name,
@@ -1381,9 +1381,9 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	return resp, nil
 }
 
-func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
+func (s stack) rpcResetStartupScriptOfInstance(ctx context.Context, id string) fail.Error {
 	var resp *compute.Instance
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
 			if err != nil {
@@ -1422,7 +1422,7 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 		}
 		newMetadata.Fingerprint = resp.Metadata.Fingerprint
 
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				op, err := s.ComputeService.Instances.SetMetadata(
 					s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata,
@@ -1450,7 +1450,7 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	return nil
 }
 
-func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, ferr fail.Error) {
+func (s stack) rpcCreateExternalAddress(ctx context.Context, name string, global bool) (_ *compute.Address, ferr fail.Error) {
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -1462,7 +1462,7 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 	var op *compute.Operation
 	zero := &compute.Address{}
 	if global {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				op, err = s.ComputeService.GlobalAddresses.Insert(s.GcpConfig.ProjectID, &query).Do()
 				if err != nil {
@@ -1478,7 +1478,7 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 			normalizeError,
 		)
 	} else {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				op, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &query).Do()
 				if err != nil {
@@ -1512,7 +1512,7 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 
 	var resp *compute.Address
 	if global {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.GlobalAddresses.Get(s.GcpConfig.ProjectID, name).Do()
 				if err != nil {
@@ -1528,7 +1528,7 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 			normalizeError,
 		)
 	} else {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
 				if err != nil {
@@ -1558,14 +1558,14 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 	return resp, nil
 }
 
-func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
+func (s stack) rpcGetInstance(ctx context.Context, ref string) (*compute.Instance, fail.Error) {
 	if ref == "" {
 		return &compute.Instance{}, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	var resp *compute.Instance
 	zero := &compute.Instance{}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 			if err != nil {
@@ -1593,20 +1593,20 @@ func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcDeleteInstance(ref string) fail.Error {
+func (s stack) rpcDeleteInstance(ctx context.Context, ref string) fail.Error {
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
 	// Get instance to make sure we have the hostname used to name the optional public IP (ref may be id or name)
-	instance, xerr := s.rpcGetInstance(ref)
+	instance, xerr := s.rpcGetInstance(ctx, ref)
 	if xerr != nil {
 		return xerr
 	}
 
 	var op *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name).Do()
 			if err != nil {
@@ -1638,7 +1638,7 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	}
 
 	publicIPName := "publicip-" + instance.Name
-	if xerr = s.rpcDeleteExternalAddress(publicIPName, false); xerr != nil {
+	if xerr = s.rpcDeleteExternalAddress(ctx, publicIPName, false); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// external ip not found, continue
@@ -1650,12 +1650,12 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	return nil
 }
 
-func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, ferr fail.Error) {
+func (s stack) rpcGetExternalAddress(ctx context.Context, name string, global bool) (_ *compute.Address, ferr fail.Error) {
 	var resp *compute.Address
 	zero := &compute.Address{}
 	var xerr fail.Error
 	if global {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.GlobalAddresses.Get(s.GcpConfig.ProjectID, name).Do()
 				if err != nil {
@@ -1671,7 +1671,7 @@ func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Addre
 			normalizeError,
 		)
 	} else {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
 				if err != nil {
@@ -1700,9 +1700,9 @@ func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Addre
 	return resp, nil
 }
 
-func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
+func (s stack) rpcDeleteExternalAddress(ctx context.Context, name string, global bool) fail.Error {
 	if global {
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				op, err := s.ComputeService.GlobalAddresses.Delete(s.GcpConfig.ProjectID, name).Do()
 				if op != nil {
@@ -1727,7 +1727,7 @@ func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 		return nil
 	}
 
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err := s.ComputeService.Addresses.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
 			if op != nil {
@@ -1752,7 +1752,7 @@ func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 	return nil
 }
 
-func (s stack) rpcStopInstance(ref string) fail.Error {
+func (s stack) rpcStopInstance(ctx context.Context, ref string) fail.Error {
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -1763,7 +1763,7 @@ func (s stack) rpcStopInstance(ref string) fail.Error {
 	}
 
 	var op *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Stop(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 			if err != nil {
@@ -1792,7 +1792,7 @@ func (s stack) rpcStopInstance(ref string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, timings.SmallDelay(), timings.HostOperationTimeout())
 }
 
-func (s stack) rpcStartInstance(ref string) fail.Error {
+func (s stack) rpcStartInstance(ctx context.Context, ref string) fail.Error {
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -1803,7 +1803,7 @@ func (s stack) rpcStartInstance(ref string) fail.Error {
 	}
 
 	var op *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Start(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 			if err != nil {
@@ -1832,13 +1832,13 @@ func (s stack) rpcStartInstance(ref string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, timings.SmallDelay(), timings.HostOperationTimeout())
 }
 
-func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
+func (s stack) rpcListZones(ctx context.Context) ([]*compute.Zone, fail.Error) {
 	var (
 		resp            *compute.ZoneList
 		out, emptySlice []*compute.Zone
 	)
 	for token := ""; ; {
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Zones.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 				if err != nil {
@@ -1871,14 +1871,14 @@ func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
+func (s stack) rpcListRegions(ctx context.Context) ([]*compute.Region, fail.Error) {
 	var (
 		out  []*compute.Region
 		resp *compute.RegionList
 	)
 	for token := ""; ; {
 		var zero []*compute.Region
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Regions.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 				if err != nil {
@@ -1911,7 +1911,7 @@ func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
+func (s stack) rpcAddTagsToInstance(ctx context.Context, hostID string, tags []string) fail.Error {
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
@@ -1925,7 +1925,7 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	}
 
 	var resp *compute.Instance
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID).Do()
 			if err != nil {
@@ -1964,7 +1964,7 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	}
 
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Instances.SetTags(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID, newTags).Do()
 			if err != nil {
@@ -1993,7 +1993,7 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, timings.SmallDelay(), 2*timings.ContextTimeout())
 }
 
-func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Error {
+func (s stack) rpcRemoveTagsFromInstance(ctx context.Context, hostID string, tags []string) fail.Error {
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
@@ -2007,7 +2007,7 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	}
 
 	var resp *compute.Instance
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID).Do()
 			if err != nil {
@@ -2048,7 +2048,7 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	}
 
 	var opp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			opp, err = s.ComputeService.Instances.SetTags(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID, newTags).Do()
 			if err != nil {
@@ -2077,14 +2077,14 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, timings.SmallDelay(), 2*timings.ContextTimeout())
 }
 
-func (s stack) rpcListNetworks() (_ []*compute.Network, ferr fail.Error) {
+func (s stack) rpcListNetworks(ctx context.Context) (_ []*compute.Network, ferr fail.Error) {
 	var (
 		out  []*compute.Network
 		resp *compute.NetworkList
 	)
 	for token := ""; ; {
 		var zero []*compute.Network
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 				if err != nil {
@@ -2119,7 +2119,7 @@ func (s stack) rpcListNetworks() (_ []*compute.Network, ferr fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcDeleteNetworkByID(id string) (ferr fail.Error) {
+func (s stack) rpcDeleteNetworkByID(ctx context.Context, id string) (ferr fail.Error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -2130,7 +2130,7 @@ func (s stack) rpcDeleteNetworkByID(id string) (ferr fail.Error) {
 	}
 
 	var resp *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Networks.Delete(s.GcpConfig.ProjectID, id).Do()
 			if err != nil {
@@ -2159,7 +2159,7 @@ func (s stack) rpcDeleteNetworkByID(id string) (ferr fail.Error) {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(resp, timings.SmallDelay(), 2*timings.ContextTimeout())
 }
 
-func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail.Error) {
+func (s stack) rpcCreateDisk(ctx context.Context, name string, kind string, size int64) (*compute.Disk, fail.Error) {
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -2174,7 +2174,7 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 	}
 	var op *compute.Operation
 	zero := &compute.Disk{}
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Disks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, &request).Do()
 			if err != nil {
@@ -2205,17 +2205,17 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 		return &compute.Disk{}, xerr
 	}
 
-	return s.rpcGetDisk(name)
+	return s.rpcGetDisk(ctx, name)
 }
 
-func (s stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
+func (s stack) rpcGetDisk(ctx context.Context, ref string) (*compute.Disk, fail.Error) {
 	if ref == "" {
 		return &compute.Disk{}, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	var resp *compute.Disk
 	zero := &compute.Disk{}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 			if err != nil {
@@ -2246,7 +2246,7 @@ func (s stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcDeleteDisk(ref string) fail.Error {
+func (s stack) rpcDeleteDisk(ctx context.Context, ref string) fail.Error {
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -2257,7 +2257,7 @@ func (s stack) rpcDeleteDisk(ref string) fail.Error {
 	}
 
 	var op *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Disks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 			if err != nil {
@@ -2286,7 +2286,7 @@ func (s stack) rpcDeleteDisk(ref string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, timings.SmallDelay(), timings.HostOperationTimeout())
 }
 
-func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Error) {
+func (s stack) rpcCreateDiskAttachment(ctx context.Context, diskRef, hostRef string) (string, fail.Error) {
 	if diskRef == "" {
 		return "", fail.InvalidParameterError("diskRef", "cannot be empty string")
 	}
@@ -2299,12 +2299,12 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 		return "", xerr
 	}
 
-	instance, xerr := s.rpcGetInstance(hostRef)
+	instance, xerr := s.rpcGetInstance(ctx, hostRef)
 	if xerr != nil {
 		return "", xerr
 	}
 
-	disk, xerr := s.rpcGetDisk(diskRef)
+	disk, xerr := s.rpcGetDisk(ctx, diskRef)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -2315,7 +2315,7 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 	}
 	var op *compute.Operation
 	zero := ""
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Instances.AttachDisk(
 				s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name, &request,
@@ -2351,7 +2351,7 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 	return generateDiskAttachmentID(instance.Name, disk.Name), nil
 }
 
-func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
+func (s stack) rpcDeleteDiskAttachment(ctx context.Context, vaID string) fail.Error {
 	if vaID == "" {
 		return fail.InvalidParameterError("vaID", "cannot be empty string")
 	}
@@ -2366,7 +2366,7 @@ func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
 		return fail.SyntaxError("the content of 'vaID' does not represent an ID for a Volume attachment")
 	}
 	var op *compute.Operation
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			op, err = s.ComputeService.Instances.DetachDisk(
 				s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverName, diskName,

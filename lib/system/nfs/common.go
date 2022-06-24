@@ -131,6 +131,12 @@ func executeScript(
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				fin, err := f.Stat()
 				if err != nil {
 					return err

@@ -45,8 +45,8 @@ type Host interface {
 	Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) fail.Error                                               // ...
 	Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (*userdata.Content, fail.Error) // creates a new host and its metadata
 	Delete(ctx context.Context) fail.Error
-	DisableSecurityGroup(ctx context.Context, sg SecurityGroup) fail.Error                                                 // disables a binded security group on host
-	EnableSecurityGroup(ctx context.Context, sg SecurityGroup) fail.Error                                                  // enables a binded security group on host
+	DisableSecurityGroup(ctx context.Context, sg SecurityGroup) fail.Error                                                 // disables a bound security group on host
+	EnableSecurityGroup(ctx context.Context, sg SecurityGroup) fail.Error                                                  // enables a bound security group on host
 	ForceGetState(ctx context.Context) (hoststate.Enum, fail.Error)                                                        // returns the real current state of the host, with error handling
 	GetAccessIP(ctx context.Context) (string, fail.Error)                                                                  // returns the IP to reach the host, with error handling
 	GetDefaultSubnet(ctx context.Context) (Subnet, fail.Error)                                                             // returns the resources.Subnet instance corresponding to the default subnet of the host, with error handling

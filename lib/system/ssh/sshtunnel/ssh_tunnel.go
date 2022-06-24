@@ -381,8 +381,10 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	tunnel.logf("[%d/%d] closing the listener", total, total)
 	err = listener.Close()
 	if err != nil {
-		err = convertErrorToTunnelError(err)
-		return fmt.Errorf("error closing the listener: %w", err)
+		if !strings.Contains(err.Error(), "use of closed") {
+			err = convertErrorToTunnelError(err)
+			return fmt.Errorf("error closing the listener: %w", err)
+		}
 	}
 
 	tunnel.logf("exiting tunnel Start")

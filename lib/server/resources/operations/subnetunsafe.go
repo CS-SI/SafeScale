@@ -601,7 +601,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		// Starting from here, delete VIP if exists with error
 		defer func() {
 			if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && !req.KeepOnFailure {
-				if derr := svc.DeleteVIP(ctx, abstractSubnet.VIP); derr != nil {
+				if derr := svc.DeleteVIP(context.Background(), abstractSubnet.VIP); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
 				}
 			}

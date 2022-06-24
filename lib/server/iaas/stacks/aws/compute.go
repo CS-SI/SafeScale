@@ -52,7 +52,7 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
 	keypair, xerr := abstract.NewKeyPair(name)
@@ -60,14 +60,14 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 		return nil, xerr
 	}
 
-	if xerr = s.rpcImportKeyPair(aws.String(keypair.Name), []byte(keypair.PublicKey)); xerr != nil {
+	if xerr = s.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey)); xerr != nil {
 		return nil, xerr
 	}
 	return keypair, nil
 }
 
 // ImportKeyPair imports an existing resources.KeyPair to AWS (not in the interface yet, but will come soon)
-func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
+func (s stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -75,10 +75,10 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("keypair")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	return s.rpcImportKeyPair(aws.String(keypair.Name), []byte(keypair.PublicKey))
+	return s.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey))
 }
 
 // InspectKeyPair loads a keypair from AWS
@@ -91,13 +91,13 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPa
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).
 		WithStopwatch().
 		Entering().
 		Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeKeyPairByID(aws.String(id))
+	resp, xerr := s.rpcDescribeKeyPairByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -115,18 +115,18 @@ func toAbstractKeyPair(in ec2.KeyPairInfo) *abstract.KeyPair {
 }
 
 // ListKeyPairs lists keypairs stored in AWS
-func (s stack) ListKeyPairs(context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).
 		WithStopwatch().
 		Entering().
 		Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeKeyPairs(nil)
+	resp, xerr := s.rpcDescribeKeyPairs(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -143,23 +143,23 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	return s.rpcDeleteKeyPair(aws.String(id))
+	return s.rpcDeleteKeyPair(ctx, aws.String(id))
 }
 
 // ListAvailabilityZones lists AWS availability zones available
-func (s stack) ListAvailabilityZones(context.Context) (_ map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	emptyMap := map[string]bool{}
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeAvailabilityZones(nil)
+	resp, xerr := s.rpcDescribeAvailabilityZones(ctx, nil)
 	if xerr != nil {
 		return emptyMap, xerr
 	}
@@ -178,15 +178,15 @@ func (s stack) ListAvailabilityZones(context.Context) (_ map[string]bool, ferr f
 }
 
 // ListRegions lists regions available in AWS
-func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
+func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeRegions(nil)
+	resp, xerr := s.rpcDescribeRegions(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -210,10 +210,10 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeImageByID(aws.String(id))
+	resp, xerr := s.rpcDescribeImageByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -230,10 +230,10 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(id))
+	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -322,10 +322,10 @@ func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeImages(nil)
+	resp, xerr := s.rpcDescribeImages(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -362,17 +362,17 @@ func (s stack) ListTemplates(ctx context.Context, all bool) (templates []*abstra
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
 	var resp []*ec2.InstanceTypeInfo
-	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(nil)
+	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// list only the resources actually available in our AZ
-	under, xerr := s.rpcDescribeInstanceTypeOfferings(aws.String(s.AwsConfig.Zone))
+	under, xerr := s.rpcDescribeInstanceTypeOfferings(ctx, aws.String(s.AwsConfig.Zone))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -444,7 +444,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
 	retryErr := retry.WhileUnsuccessful(
@@ -501,7 +501,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
 	resourceName := request.ResourceName
@@ -634,7 +634,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		PublicKey:  userData.FirstPublicKey,
 		PrivateKey: userData.FirstPrivateKey,
 	}
-	if xerr = s.ImportKeyPair(&keypair); xerr != nil {
+	if xerr = s.ImportKeyPair(ctx, &keypair); xerr != nil {
 		return nil, nil, xerr
 	}
 
@@ -651,12 +651,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 			)
 			if request.Preemptible {
 				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
-					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
+					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
 					string(userDataPhase1), publicIP, *template,
 				)
 			} else {
 				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
-					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
+					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
 					string(userDataPhase1), publicIP, *template,
 				)
 			}
@@ -732,6 +732,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 }
 
 func (s stack) buildAwsSpotMachine(
+	ctx context.Context,
 	keypairName string,
 	name string,
 	imageID string,
@@ -742,7 +743,7 @@ func (s stack) buildAwsSpotMachine(
 	publicIP bool,
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
-	resp, xerr := s.rpcDescribeSpotPriceHistory(aws.String(zone), aws.String(template.ID))
+	resp, xerr := s.rpcDescribeSpotPriceHistory(ctx, aws.String(zone), aws.String(template.ID))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -755,7 +756,7 @@ func (s stack) buildAwsSpotMachine(
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
 	instance, xerr := s.rpcRequestSpotInstance(
-		lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(publicIP), aws.String(template.ID),
+		ctx, lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(publicIP), aws.String(template.ID),
 		aws.String(imageID), aws.String(keypairName), []byte(data),
 	)
 	if xerr != nil {
@@ -772,6 +773,7 @@ func (s stack) buildAwsSpotMachine(
 }
 
 func (s stack) buildAwsMachine(
+	ctx context.Context,
 	keypairName string,
 	name string,
 	imageID string,
@@ -783,7 +785,7 @@ func (s stack) buildAwsMachine(
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
-	instance, xerr := s.rpcRunInstance(
+	instance, xerr := s.rpcRunInstance(ctx,
 		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), diskSize,
 		aws.String(keypairName), aws.Bool(publicIP), []byte(data),
 	)
@@ -817,26 +819,26 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
 	var resp *ec2.Instance
 	if ahf.Core.ID != "" {
-		resp, xerr = s.rpcDescribeInstanceByID(aws.String(ahf.Core.ID))
+		resp, xerr = s.rpcDescribeInstanceByID(ctx, aws.String(ahf.Core.ID))
 		if xerr != nil {
 			return nil, xerr
 		}
 	} else {
-		resp, xerr = s.rpcDescribeInstanceByName(aws.String(ahf.Core.Name))
+		resp, xerr = s.rpcDescribeInstanceByName(ctx, aws.String(ahf.Core.Name))
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
 
-	xerr = s.inspectInstance(ahf, hostLabel, resp)
+	xerr = s.inspectInstance(ctx, ahf, hostLabel, resp)
 	return ahf, xerr
 }
 
-func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance) (ferr fail.Error) {
+func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance) (ferr fail.Error) {
 	instanceName := ""
 	instanceType := ""
 
@@ -868,7 +870,7 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 
 	for _, ni := range instance.NetworkInterfaces {
 		newSubnet := IPInSubnet{
-			Name: s.getTagOfSubnet(ni.SubnetId, tagNameLabel),
+			Name: s.getTagOfSubnet(ctx, ni.SubnetId, tagNameLabel),
 			ID:   aws.StringValue(ni.SubnetId),
 			IP:   aws.StringValue(ni.PrivateIpAddress),
 		}
@@ -904,7 +906,7 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 		ahf.Networking.PublicIPv4 = ipv4
 	}
 
-	sizing, xerr := s.fromMachineTypeToHostEffectiveSizing(instanceType)
+	sizing, xerr := s.fromMachineTypeToHostEffectiveSizing(ctx, instanceType)
 	if xerr != nil {
 		return xerr
 	}
@@ -928,9 +930,9 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 	return nil
 }
 
-func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstract.HostEffectiveSizing, fail.Error) {
+func (s stack) fromMachineTypeToHostEffectiveSizing(ctx context.Context, machineType string) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
-	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(machineType))
+	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(machineType))
 	if xerr != nil {
 		return nullSizing, xerr
 	}
@@ -939,8 +941,8 @@ func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstrac
 	return *hs, nil
 }
 
-func (s stack) getTagOfSubnet(subnetID *string, str string) string {
-	resp, xerr := s.rpcDescribeSubnetByID(subnetID)
+func (s stack) getTagOfSubnet(ctx context.Context, subnetID *string, str string) string {
+	resp, xerr := s.rpcDescribeSubnetByID(ctx, subnetID)
 	if xerr != nil {
 		return aws.StringValue(subnetID)
 	}
@@ -954,7 +956,7 @@ func (s stack) getTagOfSubnet(subnetID *string, str string) string {
 }
 
 // InspectHostByName returns host information by its name
-func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.HostFull, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -962,15 +964,15 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, ferr fail.E
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeInstanceByName(aws.String(name))
+	resp, xerr := s.rpcDescribeInstanceByName(ctx, aws.String(name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	ahf := abstract.NewHostFull()
-	return ahf, s.inspectInstance(ahf, "'"+name+"'", resp)
+	return ahf, s.inspectInstance(ctx, ahf, "'"+name+"'", resp)
 }
 
 // GetHostState returns the current state of the host
@@ -994,10 +996,10 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 		return nullList, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeInstances(nil)
+	resp, xerr := s.rpcDescribeInstances(ctx, nil)
 	if xerr != nil {
 		return nullList, xerr
 	}
@@ -1043,10 +1045,10 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	vm, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
+	vm, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahf.GetID()))
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1099,7 +1101,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 	// Terminate instance
 	if vm != nil {
-		xerr = s.rpcTerminateInstance(vm)
+		xerr = s.rpcTerminateInstance(ctx, vm)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrAborted, *fail.ErrTimeout:
@@ -1121,7 +1123,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	// Remove volumes if some remain, report errors (other than not found) as warnings
 	for _, volume := range attachedVolumes {
 		// TODO: parallelize ?
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				_, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})
 				return err
@@ -1141,7 +1143,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 	// Remove keypair
 	if keyPairName != "" {
-		xerr = s.rpcDeleteKeyPair(aws.String(keyPairName))
+		xerr = s.rpcDeleteKeyPair(ctx, aws.String(keyPairName))
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1166,7 +1168,7 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
 	timings, xerr := s.Timings()
@@ -1174,7 +1176,7 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 		return xerr
 	}
 
-	if xerr = s.rpcStopInstances([]*string{aws.String(ahf.Core.ID)}, aws.Bool(gracefully)); xerr != nil {
+	if xerr = s.rpcStopInstances(ctx, []*string{aws.String(ahf.Core.ID)}, aws.Bool(gracefully)); xerr != nil {
 		return xerr
 	}
 
@@ -1222,7 +1224,7 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
 	timings, xerr := s.Timings()
@@ -1230,7 +1232,7 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 		return xerr
 	}
 
-	xerr = s.rpcStartInstances([]*string{aws.String(ahf.Core.ID)})
+	xerr = s.rpcStartInstances(ctx, []*string{aws.String(ahf.Core.ID)})
 	if xerr != nil {
 		return xerr
 	}
@@ -1282,10 +1284,10 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	if xerr = s.rpcRebootInstances([]*string{aws.String(ahf.Core.ID)}); xerr != nil {
+	if xerr = s.rpcRebootInstances(ctx, []*string{aws.String(ahf.Core.ID)}); xerr != nil {
 		return xerr
 	}
 
@@ -1356,7 +1358,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 		}
 	}
 
-	resp, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
+	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahf.GetID()))
 	if xerr != nil {
 		return xerr
 	}
@@ -1376,7 +1378,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 	if len(sgs) == len(resp.SecurityGroups) {
 		return nil
 	}
-	if xerr = s.rpcModifyInstanceSecurityGroups(aws.String(ahf.GetID()), sgs); xerr != nil {
+	if xerr = s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahf.GetID()), sgs); xerr != nil {
 		return xerr
 	}
 
@@ -1414,7 +1416,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 	}
 
 	// query the instance to get its current Security Groups
-	resp, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
+	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahf.GetID()))
 	if xerr != nil {
 		return xerr
 	}
@@ -1451,5 +1453,5 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 		return nil
 	}
 
-	return s.rpcModifyInstanceSecurityGroups(aws.String(ahf.GetID()), sgs)
+	return s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahf.GetID()), sgs)
 }

@@ -20,6 +20,8 @@
 package debug
 
 import (
+	"runtime/debug"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,5 +29,6 @@ import (
 func IgnoreError(err error) {
 	if err != nil {
 		logrus.Debugf("ignoring error [%s]", err)
+		logrus.Debugf(string(debug.Stack()))
 	}
 }

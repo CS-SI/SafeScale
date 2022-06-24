@@ -55,11 +55,11 @@ func TestCreateTaskWithParent(t *testing.T) {
 	require.NotNil(t, ta)
 	require.Nil(t, err)
 
-	tb, err := NewTaskWithParent(ta)
+	tb, err := NewTaskWithContext(ta.Context())
 	require.NotNil(t, tb)
 	require.Nil(t, err)
 
-	tc, err := NewTaskWithParent(nil)
+	tc, err := NewTaskWithContext(nil)
 	require.Nil(t, tc)
 	require.NotNil(t, err)
 }

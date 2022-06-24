@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -116,10 +117,9 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		if ferr != nil {
 			if !hostReq.KeepOnFailure {
 				// Disable abort signal during clean up
-				defer task.DisarmAbortSignal()()
 
 				logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-				derr := rgw.Delete(task.Context())
+				derr := rgw.Delete(context.Background())
 				if derr != nil {
 					msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 					switch derr.(type) {
@@ -137,7 +137,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				}
 				_ = ferr.AddConsequence(derr)
 			} else {
-				xerr = rgw.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = rgw.Alter(context.Background(), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())

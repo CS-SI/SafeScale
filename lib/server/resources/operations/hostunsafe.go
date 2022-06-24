@@ -119,6 +119,12 @@ func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs
 	)
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			iterations++
 			// Create the command
 			var sshCmd api.Command
@@ -227,6 +233,12 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 
 			copyCtx, cancel := context.WithTimeout(ctx, uploadTime)
@@ -439,6 +451,12 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, timings.ExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
