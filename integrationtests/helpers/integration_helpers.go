@@ -34,15 +34,15 @@ import (
 
 // HostInfo ...
 type HostInfo struct {
-	ID         string
-	Name       string
-	CPU        int
-	RAM        int
-	Disk       int
-	PublicIP   string
-	PrivateIP  string
-	State      int
-	PrivateKey string
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CPU        int    `json:"cpu"`
+	RAM        int    `json:"ram"`
+	Disk       int    `json:"disk"`
+	PublicIP   string `json:"public_ip"`
+	PrivateIP  string `json:"private_ip"`
+	State      int    `json:"state"`
+	PrivateKey string `json:"private_key"`
 }
 
 // IsSafescaledLaunched ...
