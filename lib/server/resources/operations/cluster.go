@@ -205,7 +205,7 @@ func LoadCluster(inctx context.Context, svc iaas.Service, name string, options .
 		}
 
 		chRes <- result{clusterInstance, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -259,7 +259,7 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 		}
 
 		chRes <- result{clusterInstance, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:

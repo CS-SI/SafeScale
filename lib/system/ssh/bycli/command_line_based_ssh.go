@@ -685,7 +685,7 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			return
 		}
 		chRes <- result{invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
