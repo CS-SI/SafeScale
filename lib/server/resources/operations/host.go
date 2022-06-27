@@ -1815,7 +1815,7 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 			}
 		}
 		chRes <- result{status, xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:

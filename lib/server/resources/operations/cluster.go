@@ -300,7 +300,7 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 		index++
 		instance.localCache.installMethods.Store(index, installmethod.None)
 		chRes <- result{nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -2461,7 +2461,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 
 		// Not finding a callback isn't an error, so return nil in this case
 		chRes <- result{nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -2801,7 +2801,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 
 		ar := result{nil}
 		chRes <- ar
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:

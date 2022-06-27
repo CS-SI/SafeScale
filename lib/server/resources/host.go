@@ -28,7 +28,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	_ "github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	_ "github.com/CS-SI/SafeScale/v22/lib/utils/data" // nolint
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 

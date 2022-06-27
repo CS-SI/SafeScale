@@ -60,7 +60,7 @@ func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.Cl
 		})
 
 		chRes <- result{clusterIdentity, xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:

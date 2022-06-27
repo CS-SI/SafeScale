@@ -594,7 +594,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			return
 		}
 		chRes <- result{nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:

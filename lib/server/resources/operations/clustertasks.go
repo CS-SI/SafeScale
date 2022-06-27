@@ -493,7 +493,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		chRes <- result{xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -688,7 +688,7 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 		}
 
 		chRes <- result{gatewaysDef, mastersDef, nodesDef, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -1668,7 +1668,7 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 
 		logrus.Debugf("[%s] preparation successful", hostLabel)
 		chRes <- result{nil, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -1739,7 +1739,7 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 
 		logrus.Debugf("[%s] configuration successful in [%s].", p.Host.GetName(), tracer.Stopwatch().String())
 		chRes <- result{nil, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -1864,7 +1864,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 
 		logrus.Debugf("[Cluster %s] masters creation successful: %v", clusterName, tr)
 		chRes <- result{tr, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -2478,7 +2478,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 
 		logrus.Debugf("[Cluster %s] %d node%s creation successful.", clusterName, p.count, strprocess.Plural(p.count))
 		chRes <- result{tr, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -3017,7 +3017,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 
 		logrus.Debugf("[%s] configuration successful.", hostLabel)
 		chRes <- result{nil, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -3080,7 +3080,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 
 		xerr = deleteHostOnFailure(ctx, hostInstance)
 		chRes <- result{nil, xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -3159,7 +3159,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 
 		logrus.Debugf("Successfully deleted Node '%s'", nodeName)
 		chRes <- result{nil, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -3242,7 +3242,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 
 		logrus.Debugf("Successfully deleted Master '%s'", p.node.Name)
 		chRes <- result{nil, nil}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -3285,7 +3285,7 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 		}
 
 		chRes <- result{nil, deleteHostOnFailure(ctx, casted.host)}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -3353,7 +3353,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task,
 		}
 
 		chRes <- result{nil, instance.updateClusterInventoryMaster(ctx, casted.master, casted.inventoryData)}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
