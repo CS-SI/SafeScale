@@ -259,7 +259,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 
 		chRes <- result{nil}
 		return nil
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rErr

@@ -342,7 +342,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 		chRes <- result{nil, nil}
 		return nil
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -945,7 +945,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		logrus.Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
 		chRes <- result{networkInstance, subnetInstance, nil}
 		return nil
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rn, res.rsn, res.rErr
@@ -1420,7 +1420,7 @@ func (instance *Cluster) createHostResources(
 
 		chRes <- result{nil}
 		return nil
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -2133,7 +2133,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		logrus.Debugf("[%s] Host creation successful.", hostLabel)
 		chRes <- result{hostInstance, nil}
 		return nil
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -2789,7 +2789,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		logrus.Debugf("[%s] Host creation successful.", hostLabel)
 		chRes <- result{node, nil}
 		return nil
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr

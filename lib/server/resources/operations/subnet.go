@@ -1230,7 +1230,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 		ar := result{nil}
 		chRes <- ar
 		return
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rErr

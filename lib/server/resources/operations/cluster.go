@@ -3315,7 +3315,7 @@ func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) 
 		ar := result{found, xerr}
 		chRes <- ar
 		return ar.rErr
-	}()
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
