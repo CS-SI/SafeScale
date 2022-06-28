@@ -3291,7 +3291,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 
 	instance.localCache.RLock()
 	ip := instance.localCache.accessIP
-	instance.localCache.RLock()
+	instance.localCache.RUnlock() // nolint
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
 	}
