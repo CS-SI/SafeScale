@@ -3159,6 +3159,11 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) Reboot(ctx context.Context, soft bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
+	xerr := instance.Sync(ctx)
+	if xerr != nil {
+		logrus.Debugf("failure trying to sync: %v", xerr)
+	}
+
 	if soft {
 		xerr := instance.softReboot(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -3174,7 +3179,7 @@ func (instance *Host) Reboot(ctx context.Context, soft bool) (ferr fail.Error) {
 		return nil
 	}
 
-	xerr := instance.hardReboot(ctx)
+	xerr = instance.hardReboot(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3188,6 +3193,15 @@ func (instance *Host) Sync(ctx context.Context) (ferr fail.Error) {
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
+	}
+
+	state, xerr := instance.GetState(ctx)
+	if xerr != nil {
+		return fail.Wrap(xerr, "there was an error retrieving machine state")
+	}
+
+	if state != hoststate.Started {
+		return fail.NewError("if the machine is not started sync won't work")
 	}
 
 	// Sync Host
@@ -3367,7 +3381,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 
 	instance.localCache.RLock()
 	ip := instance.localCache.accessIP
-	instance.localCache.RLock()
+	instance.localCache.RUnlock() // nolint
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
 	}

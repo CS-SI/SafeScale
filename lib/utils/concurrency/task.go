@@ -560,7 +560,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		var failure error
 		defer fail.OnPanic(&failure) // this prevents the os.Exit, but we lack communication outside the func -> the task will be unaware
 
-		instance.lock.Lock()
+		instance.lock.Lock() // nolint
 		instance.stats.runBegin = time.Now()
 		instance.lock.Unlock() // nolint
 
@@ -1086,7 +1086,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			instance.lock.Unlock() // Note: Do not defer this, the loop continue
 
 		case RUNNING:
-			instance.lock.Lock()
+			instance.lock.Lock() // nolint
 			runTerminated := instance.runTerminated
 			instance.lock.Unlock() // nolint
 

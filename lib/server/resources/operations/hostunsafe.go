@@ -52,6 +52,17 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
+	/*
+		state, xerr := instance.GetState(ctx)
+		if xerr != nil {
+			return invalid, "", "", xerr
+		}
+
+		if state != hoststate.Started {
+			return invalid, "", "", fail.NewError("the machine is not started")
+		}
+	*/
+
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
