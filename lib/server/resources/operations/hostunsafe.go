@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/sirupsen/logrus"
@@ -53,14 +52,16 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	state, xerr := instance.GetState(ctx)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
+	/*
+		state, xerr := instance.GetState(ctx)
+		if xerr != nil {
+			return invalid, "", "", xerr
+		}
 
-	if state != hoststate.Started {
-		return invalid, "", "", fail.NewError("the machine is not started")
-	}
+		if state != hoststate.Started {
+			return invalid, "", "", fail.NewError("the machine is not started")
+		}
+	*/
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
