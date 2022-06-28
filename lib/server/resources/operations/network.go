@@ -397,7 +397,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 	}
 	chRes := make(chan result)
 	go func() {
-
+		ctx := ctx
 		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			networkAbstract, ok := clonable.(*abstract.Network)
 			if !ok {

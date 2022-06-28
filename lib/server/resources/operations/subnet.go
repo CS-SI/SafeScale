@@ -1061,6 +1061,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			subnetHosts    *propertiesv1.SubnetHosts
 		)
 		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			ctx := ctx
 			var ok bool
 			subnetAbstract, ok = clonable.(*abstract.Subnet)
 			if !ok {

@@ -1168,7 +1168,18 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 		return false, nil, nil
 
 	case ABORTED:
-		fallthrough
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		if instance.resultObtained {
+			if instance.ctx.Err() != nil && instance.err == nil {
+				instance.err = fail.AbortedError(instance.ctx.Err())
+			}
+			return true, instance.result, instance.err
+		}
+
+		// result has not been returned yet by TaskAction
+		return false, nil, nil
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
@@ -1237,13 +1248,19 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, fer
 						done, result, innerXErr = instance.TryWait()
 						if innerXErr != nil {
 							if _, ok := innerXErr.(*fail.ErrAborted); ok {
+								doneWaitingCh <- struct{}{}
 								return nil, fail.AbortedError(innerXErr)
 							}
 							ctErr := spew.Sdump(innerXErr)
 							if strings.Contains(ctErr, "aborted") {
+								doneWaitingCh <- struct{}{}
 								return nil, fail.AbortedError(innerXErr)
 							}
 							logrus.Warnf("ignoring internal error: %v", innerXErr)
+						}
+						if done {
+							doneWaitingCh <- struct{}{}
+							return nil, nil
 						}
 						if !done {
 							time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
