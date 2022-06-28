@@ -470,6 +470,13 @@ func badlock(m dsl.Matcher) {
 		Report(`maybe defer $mu1.RUnlock() was intended?`)
 }
 
+func lockchain(m dsl.Matcher) {
+	m.Match(`$mu.Lock(); $*_; $mu.Lock()`).Report(`maybe $mu.Unlock() was intended?`)
+	m.Match(`$mu.RLock(); $*_; $mu.RLock()`).Report(`maybe $mu.RUnLock() was intended?`)
+	m.Match(`$mu.localcache.Lock(); $*_; $mu.localcache.Lock()`).Report(`maybe $mu.localcache.Unlock() was intended?`)
+	m.Match(`$mu.localcache.RLock(); $*_; $mu.localcache.RLock()`).Report(`maybe $mu.localcache.RUnLock() was intended?`)
+}
+
 func contextTODO(m dsl.Matcher) {
 	m.Match(`context.TODO()`).Report(`consider to use well-defined context`)
 }

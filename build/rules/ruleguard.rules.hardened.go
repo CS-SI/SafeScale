@@ -505,6 +505,13 @@ func badlock(m dsl.Matcher) {
 		Report(`maybe defer $mu1.RUnlock() was intended?`)
 }
 
+func lockchain(m dsl.Matcher) {
+	m.Match(`$mu.Lock(); $*_; $mu.Lock()`).Report(`maybe $mu.Unlock() was intended?`)
+	m.Match(`$mu.RLock(); $*_; $mu.RLock()`).Report(`maybe $mu.RUnLock() was intended?`)
+	m.Match(`$mu.localcache.Lock(); $*_; $mu.localcache.Lock()`).Report(`maybe $mu.localcache.Unlock() was intended?`)
+	m.Match(`$mu.localcache.RLock(); $*_; $mu.localcache.RLock()`).Report(`maybe $mu.localcache.RUnLock() was intended?`)
+}
+
 func contextTODO(m dsl.Matcher) {
 	m.Match(`context.TODO()`).Report(`consider to use well-defined context`)
 }
@@ -579,14 +586,16 @@ func intermediateCastWithFunc(m dsl.Matcher) {
 		Report(`unchecked cast to $z, then calling a function, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worthy`)
 }
 
-func jsonUnMarshalIgnored(m dsl.Matcher) {
-	m.Match(`_ = json.UnMarshal($*_)`).Where(!m.File().Name.Matches(`.*test.go`)).
-		Report("json marshalling errors cannot be ignored, log the error or handle it, never ignore")
-}
-
 func jsonMarshalIgnored(m dsl.Matcher) {
 	m.Match(`$x, _ = json.Marshal($*_)`,
 		`$x, _ := json.Marshal($*_)`,
 	).Where(!m.File().Name.Matches(`.*test.go`)).
 		Report("json unmarshalling errors cannot be ignored, log the error or handle it, never ignore")
+}
+
+func jsonUnMarshalIgnored(m dsl.Matcher) {
+	m.Match(`$x, _ = json.UnMarshal($*_)`,
+		`$x, _ := json.UnMarshal($*_)`,
+	).
+		Report("json unmarshalling errors cannot be ignored")
 }
