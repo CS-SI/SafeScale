@@ -36,6 +36,6 @@ func Test_DeleteVolumeMounted(t *testing.T) {
 }
 
 func Test_UntilVolume(t *testing.T) {
-	helpers.InSection("volumes").Clear().AddScenario(UntilVolume)
+	helpers.InSection("volumes").Clear().AddScenario(UntilVolumeCreated)
 	helpers.RunScenarios(t)
 }

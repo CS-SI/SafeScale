@@ -1240,6 +1240,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			// FIXME: Refactoring, this defer is actually dangerous
 			// each host iteration will trigger a defer function, and ALL the functions run at the same time at the end, triggered by the ferr error
 			// shared by everyone, this it clearly a bad idea, this needs refactoring
+			//goland:noinspection GoDeferInLoop
 			defer func(tag concurrency.TaskGroup, iwaited *bool, iright *bool) { // nolint
 				if ferr != nil {
 					if !*iright { // not for us
