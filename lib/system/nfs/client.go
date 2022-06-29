@@ -55,9 +55,7 @@ func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(
-	ctx context.Context, svc iaas.Service, export string, mountPoint string, withCache bool,
-) fail.Error {
+func (c *Client) Mount(ctx context.Context, svc iaas.Service, export string, mountPoint string, withCache bool) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
