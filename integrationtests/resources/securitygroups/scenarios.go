@@ -31,5 +31,15 @@ func AddRuleToExistingSecurityGroup(t *testing.T) {
 	// FIXME: implement this test
 }
 
+// CheckDefaultSecGroups checks that all ports (except 22) are closed by default
+func CheckDefaultSecGroups(t *testing.T) {
+	// FIXME: Implement this test
+}
+
+// OpenPort unblocks a port in a gateway, runs a server in the gateway, then accesses the server using the port
+func OpenPort(t *testing.T) {
+	// FIMXE: Implement this test
+}
+
 func init() {
 }
