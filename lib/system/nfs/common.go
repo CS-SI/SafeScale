@@ -128,6 +128,7 @@ func executeScript(ctx context.Context, timings temporal.Timings, sshconfig ssha
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				// TODO: Remove this later
 				select {
 				case <-ctx.Done():
 					return retry.StopRetryError(ctx.Err())
