@@ -448,6 +448,12 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		return xerr
 	}
 
+	isGateway, xerr := instance.IsGateway(ctx)
+	if xerr != nil {
+		return xerr
+	}
+	v["HostIsGateway"] = isGateway
+
 	single, xerr := instance.IsSingle(ctx)
 	if xerr != nil {
 		return xerr
@@ -510,6 +516,11 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 
 		v["PublicIP"] = v["EndpointIP"]
 	}
+
+	// Some Cluster-related values that need to exist
+	v["ClusterFlavor"] = ""
+	v["ClusterAdminUsername"] = ""
+	v["ClusterAdminPassword"] = ""
 
 	return nil
 }

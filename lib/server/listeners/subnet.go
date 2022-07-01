@@ -24,18 +24,15 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
-	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
-	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
-	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 )
 
 // safescale network subnet create --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" net1 subnet-1 (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
@@ -81,10 +78,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var (
-		sizing *abstract.HostSizingRequirements
-		gwName string
-	)
+	var sizing *abstract.HostSizingRequirements
 	if in.GetGateway() != nil {
 		if in.GetGateway().SizingAsString != "" {
 			sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.GetGateway().GetSizingAsString())
@@ -100,29 +94,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
-	networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), networkRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	subnetInstance, xerr := subnetfactory.New(job.Service())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// If there is conflict with docker quit
-	cidr := in.GetCidr()
-	thisCidr := netretry.CIDRString(cidr)
-	conflict, err := thisCidr.IntersectsWith("172.17.0.0/16")
-	if err != nil {
-		return nil, err
-	}
-	if conflict {
-		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", cidr, "172.17.0.0/16")
-	}
-
 	req := abstract.SubnetRequest{
-		NetworkID:      networkInstance.GetID(),
 		Name:           in.GetName(),
 		CIDR:           in.GetCidr(),
 		Domain:         in.GetDomain(),
@@ -130,12 +102,9 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		DefaultSSHPort: in.GetGateway().GetSshPort(),
 		KeepOnFailure:  in.GetKeepOnFailure(),
 	}
-	xerr = subnetInstance.Create(job.Context(), req, gwName, sizing)
-	if xerr != nil {
-		return nil, xerr
-	}
 
-	xerr = networkInstance.AdoptSubnet(job.Context(), subnetInstance)
+	handler := handlers.NewSubnetHandler(job)
+	subnetInstance, xerr := handler.Create(networkRef, req, "", *sizing)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -154,10 +123,14 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	if networkRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference for Network")
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "/subnets/list")
@@ -166,33 +139,12 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%v, %v)", in.Network, in.All).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %v)", networkRefLabel, in.All).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	var networkID string
-	networkRef, _ := srvutils.GetReference(in.Network)
-	if networkRef == "" {
-		withDefaultNetwork, err := job.Service().HasDefaultNetwork(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if withDefaultNetwork {
-			an, xerr := job.Service().GetDefaultNetwork(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-			networkID = an.ID
-		}
-	} else {
-		networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), networkRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		networkID = networkInstance.GetID()
-	}
-	list, xerr := subnetfactory.List(job.Context(), job.Service(), networkID, in.GetAll())
+	handler := handlers.NewSubnetHandler(job)
+	list, xerr := handler.List(networkRef, in.GetAll())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -239,7 +191,8 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
+	handler := handlers.NewSubnetHandler(job)
+	subnetInstance, xerr := handler.Inspect(networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -265,7 +218,6 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
@@ -281,57 +233,10 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	force := in.GetForce()
-	jobCtx := job.Context()
-	newCtx := context.WithValue(jobCtx, "force", force) // nolint
-
-	var (
-		networkInstance resources.Network
-		subnetInstance  resources.Subnet
-		subnetID        string
-	)
-	subnetInstance, xerr = subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
+	handler := handlers.NewSubnetHandler(job)
+	xerr = handler.Delete(networkRef, subnetRef, in.GetForce())
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// consider a Subnet not found as a job done
-			debug.IgnoreError(xerr)
-			return empty, nil
-		default:
-			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
-		}
-	}
-	clean := true
-	subnetID = subnetInstance.GetID()
-	networkInstance, xerr = subnetInstance.InspectNetwork(job.Context())
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// consider a Subnet not found as a successful deletion
-			debug.IgnoreError(xerr)
-			clean = false
-		default:
-			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
-		}
-	}
-	if clean {
-		xerr = subnetInstance.Delete(newCtx)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// consider a Subnet not found as a job done
-				debug.IgnoreError(xerr)
-			default:
-				return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
-			}
-		}
-	}
-
-	if networkInstance != nil {
-		xerr = networkInstance.AbandonSubnet(newCtx, subnetID)
-		if xerr != nil {
-			return empty, xerr
-		}
+		return empty, xerr
 	}
 
 	logrus.Infof("Subnet %s successfully deleted.", subnetRefLabel)
@@ -356,14 +261,13 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
-	if networkRef == "" {
+	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
@@ -377,16 +281,6 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
 	case protocol.SecurityGroupState_SGS_DISABLED:
@@ -395,12 +289,8 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		enable = resources.SecurityGroupEnable
 	}
 
-	xerr = subnetInstance.BindSecurityGroup(job.Context(), sgInstance, enable)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
+	handler := handlers.NewSubnetHandler(job)
+	return empty, handler.BindSecurityGroup(networkRef, subnetRef, sgRef, enable)
 }
 
 // UnbindSecurityGroup detaches a Security Group from a subnet
@@ -421,12 +311,8 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Networking")
-	}
-
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
-	if networkRef == "" {
+	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Subnet")
 	}
 
@@ -445,33 +331,8 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var sgInstance resources.SecurityGroup
-	sgInstance, xerr = securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	var subnetInstance resources.Subnet
-	subnetInstance, xerr = subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
-			xerr = sgInstance.UnbindFromSubnetByReference(job.Context(), subnetRef)
-			if xerr != nil {
-				return empty, xerr
-			}
-		default:
-			return empty, xerr
-		}
-	}
-
-	xerr = subnetInstance.UnbindSecurityGroup(job.Context(), sgInstance)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
+	handler := handlers.NewSubnetHandler(job)
+	return empty, handler.UnbindSecurityGroup(networkRef, subnetRef, sgRef)
 }
 
 // EnableSecurityGroup applies the rules of a bound security group on a network
@@ -492,14 +353,13 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
-	if networkRef == "" {
+	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
@@ -513,22 +373,8 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	xerr = subnetInstance.EnableSecurityGroup(job.Context(), sgInstance)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
+	handler := handlers.NewSubnetHandler(job)
+	return empty, handler.EnableSecurityGroup(networkRef, subnetRef, sgRef)
 }
 
 // DisableSecurityGroup detaches a Security Group from a subnet
@@ -549,7 +395,6 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
@@ -570,22 +415,8 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	xerr = subnetInstance.DisableSecurityGroup(job.Context(), sgInstance)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
+	handler := handlers.NewSubnetHandler(job)
+	return empty, handler.DisableSecurityGroup(networkRef, subnetRef, sgRef)
 }
 
 // ListSecurityGroups lists the Security Group bound to subnet
@@ -605,7 +436,6 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
@@ -623,12 +453,8 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 
 	state := securitygroupstate.Enum(in.GetState())
 
-	subnetInstance, xerr := subnetfactory.Load(job.Context(), job.Service(), networkRef, subnetRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	bonds, xerr := subnetInstance.ListSecurityGroups(job.Context(), state)
+	handler := handlers.NewSubnetHandler(job)
+	bonds, xerr := handler.ListSecurityGroups(networkRef, subnetRef, state)
 	if xerr != nil {
 		return nil, xerr
 	}

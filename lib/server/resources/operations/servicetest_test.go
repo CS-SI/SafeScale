@@ -1246,7 +1246,7 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 		return xerr
 	}
 	hostName := ahf.Core.Name
-	if hostName == "" {
+	if hostName == "" { //nolint
 		hostName = ahf.Core.ID
 	}
 	if hostName == "" {
@@ -1300,7 +1300,7 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 		return xerr
 	}
 	hostName := ahf.Core.Name
-	if hostName == "" {
+	if hostName == "" { //nolint
 		hostName = ahf.Core.ID
 	}
 	if hostName == "" {
@@ -1422,7 +1422,7 @@ func (e *ServiceTest) InspectNetwork(ctx context.Context, id string) (an *abstra
 	defer fail.OnPanic(&ferr)
 
 	data, err := e._getInternalData(fmt.Sprintf("networks/byID/%s", id))
-	if err != nil {
+	if err != nil { //nolint
 		data, err = e._getInternalData(fmt.Sprintf("networks/byName/%s", id))
 	}
 	if err != nil {
@@ -2180,7 +2180,7 @@ func (e *ServiceTest) StopHost(ctx context.Context, params stacks.HostParameter,
 		return xerr
 	}
 	name := ahf.Core.Name
-	if name == "" {
+	if name == "" { //nolint
 		name = ahf.Core.ID
 	}
 	if name == "" {
@@ -2217,7 +2217,7 @@ func (e *ServiceTest) StartHost(ctx context.Context, params stacks.HostParameter
 	}
 
 	name := ahf.Core.Name
-	if name == "" {
+	if name == "" { //nolint
 		name = ahf.Core.ID
 	}
 	if name == "" {

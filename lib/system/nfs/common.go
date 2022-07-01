@@ -43,10 +43,7 @@ var nfsScripts embed.FS
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-func executeScript(
-	ctx context.Context, timings temporal.Timings, sshconfig sshapi.Connector, name string,
-	data map[string]interface{},
-) (string, fail.Error) {
+func executeScript(ctx context.Context, timings temporal.Timings, sshconfig sshapi.Connector, name string, data map[string]interface{}) (string, fail.Error) {
 	currentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -131,9 +128,16 @@ func executeScript(
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				fin, err := f.Stat()
+				// FIXME: It seems that f.Stat() works only on opened file... and utils.CreateTempFileFromString() returns a closed *os.File.
+				//        maybe utils.CreateTempFileFromString() should return only a path instead?
+				fin, err := os.Stat(f.Name())
 				if err != nil {
-					return err
+					switch err.(type) {
+					case *os.PathError:
+						return retry.StopRetryError(err)
+					default:
+						return err
+					}
 				}
 
 				transferTime = time.Duration(fin.Size())*time.Second/(64*1024) + 30*time.Second
@@ -196,6 +200,7 @@ func executeScript(
 				if innerXErr != nil {
 					return fail.ExecutionError(xerr)
 				}
+
 				if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(currentCtx, outputs.COLLECT, timings.ConnectionTimeout()+timings.HostOperationTimeout()); innerXErr != nil {
 					return fail.Wrap(innerXErr, "ssh operation failed")
 				}

@@ -19,15 +19,14 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"net"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
-	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -68,7 +67,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, xerr
 	}
 	defer job.Close()
-	svc := job.Service()
 
 	tracer := debug.NewTracer(job.Task(), true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -89,74 +87,40 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", cidr, "172.17.0.0/16")
 	}
 
-	req := abstract.NetworkRequest{
-		Name:          in.GetName(),
+	networkReq := abstract.NetworkRequest{
+		Name:          networkName,
 		CIDR:          cidr,
 		DNSServers:    in.GetDnsServers(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}
-	networkInstance, xerr := networkfactory.New(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if xerr = networkInstance.Create(job.Context(), req); xerr != nil {
-		return nil, xerr
-	}
-
-	defer func() {
-		if ferr != nil && !in.GetKeepOnFailure() {
-			// VPL: using context.Background() instead of job.Context() disables the cancellation
-			// defer job.Task().DisarmAbortSignal()()
-			if dferr := networkInstance.Delete(context.Background()); dferr != nil {
-				casted := fail.ConvertError(ferr)
-				_ = casted.AddConsequence(fail.Wrap(dferr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
-				ferr = casted
-			}
-		}
-	}()
-
+	var (
+		subnetReq *abstract.SubnetRequest
+		gwSizing  *abstract.HostSizingRequirements
+	)
 	if !in.GetNoSubnet() {
-		_, networkNet, _ := net.ParseCIDR(cidr)
-		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", in.GetCidr())
-		}
-
-		logrus.Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", req.Name, subnetNet.String())
-
-		var sizing *abstract.HostSizingRequirements
 		if in.GetGateway() != nil {
 			if in.GetGateway().SizingAsString != "" {
-				sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.GetGateway().GetSizingAsString())
+				gwSizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.GetGateway().GetSizingAsString())
 				if xerr != nil {
 					return nil, xerr
 				}
 			} else if in.GetGateway().GetSizing() != nil {
-				sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.GetGateway().GetSizing())
+				gwSizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.GetGateway().GetSizing())
 			}
 		}
-		if sizing == nil {
-			sizing = &abstract.HostSizingRequirements{MinGPU: -1}
-		}
 
-		subnetInstance, xerr := subnetfactory.New(svc)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		req := abstract.SubnetRequest{
-			NetworkID:      networkInstance.GetID(),
-			Name:           in.GetName(),
-			CIDR:           subnetNet.String(),
+		subnetReq = &abstract.SubnetRequest{
+			Name:           networkName,
 			KeepOnFailure:  in.GetKeepOnFailure(),
 			DefaultSSHPort: in.GetGateway().GetSshPort(),
 			ImageRef:       in.GetGateway().GetImageId(),
 		}
-		xerr = subnetInstance.Create(job.Context(), req, in.GetGateway().GetName(), sizing)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
-		}
+	}
+
+	handler := handlers.NewNetworkHandler(job)
+	networkInstance, xerr := handler.Create(networkReq, subnetReq, "", gwSizing)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
@@ -183,18 +147,13 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 		return nil, xerr
 	}
 	defer job.Close()
-	svc := job.Service()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.network")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var list []*abstract.Network
-	if in.GetAll() {
-		list, xerr = svc.ListNetworks(ctx)
-	} else {
-		list, xerr = networkfactory.List(job.Context(), svc)
-	}
+	handler := handlers.NewNetworkHandler(job)
+	list, xerr := handler.List(in.GetAll())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -223,22 +182,23 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
-	if ref == "" {
+	networkRef, networkRefLabel := srvutils.GetReference(in)
+	if networkRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/inspect", ref))
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/inspect", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.networkInstance")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.Context(), job.Service(), ref)
+	handler := handlers.NewNetworkHandler(job)
+	networkInstance, xerr := handler.Inspect(networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -262,70 +222,26 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ref, refLabel := srvutils.GetReference(in.Network)
-	if ref == "" {
+	networkRef, networkRefLabel := srvutils.GetReference(in.Network)
+	if networkRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
 	force := in.GetForce()
-
 	if force {
 		logrus.Tracef("forcing network deletion")
 	}
 
-	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
+	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	svc := job.Service()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.Context(), svc, ref)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			abstractNetwork, xerr := svc.InspectNetworkByName(ctx, ref)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					abstractNetwork, xerr = svc.InspectNetwork(ctx, ref)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							return empty, fail.NotFoundError("failed to find Network %s", refLabel)
-						default:
-							return empty, xerr
-						}
-					}
-				default:
-					return empty, xerr
-				}
-			}
-
-			cfg, cerr := svc.GetConfigurationOptions(ctx)
-			if cerr != nil {
-				return empty, cerr
-			}
-
-			if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == abstractNetwork.Name {
-				return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
-			}
-
-			return empty, fail.InvalidRequestError("%s is not managed by SafeScale", refLabel)
-		default:
-			return empty, xerr
-		}
-	}
-
-	xerr = networkInstance.Delete(job.Context())
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	tracer.Trace("Network %s successfully deleted.", refLabel)
-	return empty, nil
+	handler := handlers.NewNetworkHandler(job)
+	return empty, handler.Delete(networkRef, in.GetForce())
 }

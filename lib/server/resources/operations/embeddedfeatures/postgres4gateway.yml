@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: no
+        host: yes
         cluster: all
     requirements:
         features:
@@ -52,6 +52,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
+                            {{ if .HostIsGateway }}
                             mkdir -p ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway/
 
                             POSTGRES_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
@@ -78,6 +79,9 @@ feature:
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
                             sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
 
                     start:
                         targets:
@@ -86,25 +90,33 @@ feature:
                             masters: no
                             nodes: no
                         run: |
+                            {{ if .HostIsGateway }}
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
                             sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
                             sfRetryEx 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
                             sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
 
             remove:
                 pace: compose,cleanup
                 steps:
                     compose:
                         targets:
-                            hosts: no
+                            hosts: yes
                             gateways: any
                             masters: no
                             nodes: no
                         run: |
+                            {{ if .HostIsGateway }}
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
                             sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
                             docker image rm -f postgres:11-alpine
                             sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
 
                     cleanup:
                         targets:
@@ -113,10 +125,14 @@ feature:
                             masters: no
                             nodes: no
                         run: |
+                            {{ if .HostIsGateway }}
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
                             if [ "${PURGE_ON_REMOVAL,,}" = "yes" ]; then
                                 rm -rf ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway
                             fi
-                            exit 0
+                            sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
 
 ...

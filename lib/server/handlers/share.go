@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ShareHandler
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ShareHandler -o mocks/mock_share.go
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
@@ -93,17 +93,17 @@ func (handler *shareHandler) Create(
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	objs, xerr := sharefactory.New(handler.job.Service())
+	shareInstance, xerr := sharefactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	objh, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return objs, objs.Create(task.Context(), shareName, objh, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
+	return shareInstance, shareInstance.Create(task.Context(), shareName, hostInstance, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 
 // Delete a share from host
@@ -125,11 +125,12 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	objs, xerr := sharefactory.Load(handler.job.Context(), handler.job.Service(), name)
+	shareInstance, xerr := sharefactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
 	}
-	return objs.Delete(task.Context())
+
+	return shareInstance.Delete(task.Context())
 }
 
 // List return the list of all shares from all servers

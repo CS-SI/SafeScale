@@ -26,6 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/server"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
@@ -46,8 +49,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/sirupsen/logrus"
 )
 
 const protocolSeparator = ":"
@@ -194,7 +195,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				}
 
 				var innerXErr fail.Error
-				subnetInstance, innerXErr = subnetfactory.Load(handler.job.Context(), svc, "", subnetID)
+				subnetInstance, innerXErr = subnetfactory.Load(ctx, svc, "", subnetID)
 				return innerXErr
 			})
 		})
@@ -364,8 +365,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 		return invalid, "", "", xerr
 	}
 
-	// retrieve ssh config to perform some commands
-	ssh, xerr := host.GetSSHConfig(ctx)
+	// retrieve sshCfg config to perform some commands
+	sshCfg, xerr := host.GetSSHConfig(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -385,7 +386,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(ssh, cmd, timings.HostOperationTimeout())
+			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(sshCfg, cmd, timings.HostOperationTimeout())
 			if xerr != nil {
 				return xerr
 			}
@@ -568,7 +569,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, xerr := handler.GetConfig(host.GetID())
+	sshCfg, xerr := handler.GetConfig(host.GetID())
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -595,7 +596,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				theTime = time.Duration(size)*time.Second/(64*1024) + 30*time.Second
 			}
 
-			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(task.Context(), remotePath, localPath, upload, theTime)
+			iretcode, istdout, istderr, innerXErr := sshCfg.CopyWithTimeout(task.Context(), remotePath, localPath, upload, theTime)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -629,10 +630,11 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					}
 				}()
 
-				crcCmd, finnerXerr = ssh.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
+				crcCmd, finnerXerr = sshCfg.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
 				if finnerXerr != nil {
 					return fail.WarningError(finnerXerr, "cannot create md5 command")
 				}
+
 				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, timings.HostLongOperationTimeout())
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
@@ -673,3 +675,88 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	)
 	return retcode, stdout, stderr, xerr
 }
+
+/*
+ * VPL: new Copy implementation... Why commented?
+
+// Copy copies file/directory from/to remote host
+func (handler *sshHandler) Copy(from, to, owner, mode string) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	const invalid = -1
+
+	if handler == nil {
+		return invalid, "", "", fail.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return invalid, "", "", fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+	if from == "" {
+		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
+	}
+	if to == "" {
+		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
+	}
+
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+
+	var (
+		pull                bool
+		hostRef             string
+		hostPath, localPath string
+		retcode             int
+		stdout, stderr      string
+	)
+
+	// If source contains remote host, we pull
+	parts := strings.Split(from, ":")
+	if len(parts) > 1 {
+		pull = true
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		localPath = from
+	}
+
+	// if destination contains remote host, we push (= !pull)
+	parts = strings.Split(to, ":")
+	if len(parts) > 1 {
+		if pull {
+			return invalid, "", "", fail.InvalidRequestError("file copy from one remote host to another one is not supported")
+		}
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		if !pull {
+			return invalid, "", "", fail.InvalidRequestError("failed to find a remote host in the request")
+		}
+		localPath = to
+	}
+
+	timings, xerr := handler.job.Service().Timings()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if pull {
+		retcode, stdout, stderr, xerr = hostInstance.Pull(handler.job.Context(), hostPath, localPath, timings.HostLongOperationTimeout())
+	} else {
+		retcode, stdout, stderr, xerr = hostInstance.Push(handler.job.Context(), localPath, hostPath, owner, mode, timings.HostLongOperationTimeout())
+	}
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+	if retcode != 0 {
+		return retcode, stdout, stderr, fail.NewError("copy failed: retcode=%d: %s", retcode, stderr)
+	}
+
+	return retcode, stdout, stderr, nil
+}
+
+*/
