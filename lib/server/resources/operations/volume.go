@@ -579,6 +579,12 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	var newDisk mapset.Set
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			newDiskSet, xerr := listAttachedDevices(ctx, host)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -773,6 +779,12 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

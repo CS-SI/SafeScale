@@ -80,7 +80,7 @@ func TestWaitingGameWF(t *testing.T) {
 }
 
 func TestChangeIdAfterAbortWF(t *testing.T) {
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 6; i++ {
 		got, err := NewTask()
 		require.NotNil(t, got)
 		require.Nil(t, err)

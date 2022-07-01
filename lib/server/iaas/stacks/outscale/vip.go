@@ -41,7 +41,7 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	subnet, xerr := s.InspectSubnet(ctx, subnetID)
@@ -49,7 +49,7 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		return nil, xerr
 	}
 
-	resp, xerr := s.rpcCreateNic(subnet.ID, name, name, securityGroups)
+	resp, xerr := s.rpcCreateNic(ctx, subnet.ID, name, name, securityGroups)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -75,8 +75,8 @@ func (s stack) AddPublicIPToVIP(context.Context, *abstract.VirtualIP) fail.Error
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
-	resp, xerr := s.rpcReadNicsOfVM(hostID)
+func (s stack) getFirstFreeDeviceNumber(ctx context.Context, hostID string) (int64, fail.Error) {
+	resp, xerr := s.rpcReadNicsOfVM(ctx, hostID)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -138,12 +138,12 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) (ferr fai
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	if xerr := s.rpcDeleteNic(vip.ID); xerr != nil {
+	if xerr := s.rpcDeleteNic(ctx, vip.ID); xerr != nil {
 		return xerr
 	}
 
-	return s.rpcDeletePublicIPByIP(vip.PublicIP)
+	return s.rpcDeletePublicIPByIP(ctx, vip.PublicIP)
 }

@@ -134,7 +134,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	}
 
 	// Openstack client
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var innerErr error
 			s.Driver, innerErr = gcos.AuthenticatedClient(gcOpts)
@@ -153,7 +153,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 
 	// Identity API
 	endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var innerErr error
 			s.IdentityClient, innerErr = gcos.NewIdentityV2(s.Driver, endpointOpts)
@@ -168,7 +168,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	// Compute API
 	switch s.versions["compute"] {
 	case "v2":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.ComputeClient, innerErr = gcos.NewComputeV2(s.Driver, endpointOpts)
@@ -186,7 +186,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	// Network API
 	switch s.versions["network"] {
 	case "v2":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.NetworkClient, innerErr = gcos.NewNetworkV2(s.Driver, endpointOpts)
@@ -204,7 +204,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	// Volume API
 	switch s.versions["volume"] {
 	case "v1":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = gcos.NewBlockStorageV1(s.Driver, endpointOpts)
@@ -213,7 +213,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	case "v2":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = gcos.NewBlockStorageV2(s.Driver, endpointOpts)
@@ -230,7 +230,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.ProviderNetworkID, innerErr = getIDFromName(s.NetworkClient, cfg.ProviderNetwork)
@@ -272,7 +272,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 
 	// Identity API
 	var identity *gophercloud.ServiceClient
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			identity, innerErr = gcos.NewIdentityV3(s.Driver, gophercloud.EndpointOpts{})
 			return normalizeError(innerErr)
@@ -306,15 +306,15 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 }
 
 // ListRegions ...
-func (s stack) ListRegions(context.Context) (list []string, ferr fail.Error) {
+func (s stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
 				// ParentRegionID: "RegionOne",
@@ -349,12 +349,12 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Try to get template
 	var flv *flavors.Flavor
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
 			return innerErr
@@ -383,7 +383,7 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPai
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return abstract.NewKeyPair(name)
@@ -398,7 +398,7 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract()
@@ -415,15 +415,15 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs(context.Context) ([]*abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []*abstract.KeyPair
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return keypairs.List(s.ComputeClient, nil).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -464,9 +464,9 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return keypairs.Delete(s.ComputeClient, id, nil).ExtractErr()
 		},
@@ -487,7 +487,7 @@ func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.Sec
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var innerErr error
 			// FIXME: bind security group to port associated to subnet
@@ -506,7 +506,7 @@ func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var innerErr error
 			// FIXME: unbind security group from port associated to subnet
@@ -538,7 +538,7 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 	}
 
 	var vipPort *ports.Port
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
 			return innerErr
@@ -548,7 +548,7 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 	if xerr != nil {
 		return xerr
 	}
-	hostPorts, xerr := s.rpcListPorts(ports.ListOpts{
+	hostPorts, xerr := s.rpcListPorts(ctx, ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
@@ -562,7 +562,7 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 	for _, p := range hostPorts {
 		p := p
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
 				return innerErr
@@ -589,7 +589,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	}
 
 	var vipPort *ports.Port
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
 			return innerErr
@@ -599,7 +599,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	if xerr != nil {
 		return xerr
 	}
-	hostPorts, xerr := s.rpcListPorts(ports.ListOpts{
+	hostPorts, xerr := s.rpcListPorts(ctx, ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
@@ -613,7 +613,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 				newAllowedAddressPairs = append(newAllowedAddressPairs, a)
 			}
 		}
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
 				return innerErr
@@ -642,7 +642,7 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Erro
 			return xerr
 		}
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
 		},
@@ -663,7 +663,7 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	host, xerr := s.InspectHost(ctx, hostParam)
 	if xerr != nil {
@@ -682,9 +682,9 @@ func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gra
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
 		},
@@ -702,9 +702,9 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fa
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
 		},
@@ -722,10 +722,10 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 		return xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.Reboot(
 				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot},
@@ -751,7 +751,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, r
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	logrus.Debugf("Trying to resize a Host...")
 	// servers.Resize()
@@ -771,7 +771,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
@@ -782,9 +782,9 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
 			if ahf.Core.ID != "" {
-				server, innerErr = s.rpcGetHostByID(ahf.Core.ID)
+				server, innerErr = s.rpcGetHostByID(ctx, ahf.Core.ID)
 			} else {
-				server, innerErr = s.rpcGetHostByName(ahf.Core.Name)
+				server, innerErr = s.rpcGetHostByName(ctx, ahf.Core.Name)
 			}
 
 			if innerErr != nil {
@@ -917,7 +917,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 		return xerr
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
@@ -939,7 +939,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 		return xerr
 	}
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
@@ -958,7 +958,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -968,7 +968,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	timeout := timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			innerXErr := stacks.RetryableRemoteCall(
+			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
 				},
@@ -1010,11 +1010,11 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
 
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			va, innerErr = volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
 				VolumeID: request.VolumeID,
@@ -1041,10 +1041,10 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
 
 	var va *volumeattach.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 			return innerErr
@@ -1071,10 +1071,10 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
 			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
@@ -1114,9 +1114,9 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
 		},

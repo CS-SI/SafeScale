@@ -53,7 +53,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		return nil, fail.InvalidParameterError("request.Size", "cannot be negative integer or 0")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// TODO: validate content of request
@@ -63,7 +63,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
 	}
 
-	resp, xerr := s.rpcCreateDisk(request.Name, selectedType, int64(request.Size))
+	resp, xerr := s.rpcCreateDisk(ctx, request.Name, selectedType, int64(request.Size))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -102,10 +102,10 @@ func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volum
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcGetDisk(ref)
+	resp, xerr := s.rpcGetDisk(ctx, ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -135,16 +135,16 @@ func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
+func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var out []*abstract.Volume
-	resp, xerr := s.rpcListDisks()
+	resp, xerr := s.rpcListDisks(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -158,13 +158,13 @@ func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
+func (s stack) rpcListDisks(ctx context.Context) ([]*compute.Disk, fail.Error) {
 	var (
 		out  []*compute.Disk
 		resp *compute.DiskList
 	)
 	for token := ""; ; {
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
 				resp, err = s.ComputeService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 				return err
@@ -193,10 +193,10 @@ func (s stack) DeleteVolume(ctx context.Context, ref string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteDisk(ref)
+	return s.rpcDeleteDisk(ctx, ref)
 }
 
 // CreateVolumeAttachment attaches a volume to a host
@@ -211,10 +211,10 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.HostID")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcCreateDiskAttachment(request.VolumeID, request.HostID)
+	resp, xerr := s.rpcCreateDiskAttachment(ctx, request.VolumeID, request.HostID)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -234,16 +234,16 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string
 		return nilA, fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	serverID, diskID := extractFromAttachmentID(vaID)
-	instance, xerr := s.rpcGetInstance(serverID)
+	instance, xerr := s.rpcGetInstance(ctx, serverID)
 	if xerr != nil {
 		return nilA, xerr
 	}
 
-	disk, xerr := s.rpcGetDisk(diskID)
+	disk, xerr := s.rpcGetDisk(ctx, diskID)
 	if xerr != nil {
 		return nilA, xerr
 	}
@@ -266,7 +266,7 @@ func (s stack) Migrate(ctx context.Context, operation string, params map[string]
 	if operation == "tags" {
 		// delete current nat route (is it really necessary ?)
 		routeName := params["subnetName"].(string) + "-nat-allowed"
-		xerr := s.rpcDeleteRoute(routeName)
+		xerr := s.rpcDeleteRoute(ctx, routeName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -277,7 +277,7 @@ func (s stack) Migrate(ctx context.Context, operation string, params map[string]
 		}
 
 		// create new nat route
-		_, xerr = s.rpcCreateRoute(params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string))
+		_, xerr = s.rpcCreateRoute(ctx, params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string))
 		if xerr != nil {
 			return xerr
 		}
@@ -301,13 +301,13 @@ func (s stack) Migrate(ctx context.Context, operation string, params map[string]
 		}
 
 		// remove old nat route tag
-		xerr = s.rpcRemoveTagsFromInstance(instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
+		xerr = s.rpcRemoveTagsFromInstance(ctx, instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
 		if xerr != nil {
 			return xerr
 		}
 
 		// add new nat route tag
-		xerr = s.rpcAddTagsToInstance(instance.GetID(), []string{fmt.Sprintf(NATRouteTagFormat, networkInstance.GetID())})
+		xerr = s.rpcAddTagsToInstance(ctx, instance.GetID(), []string{fmt.Sprintf(NATRouteTagFormat, networkInstance.GetID())})
 		if xerr != nil {
 			return xerr
 		}
@@ -327,10 +327,10 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverRef, vaID strin
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteDiskAttachment(vaID)
+	return s.rpcDeleteDiskAttachment(ctx, vaID)
 }
 
 // ListVolumeAttachments lists available volume attachment
@@ -342,12 +342,12 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverRef string) ([]*
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverRef")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var vats []*abstract.VolumeAttachment
 
-	instance, xerr := s.rpcGetInstance(serverRef)
+	instance, xerr := s.rpcGetInstance(ctx, serverRef)
 	if xerr != nil {
 		return nil, xerr
 	}

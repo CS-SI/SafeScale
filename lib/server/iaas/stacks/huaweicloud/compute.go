@@ -244,7 +244,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 			)
 		}
 		var flavorID string
-		xerr := stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(context.Background(),
 			func() (innerErr error) {
 				flavorID, innerErr = getFlavorIDFromName(sc, opts.FlavorName)
 				return normalizeError(innerErr)
@@ -299,7 +299,7 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones(context.Context) (list map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var emptyMap map[string]bool
@@ -307,12 +307,12 @@ func (s stack) ListAvailabilityZones(context.Context) (list map[string]bool, fer
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
 			return innerErr
@@ -372,7 +372,7 @@ func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
-func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
+func (s stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -389,7 +389,7 @@ func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 		allPages   pagination.Page
 		allServers []ServerWithAZ
 	)
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			allPages, innerErr = servers.List(s.ComputeClient, nil).AllPages()
 			return innerErr
@@ -421,7 +421,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
@@ -581,7 +581,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			innerXErr := stacks.RetryableRemoteCall(
+			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() (extErr error) {
 					var hr *http.Response
 					hr, r.Err = s.ComputeClient.Post( // nolint
@@ -623,7 +623,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
 			if zoneErr != nil {
 				logrus.Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
@@ -716,7 +716,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	if request.PublicIP {
 		var fip *FloatingIP
-		if fip, xerr = s.attachFloatingIP(host); xerr != nil {
+		if fip, xerr = s.attachFloatingIP(ctx, host); xerr != nil {
 			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
 		}
 		if fip == nil {
@@ -726,7 +726,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			if ferr != nil {
-				derr := s.DeleteFloatingIP(fip.ID)
+				derr := s.DeleteFloatingIP(ctx, fip.ID)
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
 					_ = ferr.AddConsequence(derr)
@@ -742,7 +742,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		userData.PublicIP = fip.PublicIPAddress
 
 		if isGateway {
-			xerr = s.enableHostRouterMode(host)
+			xerr = s.enableHostRouterMode(ctx, host)
 			if xerr != nil {
 				return nil, userData, fail.Wrap(xerr, "error enabling gateway mode of host '%s'", request.ResourceName)
 			}
@@ -849,11 +849,11 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			aimg, innerErr := images.Get(s.ComputeClient, id).Extract()
 			if innerErr != nil {
@@ -944,14 +944,14 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(context.Context, bool) (imgList []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -986,18 +986,18 @@ func (s stack) ListImages(context.Context, bool) (imgList []*abstract.Image, fer
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(context.Context, bool) ([]*abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
 
 	var flvList []*abstract.HostTemplate
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -1043,7 +1043,7 @@ func (s stack) ListTemplates(context.Context, bool) ([]*abstract.HostTemplate, f
 func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
+	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(ctx, host)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1148,7 +1148,7 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, serv
 // collectAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
+func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
 	var (
 		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
@@ -1157,7 +1157,7 @@ func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversio
 		allInterfaces []nics.Interface
 	)
 
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := s.listInterfaces(host.ID).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -1211,7 +1211,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 	}
 
 	var hostList abstract.HostList
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -1271,14 +1271,14 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	}
 
 	if s.cfgOpts.UseFloatingIP {
-		fip, xerr := s.getFloatingIPOfHost(ahf.Core.ID)
+		fip, xerr := s.getFloatingIPOfHost(ctx, ahf.Core.ID)
 		if xerr != nil {
 			return xerr
 		}
 
 		if fip != nil {
 			// Floating IP found, first dissociate it from the host...
-			retryErr := stacks.RetryableRemoteCall(
+			retryErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					err := floatingips.DisassociateInstance(
 						s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
@@ -1294,7 +1294,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 			}
 
 			// then delete it.
-			retryErr = stacks.RetryableRemoteCall(
+			retryErr = stacks.RetryableRemoteCall(ctx,
 				func() error {
 					err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
 					return normalizeError(err)
@@ -1319,7 +1319,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 		func() error {
 			// 1st, send delete host order
 			if resourcePresent { // nolint
-				innerRetryErr := stacks.RetryableRemoteCall(
+				innerRetryErr := stacks.RetryableRemoteCall(ctx,
 					func() error {
 						innerErr := servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr()
 						return normalizeError(innerErr)
@@ -1340,7 +1340,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 				var host *servers.Server
 				innerRetryErr = retry.WhileUnsuccessful(
 					func() error {
-						commRetryErr := stacks.RetryableRemoteCall(
+						commRetryErr := stacks.RetryableRemoteCall(ctx,
 							func() (innerErr error) {
 								host, innerErr = servers.Get(s.ComputeClient, hostRef).Extract()
 								return normalizeError(innerErr)
@@ -1402,9 +1402,9 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to a host
-func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail.Error) {
+func (s stack) getFloatingIPOfHost(ctx context.Context, hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := floatingips.List(s.ComputeClient).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -1439,15 +1439,15 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to a host
-func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
-	fip, xerr := s.CreateFloatingIP(host)
+func (s stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*FloatingIP, fail.Error) {
+	fip, xerr := s.CreateFloatingIP(ctx, host)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = s.AssociateFloatingIP(host.Core, fip.ID)
+	xerr = s.AssociateFloatingIP(ctx, host.Core, fip.ID)
 	if xerr != nil {
-		derr := s.DeleteFloatingIP(fip.ID)
+		derr := s.DeleteFloatingIP(ctx, fip.ID)
 		if derr != nil {
 			logrus.Warnf("Error deleting floating ip: %v", derr)
 			_ = xerr.AddConsequence(derr)
@@ -1459,7 +1459,7 @@ func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 }
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
-func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
+func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull) fail.Error {
 	var (
 		portID *string
 	)
@@ -1473,7 +1473,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			var innerErr fail.Error
-			portID, innerErr = s.getOpenstackPortID(host)
+			portID, innerErr = s.getOpenstackPortID(ctx, host)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1496,7 +1496,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 		}
 	}
 
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			pairs := []ports.AddressPair{
 				{
@@ -1516,8 +1516,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 }
 
 // DisableHostRouterMode disables the host to act as a router/gateway.
-func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
-	portID, xerr := s.getOpenstackPortID(host)
+func (s stack) disableHostRouterMode(ctx context.Context, host *abstract.HostFull) fail.Error {
+	portID, xerr := s.getOpenstackPortID(ctx, host)
 	if xerr != nil {
 		return fail.NewErrorWithCause(xerr, "failed to disable Router Mode on host '%s'", host.Core.Name)
 	}
@@ -1527,7 +1527,7 @@ func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 		)
 	}
 
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 			_, innerErr := ports.Update(s.NetworkClient, *portID, opts).Extract()
@@ -1553,11 +1553,11 @@ func (s stack) listInterfaces(hostID string) pagination.Pager {
 
 // getOpenstackPortID returns the port ID corresponding to the first private IP address of the host
 // returns nil,nil if not found
-func (s stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error) {
+func (s stack) getOpenstackPortID(ctx context.Context, host *abstract.HostFull) (*string, fail.Error) {
 	ip := host.Networking.IPv4Addresses[host.Networking.DefaultSubnetID]
 	found := false
 	nic := nics.Interface{}
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := s.listInterfaces(host.Core.ID).EachPage(
 				func(page pagination.Page) (bool, error) {

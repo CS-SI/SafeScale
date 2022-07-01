@@ -106,7 +106,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	}
 
 	// Openstack client
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var innerErr error
 			s.Driver, innerErr = openstack.AuthenticatedClient(gcOpts)
@@ -125,7 +125,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	// Identity API
 	endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var innerErr error
 			s.IdentityClient, innerErr = openstack.NewIdentityV2(s.Driver, endpointOpts)
@@ -140,7 +140,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Compute API
 	switch s.versions["compute"] {
 	case "v2":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.ComputeClient, innerErr = openstack.NewComputeV2(s.Driver, endpointOpts)
@@ -158,7 +158,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Network API
 	switch s.versions["network"] {
 	case "v2":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.NetworkClient, innerErr = openstack.NewNetworkV2(s.Driver, endpointOpts)
@@ -176,7 +176,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Volume API
 	switch s.versions["volume"] {
 	case "v1":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = openstack.NewBlockStorageV1(s.Driver, endpointOpts)
@@ -185,7 +185,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	case "v2":
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = openstack.NewBlockStorageV2(s.Driver, endpointOpts)
@@ -202,7 +202,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				var innerErr error
 				s.ProviderNetworkID, innerErr = getIDFromName(s.NetworkClient, cfg.ProviderNetwork)

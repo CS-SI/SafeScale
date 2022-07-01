@@ -197,6 +197,7 @@ func (instance *tracer) ExitingMessage() string {
 	if valid.IsNil(instance) {
 		return ""
 	}
+
 	return goingOutPrefix + instance.buildMessage(0)
 }
 

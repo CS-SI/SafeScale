@@ -18,12 +18,14 @@ package concurrency
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -245,16 +247,6 @@ func NewUnbreakableTask() (Task, fail.Error) {
 	// To be able to For safety, normally the cancel signal capture routine is not started in this case...
 	nt.abortDisengaged = true
 	return nt, nil
-}
-
-// NewTaskWithParent creates a subtask
-// Such a task can be aborted if the parent one can be
-func NewTaskWithParent(parentTask Task, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if parentTask == nil {
-		return nil, fail.InvalidParameterError("parentTask", "must not be nil")
-	}
-
-	return newTask(context.Background(), parentTask, options...)
 }
 
 // NewTaskWithContext creates an instance of Task with context
@@ -1176,7 +1168,18 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 		return false, nil, nil
 
 	case ABORTED:
-		fallthrough
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		if instance.resultObtained {
+			if instance.ctx.Err() != nil && instance.err == nil {
+				instance.err = fail.AbortedError(instance.ctx.Err())
+			}
+			return true, instance.result, instance.err
+		}
+
+		// result has not been returned yet by TaskAction
+		return false, nil, nil
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
@@ -1244,7 +1247,20 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, fer
 					for !t.Aborted() && !done {
 						done, result, innerXErr = instance.TryWait()
 						if innerXErr != nil {
+							if _, ok := innerXErr.(*fail.ErrAborted); ok {
+								doneWaitingCh <- struct{}{}
+								return nil, fail.AbortedError(innerXErr)
+							}
+							ctErr := spew.Sdump(innerXErr)
+							if strings.Contains(ctErr, "aborted") {
+								doneWaitingCh <- struct{}{}
+								return nil, fail.AbortedError(innerXErr)
+							}
 							logrus.Warnf("ignoring internal error: %v", innerXErr)
+						}
+						if done {
+							doneWaitingCh <- struct{}{}
+							return nil, nil
 						}
 						if !done {
 							time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(

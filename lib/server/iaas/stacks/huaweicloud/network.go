@@ -137,7 +137,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		JSONResponse: &resp.Body,
 		OkCodes:      []int{200, 201},
 	}
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
@@ -164,14 +164,14 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 }
 
 // ListRouters lists available routers
-func (s stack) ListRouters() ([]Router, fail.Error) {
+func (s stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
 	var emptySlice []Router
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var ns []Router
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return routers.List(s.NetworkClient, routers.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -197,10 +197,10 @@ func (s stack) ListRouters() ([]Router, fail.Error) {
 }
 
 // findVPCBoundOpenstackNetwork finds the Openstack Network resource associated to Huaweicloud VPC
-func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network, fail.Error) {
+func (s stack) findOpenStackNetworkBoundToVPC(ctx context.Context, vpcName string) (*networks.Network, fail.Error) {
 	var router *Router
 	found := false
-	routerList, xerr := s.ListRouters()
+	routerList, xerr := s.ListRouters(ctx)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to list routers")
 	}
@@ -217,7 +217,7 @@ func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network
 	}
 
 	var network *networks.Network
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			network, innerErr = networks.Get(s.NetworkClient, router.NetworkID).Extract()
 			return innerErr
@@ -246,7 +246,7 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 		OkCodes:      []int{200, 201},
 	}
 	var vpc *VPC
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			var hr *http.Response
 			hr, innerErr = s.Driver.Request("GET", url, &opts) // nolint
@@ -308,7 +308,7 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (an *abstr
 }
 
 // ListNetworks lists all the Network/VPC created
-func (s stack) ListNetworks(context.Context) ([]*abstract.Network, fail.Error) {
+func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
 	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -320,7 +320,7 @@ func (s stack) ListNetworks(context.Context) ([]*abstract.Network, fail.Error) {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, innerErr := s.Driver.Request("GET", url, &opts) // nolint
@@ -375,7 +375,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201, 204},
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			var r *http.Response
 			r, innerErr = s.Driver.Request("DELETE", url, &opts) // nolint
@@ -392,7 +392,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (su
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), true, "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, true, "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var xerr fail.Error
@@ -432,7 +432,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (su
 	}
 
 	// Creates the subnet
-	resp, xerr := s.createSubnet(req)
+	resp, xerr := s.createSubnet(ctx, req)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "error creating subnet '%s'", req.Name)
 	}
@@ -483,7 +483,7 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkID, name string) 
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, r.Err = s.NetworkClient.Get(s.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{ // nolint
@@ -520,7 +520,7 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkID, name string) 
 				return nil, fail.InconsistentError("id should be a string")
 			}
 		}
-		return s.inspectOpenstackSubnet(id)
+		return s.inspectOpenstackSubnet(ctx, id)
 	}
 	return nil, abstract.ResourceNotFoundError("subnet", name)
 }
@@ -541,7 +541,7 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (*abstract.Subnet, 
 		OkCodes:      []int{200, 201},
 	}
 	var resp *subnetEx
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, innerErr := s.Driver.Request("GET", url, &opts) // nolint
@@ -565,7 +565,7 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (*abstract.Subnet, 
 	return as, nil
 }
 
-func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) {
+func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract.Subnet, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -573,11 +573,11 @@ func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
 			return innerErr
@@ -614,7 +614,7 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) ([]*abstract.
 		return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
 	})
 	var subnetList []*abstract.Subnet
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 				list, err := subnets.ExtractSubnets(page)
@@ -680,7 +680,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
 	return retry.Action(
 		func() error {
-			return stacks.RetryableRemoteCall(
+			return stacks.RetryableRemoteCall(ctx,
 				func() error {
 					var hr *http.Response
 					hr, innerErr := s.Driver.Request("DELETE", url, &opts) // nolint
@@ -751,7 +751,7 @@ type subnetDeleteResult struct { // nolint
 }
 
 // createSubnet creates a subnet using native FlexibleEngine API
-func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.Error) {
+func (s stack) createSubnet(ctx context.Context, req abstract.SubnetRequest) (*subnets.Subnet, fail.Error) {
 	network, _ /*networkDesc*/, _ := net.ParseCIDR(req.CIDR)
 
 	// Calculate IP address for gateway
@@ -795,7 +795,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 		JSONResponse: &respCreate.Body,
 		OkCodes:      []int{200, 201},
 	}
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
 			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
@@ -825,7 +825,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			innerXErr := stacks.RetryableRemoteCall(
+			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					var hr *http.Response
 					hr, innerErr := s.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts) // nolint

@@ -256,6 +256,12 @@ func (sc *LibCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 	}
 
 	xerr := retry.WhileUnsuccessful(func() error { // retry only if we have a tunnel problem
+		select {
+		case <-time.After(1 * time.Second):
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		}
+
 		tu, _, err := sc.cfg.CreateTunneling(ctx)
 		if err != nil {
 			return fail.NewError("failure creating tunnel: %w", err)
@@ -265,7 +271,6 @@ func (sc *LibCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 
 		rv, out, sterr, xerr := sc.NewRunWithTimeout(ctx, outs, timeout)
 		if rv == -2 {
-			// logrus.Warningf("tunnel problem")
 			return fmt.Errorf("tunnel problem")
 		}
 		rc = rv
@@ -274,7 +279,7 @@ func (sc *LibCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, tim
 		pb = xerr
 		return nil
 	},
-		time.Second,
+		0,               // internal select takes care of it
 		expandedTimeout) // no need to increase this, if there is a tunnel problem, it happens really fast
 
 	if xerr != nil {
@@ -363,6 +368,12 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 		var session *ssh.Session
 
 		err = retry.WhileUnsuccessful(func() error { // FIXME: Turn this into goroutine
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			// Each ClientConn can support multiple interactive sessions, represented by a Session.
 			var internalErr error
 			var newsession *ssh.Session
@@ -500,17 +511,22 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			return res.errorcode, res.stdout, res.stderr, nil
 		case <-enough:
 			return 255, "", "", fail.NewError("received timeout of %s", timeout)
+		case <-ctx.Done():
+			return 255, "", "", fail.ConvertError(ctx.Err())
 		}
 	}
 
-	res := <-results
+	select {
+	case res := <-results:
+		if outs == outputs.DISPLAY {
+			fmt.Print(res.stdout)
+			fmt.Print(res.stderr)
+		}
 
-	if outs == outputs.DISPLAY {
-		fmt.Print(res.stdout)
-		fmt.Print(res.stderr)
+		return res.errorcode, res.stdout, res.stderr, nil
+	case <-ctx.Done():
+		return 255, "", "", fail.ConvertError(ctx.Err())
 	}
-
-	return res.errorcode, res.stdout, res.stderr, nil
 }
 
 func (sc *LibCommand) cleanup() error {
@@ -703,6 +719,12 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-time.After(temporal.DefaultDelay()):
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			}
+
 			retcode = -1
 			iterations++
 
@@ -726,7 +748,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 
 			return nil
 		},
-		temporal.DefaultDelay(),
+		0,
 		timeout+time.Minute,
 	)
 	if retryErr != nil {

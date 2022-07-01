@@ -90,6 +90,10 @@ func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 		}
 	}
 
+	if item == nil {
+		return o, fail.InvalidInstanceContentError("item", "should NOT be nil")
+	}
+
 	// if the object exists, we get its content
 	o.item = item
 	return o, nil

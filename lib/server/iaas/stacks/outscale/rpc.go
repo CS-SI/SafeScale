@@ -17,6 +17,8 @@
 package outscale
 
 import (
+	"context"
+
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
 
@@ -24,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-func (s stack) rpcReadSecurityGroups(networkID string, sgIDs []string) ([]osc.SecurityGroup, fail.Error) {
+func (s stack) rpcReadSecurityGroups(ctx context.Context, networkID string, sgIDs []string) ([]osc.SecurityGroup, fail.Error) {
 	var filters osc.FiltersSecurityGroup
 	if len(sgIDs) > 0 {
 		filters.SecurityGroupIds = sgIDs
@@ -35,7 +37,7 @@ func (s stack) rpcReadSecurityGroups(networkID string, sgIDs []string) ([]osc.Se
 		}),
 	}
 	var resp osc.ReadSecurityGroupsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerErr := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &opts)
 			if innerErr != nil {
@@ -69,12 +71,12 @@ func (s stack) rpcReadSecurityGroups(networkID string, sgIDs []string) ([]osc.Se
 	return out, nil
 }
 
-func (s stack) rpcReadSecurityGroupByID(id string) (osc.SecurityGroup, fail.Error) {
+func (s stack) rpcReadSecurityGroupByID(ctx context.Context, id string) (osc.SecurityGroup, fail.Error) {
 	if id == "" {
 		return osc.SecurityGroup{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	groups, xerr := s.rpcReadSecurityGroups("", []string{id})
+	groups, xerr := s.rpcReadSecurityGroups(ctx, "", []string{id})
 	if xerr != nil {
 		return osc.SecurityGroup{}, xerr
 	}
@@ -85,7 +87,7 @@ func (s stack) rpcReadSecurityGroupByID(id string) (osc.SecurityGroup, fail.Erro
 	return groups[0], nil
 }
 
-func (s stack) rpcReadSecurityGroupByName(networkID, name string) (osc.SecurityGroup, fail.Error) {
+func (s stack) rpcReadSecurityGroupByName(ctx context.Context, networkID, name string) (osc.SecurityGroup, fail.Error) {
 	if networkID == "" {
 		return osc.SecurityGroup{}, fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
@@ -101,7 +103,7 @@ func (s stack) rpcReadSecurityGroupByName(networkID, name string) (osc.SecurityG
 		}),
 	}
 	var resp osc.ReadSecurityGroupsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerErr := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &opts)
 			if innerErr != nil {
@@ -125,7 +127,7 @@ func (s stack) rpcReadSecurityGroupByName(networkID, name string) (osc.SecurityG
 }
 
 // rpcReadVMs gets VM information from provider
-func (s stack) rpcReadVMs(vmIDs []string) ([]osc.Vm, fail.Error) {
+func (s stack) rpcReadVMs(ctx context.Context, vmIDs []string) ([]osc.Vm, fail.Error) {
 	query := osc.ReadVmsOpts{}
 	if len(vmIDs) > 0 {
 		query.ReadVmsRequest = optional.NewInterface(osc.ReadVmsRequest{
@@ -135,7 +137,7 @@ func (s stack) rpcReadVMs(vmIDs []string) ([]osc.Vm, fail.Error) {
 		})
 	}
 	var resp osc.ReadVmsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerErr := s.client.VmApi.ReadVms(s.auth, &query)
 			if innerErr != nil {
@@ -159,12 +161,12 @@ func (s stack) rpcReadVMs(vmIDs []string) ([]osc.Vm, fail.Error) {
 }
 
 // rpcReadVMByID gets VM information from provider
-func (s stack) rpcReadVMByID(id string) (osc.Vm, fail.Error) {
+func (s stack) rpcReadVMByID(ctx context.Context, id string) (osc.Vm, fail.Error) {
 	if id == "" {
 		return osc.Vm{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	vms, xerr := s.rpcReadVMs([]string{id})
+	vms, xerr := s.rpcReadVMs(ctx, []string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -208,7 +210,7 @@ func localizeInstance(instances []osc.Vm) (osc.Vm, fail.Error) {
 	return instance, nil
 }
 
-func (s stack) rpcReadVMByName(name string) (osc.Vm, fail.Error) {
+func (s stack) rpcReadVMByName(ctx context.Context, name string) (osc.Vm, fail.Error) {
 	if name == "" {
 		return osc.Vm{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -221,7 +223,7 @@ func (s stack) rpcReadVMByName(name string) (osc.Vm, fail.Error) {
 		}),
 	}
 	var resp osc.ReadVmsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerErr := s.client.VmApi.ReadVms(s.auth, &opts)
 			if innerErr != nil {
@@ -257,13 +259,13 @@ func (s stack) rpcReadVMByName(name string) (osc.Vm, fail.Error) {
 }
 
 // rpcDeleteVms ...
-func (s stack) rpcDeleteVms(vmIDs []string) fail.Error {
+func (s stack) rpcDeleteVms(ctx context.Context, vmIDs []string) fail.Error {
 	opts := osc.DeleteVmsOpts{
 		DeleteVmsRequest: optional.NewInterface(osc.DeleteVmsRequest{
 			VmIds: vmIDs,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, innerErr := s.client.VmApi.DeleteVms(s.auth, &opts)
 			if innerErr != nil {
@@ -275,7 +277,7 @@ func (s stack) rpcDeleteVms(vmIDs []string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateNetwork(name, cidr string) (_ osc.Net, ferr fail.Error) {
+func (s stack) rpcCreateNetwork(ctx context.Context, name, cidr string) (_ osc.Net, ferr fail.Error) {
 	if cidr == "" {
 		return osc.Net{}, fail.InvalidParameterError("cidr", "cannot be empty string")
 	}
@@ -287,7 +289,7 @@ func (s stack) rpcCreateNetwork(name, cidr string) (_ osc.Net, ferr fail.Error) 
 		}),
 	}
 	var resp osc.CreateNetResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.NetApi.CreateNet(s.auth, &opts)
 			if innerXerr != nil {
@@ -304,13 +306,13 @@ func (s stack) rpcCreateNetwork(name, cidr string) (_ osc.Net, ferr fail.Error) 
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteNetwork(resp.Net.NetId); derr != nil {
+			if derr := s.rpcDeleteNetwork(ctx, resp.Net.NetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", name))
 			}
 		}
 	}()
 
-	tags, xerr := s.rpcCreateTags(resp.Net.NetId, map[string]string{
+	tags, xerr := s.rpcCreateTags(ctx, resp.Net.NetId, map[string]string{
 		tagNameLabel: name,
 	})
 	if xerr != nil {
@@ -321,14 +323,14 @@ func (s stack) rpcCreateNetwork(name, cidr string) (_ osc.Net, ferr fail.Error) 
 	return resp.Net, nil
 }
 
-func (s stack) rpcUpdateNet(networkID, dhcpOptionsSetID string) fail.Error {
+func (s stack) rpcUpdateNet(ctx context.Context, networkID, dhcpOptionsSetID string) fail.Error {
 	opts := osc.UpdateNetOpts{
 		UpdateNetRequest: optional.NewInterface(osc.UpdateNetRequest{
 			NetId:            networkID,
 			DhcpOptionsSetId: dhcpOptionsSetID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.NetApi.UpdateNet(s.auth, &opts)
 			if err != nil {
@@ -340,7 +342,7 @@ func (s stack) rpcUpdateNet(networkID, dhcpOptionsSetID string) fail.Error {
 	)
 }
 
-func (s stack) rpcDeleteNetwork(id string) fail.Error {
+func (s stack) rpcDeleteNetwork(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -350,7 +352,7 @@ func (s stack) rpcDeleteNetwork(id string) fail.Error {
 			NetId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, innerErr := s.client.NetApi.DeleteNet(s.auth, &opts)
 			if innerErr != nil {
@@ -362,7 +364,7 @@ func (s stack) rpcDeleteNetwork(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateTags(id string, tags map[string]string) ([]osc.ResourceTag, fail.Error) {
+func (s stack) rpcCreateTags(ctx context.Context, id string, tags map[string]string) ([]osc.ResourceTag, fail.Error) {
 	var tagList []osc.ResourceTag
 	for k, v := range tags {
 		tagList = append(tagList, osc.ResourceTag{
@@ -376,7 +378,7 @@ func (s stack) rpcCreateTags(id string, tags map[string]string) ([]osc.ResourceT
 			Tags:        tagList,
 		}),
 	}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, innerErr := s.client.TagApi.CreateTags(s.auth, &opts)
 			if innerErr != nil {
@@ -392,7 +394,7 @@ func (s stack) rpcCreateTags(id string, tags map[string]string) ([]osc.ResourceT
 	return tagList, nil
 }
 
-func (s stack) rpcDeleteSubnet(id string) fail.Error {
+func (s stack) rpcDeleteSubnet(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -402,7 +404,7 @@ func (s stack) rpcDeleteSubnet(id string) fail.Error {
 			SubnetId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.SubnetApi.DeleteSubnet(s.auth, &opts)
 			if err != nil {
@@ -414,7 +416,7 @@ func (s stack) rpcDeleteSubnet(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fail.Error) {
+func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, cidr string) (_ osc.Subnet, ferr fail.Error) {
 	if name == "" {
 		return osc.Subnet{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -433,7 +435,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fai
 		}),
 	}
 	var resp osc.CreateSubnetResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.SubnetApi.CreateSubnet(s.auth, &createRequest)
 			if innerXerr != nil {
@@ -450,7 +452,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fai
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteSubnet(resp.Subnet.SubnetId); derr != nil {
+			if derr := s.rpcDeleteSubnet(ctx, resp.Subnet.SubnetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", name))
 			}
 		}
@@ -462,7 +464,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fai
 			SubnetId:            resp.Subnet.SubnetId,
 		}),
 	}
-	xerr = stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.SubnetApi.UpdateSubnet(s.auth, &updateRequest)
 			if err != nil {
@@ -476,7 +478,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fai
 		return osc.Subnet{}, xerr
 	}
 
-	_, xerr = s.rpcCreateTags(resp.Subnet.SubnetId, map[string]string{
+	_, xerr = s.rpcCreateTags(ctx, resp.Subnet.SubnetId, map[string]string{
 		"name": name,
 	})
 	if xerr != nil {
@@ -486,7 +488,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fai
 	return resp.Subnet, nil
 }
 
-func (s stack) rpcReadSubnets(networkID string, ids []string) ([]osc.Subnet, fail.Error) {
+func (s stack) rpcReadSubnets(ctx context.Context, networkID string, ids []string) ([]osc.Subnet, fail.Error) {
 	var filters osc.FiltersSubnet
 	if len(ids) > 0 {
 		filters.SubnetIds = ids
@@ -501,7 +503,7 @@ func (s stack) rpcReadSubnets(networkID string, ids []string) ([]osc.Subnet, fai
 		}),
 	}
 	var resp osc.ReadSubnetsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.SubnetApi.ReadSubnets(s.auth, &opts)
 			if innerXerr != nil {
@@ -524,12 +526,12 @@ func (s stack) rpcReadSubnets(networkID string, ids []string) ([]osc.Subnet, fai
 	return resp.Subnets, nil
 }
 
-func (s stack) rpcReadSubnetByID(id string) (osc.Subnet, fail.Error) {
+func (s stack) rpcReadSubnetByID(ctx context.Context, id string) (osc.Subnet, fail.Error) {
 	if id == "" {
 		return osc.Subnet{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	subnets, xerr := s.rpcReadSubnets("", []string{id})
+	subnets, xerr := s.rpcReadSubnets(ctx, "", []string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -547,7 +549,7 @@ func (s stack) rpcReadSubnetByID(id string) (osc.Subnet, fail.Error) {
 	return subnets[0], nil
 }
 
-func (s stack) rpcReadTagsOfResource(resourceID string) (map[string]string, fail.Error) {
+func (s stack) rpcReadTagsOfResource(ctx context.Context, resourceID string) (map[string]string, fail.Error) {
 	if resourceID == "" {
 		return map[string]string{}, fail.InvalidParameterError("resourceID", "cannot be empty string")
 	}
@@ -559,7 +561,7 @@ func (s stack) rpcReadTagsOfResource(resourceID string) (map[string]string, fail
 		}),
 	}
 	var resp osc.ReadTagsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.TagApi.ReadTags(s.auth, &opts)
 			if innerXerr != nil {
@@ -579,7 +581,7 @@ func (s stack) rpcReadTagsOfResource(resourceID string) (map[string]string, fail
 	return tags, nil
 }
 
-func (s stack) rpcReadNics(subnetID, hostID string) ([]osc.Nic, fail.Error) {
+func (s stack) rpcReadNics(ctx context.Context, subnetID, hostID string) ([]osc.Nic, fail.Error) {
 	var filters osc.FiltersNic
 	if subnetID != "" {
 		filters.SubnetIds = []string{subnetID}
@@ -593,7 +595,7 @@ func (s stack) rpcReadNics(subnetID, hostID string) ([]osc.Nic, fail.Error) {
 		}),
 	}
 	var resp osc.ReadNicsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.NicApi.ReadNics(s.auth, &opts)
 			if innerXerr != nil {
@@ -622,7 +624,7 @@ func (s stack) rpcReadNics(subnetID, hostID string) ([]osc.Nic, fail.Error) {
 	return resp.Nics, nil
 }
 
-func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (_ osc.Nic, ferr fail.Error) {
+func (s stack) rpcCreateNic(ctx context.Context, subnetID, name, description string, sgs []string) (_ osc.Nic, ferr fail.Error) {
 	if subnetID == "" {
 		return osc.Nic{}, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
@@ -642,7 +644,7 @@ func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (_
 	}
 
 	var resp osc.CreateNicResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.NicApi.CreateNic(s.auth, &opts)
 			if innerXerr != nil {
@@ -659,13 +661,13 @@ func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (_
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteNic(resp.Nic.NicId); derr != nil {
+			if derr := s.rpcDeleteNic(ctx, resp.Nic.NicId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Nic '%s'", name))
 			}
 		}
 	}()
 
-	tags, xerr := s.rpcCreateTags(resp.Nic.NicId, map[string]string{
+	tags, xerr := s.rpcCreateTags(ctx, resp.Nic.NicId, map[string]string{
 		tagNameLabel: name,
 	})
 	if xerr != nil {
@@ -676,7 +678,7 @@ func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (_
 	return resp.Nic, nil
 }
 
-func (s stack) rpcDeleteNic(id string) fail.Error {
+func (s stack) rpcDeleteNic(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -686,7 +688,7 @@ func (s stack) rpcDeleteNic(id string) fail.Error {
 			NicId: id,
 		}),
 	}
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.NicApi.DeleteNic(s.auth, &opts)
 			if err != nil {
@@ -702,7 +704,7 @@ func (s stack) rpcDeleteNic(id string) fail.Error {
 	return nil
 }
 
-func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
+func (s stack) rpcLinkNic(ctx context.Context, vmID, nicID string, order int32) fail.Error {
 	if vmID == "" {
 		return fail.InvalidParameterError("vmID", "cannot be empty string")
 	}
@@ -717,7 +719,7 @@ func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
 			DeviceNumber: order,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.NicApi.LinkNic(s.auth, &opts)
 			if err != nil {
@@ -729,7 +731,7 @@ func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
 	)
 }
 
-func (s stack) rpcUnLinkNic(linkNicID string) fail.Error {
+func (s stack) rpcUnLinkNic(ctx context.Context, linkNicID string) fail.Error {
 	if linkNicID == "" {
 		return fail.InvalidParameterError("nicLinkID", "cannot be empty string")
 	}
@@ -739,7 +741,7 @@ func (s stack) rpcUnLinkNic(linkNicID string) fail.Error {
 			LinkNicId: linkNicID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.NicApi.UnlinkNic(s.auth, &opts)
 			if err != nil {
@@ -751,7 +753,7 @@ func (s stack) rpcUnLinkNic(linkNicID string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateDhcpOptions(name string, dnsServers, ntpServers []string) (osc.DhcpOptionsSet, fail.Error) {
+func (s stack) rpcCreateDhcpOptions(ctx context.Context, name string, dnsServers, ntpServers []string) (osc.DhcpOptionsSet, fail.Error) {
 	opts := osc.CreateDhcpOptionsOpts{
 		CreateDhcpOptionsRequest: optional.NewInterface(osc.CreateDhcpOptionsRequest{
 			NtpServers:        ntpServers,
@@ -759,7 +761,7 @@ func (s stack) rpcCreateDhcpOptions(name string, dnsServers, ntpServers []string
 		}),
 	}
 	var resp osc.CreateDhcpOptionsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, innerXerr := s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &opts)
 			if innerXerr != nil {
@@ -774,7 +776,7 @@ func (s stack) rpcCreateDhcpOptions(name string, dnsServers, ntpServers []string
 		return osc.DhcpOptionsSet{}, xerr
 	}
 
-	_, xerr = s.rpcCreateTags(resp.DhcpOptionsSet.DhcpOptionsSetId, map[string]string{
+	_, xerr = s.rpcCreateTags(ctx, resp.DhcpOptionsSet.DhcpOptionsSetId, map[string]string{
 		"name": name,
 	})
 	if xerr != nil {
@@ -784,7 +786,7 @@ func (s stack) rpcCreateDhcpOptions(name string, dnsServers, ntpServers []string
 	return resp.DhcpOptionsSet, nil
 }
 
-func (s stack) rpcReadDhcpOptionsByID(id string) ([]osc.DhcpOptionsSet, fail.Error) {
+func (s stack) rpcReadDhcpOptionsByID(ctx context.Context, id string) ([]osc.DhcpOptionsSet, fail.Error) {
 	if id == "" {
 		return []osc.DhcpOptionsSet{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -797,7 +799,7 @@ func (s stack) rpcReadDhcpOptionsByID(id string) ([]osc.DhcpOptionsSet, fail.Err
 		}),
 	}
 	var resp osc.ReadDhcpOptionsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &opts)
 			if innerXerr != nil {
@@ -817,7 +819,7 @@ func (s stack) rpcReadDhcpOptionsByID(id string) ([]osc.DhcpOptionsSet, fail.Err
 	return resp.DhcpOptionsSets, nil
 }
 
-func (s stack) rpcDeleteDhcpOptions(id string) fail.Error {
+func (s stack) rpcDeleteDhcpOptions(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -827,7 +829,7 @@ func (s stack) rpcDeleteDhcpOptions(id string) fail.Error {
 			DhcpOptionsSetId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &opts)
 			if err != nil {
@@ -839,7 +841,7 @@ func (s stack) rpcDeleteDhcpOptions(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateFlexibleGpu(model string) (osc.FlexibleGpu, fail.Error) {
+func (s stack) rpcCreateFlexibleGpu(ctx context.Context, model string) (osc.FlexibleGpu, fail.Error) {
 	createFlexibleGpuOpts := osc.CreateFlexibleGpuOpts{
 		CreateFlexibleGpuRequest: optional.NewInterface(osc.CreateFlexibleGpuRequest{
 			DeleteOnVmDeletion: true,
@@ -849,7 +851,7 @@ func (s stack) rpcCreateFlexibleGpu(model string) (osc.FlexibleGpu, fail.Error) 
 		}),
 	}
 	var resp osc.CreateFlexibleGpuResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerXerr := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &createFlexibleGpuOpts)
 			if innerXerr != nil {
@@ -866,14 +868,14 @@ func (s stack) rpcCreateFlexibleGpu(model string) (osc.FlexibleGpu, fail.Error) 
 	return resp.FlexibleGpu, nil
 }
 
-func (s stack) rpcLinkFlexibleGpu(gpuID, vmID string) fail.Error {
+func (s stack) rpcLinkFlexibleGpu(ctx context.Context, gpuID, vmID string) fail.Error {
 	opts := osc.LinkFlexibleGpuOpts{
 		LinkFlexibleGpuRequest: optional.NewInterface(osc.LinkFlexibleGpuRequest{
 			VmId:          vmID,
 			FlexibleGpuId: gpuID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &opts)
 			if err != nil {
@@ -885,7 +887,7 @@ func (s stack) rpcLinkFlexibleGpu(gpuID, vmID string) fail.Error {
 	)
 }
 
-func (s stack) rpcDeleteFlexibleGpu(id string) fail.Error {
+func (s stack) rpcDeleteFlexibleGpu(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -895,7 +897,7 @@ func (s stack) rpcDeleteFlexibleGpu(id string) fail.Error {
 			FlexibleGpuId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &opts)
 			if err != nil {
@@ -908,7 +910,7 @@ func (s stack) rpcDeleteFlexibleGpu(id string) fail.Error {
 
 }
 
-func (s stack) rpcUpdateVMSecurityGroups(id string, sgs []string) fail.Error {
+func (s stack) rpcUpdateVMSecurityGroups(ctx context.Context, id string, sgs []string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -922,7 +924,7 @@ func (s stack) rpcUpdateVMSecurityGroups(id string, sgs []string) fail.Error {
 			SecurityGroupIds: sgs,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VmApi.UpdateVm(s.auth, &opts)
 			if err != nil {
@@ -934,7 +936,7 @@ func (s stack) rpcUpdateVMSecurityGroups(id string, sgs []string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string) (_ osc.Volume, ferr fail.Error) {
+func (s stack) rpcCreateVolume(ctx context.Context, name string, size int32, iops int32, speed string) (_ osc.Volume, ferr fail.Error) {
 	createVolumeOpts := osc.CreateVolumeOpts{
 		CreateVolumeRequest: optional.NewInterface(osc.CreateVolumeRequest{
 			Iops:          iops,
@@ -945,7 +947,7 @@ func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string
 		}),
 	}
 	var resp osc.CreateVolumeResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.VolumeApi.CreateVolume(s.auth, &createVolumeOpts)
 			if err != nil {
@@ -962,13 +964,13 @@ func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteVolume(resp.Volume.VolumeId); derr != nil {
+			if derr := s.rpcDeleteVolume(ctx, resp.Volume.VolumeId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
 			}
 		}
 	}()
 
-	_, xerr = s.rpcCreateTags(resp.Volume.VolumeId, map[string]string{
+	_, xerr = s.rpcCreateTags(ctx, resp.Volume.VolumeId, map[string]string{
 		tagNameLabel: name,
 	})
 	if xerr != nil {
@@ -978,7 +980,7 @@ func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string
 	return resp.Volume, nil
 }
 
-func (s stack) rpcReadVolumes(ids []string) ([]osc.Volume, fail.Error) {
+func (s stack) rpcReadVolumes(ctx context.Context, ids []string) ([]osc.Volume, fail.Error) {
 	filters := osc.FiltersVolume{
 		SubregionNames: []string{s.Options.Compute.Subregion},
 	}
@@ -991,7 +993,7 @@ func (s stack) rpcReadVolumes(ids []string) ([]osc.Volume, fail.Error) {
 		}),
 	}
 	var resp osc.ReadVolumesResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.VolumeApi.ReadVolumes(s.auth, &opts)
 			if err != nil {
@@ -1015,12 +1017,12 @@ func (s stack) rpcReadVolumes(ids []string) ([]osc.Volume, fail.Error) {
 	return resp.Volumes, nil
 }
 
-func (s stack) rpcReadVolumeByID(id string) (osc.Volume, fail.Error) {
+func (s stack) rpcReadVolumeByID(ctx context.Context, id string) (osc.Volume, fail.Error) {
 	if id == "" {
 		return osc.Volume{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	resp, xerr := s.rpcReadVolumes([]string{id})
+	resp, xerr := s.rpcReadVolumes(ctx, []string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1035,7 +1037,7 @@ func (s stack) rpcReadVolumeByID(id string) (osc.Volume, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcReadVolumeByName(name string) (osc.Volume, fail.Error) {
+func (s stack) rpcReadVolumeByName(ctx context.Context, name string) (osc.Volume, fail.Error) {
 	if name == "" {
 		return osc.Volume{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -1049,7 +1051,7 @@ func (s stack) rpcReadVolumeByName(name string) (osc.Volume, fail.Error) {
 		}),
 	}
 	var resp osc.ReadVolumesResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.VolumeApi.ReadVolumes(s.auth, &opts)
 			if err != nil {
@@ -1072,7 +1074,7 @@ func (s stack) rpcReadVolumeByName(name string) (osc.Volume, fail.Error) {
 	return resp.Volumes[0], nil
 }
 
-func (s stack) rpcDeleteVolume(id string) fail.Error {
+func (s stack) rpcDeleteVolume(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1082,7 +1084,7 @@ func (s stack) rpcDeleteVolume(id string) fail.Error {
 			VolumeId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VolumeApi.DeleteVolume(s.auth, &opts)
 			if err != nil {
@@ -1094,7 +1096,7 @@ func (s stack) rpcDeleteVolume(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcLinkVolume(volumeID, hostID, deviceName string) fail.Error {
+func (s stack) rpcLinkVolume(ctx context.Context, volumeID, hostID, deviceName string) fail.Error {
 	if volumeID == "" {
 		return fail.InvalidParameterError("volumeID", "cannot be empty string")
 	}
@@ -1111,7 +1113,7 @@ func (s stack) rpcLinkVolume(volumeID, hostID, deviceName string) fail.Error {
 			VolumeId:   volumeID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VolumeApi.LinkVolume(s.auth, &opts)
 			if err != nil {
@@ -1123,7 +1125,7 @@ func (s stack) rpcLinkVolume(volumeID, hostID, deviceName string) fail.Error {
 	)
 }
 
-func (s stack) rpcUnlinkVolume(id string) fail.Error {
+func (s stack) rpcUnlinkVolume(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1133,7 +1135,7 @@ func (s stack) rpcUnlinkVolume(id string) fail.Error {
 			VolumeId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VolumeApi.UnlinkVolume(s.auth, &opts)
 			if err != nil {
@@ -1145,7 +1147,7 @@ func (s stack) rpcUnlinkVolume(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcLinkInternetService(networkID, internetServiceID string) fail.Error {
+func (s stack) rpcLinkInternetService(ctx context.Context, networkID, internetServiceID string) fail.Error {
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
@@ -1159,7 +1161,7 @@ func (s stack) rpcLinkInternetService(networkID, internetServiceID string) fail.
 			NetId:             networkID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.InternetServiceApi.LinkInternetService(s.auth, &opts)
 			if err != nil {
@@ -1171,7 +1173,7 @@ func (s stack) rpcLinkInternetService(networkID, internetServiceID string) fail.
 	)
 }
 
-func (s stack) rpcDeleteInternetService(id string) fail.Error {
+func (s stack) rpcDeleteInternetService(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1181,7 +1183,7 @@ func (s stack) rpcDeleteInternetService(id string) fail.Error {
 			InternetServiceId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.InternetServiceApi.DeleteInternetService(s.auth, &opts)
 			if err != nil {
@@ -1193,13 +1195,13 @@ func (s stack) rpcDeleteInternetService(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateInternetService(name string) (_ osc.InternetService, ferr fail.Error) {
+func (s stack) rpcCreateInternetService(ctx context.Context, name string) (_ osc.InternetService, ferr fail.Error) {
 	if name == "" {
 		return osc.InternetService{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	var resp osc.CreateInternetServiceResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
 			if err != nil {
@@ -1216,13 +1218,13 @@ func (s stack) rpcCreateInternetService(name string) (_ osc.InternetService, fer
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteInternetService(resp.InternetService.InternetServiceId); derr != nil {
+			if derr := s.rpcDeleteInternetService(ctx, resp.InternetService.InternetServiceId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete internet service '%s'", name))
 			}
 		}
 	}()
 
-	_, xerr = s.rpcCreateTags(resp.InternetService.InternetServiceId, map[string]string{
+	_, xerr = s.rpcCreateTags(ctx, resp.InternetService.InternetServiceId, map[string]string{
 		tagNameLabel: name,
 	})
 	if xerr != nil {
@@ -1232,7 +1234,7 @@ func (s stack) rpcCreateInternetService(name string) (_ osc.InternetService, fer
 	return resp.InternetService, nil
 }
 
-func (s stack) rpcUnlinkInternetService(networkID, internetServiceID string) fail.Error {
+func (s stack) rpcUnlinkInternetService(ctx context.Context, networkID, internetServiceID string) fail.Error {
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
@@ -1246,7 +1248,7 @@ func (s stack) rpcUnlinkInternetService(networkID, internetServiceID string) fai
 			NetId:             networkID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.InternetServiceApi.UnlinkInternetService(s.auth, &opts)
 			if err != nil {
@@ -1258,7 +1260,7 @@ func (s stack) rpcUnlinkInternetService(networkID, internetServiceID string) fai
 	)
 }
 
-func (s stack) rpcReadInternetServices(ids []string) ([]osc.InternetService, fail.Error) {
+func (s stack) rpcReadInternetServices(ctx context.Context, ids []string) ([]osc.InternetService, fail.Error) {
 	var filters osc.FiltersInternetService
 	if len(ids) > 0 {
 		filters.InternetServiceIds = ids
@@ -1269,7 +1271,7 @@ func (s stack) rpcReadInternetServices(ids []string) ([]osc.InternetService, fai
 		}),
 	}
 	var resp osc.ReadInternetServicesResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.InternetServiceApi.ReadInternetServices(s.auth, &opts)
 			if err != nil {
@@ -1294,7 +1296,7 @@ func (s stack) rpcReadInternetServices(ids []string) ([]osc.InternetService, fai
 	return resp.InternetServices, nil
 }
 
-func (s stack) rpcCreateRoute(internetServiceID, routeTableID, destination string) fail.Error {
+func (s stack) rpcCreateRoute(ctx context.Context, internetServiceID, routeTableID, destination string) fail.Error {
 	opts := osc.CreateRouteOpts{
 		CreateRouteRequest: optional.NewInterface(osc.CreateRouteRequest{
 			DestinationIpRange: destination,
@@ -1302,7 +1304,7 @@ func (s stack) rpcCreateRoute(internetServiceID, routeTableID, destination strin
 			RouteTableId:       routeTableID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.RouteApi.CreateRoute(s.auth, &opts)
 			if err != nil {
@@ -1314,7 +1316,7 @@ func (s stack) rpcCreateRoute(internetServiceID, routeTableID, destination strin
 	)
 }
 
-func (s stack) rpcReadRouteTablesOfNetworks(networkIDs []string) ([]osc.RouteTable, fail.Error) {
+func (s stack) rpcReadRouteTablesOfNetworks(ctx context.Context, networkIDs []string) ([]osc.RouteTable, fail.Error) {
 	var filters osc.FiltersRouteTable
 	if len(networkIDs) > 0 {
 		filters.NetIds = networkIDs
@@ -1325,7 +1327,7 @@ func (s stack) rpcReadRouteTablesOfNetworks(networkIDs []string) ([]osc.RouteTab
 		}),
 	}
 	var resp osc.ReadRouteTablesResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.RouteTableApi.ReadRouteTables(s.auth, &opts)
 			if err != nil {
@@ -1350,12 +1352,12 @@ func (s stack) rpcReadRouteTablesOfNetworks(networkIDs []string) ([]osc.RouteTab
 	return resp.RouteTables, nil
 }
 
-func (s stack) rpcReadRouteTableOfNetwork(id string) (osc.RouteTable, fail.Error) {
+func (s stack) rpcReadRouteTableOfNetwork(ctx context.Context, id string) (osc.RouteTable, fail.Error) {
 	if id == "" {
 		return osc.RouteTable{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	resp, xerr := s.rpcReadRouteTablesOfNetworks([]string{id})
+	resp, xerr := s.rpcReadRouteTablesOfNetworks(ctx, []string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1370,7 +1372,7 @@ func (s stack) rpcReadRouteTableOfNetwork(id string) (osc.RouteTable, fail.Error
 	return resp[0], nil
 }
 
-func (s stack) rpcReadNets(ids []string) ([]osc.Net, fail.Error) {
+func (s stack) rpcReadNets(ctx context.Context, ids []string) ([]osc.Net, fail.Error) {
 	var filters osc.FiltersNet
 	if len(ids) > 0 {
 		filters.NetIds = ids
@@ -1384,7 +1386,7 @@ func (s stack) rpcReadNets(ids []string) ([]osc.Net, fail.Error) {
 		emptySlice []osc.Net
 		resp       osc.ReadNetsResponse
 	)
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.NetApi.ReadNets(s.auth, &opts)
 			if err != nil {
@@ -1407,12 +1409,12 @@ func (s stack) rpcReadNets(ids []string) ([]osc.Net, fail.Error) {
 	return resp.Nets, nil
 }
 
-func (s stack) rpcReadNetByID(id string) (osc.Net, fail.Error) {
+func (s stack) rpcReadNetByID(ctx context.Context, id string) (osc.Net, fail.Error) {
 	if id == "" {
 		return osc.Net{}, fail.InvalidParameterError("id", "cannot be nil")
 	}
 
-	resp, xerr := s.rpcReadNets([]string{id})
+	resp, xerr := s.rpcReadNets(ctx, []string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1427,7 +1429,7 @@ func (s stack) rpcReadNetByID(id string) (osc.Net, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcReadNetByName(name string) (osc.Net, fail.Error) {
+func (s stack) rpcReadNetByName(ctx context.Context, name string) (osc.Net, fail.Error) {
 	if name == "" {
 		return osc.Net{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -1440,7 +1442,7 @@ func (s stack) rpcReadNetByName(name string) (osc.Net, fail.Error) {
 		}),
 	}
 	var resp osc.ReadNetsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.NetApi.ReadNets(s.auth, &opts)
 			if err != nil {
@@ -1464,7 +1466,7 @@ func (s stack) rpcReadNetByName(name string) (osc.Net, fail.Error) {
 	return resp.Nets[0], nil
 }
 
-func (s stack) rpcCreateSecurityGroup(networkID, name, description string) (osc.SecurityGroup, fail.Error) {
+func (s stack) rpcCreateSecurityGroup(ctx context.Context, networkID, name, description string) (osc.SecurityGroup, fail.Error) {
 	if networkID == "" {
 		return osc.SecurityGroup{}, fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
@@ -1480,7 +1482,7 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description string) (osc.
 		}),
 	}
 	var resp osc.CreateSecurityGroupResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &opts)
 			if err != nil {
@@ -1497,7 +1499,7 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description string) (osc.
 	return resp.SecurityGroup, nil
 }
 
-func (s stack) rpcDeleteSecurityGroup(id string) fail.Error {
+func (s stack) rpcDeleteSecurityGroup(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1507,7 +1509,7 @@ func (s stack) rpcDeleteSecurityGroup(id string) fail.Error {
 			SecurityGroupId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &opts)
 			if err != nil {
@@ -1519,7 +1521,7 @@ func (s stack) rpcDeleteSecurityGroup(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateSecurityGroupRules(id, flow string, rules []osc.SecurityGroupRule) fail.Error {
+func (s stack) rpcCreateSecurityGroupRules(ctx context.Context, id, flow string, rules []osc.SecurityGroupRule) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1537,7 +1539,7 @@ func (s stack) rpcCreateSecurityGroupRules(id, flow string, rules []osc.Security
 			Flow:            flow,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &opts)
 			if err != nil {
@@ -1549,7 +1551,7 @@ func (s stack) rpcCreateSecurityGroupRules(id, flow string, rules []osc.Security
 	)
 }
 
-func (s stack) rpcDeleteSecurityGroupRules(id, flow string, rules []osc.SecurityGroupRule) fail.Error {
+func (s stack) rpcDeleteSecurityGroupRules(ctx context.Context, id, flow string, rules []osc.SecurityGroupRule) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1571,7 +1573,7 @@ func (s stack) rpcDeleteSecurityGroupRules(id, flow string, rules []osc.Security
 			Flow:            flow,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &opts)
 			if err != nil {
@@ -1583,7 +1585,7 @@ func (s stack) rpcDeleteSecurityGroupRules(id, flow string, rules []osc.Security
 	)
 }
 
-func (s stack) rpcCreateKeypair(name string, publicKey string) fail.Error {
+func (s stack) rpcCreateKeypair(ctx context.Context, name string, publicKey string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -1597,7 +1599,7 @@ func (s stack) rpcCreateKeypair(name string, publicKey string) fail.Error {
 			PublicKey:   publicKey,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.KeypairApi.CreateKeypair(s.auth, &opts)
 			if err != nil {
@@ -1609,7 +1611,7 @@ func (s stack) rpcCreateKeypair(name string, publicKey string) fail.Error {
 	)
 }
 
-func (s stack) rpcReadKeypairs(names []string) ([]osc.Keypair, fail.Error) {
+func (s stack) rpcReadKeypairs(ctx context.Context, names []string) ([]osc.Keypair, fail.Error) {
 	var filters osc.FiltersKeypair
 	if len(names) > 0 {
 		filters.KeypairNames = names
@@ -1620,7 +1622,7 @@ func (s stack) rpcReadKeypairs(names []string) ([]osc.Keypair, fail.Error) {
 		}),
 	}
 	var resp osc.ReadKeypairsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.KeypairApi.ReadKeypairs(s.auth, &opts)
 			if err != nil {
@@ -1643,12 +1645,12 @@ func (s stack) rpcReadKeypairs(names []string) ([]osc.Keypair, fail.Error) {
 	return resp.Keypairs, nil
 }
 
-func (s stack) rpcReadKeypairByName(name string) (osc.Keypair, fail.Error) {
+func (s stack) rpcReadKeypairByName(ctx context.Context, name string) (osc.Keypair, fail.Error) {
 	if name == "" {
 		return osc.Keypair{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	resp, xerr := s.rpcReadKeypairs([]string{name})
+	resp, xerr := s.rpcReadKeypairs(ctx, []string{name})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1663,7 +1665,7 @@ func (s stack) rpcReadKeypairByName(name string) (osc.Keypair, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcDeleteKeypair(name string) fail.Error {
+func (s stack) rpcDeleteKeypair(ctx context.Context, name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -1673,7 +1675,7 @@ func (s stack) rpcDeleteKeypair(name string) fail.Error {
 			KeypairName: name,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.KeypairApi.DeleteKeypair(s.auth, &opts)
 			if err != nil {
@@ -1685,7 +1687,7 @@ func (s stack) rpcDeleteKeypair(name string) fail.Error {
 	)
 }
 
-func (s stack) rpcReadImages(ids []string) ([]osc.Image, fail.Error) {
+func (s stack) rpcReadImages(ctx context.Context, ids []string) ([]osc.Image, fail.Error) {
 	var filters osc.FiltersImage
 	if len(ids) > 0 {
 		filters.ImageIds = ids
@@ -1696,7 +1698,7 @@ func (s stack) rpcReadImages(ids []string) ([]osc.Image, fail.Error) {
 		}),
 	}
 	var resp osc.ReadImagesResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.ImageApi.ReadImages(s.auth, &opts)
 			if err != nil {
@@ -1719,12 +1721,12 @@ func (s stack) rpcReadImages(ids []string) ([]osc.Image, fail.Error) {
 	return resp.Images, nil
 }
 
-func (s stack) rpcReadImageByID(id string) (osc.Image, fail.Error) {
+func (s stack) rpcReadImageByID(ctx context.Context, id string) (osc.Image, fail.Error) {
 	if id == "" {
 		return osc.Image{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	resp, xerr := s.rpcReadImages([]string{id})
+	resp, xerr := s.rpcReadImages(ctx, []string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1739,7 +1741,7 @@ func (s stack) rpcReadImageByID(id string) (osc.Image, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcLinkPublicIP(ipID, nicID string) fail.Error {
+func (s stack) rpcLinkPublicIP(ctx context.Context, ipID, nicID string) fail.Error {
 	if ipID == "" {
 		return fail.InvalidParameterError("ipID", "cannot be empty string")
 	}
@@ -1753,7 +1755,7 @@ func (s stack) rpcLinkPublicIP(ipID, nicID string) fail.Error {
 			PublicIpId: ipID,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.PublicIpApi.LinkPublicIp(s.auth, &opts)
 			if err != nil {
@@ -1765,7 +1767,7 @@ func (s stack) rpcLinkPublicIP(ipID, nicID string) fail.Error {
 	)
 }
 
-func (s stack) rpcDeletePublicIPByID(id string) fail.Error {
+func (s stack) rpcDeletePublicIPByID(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1775,7 +1777,7 @@ func (s stack) rpcDeletePublicIPByID(id string) fail.Error {
 			PublicIpId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &opts)
 			if err != nil {
@@ -1787,13 +1789,13 @@ func (s stack) rpcDeletePublicIPByID(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcDeletePublicIPByIP(ip string) fail.Error {
+func (s stack) rpcDeletePublicIPByIP(ctx context.Context, ip string) fail.Error {
 	opts := osc.DeletePublicIpOpts{
 		DeletePublicIpRequest: optional.NewInterface(osc.DeletePublicIpRequest{
 			PublicIp: ip,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &opts)
 			if err != nil {
@@ -1805,9 +1807,9 @@ func (s stack) rpcDeletePublicIPByIP(ip string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreatePublicIP() (osc.PublicIp, fail.Error) {
+func (s stack) rpcCreatePublicIP(ctx context.Context) (osc.PublicIp, fail.Error) {
 	var resp osc.CreatePublicIpResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
 			if err != nil {
@@ -1824,9 +1826,9 @@ func (s stack) rpcCreatePublicIP() (osc.PublicIp, fail.Error) {
 	return resp.PublicIp, nil
 }
 
-func (s stack) rpcCreateVMs(request osc.CreateVmsRequest) ([]osc.Vm, fail.Error) {
+func (s stack) rpcCreateVMs(ctx context.Context, request osc.CreateVmsRequest) ([]osc.Vm, fail.Error) {
 	var resp osc.CreateVmsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			dr, hr, innerErr := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
 				CreateVmsRequest: optional.NewInterface(request),
@@ -1848,7 +1850,7 @@ func (s stack) rpcCreateVMs(request osc.CreateVmsRequest) ([]osc.Vm, fail.Error)
 	return resp.Vms, nil
 }
 
-func (s stack) rpcReadPublicIPsOfVM(id string) ([]osc.PublicIp, fail.Error) {
+func (s stack) rpcReadPublicIPsOfVM(ctx context.Context, id string) ([]osc.PublicIp, fail.Error) {
 	if id == "" {
 		return []osc.PublicIp{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1859,7 +1861,7 @@ func (s stack) rpcReadPublicIPsOfVM(id string) ([]osc.PublicIp, fail.Error) {
 		}),
 	}
 	var resp osc.ReadPublicIpsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &opts)
 			if err != nil {
@@ -1879,7 +1881,7 @@ func (s stack) rpcReadPublicIPsOfVM(id string) ([]osc.PublicIp, fail.Error) {
 	return resp.PublicIps, nil
 }
 
-func (s stack) rpcStopVMs(ids []string) fail.Error {
+func (s stack) rpcStopVMs(ctx context.Context, ids []string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -1890,7 +1892,7 @@ func (s stack) rpcStopVMs(ids []string) fail.Error {
 			ForceStop: true,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VmApi.StopVms(s.auth, &opts)
 			if err != nil {
@@ -1902,7 +1904,7 @@ func (s stack) rpcStopVMs(ids []string) fail.Error {
 	)
 }
 
-func (s stack) rpcStartVMs(ids []string) fail.Error {
+func (s stack) rpcStartVMs(ctx context.Context, ids []string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -1912,7 +1914,7 @@ func (s stack) rpcStartVMs(ids []string) fail.Error {
 			VmIds: ids,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VmApi.StartVms(s.auth, &opts)
 			if err != nil {
@@ -1925,7 +1927,7 @@ func (s stack) rpcStartVMs(ids []string) fail.Error {
 
 }
 
-func (s stack) rpcRebootVMs(ids []string) fail.Error {
+func (s stack) rpcRebootVMs(ctx context.Context, ids []string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -1935,7 +1937,7 @@ func (s stack) rpcRebootVMs(ids []string) fail.Error {
 			VmIds: ids,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VmApi.RebootVms(s.auth, &opts)
 			if err != nil {
@@ -1947,7 +1949,7 @@ func (s stack) rpcRebootVMs(ids []string) fail.Error {
 	)
 }
 
-func (s stack) rpcUpdateVMType(id string, typ string) fail.Error {
+func (s stack) rpcUpdateVMType(ctx context.Context, id string, typ string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1961,7 +1963,7 @@ func (s stack) rpcUpdateVMType(id string, typ string) fail.Error {
 			VmType: typ,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, hr, err := s.client.VmApi.UpdateVm(s.auth, &opts)
 			if err != nil {
@@ -1973,7 +1975,7 @@ func (s stack) rpcUpdateVMType(id string, typ string) fail.Error {
 	)
 }
 
-func (s stack) rpcReadNicsOfVM(id string) ([]osc.Nic, fail.Error) {
+func (s stack) rpcReadNicsOfVM(ctx context.Context, id string) ([]osc.Nic, fail.Error) {
 	opts := osc.ReadNicsOpts{
 		ReadNicsRequest: optional.NewInterface(osc.ReadNicsRequest{
 			Filters: osc.FiltersNic{
@@ -1982,7 +1984,7 @@ func (s stack) rpcReadNicsOfVM(id string) ([]osc.Nic, fail.Error) {
 		}),
 	}
 	var resp osc.ReadNicsResponse
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			dr, hr, err := s.client.NicApi.ReadNics(s.auth, &opts)
 			if err != nil {

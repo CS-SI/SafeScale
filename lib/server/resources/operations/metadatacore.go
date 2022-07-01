@@ -179,6 +179,12 @@ func (myself *MetadataCore) Inspect(ctx context.Context, callback resources.Call
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
 	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
+
 		myself.Lock()
 		xerr = myself.unsafeReload(ctx)
 		myself.Unlock() // nolint
@@ -199,6 +205,11 @@ func (myself *MetadataCore) Inspect(ctx context.Context, callback resources.Call
 	defer myself.RUnlock()
 
 	xerr = retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
 		return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
 			return callback(clonable, myself.properties)
 		})
@@ -508,6 +519,12 @@ func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.
 	if myself.kindSplittedStore {
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				if innerXErr := myself.readByID(ctx, id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
@@ -526,6 +543,12 @@ func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.
 	} else {
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				if innerXErr := myself.readByName(ctx, id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
@@ -573,6 +596,12 @@ func (myself *MetadataCore) readByID(ctx context.Context, id string) fail.Error 
 	}
 
 	rerr := retry.WhileUnsuccessful(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
+
 		werr := myself.folder.Read(ctx, path, id, func(buf []byte) fail.Error {
 			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				switch innerXErr.(type) {
@@ -622,6 +651,11 @@ func (myself *MetadataCore) readByName(ctx context.Context, name string) fail.Er
 	}
 
 	rerr := retry.WhileUnsuccessful(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
 		werr := myself.folder.Read(ctx, path, name, func(buf []byte) fail.Error {
 			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
@@ -727,6 +761,12 @@ func (myself *MetadataCore) unsafeReload(ctx context.Context) (ferr fail.Error) 
 
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				if innerXErr := myself.readByID(ctx, id); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately
@@ -764,6 +804,12 @@ func (myself *MetadataCore) unsafeReload(ctx context.Context) (ferr fail.Error) 
 
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				if innerXErr := myself.readByName(ctx, name); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound: // If not found, stop immediately

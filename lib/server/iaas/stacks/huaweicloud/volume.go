@@ -102,7 +102,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		VolumeType:       strings.ToUpper(s.getVolumeType(request.Speed)),
 	}
 	var vol *volumes.Volume
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			vol, innerErr = volumes.Create(s.VolumeClient, opts).Extract()
 			return normalizeError(innerErr)
@@ -133,7 +133,7 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 	}
 
 	var vol *volumes.Volume
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			vol, innerErr = volumes.Get(s.VolumeClient, id).Extract()
 			return normalizeError(innerErr)
@@ -160,13 +160,13 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 }
 
 // ListVolumes lists volumes
-func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
+func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var vs []*abstract.Volume
-	commRetryErr := stacks.RetryableRemoteCall(
+	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := volumes.List(s.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumes.ExtractVolumes(page)

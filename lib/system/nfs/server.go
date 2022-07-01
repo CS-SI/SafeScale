@@ -149,6 +149,12 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
+
 		istdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
@@ -177,6 +183,12 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 
 	// FIXME: Add a retry here only if we catch an ExecutionError or a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
+
 		stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)

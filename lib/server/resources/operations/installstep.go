@@ -241,8 +241,8 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, ferr fail.Error) {
-	outcomes = &unitResults{}
+func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
+	outcomes := &unitResults{}
 
 	if task.Aborted() {
 		lerr, err := task.LastError()
@@ -259,13 +259,13 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	return is.loopConcurrentlyOnHosts(task, hosts, v)
 }
 
-func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, ferr fail.Error) {
+func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	ctx := task.Context()
-	outcomes = &unitResults{}
+	outcomes := &unitResults{}
 
 	var (
 		subtask concurrency.Task
@@ -282,7 +282,7 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 			return nil, xerr
 		}
 
-		subtask, xerr = concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
+		subtask, xerr = concurrency.NewTaskWithContext(task.Context(), concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -318,12 +318,11 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	return outcomes, nil
 }
 
-func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, ferr fail.Error) {
+func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	outcomes = &unitResults{}
 	ctx := task.Context()
 
 	var (
@@ -331,7 +330,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		subtask concurrency.Task
 	)
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	tg, xerr := concurrency.NewTaskGroupWithContext(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}

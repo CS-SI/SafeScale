@@ -608,63 +608,93 @@ func (scmd *CliCommand) Start() fail.Error {
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
-func (scmd *CliCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 	const invalid = -1
-	if scmd == nil {
-		return invalid, "", "", fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
-	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-	tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
-	defer tracer.Exiting()
-
-	subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
-	if xerr != nil {
-		return invalid, "", "", xerr
+	type result struct {
+		ra   int
+		rb   string
+		rc   string
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
 
-	if timeout == 0 {
-		timeout = 1200 * time.Second // upper bound of 20 min
-	} else if timeout > 1200*time.Second {
-		timeout = 1200 * time.Second // nothing should take more than 20 min
-	}
-
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	_, r, xerr := subtask.WaitFor(timeout)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrTimeout:
-			xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
-		default:
-			debug.IgnoreError(xerr)
+		if scmd == nil {
+			chRes <- result{invalid, "", "", fail.InvalidInstanceError()}
+			return
+		}
+		if ctx == nil {
+			chRes <- result{invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")}
+			return
 		}
 
-		// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
-		{
-			if strings.Contains(xerr.Error(), "annot allocate memory") {
-				return invalid, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
-			}
+		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+		tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
+		defer tracer.Exiting()
 
-			if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
-				return invalid, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")
-			}
+		subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
+		if xerr != nil {
+			chRes <- result{invalid, "", "", xerr}
+			return
 		}
 
-		tracer.Trace("run failed: %v", xerr)
-		return invalid, "", "", xerr
-	}
+		if timeout == 0 {
+			timeout = 1200 * time.Second // upper bound of 20 min
+		} else if timeout > 1200*time.Second {
+			timeout = 1200 * time.Second // nothing should take more than 20 min
+		}
 
-	if result, ok := r.(data.Map); ok {
-		tracer.Trace("run succeeded, retcode=%d", result["retcode"].(int))
-		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
+		if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
+			chRes <- result{invalid, "", "", xerr}
+			return
+		}
+
+		_, r, xerr := subtask.WaitFor(timeout)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrTimeout:
+				xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
+			default:
+				debug.IgnoreError(xerr)
+			}
+
+			// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
+			{
+				if strings.Contains(xerr.Error(), "annot allocate memory") {
+					chRes <- result{invalid, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")}
+					return
+				}
+
+				if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
+					chRes <- result{invalid, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")}
+					return
+				}
+			}
+
+			tracer.Trace("run failed: %v", xerr)
+			chRes <- result{invalid, "", "", xerr}
+			return
+		}
+
+		if res, ok := r.(data.Map); ok {
+			tracer.Trace("run succeeded, retcode=%d", res["retcode"].(int))
+			chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
+			return
+		}
+		chRes <- result{invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.ra, res.rb, res.rc, res.rErr
+	case <-ctx.Done():
+		return invalid, "", "", fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return invalid, "", "", fail.ConvertError(inctx.Err())
 	}
-	return invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
 type taskExecuteParameters struct {
@@ -1165,6 +1195,12 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-time.After(temporal.DefaultDelay()):
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			}
+
 			iterations++
 
 			var sshCmd sshapi.Command
@@ -1219,7 +1255,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 
 			return nil
 		},
-		temporal.DefaultDelay(),
+		0,
 		timeout+time.Minute,
 	)
 	if retryErr != nil {

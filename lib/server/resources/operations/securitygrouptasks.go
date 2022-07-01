@@ -121,7 +121,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 	ctx := task.Context()
 
 	if len(p.subnetHosts.ByID) > 0 {
-		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		tg, xerr := concurrency.NewTaskGroupWithContext(task.Context(), concurrency.InheritParentIDOption)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), p.subnetName)
 		}

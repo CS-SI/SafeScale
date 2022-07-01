@@ -128,6 +128,13 @@ func executeScript(ctx context.Context, timings temporal.Timings, sshconfig ssha
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
+				// TODO: Remove this later
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				// FIXME: It seems that f.Stat() works only on opened file... and utils.CreateTempFileFromString() returns a closed *os.File.
 				//        maybe utils.CreateTempFileFromString() should return only a path instead?
 				fin, err := os.Stat(f.Name())

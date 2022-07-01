@@ -65,7 +65,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -73,7 +73,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	}
 
 	// Check if network already there
-	if _, xerr = s.rpcDescribeVpcByName(aws.String(req.Name)); xerr != nil {
+	if _, xerr = s.rpcDescribeVpcByName(ctx, aws.String(req.Name)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
@@ -86,7 +86,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	}
 
 	// if not, create the network/VPC
-	theVpc, xerr := s.rpcCreateVpc(aws.String(req.Name), aws.String(req.CIDR))
+	theVpc, xerr := s.rpcCreateVpc(ctx, aws.String(req.Name), aws.String(req.CIDR))
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create VPC")
 	}
@@ -95,7 +95,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if IsOperation(theVpc, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
-				vpcTmp, innerXErr := s.rpcDescribeVpcByID(theVpc.VpcId)
+				vpcTmp, innerXErr := s.rpcDescribeVpcByID(ctx, theVpc.VpcId)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -130,24 +130,24 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		}
 	}()
 
-	gw, xerr := s.rpcCreateInternetGateway()
+	gw, xerr := s.rpcCreateInternetGateway(ctx)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create internet gateway")
 	}
 
-	if xerr = s.rpcAttachInternetGateway(theVpc.VpcId, gw.InternetGatewayId); xerr != nil {
+	if xerr = s.rpcAttachInternetGateway(ctx, theVpc.VpcId, gw.InternetGatewayId); xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to attach internet gateway to Network")
 	}
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.rpcDetachInternetGateway(theVpc.VpcId, gw.InternetGatewayId); derr != nil {
+			if derr := s.rpcDetachInternetGateway(ctx, theVpc.VpcId, gw.InternetGatewayId); derr != nil {
 				_ = ferr.AddConsequence(normalizeError(derr))
 			}
 		}
 	}()
 
-	tables, xerr := s.rpcDescribeRouteTables(aws.String("vpc-id"), []*string{theVpc.VpcId})
+	tables, xerr := s.rpcDescribeRouteTables(ctx, aws.String("vpc-id"), []*string{theVpc.VpcId})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -155,13 +155,13 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, fail.InconsistentError("no Route Tables")
 	}
 
-	if xerr = s.rpcCreateRoute(gw.InternetGatewayId, tables[0].RouteTableId, aws.String("0.0.0.0/0")); xerr != nil {
+	if xerr = s.rpcCreateRoute(ctx, gw.InternetGatewayId, tables[0].RouteTableId, aws.String("0.0.0.0/0")); xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create route")
 	}
 
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.rpcDeleteRoute(tables[0].RouteTableId, aws.String("0.0.0.0/0")); derr != nil {
+			if derr := s.rpcDeleteRoute(ctx, tables[0].RouteTableId, aws.String("0.0.0.0/0")); derr != nil {
 				_ = ferr.AddConsequence(normalizeError(derr))
 			}
 		}
@@ -188,9 +188,9 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (_ *abstract.Netwo
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	resp, xerr := s.rpcDescribeVpcByID(aws.String(id))
+	resp, xerr := s.rpcDescribeVpcByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -231,9 +231,9 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s')", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s')", name).WithStopwatch().Entering().Exiting()
 
-	resp, xerr := s.rpcDescribeVpcByName(aws.String(name))
+	resp, xerr := s.rpcDescribeVpcByName(ctx, aws.String(name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -247,15 +247,15 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 }
 
 // ListNetworks ...
-func (s stack) ListNetworks(context.Context) (_ []*abstract.Network, ferr fail.Error) {
+func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
 	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 
-	resp, xerr := s.rpcDescribeVpcs(nil)
+	resp, xerr := s.rpcDescribeVpcs(ctx, nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -285,14 +285,14 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var xerr fail.Error
 	if _, xerr = s.InspectNetwork(ctx, id); xerr != nil {
 		return xerr
 	}
 
-	gwTmp, xerr := s.rpcDescribeInternetGateways(aws.String(id), nil)
+	gwTmp, xerr := s.rpcDescribeInternetGateways(ctx, aws.String(id), nil)
 	if xerr != nil {
 		return xerr
 	}
@@ -300,18 +300,18 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	for _, agwTmp := range gwTmp {
 		for _, att := range agwTmp.Attachments {
 			if aws.StringValue(att.VpcId) == id {
-				if xerr = s.rpcDetachInternetGateway(att.VpcId, agwTmp.InternetGatewayId); xerr != nil {
+				if xerr = s.rpcDetachInternetGateway(ctx, att.VpcId, agwTmp.InternetGatewayId); xerr != nil {
 					return xerr
 				}
 
-				if xerr = s.rpcDeleteInternetGateway(agwTmp.InternetGatewayId); xerr != nil {
+				if xerr = s.rpcDeleteInternetGateway(ctx, agwTmp.InternetGatewayId); xerr != nil {
 					return xerr
 				}
 			}
 		}
 	}
 
-	rtTmp, xerr := s.rpcDescribeRouteTables(aws.String("vpc-id"), []*string{aws.String(id)})
+	rtTmp, xerr := s.rpcDescribeRouteTables(ctx, aws.String("vpc-id"), []*string{aws.String(id)})
 	if xerr != nil {
 		return xerr
 	}
@@ -323,7 +323,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 			// Dissociate
 			for _, rta := range artTmp.Associations {
 				if !aws.BoolValue(rta.Main) {
-					if xerr = s.rpcDisassociateRouteTable(rta.RouteTableAssociationId); xerr != nil {
+					if xerr = s.rpcDisassociateRouteTable(ctx, rta.RouteTableAssociationId); xerr != nil {
 						return xerr
 					}
 				} else {
@@ -335,17 +335,17 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 				continue
 			}
 
-			if xerr = s.rpcDeleteRouteTable(artTmp.RouteTableId); xerr != nil {
+			if xerr = s.rpcDeleteRouteTable(ctx, artTmp.RouteTableId); xerr != nil {
 				return xerr
 			}
 		}
 
-		if xerr = s.rpcDeleteRoute(rtTmp[0].RouteTableId, aws.String("0.0.0.0/0")); xerr != nil {
+		if xerr = s.rpcDeleteRoute(ctx, rtTmp[0].RouteTableId, aws.String("0.0.0.0/0")); xerr != nil {
 			return xerr
 		}
 	}
 
-	return s.rpcDeleteVpc(aws.String(id))
+	return s.rpcDeleteVpc(ctx, aws.String(id))
 }
 
 func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
@@ -390,7 +390,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -401,7 +401,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 		return nil, fail.Wrap(err, "error parsing requested CIDR")
 	}
 
-	resp, xerr := s.rpcCreateSubnet(aws.String(req.Name), aws.String(req.NetworkID), aws.String(s.AwsConfig.Zone), aws.String(req.CIDR))
+	resp, xerr := s.rpcCreateSubnet(ctx, aws.String(req.Name), aws.String(req.NetworkID), aws.String(s.AwsConfig.Zone), aws.String(req.CIDR))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -417,7 +417,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 	if IsOperation(resp, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
-				descr, innerXErr := s.rpcDescribeSubnetByID(resp.SubnetId)
+				descr, innerXErr := s.rpcDescribeSubnetByID(ctx, resp.SubnetId)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -440,7 +440,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 			}
 		}
 	}
-	tables, xerr := s.rpcDescribeRouteTables(aws.String("vpc-id"), []*string{aws.String(req.NetworkID)})
+	tables, xerr := s.rpcDescribeRouteTables(ctx, aws.String("vpc-id"), []*string{aws.String(req.NetworkID)})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -449,7 +449,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 	}
 
 	// First result should be the public interface
-	if xerr = s.rpcAssociateRouteTable(resp.SubnetId, tables[0].RouteTableId); xerr != nil {
+	if xerr = s.rpcAssociateRouteTable(ctx, resp.SubnetId, tables[0].RouteTableId); xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to associate route tables to Subnet")
 	}
 
@@ -476,9 +476,9 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	resp, xerr := s.rpcDescribeSubnetByID(aws.String(id))
+	resp, xerr := s.rpcDescribeSubnetByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -513,7 +513,7 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s', '%s')", networkRef, subnetName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s', '%s')", networkRef, subnetName).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -531,6 +531,12 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 	var resp *ec2.DescribeSubnetsOutput
 	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			resp, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
@@ -564,7 +570,7 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (list []*abst
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -579,6 +585,12 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (list []*abst
 	var subnets *ec2.DescribeSubnetsOutput
 	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			subnets, innerErr = s.EC2Service.DescribeSubnets(query)
 			return normalizeError(innerErr)
 		},
@@ -630,7 +642,7 @@ func (s stack) initEC2DescribeSubnetsInput(ctx context.Context, networkRef strin
 
 // listSubnetIDs ...
 func (s stack) listSubnetIDs(ctx context.Context, networkRef string) (list []string, ferr fail.Error) { // nolint
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -645,6 +657,12 @@ func (s stack) listSubnetIDs(ctx context.Context, networkRef string) (list []str
 	var subnets *ec2.DescribeSubnetsOutput
 	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			subnets, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
@@ -671,10 +689,10 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	// Disassociate route tables from subnet
-	tables, xerr := s.rpcDescribeRouteTables(aws.String("association.subnet-id"), []*string{aws.String(id)})
+	tables, xerr := s.rpcDescribeRouteTables(ctx, aws.String("association.subnet-id"), []*string{aws.String(id)})
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find route tables of Subnet")
 	}
@@ -683,7 +701,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		for _, v := range tables {
 			for _, a := range v.Associations {
 				if aws.StringValue(a.SubnetId) == id {
-					xerr = s.rpcDisassociateRouteTable(a.RouteTableAssociationId)
+					xerr = s.rpcDisassociateRouteTable(ctx, a.RouteTableAssociationId)
 					if xerr != nil {
 						return fail.Wrap(xerr, "failed to dissociate route tables from Subnet")
 					}
@@ -692,7 +710,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		}
 	}
 
-	return s.rpcDeleteSubnet(aws.String(id))
+	return s.rpcDeleteSubnet(ctx, aws.String(id))
 }
 
 // BindSecurityGroupToSubnet binds a security group to a network

@@ -97,7 +97,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
 	az, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil { // nolint
@@ -114,7 +114,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 			Size:             request.Size,
 			VolumeType:       s.getVolumeType(request.Speed),
 		}
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (innerErr error) {
 				vol, innerErr = volumesv1.Create(s.VolumeClient, opts).Extract()
 				return innerErr
@@ -143,7 +143,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 			VolumeType:       s.getVolumeType(request.Speed),
 		}
 		var vol *volumesv2.Volume
-		xerr = stacks.RetryableRemoteCall(
+		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (innerErr error) {
 				vol, innerErr = volumesv2.Create(s.VolumeClient, opts).Extract()
 				return innerErr
@@ -183,10 +183,10 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var vol *volumesv2.Volume
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			vol, innerErr = volumesv2.Get(s.VolumeClient, id).Extract()
 			return innerErr
@@ -213,15 +213,15 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
+func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.Volume
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.Volume{} // If call fails, need to restart list from 0...
 			innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -264,7 +264,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -274,7 +274,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	var timeout = timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			innerXErr := stacks.RetryableRemoteCall(
+			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
 				},
@@ -316,11 +316,11 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
 
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			va, innerErr = volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
 				VolumeID: request.VolumeID,
@@ -348,10 +348,10 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 		return nilA, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
 
 	var va *volumeattach.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 			return innerErr
@@ -378,10 +378,10 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
 			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
@@ -425,9 +425,9 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
-	return stacks.RetryableRemoteCall(
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
 		},

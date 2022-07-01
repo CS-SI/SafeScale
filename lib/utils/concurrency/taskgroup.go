@@ -120,10 +120,10 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 		switch parentTask := parentTask.(type) {
 		case *task:
 			p := parentTask
-			t, err = NewTaskWithParent(p)
+			t, err = NewTaskWithContext(p.ctx)
 		case *taskGroup:
 			p := parentTask
-			t, err = NewTaskWithParent(p.task)
+			t, err = NewTaskWithContext(p.ctx)
 		}
 	}
 
@@ -259,7 +259,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	case RUNNING:
 		// can start a new Task
 		// instance.last++
-		subtask, err := NewTaskWithParent(instance.task, options...)
+		subtask, err := NewTaskWithContext(instance.ctx, options...)
 		if err != nil {
 			return nil, err
 		}
@@ -692,7 +692,7 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 		fallthrough
 	case RUNNING:
 		doneWaitingCh := make(chan struct{})
-		waiterTask, xerr := NewTaskWithParent(instance.task, InheritParentIDOption, AmendID("WaitGroupForHelper"))
+		waiterTask, xerr := NewTaskWithContext(instance.ctx, InheritParentIDOption, AmendID("WaitGroupForHelper"))
 		if xerr != nil {
 			return false, nil, fail.Wrap(xerr, "failed to create task to wait")
 		}

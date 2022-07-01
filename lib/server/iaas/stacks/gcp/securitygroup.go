@@ -44,7 +44,7 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return emptySlice, nil
@@ -60,7 +60,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	auuid, err := uuid.NewV4()
@@ -79,7 +79,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		if ferr != nil {
 			for _, v := range asg.Rules {
 				for _, r := range v.IDs {
-					if derr := s.rpcDeleteFirewallRuleByID(r); derr != nil {
+					if derr := s.rpcDeleteFirewallRuleByID(ctx, r); derr != nil {
 						switch ferr.(type) {
 						case *fail.ErrNotFound:
 							// rule not found, considered as a removal success
@@ -186,14 +186,14 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 		return fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
 				var xerr fail.Error
-				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
+				if xerr = s.rpcDeleteFirewallRuleByID(ctx, r); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
@@ -238,13 +238,13 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		return nil, fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
-				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
+				if xerr = s.rpcDeleteFirewallRuleByID(ctx, r); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
@@ -278,7 +278,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if rule.EtherType == ipversion.IPv6 {
@@ -292,7 +292,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 	}
 
 	ruleName := fmt.Sprintf("%s-%d", asg.ID, len(asg.Rules))
-	resp, xerr := s.rpcCreateFirewallRule(ruleName, asg.Network, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
+	resp, xerr := s.rpcCreateFirewallRule(ctx, ruleName, asg.Network, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
 	if xerr != nil {
 		return asg, xerr
 	}
@@ -320,7 +320,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError() // FIXME: Technical debt
@@ -338,12 +338,12 @@ func (s stack) DisableSecurityGroup(ctx context.Context, asg *abstract.SecurityG
 		return fail.InvalidParameterError("asg", "must be complete")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	for _, v := range asg.Rules {
 		for _, r := range v.IDs {
-			resp, xerr := s.rpcGetFirewallRuleByID(r)
+			resp, xerr := s.rpcGetFirewallRuleByID(ctx, r)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -353,7 +353,7 @@ func (s stack) DisableSecurityGroup(ctx context.Context, asg *abstract.SecurityG
 				}
 			}
 
-			if xerr = s.rpcDisableFirewallRuleByName(resp.Name); xerr != nil {
+			if xerr = s.rpcDisableFirewallRuleByName(ctx, resp.Name); xerr != nil {
 				return xerr
 			}
 		}
@@ -373,12 +373,12 @@ func (s stack) EnableSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 		return fail.InvalidParameterError("asg", "must be complete")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	for _, v := range asg.Rules {
 		for _, r := range v.IDs {
-			resp, xerr := s.rpcGetFirewallRuleByID(r)
+			resp, xerr := s.rpcGetFirewallRuleByID(ctx, r)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -388,7 +388,7 @@ func (s stack) EnableSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 				}
 			}
 
-			if xerr = s.rpcDisableFirewallRuleByName(resp.Name); xerr != nil {
+			if xerr = s.rpcDisableFirewallRuleByName(ctx, resp.Name); xerr != nil {
 				return xerr
 			}
 		}

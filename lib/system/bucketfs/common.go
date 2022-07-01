@@ -186,6 +186,12 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")

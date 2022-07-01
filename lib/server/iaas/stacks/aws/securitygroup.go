@@ -39,10 +39,10 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcDescribeSecurityGroups(aws.String(networkRef), nil)
+	resp, xerr := s.rpcDescribeSecurityGroups(ctx, aws.String(networkRef), nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -68,7 +68,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	network, xerr := s.InspectNetwork(ctx, networkRef)
@@ -77,14 +77,14 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	}
 
 	// Create the security group with the VPC, name and description.
-	resp, xerr := s.rpcCreateSecurityGroup(aws.String(network.ID), aws.String(name), aws.String(description))
+	resp, xerr := s.rpcCreateSecurityGroup(ctx, aws.String(network.ID), aws.String(name), aws.String(description))
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create security group named '%s'", name)
 	}
 
 	defer func() {
 		if ferr != nil {
-			if derr := s.rpcDeleteSecurityGroup(resp); derr != nil {
+			if derr := s.rpcDeleteSecurityGroup(ctx, resp); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
@@ -108,7 +108,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	}
 
 	// Add permissions to the Security Group
-	if xerr = s.addRules(asg, ingressPermissions, egressPermissions); xerr != nil {
+	if xerr = s.addRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
 		return nil, xerr
 	}
 
@@ -226,10 +226,10 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 		}
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteSecurityGroup(aws.String(asg.ID))
+	return s.rpcDeleteSecurityGroup(ctx, aws.String(asg.ID))
 }
 
 // InspectSecurityGroup returns information about a security group
@@ -242,11 +242,11 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if asg.ID != "" {
-		resp, xerr := s.rpcDescribeSecurityGroupByID(aws.String(asg.ID))
+		resp, xerr := s.rpcDescribeSecurityGroupByID(ctx, aws.String(asg.ID))
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -257,7 +257,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 		if asg.Network == "" {
 			return nil, fail.InvalidParameterError("sgParam", "field 'Network' cannot be empty string when using Security Group name")
 		}
-		resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(asg.Network), aws.String(asg.Name))
+		resp, xerr := s.rpcDescribeSecurityGroupByName(ctx, aws.String(asg.Network), aws.String(asg.Name))
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -349,21 +349,21 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		}
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcDescribeSecurityGroupByID(aws.String(asg.ID))
+	resp, xerr := s.rpcDescribeSecurityGroupByID(ctx, aws.String(asg.ID))
 	if xerr != nil {
 		return asg, xerr
 	}
 
 	if len(resp.IpPermissions) > 0 {
-		if xerr = s.rpcRevokeSecurityGroupIngress(aws.String(asg.ID), resp.IpPermissions); xerr != nil {
+		if xerr = s.rpcRevokeSecurityGroupIngress(ctx, aws.String(asg.ID), resp.IpPermissions); xerr != nil {
 			return asg, xerr
 		}
 	}
 	if len(resp.IpPermissionsEgress) > 0 {
-		if xerr = s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), resp.IpPermissionsEgress); xerr != nil {
+		if xerr = s.rpcRevokeSecurityGroupEgress(ctx, aws.String(asg.ID), resp.IpPermissionsEgress); xerr != nil {
 			return asg, xerr
 		}
 	}
@@ -389,7 +389,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
@@ -398,7 +398,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 	}
 
 	// Add permissions to the security group
-	if xerr = s.addRules(asg, ingressPermissions, egressPermissions); xerr != nil {
+	if xerr = s.addRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
 		return asg, xerr
 	}
 
@@ -406,14 +406,14 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 }
 
 // addRules applies the rules to the security group
-func (s stack) addRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
+func (s stack) addRules(ctx context.Context, asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
 	if len(ingress) > 0 {
-		if xerr := s.rpcAuthorizeSecurityGroupIngress(aws.String(asg.ID), ingress); xerr != nil {
+		if xerr := s.rpcAuthorizeSecurityGroupIngress(ctx, aws.String(asg.ID), ingress); xerr != nil {
 			return fail.Wrap(xerr, "unable to add ingress rules to Security Group '%s'", asg.Name)
 		}
 	}
 	if len(egress) > 0 {
-		if xerr := s.rpcAuthorizeSecurityGroupEgress(aws.String(asg.ID), egress); xerr != nil {
+		if xerr := s.rpcAuthorizeSecurityGroupEgress(ctx, aws.String(asg.ID), egress); xerr != nil {
 			return fail.Wrap(xerr, "unable to add egress rules to Security Group '%s'", asg.Name)
 		}
 	}
@@ -440,7 +440,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
@@ -448,7 +448,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return asg, xerr
 	}
 
-	if xerr = s.deleteRules(asg, ingressPermissions, egressPermissions); xerr != nil {
+	if xerr = s.deleteRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
 		return asg, xerr
 	}
 
@@ -456,16 +456,16 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 }
 
 // deleteRules deletes the rules from the security group
-func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
+func (s stack) deleteRules(ctx context.Context, asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
 	// Add permissions to the security group
 	if len(ingress) > 0 {
-		if xerr := s.rpcRevokeSecurityGroupIngress(aws.String(asg.ID), ingress); xerr != nil {
+		if xerr := s.rpcRevokeSecurityGroupIngress(ctx, aws.String(asg.ID), ingress); xerr != nil {
 			return fail.Wrap(xerr, "failed to delete ingress rules from Security Group '%s'", asg.Name)
 		}
 	}
 
 	if len(egress) > 0 {
-		xerr := s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), egress)
+		xerr := s.rpcRevokeSecurityGroupEgress(ctx, aws.String(asg.ID), egress)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:

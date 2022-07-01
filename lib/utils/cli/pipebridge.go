@@ -156,7 +156,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 
 	// First starts the "displayer" routine...
 	var xerr fail.Error
-	if pbc.displayTask, xerr = concurrency.NewTaskWithParent(task); xerr != nil {
+	if pbc.displayTask, xerr = concurrency.NewTaskWithContext(task.Context()); xerr != nil {
 		return xerr
 	}
 
@@ -166,7 +166,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	// ... then starts the "pipe readers"
-	taskGroup, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
+	taskGroup, xerr := concurrency.NewTaskGroupWithContext(task.Context(), concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
 	if xerr != nil {
 		return xerr
 	}

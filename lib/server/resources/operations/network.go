@@ -146,99 +146,130 @@ func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 //   - *fail.ErrNotAvailable: a Network with the same name is currently created
 //   - *fail.ErrDuplicate: a Network with the same name already exist on Provider Side (managed or not by SafeScale)
 //   - *fail.ErrAborted: abort signal has been received
-func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+func (instance *Network) Create(inctx context.Context, req abstract.NetworkRequest) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance.MetadataCore) && instance.MetadataCore.IsTaken() {
 		return fail.NotAvailableError("already carrying information")
 	}
-	if ctx == nil {
+	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
+	tracer := debug.NewTracer(inctx, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	svc := instance.Service()
 
-	childCtx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// Check if Network already exists and is managed by SafeScale
-	_, xerr := LoadNetwork(childCtx, svc, req.Name)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-			debug.IgnoreError(xerr)
-		default:
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer fail.OnPanic(&ferr)
+
+		// Check if Network already exists and is managed by SafeScale
+		_, xerr := LoadNetwork(ctx, svc, req.Name)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// continue
+				debug.IgnoreError(xerr)
+			default:
+				chRes <- result{xerr}
+				return xerr
+			}
+		} else {
+			xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
+			_ = xerr.Annotate("managed", true)
+			chRes <- result{xerr}
 			return xerr
 		}
-	} else {
-		xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
-		_ = xerr.Annotate("managed", true)
-		return xerr
-	}
 
-	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	_, xerr = svc.InspectNetworkByName(ctx, req.Name)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-			debug.IgnoreError(xerr)
-		default:
-			return xerr
-		}
-	} else {
-		xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
-		_ = xerr.Annotate("managed", false)
-		return xerr
-	}
-
-	// Verify the CIDR is not routable
-	if req.CIDR != "" {
-		routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
+		// Verify if the subnet already exist and in this case is not managed by SafeScale
+		_, xerr = svc.InspectNetworkByName(ctx, req.Name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// continue
+				debug.IgnoreError(xerr)
+			default:
+				chRes <- result{xerr}
+				return xerr
+			}
+		} else {
+			xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
+			_ = xerr.Annotate("managed", false)
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		if routable {
-			return fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
-		}
-	}
+		// Verify the CIDR is not routable
+		if req.CIDR != "" {
+			routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				rv := fail.Wrap(xerr, "failed to determine if CIDR is not routable")
+				chRes <- result{rv}
+				return rv
+			}
 
-	// Create the Network
-	logrus.Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
-	abstractNetwork, xerr := svc.CreateNetwork(ctx, req)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failure creating provider network")
-	}
-
-	defer func() {
-		if ferr != nil && !req.KeepOnFailure {
-			derr := svc.DeleteNetwork(ctx, abstractNetwork.ID)
-			derr = debug.InjectPlannedFail(derr)
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+			if routable {
+				rv := fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
+				chRes <- result{rv}
+				return rv
 			}
 		}
-	}()
 
-	// Write subnet object metadata
-	logrus.Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
-	abstractNetwork.Imported = false
-	return instance.carry(childCtx, abstractNetwork)
+		var abstractNetwork *abstract.Network
+
+		defer func() {
+			if ferr != nil && !req.KeepOnFailure {
+				derr := svc.DeleteNetwork(ctx, abstractNetwork.ID)
+				derr = debug.InjectPlannedFail(derr)
+				if derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+				}
+			}
+		}()
+
+		// Create the Network
+		logrus.Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
+		abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			rv := fail.Wrap(xerr, "failure creating provider network")
+			chRes <- result{rv}
+			return rv
+		}
+
+		// Write subnet object metadata
+		logrus.Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
+		abstractNetwork.Imported = false
+		xerr = instance.carry(ctx, abstractNetwork)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		chRes <- result{nil}
+		return nil
+	}() // nolint
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		<-chRes // wait for cleanup
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes // wait for cleanup
+		return fail.ConvertError(inctx.Err())
+	}
 }
 
 // carry registers clonable as core value and deals with cache
@@ -348,207 +379,233 @@ var (
 )
 
 // Delete deletes subnet
-func (instance *Network) Delete(ctx context.Context) (ferr fail.Error) {
+func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if ctx == nil {
+	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		networkAbstract, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
-		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)         // nolint
-		return nil
-	})
-	if xerr != nil {
-		return xerr
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
-
-	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		abstractNetwork, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		svc := instance.Service()
-
-		var subnets map[string]string
-		innerXErr := props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-			subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+	chRes := make(chan result)
+	go func() {
+		ctx := ctx
+		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			networkAbstract, ok := clonable.(*abstract.Network)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			subnets = subnetsV1.ByName
+			ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
+			ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)         // nolint
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
 
-		subnetsLen := len(subnets)
-		switch subnetsLen {
-		case 0:
-			// no subnet, continue to delete the Network
-		case 1:
-			var found bool
-			for k, v := range subnets {
-				if k == instance.GetName() {
-					found = true
-					deleted := false
-					// the single subnet present is a subnet named like the Network, delete it first
-					subnetInstance, xerr := LoadSubnet(ctx, svc, "", v)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							// Subnet is already deleted, considered as a success and continue
-							debug.IgnoreError(xerr)
-							deleted = true
-						default:
-							return xerr
-						}
-					}
+		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
+		defer tracer.Exiting()
 
-					if !deleted {
-						subnetName := subnetInstance.GetName()
-						xerr = subnetInstance.Delete(ctx)
-						xerr = debug.InjectPlannedFail(xerr)
-						if xerr != nil {
-							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
-						}
-					}
-				}
-			}
-			if !found {
-				return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", instance.GetName())
-			}
-		default:
-			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
+		timings, xerr := instance.Service().Timings()
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
 
-		// delete Network if not imported, with tolerance
-		if !abstractNetwork.Imported {
-			innerXErr = props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-				nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+		// instance.lock.Lock()
+		// defer instance.lock.Unlock()
+
+		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			abstractNetwork, ok := clonable.(*abstract.Network)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			svc := instance.Service()
+
+			var subnets map[string]string
+			innerXErr := props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-
-				for k := range nsgV1.ByID {
-					sgInstance, propsXErr := LoadSecurityGroup(ctx, svc, k)
-					if propsXErr != nil {
-						switch propsXErr.(type) {
-						case *fail.ErrNotFound:
-							continue
-						default:
-							return propsXErr
-						}
-					}
-
-					// -- delete Security Group
-					// sgInstance.lock.Lock()
-					// //goland:noinspection GoDeferInLoop
-					// defer sgInstance.lock.Unlock()
-
-					propsXErr = sgInstance.unsafeDelete(ctx, true)
-					if propsXErr != nil {
-						return propsXErr
-					}
-
-					// -- delete reference to Security Group in Network
-					delete(nsgV1.ByID, sgInstance.GetID())
-					delete(nsgV1.ByName, sgInstance.GetName())
-				}
+				subnets = subnetsV1.ByName
 				return nil
 			})
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			maybeDeleted := false
-			innerXErr = svc.DeleteNetwork(ctx, abstractNetwork.ID)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
-					logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
-					maybeDeleted = true
-				case *fail.ErrTimeout:
-					logrus.Error("cannot delete Network due to a timeout")
-					errWaitMore := retry.WhileUnsuccessful(
-						func() error {
-							recNet, recErr := svc.InspectNetwork(ctx, abstractNetwork.ID)
-							if _, ok := recErr.(*fail.ErrNotFound); ok {
-								return nil
+			subnetsLen := len(subnets)
+			switch subnetsLen {
+			case 0:
+				// no subnet, continue to delete the Network
+			case 1:
+				var found bool
+				for k, v := range subnets {
+					if k == instance.GetName() {
+						found = true
+						deleted := false
+						// the single subnet present is a subnet named like the Network, delete it first
+						subnetInstance, xerr := LoadSubnet(ctx, svc, "", v)
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							switch xerr.(type) {
+							case *fail.ErrNotFound:
+								// Subnet is already deleted, considered as a success and continue
+								debug.IgnoreError(xerr)
+								deleted = true
+							default:
+								return xerr
 							}
-							if recNet != nil {
-								return fmt.Errorf("still there")
-							}
+						}
 
-							return fail.Wrap(recErr, "another kind of error")
-						},
-						timings.SmallDelay(),
-						timings.ContextTimeout(),
-					)
-					if errWaitMore != nil {
-						_ = innerXErr.AddConsequence(errWaitMore)
-						return innerXErr
+						if !deleted {
+							subnetName := subnetInstance.GetName()
+							xerr = subnetInstance.Delete(ctx)
+							xerr = debug.InjectPlannedFail(xerr)
+							if xerr != nil {
+								return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+							}
+						}
 					}
-				default:
-					logrus.Errorf(innerXErr.Error())
+				}
+				if !found {
+					return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", instance.GetName())
+				}
+			default:
+				return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
+			}
+
+			// delete Network if not imported, with tolerance
+			if !abstractNetwork.Imported {
+				innerXErr = props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+					nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.SecurityGroupsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					for k := range nsgV1.ByID {
+						sgInstance, propsXErr := LoadSecurityGroup(ctx, svc, k)
+						if propsXErr != nil {
+							switch propsXErr.(type) {
+							case *fail.ErrNotFound:
+								continue
+							default:
+								return propsXErr
+							}
+						}
+
+						propsXErr = sgInstance.unsafeDelete(ctx, true)
+						if propsXErr != nil {
+							return propsXErr
+						}
+
+						// -- delete reference to Security Group in Network
+						delete(nsgV1.ByID, sgInstance.GetID())
+						delete(nsgV1.ByName, sgInstance.GetName())
+					}
+					return nil
+				})
+				if innerXErr != nil {
 					return innerXErr
 				}
-			}
 
-			if maybeDeleted {
-				logrus.Debugf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
-			}
-			iterations := 6
-			for {
-				if _, ierr := svc.InspectNetwork(ctx, abstractNetwork.ID); ierr != nil {
-					if _, ok := ierr.(*fail.ErrNotFound); ok {
-						break
+				maybeDeleted := false
+				innerXErr = svc.DeleteNetwork(ctx, abstractNetwork.ID)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
+						logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
+						maybeDeleted = true
+					case *fail.ErrTimeout:
+						logrus.Error("cannot delete Network due to a timeout")
+						errWaitMore := retry.WhileUnsuccessful(
+							func() error {
+								select {
+								case <-ctx.Done():
+									return retry.StopRetryError(ctx.Err())
+								default:
+								}
+
+								recNet, recErr := svc.InspectNetwork(ctx, abstractNetwork.ID)
+								if _, ok := recErr.(*fail.ErrNotFound); ok {
+									return nil
+								}
+								if recNet != nil {
+									return fmt.Errorf("still there")
+								}
+
+								return fail.Wrap(recErr, "another kind of error")
+							},
+							timings.SmallDelay(),
+							timings.ContextTimeout(),
+						)
+						if errWaitMore != nil {
+							_ = innerXErr.AddConsequence(errWaitMore)
+							return innerXErr
+						}
+					default:
+						logrus.Errorf(innerXErr.Error())
+						return innerXErr
 					}
 				}
-				iterations--
-				if iterations < 0 {
-					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
-					break
-				}
-				time.Sleep(timings.NormalDelay())
-			}
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failure altering metadata")
-	}
 
-	// Remove metadata
-	xerr = instance.MetadataCore.Delete(ctx)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failure deleting metadata")
+				if maybeDeleted {
+					logrus.Debugf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
+				}
+				iterations := 6
+				for {
+					if _, ierr := svc.InspectNetwork(ctx, abstractNetwork.ID); ierr != nil {
+						if _, ok := ierr.(*fail.ErrNotFound); ok {
+							break
+						}
+					}
+					iterations--
+					if iterations < 0 {
+						logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
+						break
+					}
+					time.Sleep(timings.NormalDelay())
+				}
+			}
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{fail.Wrap(xerr, "failure altering metadata")}
+			return
+		}
+
+		// Remove metadata
+		xerr = instance.MetadataCore.Delete(ctx)
+		if xerr != nil {
+			chRes <- result{fail.Wrap(xerr, "failure deleting metadata")}
+			return
+		}
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		<-chRes
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes
+		return fail.ConvertError(inctx.Err())
 	}
-	return nil
 }
 
 // GetCIDR returns the CIDR of the subnet

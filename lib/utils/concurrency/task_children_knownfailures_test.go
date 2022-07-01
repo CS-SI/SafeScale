@@ -35,7 +35,7 @@ func TestAbortNotStartedTask(t *testing.T) {
 	xerr = parent.SetID("/parent")
 	require.Nil(t, xerr)
 
-	child, xerr := NewTaskWithParent(parent)
+	child, xerr := NewTaskWithContext(parent.Context())
 	require.Nil(t, xerr)
 	_, xerr = child.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
@@ -94,7 +94,7 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 		}, nil)
 		require.Nil(t, xerr)
 
-		child, xerr := NewTaskWithParent(parent)
+		child, xerr := NewTaskWithContext(parent.Context())
 		require.Nil(t, xerr)
 		_, xerr = child.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(400) * time.Millisecond)
@@ -105,7 +105,7 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 		}, nil, InheritParentIDOption, AmendID("/child"))
 		require.Nil(t, xerr)
 
-		sibling, xerr := NewTaskWithParent(parent)
+		sibling, xerr := NewTaskWithContext(parent.Context())
 		require.Nil(t, xerr)
 		_, xerr = sibling.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(500) * time.Millisecond)

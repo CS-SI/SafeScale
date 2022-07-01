@@ -519,8 +519,14 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 			return xerr
 		}
 	}
-	return retry.WhileUnsuccessful(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			_, xerr := svc.InspectSubnet(ctx, id)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -538,6 +544,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 		timings.SmallDelay(),
 		timings.ContextTimeout(),
 	)
+	return xerr
 }
 
 // validateCIDR tests if CIDR requested is valid, or select one if no CIDR is provided
@@ -1016,194 +1023,225 @@ var (
 )
 
 // Delete deletes a Subnet
-func (instance *Subnet) Delete(ctx context.Context) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if ctx == nil {
+	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	var force bool
-	var ok bool
-	if cv := ctx.Value("force"); cv != nil {
-		force, ok = cv.(bool)
-		if !ok {
-			return fail.InvalidRequestError("force flag must be a bool")
-		}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer fail.OnPanic(&ferr)
 
-	if force {
-		logrus.Tracef("forcing subnet deletion")
-	}
-
-	lastCtx := ctx
-
-	var (
-		subnetAbstract *abstract.Subnet
-		subnetHosts    *propertiesv1.SubnetHosts
-	)
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		var force bool
 		var ok bool
-		subnetAbstract, ok = clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		if cv := ctx.Value("force"); cv != nil {
+			force, ok = cv.(bool)
+			if !ok {
+				ar := result{fail.InvalidRequestError("force flag must be a bool")}
+				chRes <- ar
+				return
+			}
 		}
-		lastCtx = context.WithValue(lastCtx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
-		lastCtx = context.WithValue(lastCtx, currentSubnetPropertiesContextKey, props)        // nolint
 
-		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		if force {
+			logrus.Tracef("forcing subnet deletion")
+		}
+
+		var (
+			subnetAbstract *abstract.Subnet
+			subnetHosts    *propertiesv1.SubnetHosts
+		)
+		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			ctx := ctx
 			var ok bool
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+			subnetAbstract, ok = clonable.(*abstract.Subnet)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
+			ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)        // nolint
 
-			return nil
+			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				var ok bool
+				subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				return nil
+			})
 		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("operations.Subnet")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	// Lock Subnet instance
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
-	svc := instance.Service()
-	subnetName := instance.GetName()
-	xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		if xerr != nil {
+			ar := result{xerr}
+			chRes <- ar
+			return
 		}
 
-		// Check if hosts are still attached to Subnet according to metadata
-		var errorMsg string
-		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
+		tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("operations.Subnet")*/).WithStopwatch().Entering()
+		defer tracer.Exiting()
+
+		// Lock Subnet instance
+		// instance.lock.Lock()
+		// defer instance.lock.Unlock()
+
+		svc := instance.Service()
+		subnetName := instance.GetName()
+		xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostsLen := uint(len(shV1.ByName))
-			hostList := make([]string, 0, hostsLen)
-			if hostsLen > 0 {
-				for k := range shV1.ByName {
-					// Check if Host still has metadata and count it if yes
-					if hess, innerXErr := LoadHost(lastCtx, svc, k); innerXErr != nil {
-						debug.IgnoreError(innerXErr)
-					} else {
-						if _, innerXErr := hess.ForceGetState(lastCtx); innerXErr != nil {
+			// Check if hosts are still attached to Subnet according to metadata
+			var errorMsg string
+			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				shV1, ok := clonable.(*propertiesv1.SubnetHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				hostsLen := uint(len(shV1.ByName))
+				hostList := make([]string, 0, hostsLen)
+				if hostsLen > 0 {
+					for k := range shV1.ByName {
+						// Check if Host still has metadata and count it if yes
+						if hess, innerXErr := LoadHost(ctx, svc, k); innerXErr != nil {
 							debug.IgnoreError(innerXErr)
 						} else {
-							hostList = append(hostList, k)
+							if _, innerXErr := hess.ForceGetState(ctx); innerXErr != nil {
+								debug.IgnoreError(innerXErr)
+							} else {
+								hostList = append(hostList, k)
+							}
 						}
 					}
 				}
-			}
-			hostsLen = uint(len(hostList))
-			if hostsLen > 0 {
-				var verb string
-				if hostsLen == 1 {
-					verb = "is"
-				} else {
-					verb = "are"
+				hostsLen = uint(len(hostList))
+				if hostsLen > 0 {
+					var verb string
+					if hostsLen == 1 {
+						verb = "is"
+					} else {
+						verb = "are"
+					}
+					errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
+					return fail.NotAvailableError(errorMsg)
 				}
-				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
-				return fail.NotAvailableError(errorMsg)
-			}
-			return nil
+				return nil
+			})
 		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		if xerr != nil {
+			ar := result{xerr}
+			chRes <- ar
+			return
 		}
 
-		// 1st delete gateway(s)
-		gwIDs, innerXErr := instance.deleteGateways(lastCtx, as)
-		if innerXErr != nil {
-			return innerXErr
-		}
+		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-		// FIXME: see if we can adapt relaxedDeleteHost to use context values and prevent duplicated code...
-		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
-		if len(gwIDs) > 0 {
-			for _, v := range gwIDs {
-				if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
+			// 1st delete gateway(s)
+			gwIDs, innerXErr := instance.deleteGateways(ctx, as)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// FIXME: see if we can adapt relaxedDeleteHost to use context values and prevent duplicated code...
+			// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
+			if len(gwIDs) > 0 {
+				for _, v := range gwIDs {
+					if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
+						return innerXErr
+					}
+				}
+			}
+
+			// 2nd delete VIP if needed
+			if as.VIP != nil {
+				if innerXErr := svc.DeleteVIP(ctx, as.VIP); innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
+				}
+			}
+
+			// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
+			innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+				ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, subnetHosts, ssgV1)
+				return innerXErr
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// 4st free CIDR index if the Subnet has been created for a single Host
+			if as.SingleHostCIDRIndex > 0 {
+				// networkInstance, innerXErr := instance.unsafeInspectNetwork()
+				networkInstance, innerXErr := LoadNetwork(ctx, instance.Service(), as.Network)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				innerXErr = FreeCIDRForSingleHost(ctx, networkInstance, as.SingleHostCIDRIndex)
+				if innerXErr != nil {
 					return innerXErr
 				}
 			}
-		}
 
-		// 2nd delete VIP if needed
-		if as.VIP != nil {
-			if innerXErr := svc.DeleteVIP(ctx, as.VIP); innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
-			}
-		}
-
-		// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
-		innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// finally delete Subnet
+			logrus.Debugf("Deleting Subnet '%s'...", as.Name)
+			if innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, as.ID); innerXErr != nil {
+				return innerXErr
 			}
 
-			innerXErr := instance.onRemovalUnbindSecurityGroups(lastCtx, subnetHosts, ssgV1)
+			// Delete Subnet's own Security Groups
+			innerXErr = instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
 			return innerXErr
 		})
-		if innerXErr != nil {
-			return innerXErr
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			ar := result{xerr}
+			chRes <- ar
+			return
 		}
 
-		// 4st free CIDR index if the Subnet has been created for a single Host
-		if as.SingleHostCIDRIndex > 0 {
-			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-			networkInstance, innerXErr := LoadNetwork(lastCtx, instance.Service(), as.Network)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			innerXErr = FreeCIDRForSingleHost(ctx, networkInstance, as.SingleHostCIDRIndex)
-			if innerXErr != nil {
-				return innerXErr
-			}
+		// Remove metadata
+		xerr = instance.MetadataCore.Delete(ctx)
+		if xerr != nil {
+			ar := result{xerr}
+			chRes <- ar
+			return
 		}
 
-		// finally delete Subnet
-		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, as.ID); innerXErr != nil {
-			return innerXErr
-		}
-
-		// Delete Subnet's own Security Groups
-		return instance.deleteSecurityGroups(lastCtx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+		logrus.Infof("Subnet '%s' successfully deleted.", subnetName)
+		ar := result{nil}
+		chRes <- ar
+		return
+	}() // nolint
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		<-chRes
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes
+		return fail.ConvertError(inctx.Err())
 	}
-
-	// Remove metadata
-	xerr = instance.MetadataCore.Delete(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	logrus.Infof("Subnet '%s' successfully deleted.", subnetName)
-	return nil
 }
 
 // deleteSecurityGroups deletes the Security Groups created for the Subnet
