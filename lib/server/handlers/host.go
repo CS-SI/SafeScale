@@ -59,8 +59,8 @@ type HostHandler interface {
 	Stop(string) fail.Error
 	UnbindSecurityGroup(string, string) fail.Error
 	BindLabel(hostRef, labelRef, value string) fail.Error
-	InspectLabel(hostRef, labelRef string) (_ resources.Label, value string, ferr fail.Error)
-	ListLabels(hostRef string, kind string) (_ []*protocol.LabelInspectResponse, ferr fail.Error)
+	InspectLabel(hostRef, labelRef string) (resources.Label, string, fail.Error)
+	ListLabels(hostRef string, kind string) ([]*protocol.LabelInspectResponse, fail.Error)
 	ResetLabel(hostRef, labelRef string) fail.Error
 	UnbindLabel(hostRef, labelRef string) fail.Error
 	UpdateLabel(hostRef, labelRef, value string) fail.Error
