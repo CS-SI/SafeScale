@@ -618,20 +618,18 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(ctx)
+	serverInstance, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// serverID = rhServer.ID()
-	// serverName = rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
+	serverPrivateIP, xerr := serverInstance.GetPrivateIP(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = rhServer.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = serverInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -642,10 +640,12 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 			if cerr != nil {
 				return fail.Wrap(cerr)
 			}
+
 			hostShare, ok = cloned.(*propertiesv1.HostShare)
 			if !ok {
 				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
 			}
+
 			return nil
 		})
 	})
@@ -710,7 +710,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}
 
 	// -- Mount the Share on host --
-	xerr = rhServer.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = serverInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -764,7 +764,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := rhServer.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := serverInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {

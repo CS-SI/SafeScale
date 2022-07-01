@@ -36,8 +36,8 @@ func Docker(t *testing.T) {
 	defer names.TearDown()
 
 	out, err := helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.100.0/24")
-	require.Nil(t, err)
 	_ = out
+	require.Nil(t, err)
 
 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
 	fmt.Print(out)
@@ -45,12 +45,12 @@ func Docker(t *testing.T) {
 	require.True(t, strings.Contains(out, " user"))
 
 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker")
-	require.NotNil(t, err)
 	_ = out
+	require.NotNil(t, err)
 
 	out, err = helpers.GetOutput("safescale host feature add gw-" + names.Networks[0] + " docker")
-	require.Nil(t, err)
 	_ = out
+	require.Nil(t, err)
 
 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker ps\"")
 	fmt.Print(out)
@@ -58,16 +58,16 @@ func Docker(t *testing.T) {
 	require.True(t, strings.Contains(out, "CONTAINER"))
 
 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker")
-	require.Nil(t, err)
 	_ = out
+	require.Nil(t, err)
 
 	out, err = helpers.GetOutput("safescale host feature delete gw-" + names.Networks[0] + " docker")
-	require.Nil(t, err)
 	_ = out
+	require.Nil(t, err)
 
 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker")
-	require.NotNil(t, err)
 	_ = out
+	require.NotNil(t, err)
 
 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker ps\"")
 	fmt.Print(out)
@@ -124,85 +124,85 @@ func DockerNotGateway(t *testing.T) {
 	require.False(t, strings.Contains(out, "CONTAINER"))
 }
 
-func DockerCompose(t *testing.T) {
-	names := helpers.GetNames("DockerCompose", 0, 0, 0, 0, 1, 0, 0, 0)
-	names.TearDown()
-	defer names.TearDown()
-
-	out, err := helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.102.0/24")
-	require.Nil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
-	fmt.Print(out)
-	require.Nil(t, err)
-	require.True(t, strings.Contains(out, " user"))
-
-	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
-	require.NotNil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale host feature add gw-" + names.Networks[0] + " docker-compose")
-	require.Nil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
-	fmt.Print(out)
-	require.Nil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
-	require.Nil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale host feature delete gw-" + names.Networks[0] + " docker-compose")
-	require.Nil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
-	require.NotNil(t, err)
-	_ = out
-
-	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
-	fmt.Print(out)
-	require.NotNil(t, err)
-}
+// VPL: no Feature called docker-compose; integrated in docker.yml
+// func DockerCompose(t *testing.T) {
+// 	names := helpers.GetNames("DockerCompose", 0, 0, 0, 0, 1, 0, 0, 0)
+// 	names.TearDown()
+// 	defer names.TearDown()
+//
+// 	out, err := helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.102.0/24")
+// 	require.Nil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
+// 	fmt.Print(out)
+// 	require.Nil(t, err)
+// 	require.True(t, strings.Contains(out, " user"))
+//
+// 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
+// 	require.NotNil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale host feature add gw-" + names.Networks[0] + " docker-compose")
+// 	require.Nil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
+// 	fmt.Print(out)
+// 	require.Nil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
+// 	require.Nil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale host feature delete gw-" + names.Networks[0] + " docker-compose")
+// 	require.Nil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
+// 	require.NotNil(t, err)
+// 	_ = out
+//
+// 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
+// 	fmt.Print(out)
+// 	require.NotNil(t, err)
+// }
 
 func RemoteDesktopOnSingleHost(t *testing.T) {
 	names := helpers.GetNames("RemoteDesktop", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := helpers.GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
+	out, err := helpers.GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0] + " | jq -r .result")
 	require.Nil(t, err)
-	_ = out
 	host := helpers.HostInfo{}
-	_ = json.Unmarshal([]byte(out), &host)
+	_ = json.Unmarshal(([]byte)(out), &host)
 
-	out, err = helpers.GetOutput("safescale host feature check --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature check --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.NotNil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature add --skip-proxy --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature add --skip-proxy --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.Nil(t, err)
 	_ = out
 
-	// TODO: try to connect to the host through guacamole?
-	out, err = helpers.GetOutput("wget " + host.PublicIP + ":9080/guacamole")
-	_ = out
-	fmt.Print(out)
-	require.Nil(t, err)
+	// FIXME: how to test remotedesktio is working? the code below cannot work as-is. Will need to install edgeproxy4gateway before (on gateway on single host)
+	// out, err = helpers.GetOutput("wget " + host.PublicIP + ":9080/guacamole")
+	// _ = out
+	// fmt.Print(out)
+	// require.Nil(t, err)
 
 	fmt.Println(names.Hosts[0])
-	out, err = helpers.GetOutput("safescale host feature check --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature check --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale host feature delete --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature delete --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.Nil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature check --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature check --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.NotNil(t, err)
 	_ = out
 
@@ -220,38 +220,37 @@ func RemoteDesktopOnSubnetHost(t *testing.T) {
 	_ = out
 	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])
-	_ = out
+	out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0] + " | jq -r .result")
 	require.Nil(t, err)
 	host := helpers.HostInfo{}
 	_ = json.Unmarshal([]byte(out), &host)
 
-	out, err = helpers.GetOutput("safescale host feature check --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature check --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.NotNil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature add --skip-proxy --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
-	require.Nil(t, err)
+	out, err = helpers.GetOutput("safescale host feature add --skip-proxy --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	_ = out
+	require.Nil(t, err)
 
-	// TODO: try to connect to the host through guacamole?
-	out, err = helpers.GetOutput("wget " + host.PublicIP + ":9080/guacamole")
-	fmt.Print(out)
-	require.Nil(t, err)
-	_ = out
+	// FIXME: how to test remotedesktio is working? the code below cannot work as-is. Will need to install edgeproxy4gateway before (on gateway on single host)
+	// out, err = helpers.GetOutput("wget " + host.PublicIP + ":9080/guacamole")
+	// fmt.Print(out)
+	// require.Nil(t, err)
+	// _ = out
 
 	fmt.Println(names.Hosts[0])
-	out, err = helpers.GetOutput("safescale host feature check --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature check --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale host feature delete --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = helpers.GetOutput("safescale host feature delete --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	_ = out
 	require.Nil(t, err)
-	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature check --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
-	require.NotNil(t, err)
+	out, err = helpers.GetOutput("safescale host feature check --param Username=user --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	_ = out
+	require.NotNil(t, err)
 
 	out, err = helpers.GetOutput("wget " + host.PublicIP + ":9080/guacamole")
 	fmt.Print(out)
@@ -267,11 +266,11 @@ func ReverseProxy(t *testing.T) {
 	require.Nil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " kong")
+	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " edgeproxy4subnet")
 	require.NotNil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature add gw-" + names.Networks[0] + " kong")
+	out, err = helpers.GetOutput("safescale host feature add gw-" + names.Networks[0] + " edgeproxy4subnet")
 	require.Nil(t, err)
 	_ = out
 
@@ -280,15 +279,15 @@ func ReverseProxy(t *testing.T) {
 	require.Nil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " kong")
+	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " edgeproxy4subnet")
 	require.Nil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature delete gw-" + names.Networks[0] + " kong")
+	out, err = helpers.GetOutput("safescale host feature delete gw-" + names.Networks[0] + " edgeproxy4subnet")
 	require.Nil(t, err)
 	_ = out
 
-	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " kong")
+	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " edgeproxy4subnet")
 	require.NotNil(t, err)
 	_ = out
 
@@ -303,4 +302,10 @@ func NvidiaDocker(t *testing.T) {
 }
 
 func init() {
+	helpers.InSection("features").Clear().
+		AddScenario(Docker).
+		AddScenario(DockerNotGateway).
+		AddScenario(RemoteDesktopOnSingleHost).
+		AddScenario(RemoteDesktopOnSubnetHost).
+		AddScenario(ReverseProxy)
 }

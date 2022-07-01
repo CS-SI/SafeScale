@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
-	volumefactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/volume"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -119,14 +118,14 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	handler := handlers.NewVolumeHandler(job)
-	rv, xerr := handler.Create(name, int(size), volumespeed.Enum(speed))
+	volumeInstance, xerr := handler.Create(name, int(size), volumespeed.Enum(speed))
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer.Trace("Volume '%s' created", name)
-	return rv.ToProtocol(job.Context())
+	return volumeInstance.ToProtocol(job.Context())
 }
 
 // Attach a volume to a host and create a mount point
@@ -172,8 +171,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"),
-		"(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -297,7 +295,8 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(job.Context(), job.Service(), ref)
+	handler := handlers.NewVolumeHandler(job)
+	volumeInstance, xerr := handler.Inspect(ref)
 	if xerr != nil {
 		return nil, xerr
 	}

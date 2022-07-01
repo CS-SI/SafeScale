@@ -429,9 +429,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
 	defer tracer.Exiting()
 
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
 		nfsServer                                                      *nfs.Server

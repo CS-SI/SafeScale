@@ -22,9 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
-	sharefactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/share"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -79,18 +76,9 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	if in.OptionsAsString == "" && in.Options != nil {
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
-	svc := job.Service()
-	rh, xerr := hostfactory.Load(job.Context(), svc, hostRef)
-	if xerr != nil {
-		return nil, xerr
-	}
 
-	shareInstance, xerr := sharefactory.New(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = shareInstance.Create(job.Context(), shareName, rh, sharePath, in.OptionsAsString)
+	handler := handlers.NewShareHandler(job)
+	shareInstance, xerr := handler.Create(shareName, hostRef, sharePath, in.GetOptionsAsString())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -131,16 +119,8 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	shareInstance, xerr := sharefactory.Load(job.Context(), job.Service(), shareName)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	if xerr = shareInstance.Delete(job.Context()); xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
+	handler := handlers.NewShareHandler(job)
+	return empty, handler.Delete(shareName)
 }
 
 // List return the list of all available shares
@@ -292,10 +272,11 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, xerr
 	}
 
-	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if shareInstance == nil {
-		return nil, abstract.ResourceNotFoundError("share", shareRef)
-	}
+	// VPL: operations.Host should filter these behavioral differences
+	// // DEFENSIVE CODING: this _must not_ happen, but InspectShare has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
+	// if shareInstance == nil {
+	//	return nil, abstract.ResourceNotFoundError("share", shareRef)
+	// }
 
 	return shareInstance.ToProtocol(job.Context())
 }

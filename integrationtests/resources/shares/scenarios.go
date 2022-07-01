@@ -47,10 +47,11 @@ func Standard(t *testing.T) {
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
-	fmt.Println(out)
-	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "already exist"))
+	// Note: we are not testing network here, so no need to check that same network cannot be created
+	// out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
+	// fmt.Println(out)
+	// require.NotNil(t, err)
+	// require.True(t, strings.Contains(out, "already exist"))
 
 	fmt.Println("Creating VM " + names.Hosts[0])
 
@@ -58,12 +59,13 @@ func Standard(t *testing.T) {
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
-	fmt.Println(out)
-	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
+	// Note: we are not testing host here, so no need to check that same host cannot be created
+	// out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
+	// fmt.Println(out)
+	// require.NotNil(t, err)
+	// require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = helpers.GetOutput("safescale host inspect " + names.Hosts[0])
+	out, err = helpers.GetOutput("safescale host inspect " + names.Hosts[0] + " | jq -r .result")
 	fmt.Println(out)
 	require.Nil(t, err)
 
@@ -76,10 +78,11 @@ func Standard(t *testing.T) {
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = helpers.GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
-	fmt.Println(out)
-	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
+	// Note: we are not testing host here, so no need to check that same host cannot be created
+	// out, err = helpers.GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
+	// fmt.Println(out)
+	// require.NotNil(t, err)
+	// require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
 	out, err = helpers.GetOutput("safescale share list")
 	fmt.Println(out)
@@ -103,7 +106,6 @@ func Standard(t *testing.T) {
 	out, err = helpers.GetOutput("safescale share inspect " + names.Shares[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-
 	require.True(t, strings.Contains(out, names.Shares[0]))
 	require.True(t, strings.Contains(out, names.Hosts[0]))
 	require.True(t, strings.Contains(out, names.Hosts[1]))
@@ -181,6 +183,8 @@ func SharePartialError(t *testing.T) {
 	require.True(t, strings.Contains(out, "success"))
 }
 
+// FIXME: same tests than other previous ones about shares, volume is not the target in these tests, at least in this workflow
+//        should test volume used as source of share, maybe?
 func ShareError(t *testing.T) {
 	names := helpers.GetNames("ShareError", 0, 1, 1, 1, 1, 0, 0, 0)
 	names.TearDown()
@@ -386,4 +390,10 @@ func ShareVolumeMounted(t *testing.T) {
 }
 
 func init() {
+	helpers.InSection("shares").Clear().
+		AddScenario(Standard).
+		AddScenario(ShareError).
+		AddScenario(SharePartialError).
+		AddScenario(UntilShareCreated).
+		AddScenario(SharePartialError)
 }

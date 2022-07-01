@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
+	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
@@ -64,7 +64,8 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	list, xerr := securitygroupfactory.List(task.Context(), job.Service(), all)
+	handler := handlers.NewSecurityGroupHandler(job)
+	list, xerr := handler.List(all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -93,39 +94,30 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	}
 
 	name := in.GetName()
-	networkRef, _ := srvutils.GetReference(in.GetNetwork())
-	job, err := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
-	if err != nil {
-		return nil, err
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
-	svc := job.Service()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.security-group"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.security-group"), "('%s', '%s')", networkRefLabel, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.Context(), svc, networkRef)
+	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.GetRules())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.Rules)
+	handler := handlers.NewSecurityGroupHandler(job)
+	sgInstance, xerr := handler.Create(networkRef, name, in.GetDescription(), rules)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.New(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = sgInstance.Create(job.Context(), networkInstance.GetID(), name, in.Description, rules)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return sgInstance.ToProtocol(ctx)
+	tracer.Trace("Security Group '%s' successfully created", name)
+	return sgInstance.ToProtocol(job.Context())
 }
 
 // Clear calls the clear method to remove all rules from a security group
@@ -150,9 +142,9 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/clear", ref))
-	if err != nil {
-		return empty, err
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/clear", ref))
+	if xerr != nil {
+		return empty, xerr
 	}
 	defer job.Close()
 
@@ -160,14 +152,10 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
+	handler := handlers.NewSecurityGroupHandler(job)
+	xerr = handler.Clear(ref)
 	if xerr != nil {
 		return empty, xerr
-	}
-
-	xerr = sgInstance.Clear(job.Context())
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	tracer.Trace("Security Group '%s' successfully cleared", ref)
@@ -195,9 +183,9 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/reset", ref))
-	if err != nil {
-		return empty, err
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/reset", ref))
+	if xerr != nil {
+		return empty, xerr
 	}
 	defer job.Close()
 
@@ -205,12 +193,8 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	xerr = sgInstance.Reset(job.Context())
+	handler := handlers.NewSecurityGroupHandler(job)
+	xerr = handler.Reset(ref)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -250,7 +234,8 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
+	handler := handlers.NewSecurityGroupHandler(job)
+	sgInstance, xerr := handler.Inspect(ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -280,9 +265,9 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/delete", sgRef))
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/delete", sgRef))
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -290,12 +275,8 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	xerr = sgInstance.Delete(job.Context(), in.GetForce())
+	handler := handlers.NewSecurityGroupHandler(job)
+	xerr = handler.Delete(sgRef, in.GetForce())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -329,9 +310,9 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, xerr
 	}
 
-	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/add", sgRef))
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/add", sgRef))
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -339,12 +320,8 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), sgRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = sgInstance.AddRule(job.Context(), rule)
+	handler := handlers.NewSecurityGroupHandler(job)
+	sgInstance, xerr := handler.AddRule(sgRef, rule)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -388,12 +365,8 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(job.Context(), job.Service(), ref)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = sgInstance.DeleteRule(job.Context(), rule)
+	handler := handlers.NewSecurityGroupHandler(job)
+	sgInstance, xerr := handler.DeleteRule(ref, rule)
 	if xerr != nil {
 		return nil, xerr
 	}

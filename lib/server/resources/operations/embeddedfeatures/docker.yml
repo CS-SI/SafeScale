@@ -348,8 +348,11 @@ feature:
                             sfFirewallReload || sfFail 192 "Firewall problem"
 
                             case $LINUX_KIND in
+                                ubuntu)
+                                    sfApt remove -qqy docker-ce*
+                                    ;;
                                 debian|ubuntu)
-                                    dpkg --purge --force-remove-reinstreq docker-ce*
+                                    dpkg --purge --force-remove-reinstreq docker-ce docker-ce-cli docker-ce-rootless-extras
                                     ;;
                                 centos|redhat|rhel)
                                     yum remove -y docker-ce*

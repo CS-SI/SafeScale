@@ -162,9 +162,7 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	return content, nil
 }
 
-func uploadContentToFile(
-	ctx context.Context, content, name, owner, rights string, host resources.Host,
-) (string, fail.Error) {
+func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host resources.Host) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
 	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
