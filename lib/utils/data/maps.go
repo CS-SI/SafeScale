@@ -44,41 +44,14 @@ func NewMap() Map {
 	return Map{}
 }
 
-// Clone clones the content of a Variables
-// satisfies interface Clonable
-func (m Map) Clone() (Clonable, error) {
+func FromMap(m Map) (Map, error) {
 	cm := NewMap()
 	return (&cm).Replace(&m)
 }
 
-func (m Map) FakeClone() (Map, error) {
-	cm := NewMap()
-	return (&cm).FakeReplace(&m)
-}
-
-// Replace replaces the content of the Map with content of another one
-// satisfies interface Clonable
-func (m *Map) Replace(src Clonable) (Clonable, error) {
-	casted, ok := src.(*Map)
-	if !ok {
-		return nil, fmt.Errorf("src is not a Map")
-	}
-
-	*m = make(Map, len(*casted))
-	for k, v := range *casted {
-		(*m)[k] = v
-	}
-	return m, nil
-}
-
-func (m *Map) FakeReplace(src Clonable) (Map, error) {
-	casted, ok := src.(*Map)
-	if !ok {
-		return nil, fmt.Errorf("src is not a Map")
-	}
-
-	*m = make(Map, len(*casted))
-	for k, v := range *casted {
+func (m *Map) Replace(src *Map) (Map, error) {
+	*m = make(Map, len(*src))
+	for k, v := range *src {
 		(*m)[k] = v
 	}
 	return *m, nil
