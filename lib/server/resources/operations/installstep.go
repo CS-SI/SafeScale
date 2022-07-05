@@ -423,7 +423,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	var xerr fail.Error
 	var cerr error
-	clonedV, cerr = v.FakeClone()
+	clonedV, cerr = data.FromMap(v)
 	if cerr != nil {
 		return nil, fail.Wrap(cerr)
 	}
@@ -468,6 +468,14 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	}
 
 	clonedV["Hostname"] = host.GetName() + domain
+
+	// FIXME: Another bug mitigation
+	isgw, xerr := host.IsGateway(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+	clonedV["HostIsGateway"] = isgw
+
 	// logrus.Warningf("Checking variable substitution for: %s", spew.Sdump(clonedV))
 
 	clonedV, xerr = realizeVariables(clonedV)
@@ -613,7 +621,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 // realizeVariables replaces any template occurring in every variable
 func realizeVariables(variables data.Map) (data.Map, fail.Error) {
-	cloneV, cerr := variables.FakeClone()
+	cloneV, cerr := data.FromMap(variables)
 	if cerr != nil {
 		return nil, fail.Wrap(cerr)
 	}
