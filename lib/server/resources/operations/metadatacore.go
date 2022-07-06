@@ -125,23 +125,37 @@ func (myself *MetadataCore) Service() iaas.Service {
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
 func (myself *MetadataCore) GetID() string {
-	return myself.getID()
+	id, err := myself.getID()
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
-func (myself *MetadataCore) getID() string {
-	id := myself.id.Load().(string) // nolint, better panic than error-hiding
-	return id
+func (myself *MetadataCore) getID() (string, fail.Error) {
+	id, ok := myself.id.Load().(string) // nolint, better panic than error-hiding
+	if !ok {
+		return "", fail.InvalidInstanceError()
+	}
+	return id, nil
 }
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
 func (myself *MetadataCore) GetName() string {
-	return myself.getName()
+	name, err := myself.getName()
+	if err != nil {
+		panic(err)
+	}
+	return name
 }
 
-func (myself *MetadataCore) getName() string {
-	name := myself.name.Load().(string) // nolint, better panic than error-hiding
-	return name
+func (myself *MetadataCore) getName() (string, fail.Error) {
+	name, ok := myself.name.Load().(string) // nolint, better panic than error-hiding
+	if !ok {
+		return "", fail.InvalidInstanceError()
+	}
+	return name, nil
 }
 
 func (myself *MetadataCore) IsTaken() bool {
@@ -242,6 +256,12 @@ func (myself *MetadataCore) Review(ctx context.Context, callback resources.Callb
 	myself.RLock()
 	defer myself.RUnlock()
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
 		return callback(clonable, myself.properties)
 	})
@@ -264,11 +284,25 @@ func (myself *MetadataCore) Alter(ctx context.Context, callback resources.Callba
 		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	myself.Lock()
 	defer myself.Unlock()
 
-	if myself.getName() == "" || myself.getID() == "" {
-		return fail.InconsistentError("uninitalized metadata should not be altered")
+	if name, err := myself.getName(); err != nil {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	} else if name == "" {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+
+	if id, err := myself.getID(); err != nil {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	} else if id == "" {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
 	}
 
 	// Make sure myself.properties is populated
@@ -355,6 +389,12 @@ func (myself *MetadataCore) Carry(ctx context.Context, clonable data.Clonable) (
 		return fail.NotAvailableError("already carrying a value")
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	myself.Lock()
 	defer myself.Unlock()
 
@@ -427,6 +467,12 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	myself.Lock()
 	defer myself.Unlock()
 
@@ -436,7 +482,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 	}
 
 	if !myself.kindSplittedStore {
-		isName, xerr := myself.Service().HasObject(bu.GetName(), myself.folder.absolutePath("", ref))
+		isName, xerr := myself.Service().HasObject(ctx, bu.GetName(), myself.folder.absolutePath("", ref))
 		if xerr != nil {
 			return xerr
 		}
@@ -457,7 +503,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 		return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.absolutePath("", ref))
 	}
 
-	isName, xerr := myself.Service().HasObject(bu.GetName(), myself.folder.absolutePath(byNameFolderName, ref))
+	isName, xerr := myself.Service().HasObject(ctx, bu.GetName(), myself.folder.absolutePath(byNameFolderName, ref))
 	if xerr != nil {
 		return xerr
 	}
@@ -470,7 +516,7 @@ func (myself *MetadataCore) Read(ctx context.Context, ref string) (ferr fail.Err
 		}
 	}
 
-	isID, xerr := myself.Service().HasObject(bu.GetName(), myself.folder.absolutePath(byIDFolderName, ref))
+	isID, xerr := myself.Service().HasObject(ctx, bu.GetName(), myself.folder.absolutePath(byIDFolderName, ref))
 	if xerr != nil {
 		return xerr
 	}
@@ -506,6 +552,12 @@ func (myself *MetadataCore) ReadByID(ctx context.Context, id string) (ferr fail.
 	}
 	if myself.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
+	}
+
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
 	}
 
 	timings, xerr := myself.Service().Timings()
@@ -595,6 +647,12 @@ func (myself *MetadataCore) readByID(ctx context.Context, id string) fail.Error 
 		return xerr
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	rerr := retry.WhileUnsuccessful(func() error {
 		select {
 		case <-ctx.Done():
@@ -603,6 +661,12 @@ func (myself *MetadataCore) readByID(ctx context.Context, id string) fail.Error 
 		}
 
 		werr := myself.folder.Read(ctx, path, id, func(buf []byte) fail.Error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -650,6 +714,12 @@ func (myself *MetadataCore) readByName(ctx context.Context, name string) fail.Er
 		return xerr
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	rerr := retry.WhileUnsuccessful(func() error {
 		select {
 		case <-ctx.Done():
@@ -657,6 +727,12 @@ func (myself *MetadataCore) readByName(ctx context.Context, name string) fail.Er
 		default:
 		}
 		werr := myself.folder.Read(ctx, path, name, func(buf []byte) fail.Error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if innerXErr := myself.unsafeDeserialize(buf); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
 			}
@@ -684,6 +760,12 @@ func (myself *MetadataCore) readByName(ctx context.Context, name string) fail.Er
 
 // write updates the metadata corresponding to the host in the Object Storage
 func (myself *MetadataCore) write(ctx context.Context) fail.Error {
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	if !myself.committed {
 		jsoned, xerr := myself.unsafeSerialize()
 		xerr = debug.InjectPlannedFail(xerr)
@@ -733,6 +815,12 @@ func (myself *MetadataCore) Reload(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	myself.Lock()
 	defer myself.Unlock()
 
@@ -743,6 +831,12 @@ func (myself *MetadataCore) Reload(ctx context.Context) (ferr fail.Error) {
 // Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
 
 	timings, xerr := myself.Service().Timings()
 	if xerr != nil {
@@ -855,6 +949,12 @@ func (myself *MetadataCore) BrowseFolder(ctx context.Context, callback func(buf 
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	myself.RLock()
 	defer myself.RUnlock()
 
@@ -874,6 +974,12 @@ func (myself *MetadataCore) Delete(ctx context.Context) (ferr fail.Error) {
 
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
 	}
 
 	myself.Lock()
@@ -987,6 +1093,12 @@ func (myself *MetadataCore) Sdump(ctx context.Context) (_ string, ferr fail.Erro
 		return "", fail.InvalidInstanceError()
 	}
 
+	select {
+	case <-ctx.Done():
+		return "", fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	myself.RLock()
 	defer myself.RUnlock()
 
@@ -1050,6 +1162,12 @@ func (myself *MetadataCore) Deserialize(ctx context.Context, buf []byte) (ferr f
 
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	select {
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	default:
 	}
 
 	myself.Lock()

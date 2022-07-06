@@ -101,7 +101,7 @@ func Test_LoadBucket(t *testing.T) {
 
 		svc._reset()
 
-		_, err = svc.CreateBucket("mybucket")
+		_, err = svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		svc._updateOption("timingsErr", fail.NotFoundError("no timings !"))
@@ -112,7 +112,7 @@ func Test_LoadBucket(t *testing.T) {
 
 		svc._reset()
 
-		_, err = svc.CreateBucket("mybucket")
+		_, err = svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err = LoadBucket(ctx, svc, "mybucket")
@@ -130,7 +130,7 @@ func TestBucket_IsNull(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket("mybucket")
+		_, err := svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err := LoadBucket(ctx, svc, "mybucket")
@@ -169,7 +169,7 @@ func TestBucket_Browse(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket("mybucket")
+		_, err := svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err := LoadBucket(ctx, svc, "mybucket")
@@ -206,7 +206,7 @@ func TestBucket_Create(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket("mybucket")
+		_, err := svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err := LoadBucket(ctx, svc, "mybucket")
@@ -228,7 +228,7 @@ func TestBucket_Delete(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket("mybucket")
+		_, err := svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err := LoadBucket(ctx, svc, "mybucket")
@@ -256,7 +256,7 @@ func TestBucket_Mount(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket("mybucket")
+		_, err := svc.CreateBucket(nil, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err := LoadBucket(ctx, svc, "mybucket")

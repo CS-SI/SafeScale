@@ -25,6 +25,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -532,6 +533,7 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 
 		if a.Timeout != 0 {
 			if !all {
+				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil {
 					switch ferr.(type) {
 					case *fail.ErrAborted:
@@ -552,6 +554,7 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 				}
 			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
+					ferr = debug.InjectPlannedFail(ferr)
 					if count == 1 {
 						msg := callstack.DecorateWith(
 							"wrong retry-timeout cfg: ",
@@ -660,6 +663,7 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 				}
 			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
+					ferr = debug.InjectPlannedFail(ferr)
 					if count == 1 {
 						msg := callstack.DecorateWith(
 							"wrong retry-timeout cfg: ",

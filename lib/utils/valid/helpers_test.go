@@ -126,17 +126,17 @@ func TestIsNotInitialized(t *testing.T) {
 }
 
 func TestNotNulls(t *testing.T) {
-	var err error = fmt.Errorf("")
-	var ptrerr *error = &err
-	var dblptrerr **error = &ptrerr
+	var err = fmt.Errorf("")
+	var ptrerr = &err
+	var dblptrerr = &ptrerr
 
-	var ourErr fail.Error = fail.NewError("")
-	var ptrOurErr *fail.Error = &ourErr
-	var dblptrOurErr **fail.Error = &ptrOurErr
+	var ourErr = fail.NewError("")
+	var ptrOurErr = &ourErr
+	var dblptrOurErr = &ptrOurErr
 
-	var ptrOurConcreteErr *fail.ErrNotFound = fail.NotFoundError("")
-	var ourConcreteErr fail.ErrNotFound = *ptrOurConcreteErr
-	var dlbPtrOurConcreteErr **fail.ErrNotFound = &ptrOurConcreteErr
+	var ptrOurConcreteErr = fail.NotFoundError("")
+	var ourConcreteErr = *ptrOurConcreteErr
+	var dlbPtrOurConcreteErr = &ptrOurConcreteErr
 
 	var emptyStrArray []string
 
@@ -180,17 +180,17 @@ func TestNotNulls(t *testing.T) {
 }
 
 func TestInitialized(t *testing.T) {
-	var err error = fmt.Errorf("")
-	var ptrerr *error = &err
-	var dblptrerr **error = &ptrerr
+	var err = fmt.Errorf("")
+	var ptrerr = &err
+	var dblptrerr = &ptrerr
 
-	var ourErr fail.Error = fail.NewError("")
-	var ptrOurErr *fail.Error = &ourErr
-	var dblptrOurErr **fail.Error = &ptrOurErr
+	var ourErr = fail.NewError("")
+	var ptrOurErr = &ourErr
+	var dblptrOurErr = &ptrOurErr
 
-	var ptrOurConcreteErr *fail.ErrNotFound = fail.NotFoundError("")
-	var ourConcreteErr fail.ErrNotFound = *ptrOurConcreteErr
-	var dlbPtrOurConcreteErr **fail.ErrNotFound = &ptrOurConcreteErr
+	var ptrOurConcreteErr = fail.NotFoundError("")
+	var ourConcreteErr = *ptrOurConcreteErr
+	var dlbPtrOurConcreteErr = &ptrOurConcreteErr
 
 	var emptyStrArray []string
 

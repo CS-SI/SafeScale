@@ -39,7 +39,7 @@ type LabelListener struct {
 }
 
 // List the available tags
-func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest) (_ *protocol.LabelListResponse, err error) {
+func (s *LabelListener) List(inctx context.Context, in *protocol.LabelListRequest) (_ *protocol.LabelListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list labels")
 
@@ -49,18 +49,19 @@ func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest)
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "/labels/list")
+	job, err := PrepareJob(inctx, in.GetTenantId(), "/labels/list")
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
+	ctx := job.Context()
 	selectTags := in.GetTags()
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "(%v)", selectTags).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%v)", selectTags).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -73,7 +74,7 @@ func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest)
 	// Map resources.Tag to protocol.Tag
 	var outList []*protocol.LabelInspectResponse
 	for _, v := range list {
-		item, xerr := v.ToProtocol(job.Context(), false)
+		item, xerr := v.ToProtocol(ctx, false)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -86,7 +87,7 @@ func (s *LabelListener) List(ctx context.Context, in *protocol.LabelListRequest)
 }
 
 // Create a new label/tag
-func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequest) (_ *protocol.LabelInspectResponse, err error) {
+func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRequest) (_ *protocol.LabelInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create label")
 
@@ -96,18 +97,19 @@ func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequ
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/label/%s/create", name))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/label/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "('%s')", name).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -118,11 +120,11 @@ func (s *LabelListener) Create(ctx context.Context, in *protocol.LabelCreateRequ
 	}
 
 	tracer.Trace("%s '%s' created", kindToString(in.GetHasDefault()), name)
-	return labelInstance.ToProtocol(job.Context(), true)
+	return labelInstance.ToProtocol(ctx, true)
 }
 
 // Delete a Label
-func (s *LabelListener) Delete(ctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Label")
 
@@ -133,21 +135,22 @@ func (s *LabelListener) Delete(ctx context.Context, in *protocol.LabelInspectReq
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	ref, refLabel := srvutils.GetReference(in.GetLabel())
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetLabel().GetTenantId(), fmt.Sprintf("/label/%s/delete", ref))
+	job, xerr := PrepareJob(inctx, in.GetLabel().GetTenantId(), fmt.Sprintf("/label/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -161,7 +164,7 @@ func (s *LabelListener) Delete(ctx context.Context, in *protocol.LabelInspectReq
 }
 
 // Inspect a Label/Tag
-func (s *LabelListener) Inspect(ctx context.Context, in *protocol.LabelInspectRequest) (_ *protocol.LabelInspectResponse, err error) {
+func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspectRequest) (_ *protocol.LabelInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect label")
 
@@ -171,25 +174,26 @@ func (s *LabelListener) Inspect(ctx context.Context, in *protocol.LabelInspectRe
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	ref, refLabel := srvutils.GetReference(in.GetLabel())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetLabel().GetTenantId(), fmt.Sprintf("/label/%s/inspect", ref))
+	job, xerr := PrepareJob(inctx, in.GetLabel().GetTenantId(), fmt.Sprintf("/label/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := labelfactory.Load(job.Context(), job.Service(), ref)
+	instance, xerr := labelfactory.Load(ctx, job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -203,5 +207,5 @@ func (s *LabelListener) Inspect(ctx context.Context, in *protocol.LabelInspectRe
 		return nil, fail.NotFoundError("failed to find %s '%s'", kindToString(istag), ref)
 	}
 
-	return instance.ToProtocol(job.Context(), true)
+	return instance.ToProtocol(ctx, true)
 }

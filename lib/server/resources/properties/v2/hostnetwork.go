@@ -51,6 +51,24 @@ func NewHostNetworking() *HostNetworking {
 	}
 }
 
+func NewHostNetworkingFromProperty(propos *serialize.JSONProperties) (*HostNetworking, fail.Error) {
+	var netInfo *HostNetworking
+	xerr := propos.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		clod, ok := clonable.(*HostNetworking)
+		if !ok {
+			return fail.InconsistentError("Bad cast")
+		}
+
+		*netInfo = *clod
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return netInfo, nil
+}
+
 // IsNull tells if the HostNetworking corresponds to a null value
 func (hn *HostNetworking) IsNull() bool {
 	return hn == nil || hn.DefaultSubnetID == "" || (len(hn.IPv4Addresses) == 0 && len(hn.IPv6Addresses) == 0)

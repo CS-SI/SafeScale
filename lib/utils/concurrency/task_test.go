@@ -988,6 +988,38 @@ func TestSingleTaskRunThatFails(t *testing.T) {
 	require.NotNil(t, res)
 }
 
+func TestSingleTaskRunWithCancel(t *testing.T) {
+	kublai, culture := context.WithCancel(context.Background())
+
+	single, err := NewTaskWithContext(kublai)
+	require.NotNil(t, single)
+	require.Nil(t, err)
+
+	time.AfterFunc(50*time.Millisecond, func() {
+		culture()
+	})
+
+	res, err := single.Run(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			ahh := make(chan error)
+			go func() {
+				time.Sleep(time.Duration(400) * time.Millisecond)
+				ahh <- fail.NewError("issues")
+			}()
+			select {
+			case ar := <-ahh:
+				return struct{}{}, fail.ConvertError(ar)
+			case <-t.Context().Done():
+				return nil, fail.ConvertError(t.Context().Err())
+			}
+		}, nil,
+	)
+	require.NotNil(t, err)
+	require.Nil(t, res)
+
+	t.Log(err)
+}
+
 func TestSingleTaskTryWaitKO(t *testing.T) {
 	single, err := NewUnbreakableTask()
 	require.NotNil(t, single)
@@ -1309,7 +1341,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		case *fail.ErrInconsistent:
 			// expected
 		default:
-			t.Errorf("Unesxpected error: %v", xerr)
+			t.Errorf("Unexpected error: %v", xerr)
 			t.FailNow()
 		}
 
@@ -1363,6 +1395,8 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			// expected
+		case *fail.ErrAborted:
+			// aborted by timeout, also expected
 		default:
 			t.Errorf(
 				"Where are the timeout errors ??: %s", spew.Sdump(xerr),

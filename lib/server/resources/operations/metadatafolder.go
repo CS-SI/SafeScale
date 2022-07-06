@@ -149,7 +149,7 @@ func (instance MetadataFolder) Lookup(ctx context.Context, path string, name str
 		return xerr
 	}
 
-	list, xerr := instance.service.ListObjects(bucket.Name, absPath, objectstorage.NoPrefix)
+	list, xerr := instance.service.ListObjects(ctx, bucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -178,7 +178,16 @@ func (instance MetadataFolder) Delete(ctx context.Context, path string, name str
 		return xerr
 	}
 
-	xerr = instance.service.DeleteObject(bucket.Name, instance.absolutePath(path, name))
+	has, xerr := instance.service.HasObject(ctx, bucket.Name, instance.absolutePath(path, name))
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
+	}
+	if !has {
+		return nil
+	}
+
+	xerr = instance.service.DeleteObject(ctx, bucket.Name, instance.absolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
@@ -220,13 +229,13 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 			if iErr != nil {
 				return iErr
 			}
-			iErr = instance.service.ReadObject(bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
+			iErr = instance.service.ReadObject(ctx, bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
 			if iErr != nil {
 				switch iErr.(type) {
 				case *fail.ErrNotFound:
 					return retry.StopRetryError(iErr, "does NOT exist")
 				default:
-					_ = instance.service.InvalidateObject(bucket.Name, instance.absolutePath(path, name))
+					_ = instance.service.InvalidateObject(ctx, bucket.Name, instance.absolutePath(path, name))
 					return iErr
 				}
 			}
@@ -268,17 +277,18 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 		default:
 		}
 	}
+
 	datas := goodBuffer.Bytes()
 	if doCrypt {
-		var err error
-		datas, err = crypt.Decrypt(datas, instance.cryptKey)
+		decrypted, err := crypt.Decrypt(datas, instance.cryptKey)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
+		datas = decrypted
 	}
 
-	xerr = callback(datas) // FIXME: Here we have to look for deserializing problems...
+	xerr = callback(datas)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
@@ -287,8 +297,8 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 	return nil
 }
 
-// Write writes the content in Object Storage, and check the write is committed.
-// Returns nil on success (with assurance the write has been committed on remote side)
+// Write writes the content in Object Storage, and check the write operation is committed.
+// Returns nil on success (with assurance the write operation has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
 func (instance MetadataFolder) Write(ctx context.Context, path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
@@ -333,6 +343,10 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 	absolutePath := instance.absolutePath(path, name)
 	timeout := timings.MetadataReadAfterWriteTimeout()
 
+	readAfterWrite := time.Now()
+	iterations := 0
+	innerIterations := 0
+
 	// Outer retry will write the metadata at most 3 times
 	xerr = retry.Action(
 		func() error {
@@ -342,12 +356,11 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 			default:
 			}
 
+			iterations++
+
 			var innerXErr fail.Error
 			source := bytes.NewBuffer(data)
-			// sourceHash := md5.New()
-			// _, _ = sourceHash.Write(source.Bytes())
-			// srcHex := hex.EncodeToString(sourceHash.Sum(nil))
-			if _, innerXErr = instance.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
+			if _, innerXErr = instance.service.WriteObject(ctx, bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -360,21 +373,27 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					default:
 					}
 
+					innerIterations++
+
 					var target bytes.Buffer
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
-					if innerErr := instance.service.ReadObject(bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
-						_ = instance.service.InvalidateObject(bucketName, absolutePath)
+					if innerErr := instance.service.ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
+						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
+						logrus.Warningf(innerErr.Error())
 						return innerErr
 					}
 
 					if !bytes.Equal(data, target.Bytes()) {
-						return fail.NewError("remote content is different from local reference")
+						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
+						innerErr := fail.NewError("remote content is different from local reference")
+						logrus.Warningf(innerErr.Error())
+						return innerErr
 					}
 
 					return nil
 				},
-				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(timings.SmallDelay()),
+				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout), retry.Max(3)),
+				retry.Linear(timings.SmallDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -396,14 +415,14 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 			}
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(timings.SmallDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Max(3)),
+		retry.Constant(0),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
 			switch v { // nolint
 			case verdict.Retry:
-				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(timeout+30*time.Second))
+				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(time.Since(readAfterWrite)))
 			}
 		},
 	)
@@ -418,6 +437,13 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 			return xerr
 		}
 	}
+
+	if iterations > 1 {
+		logrus.Warningf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+	} else {
+		logrus.Debugf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+	}
+
 	return nil
 }
 
@@ -433,7 +459,7 @@ func (instance MetadataFolder) Browse(ctx context.Context, path string, callback
 		return xerr
 	}
 
-	list, xerr := instance.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
+	list, xerr := instance.service.ListObjects(ctx, metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "Error browsing metadata: listing objects")
@@ -451,10 +477,10 @@ func (instance MetadataFolder) Browse(ctx context.Context, path string, callback
 			continue
 		}
 		var buffer bytes.Buffer
-		xerr = instance.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
+		xerr = instance.service.ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			_ = instance.service.InvalidateObject(metadataBucket.Name, i)
+			_ = instance.service.InvalidateObject(ctx, metadataBucket.Name, i)
 			return fail.Wrap(xerr, "Error browsing metadata: reading from buffer")
 		}
 

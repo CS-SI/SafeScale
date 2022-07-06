@@ -434,7 +434,7 @@ func Test_HostNetworkingFromAbstractToPropertyV2(t *testing.T) {
 
 func Test_HostStateFromAbstractToProtocol(t *testing.T) {
 
-	var list []hoststate.Enum = []hoststate.Enum{
+	var list = []hoststate.Enum{
 		hoststate.Any,
 		hoststate.Deleted,
 		hoststate.Failed,
@@ -523,8 +523,8 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 	ipaddr, xerr = hostConf.GetIPAddress()
 	require.Nil(t, xerr)
 	require.EqualValues(t, ipaddr, phostcfg.Host)
-	//port, xerr = hostConf.GetPort()
-	//require.Nil(t, xerr)
+	// port, xerr = hostConf.GetPort()
+	// require.Nil(t, xerr)
 	require.EqualValues(t, 22 /*port*/, phostcfg.Port)
 	pkey, xerr = hostConf.GetPrivateKey()
 	require.Nil(t, xerr)
@@ -547,8 +547,8 @@ func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
 func Test_HostStatusFromAbstractToProtocol(t *testing.T) {
 
-	var Name string = "HostName"
-	var Status hoststate.Enum = hoststate.Any
+	var Name = "HostName"
+	var Status = hoststate.Any
 
 	phs := HostStatusFromAbstractToProtocol(Name, Status)
 	require.EqualValues(t, phs.Name, Name)

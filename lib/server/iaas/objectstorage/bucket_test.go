@@ -17,6 +17,7 @@
 package objectstorage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -190,13 +191,13 @@ func TestLocation_CreateBucket(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
 	require.Nil(t, err)
 
-	if there, err := loc.FindBucket("boo"); err == nil {
+	if there, err := loc.FindBucket(context.Background(), "boo"); err == nil {
 		if there {
 			return
 		}
 	}
 
-	osb, err := loc.CreateBucket("boo")
+	osb, err := loc.CreateBucket(context.Background(), "boo")
 	require.Nil(t, err)
 	require.NotNil(t, osb)
 }

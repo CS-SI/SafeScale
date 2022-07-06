@@ -684,8 +684,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.DeleteHost(ctx, ahc.ID)
+			derr := s.DeleteHost(context.Background(), ahc.ID)
 			if derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
@@ -725,8 +726,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.DeleteFloatingIP(ctx, fip.ID)
+				derr := s.DeleteFloatingIP(context.Background(), fip.ID)
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
 					_ = ferr.AddConsequence(derr)
@@ -1447,10 +1449,10 @@ func (s stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 
 	xerr = s.AssociateFloatingIP(ctx, host.Core, fip.ID)
 	if xerr != nil {
-		derr := s.DeleteFloatingIP(ctx, fip.ID)
-		if derr != nil {
-			logrus.Warnf("Error deleting floating ip: %v", derr)
-			_ = xerr.AddConsequence(derr)
+		rerr := s.DeleteFloatingIP(ctx, fip.ID)
+		if rerr != nil {
+			logrus.Warnf("Error deleting floating ip: %v", rerr)
+			_ = xerr.AddConsequence(rerr)
 		}
 		return nil, xerr
 	}

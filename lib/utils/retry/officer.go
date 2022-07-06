@@ -140,15 +140,18 @@ func Fibonacci(base time.Duration) *Officer {
 }
 
 func randomInt(min, max int) int {
-	// FIXME: if min > max, it PANICS -> randomInt has to return (int, error)
 	if min == max {
 		return min
 	}
 	mrand.Seed(time.Now().Unix())
+	if min > max {
+		return mrand.Intn(min-max) + max // nolint
+	}
+
 	return mrand.Intn(max-min) + min // nolint
 }
 
-func Randomized(bottom time.Duration, top time.Duration) *Officer { // FIXME: Use this
+func Randomized(bottom time.Duration, top time.Duration) *Officer {
 	o := Officer{
 		Block: func(t Try) {
 			sleepTime := time.Duration(randomInt(int(bottom.Milliseconds()), int(top.Milliseconds()))) * time.Millisecond

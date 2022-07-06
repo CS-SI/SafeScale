@@ -175,6 +175,12 @@ func LoadFeatureFile(ctx context.Context, svc iaas.Service, name string, embedde
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {

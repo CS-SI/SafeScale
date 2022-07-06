@@ -64,6 +64,12 @@ func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	featureFileInstance, xerr := LoadFeatureFile(ctx, svc, name, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -85,6 +91,12 @@ func NewEmbeddedFeature(ctx context.Context, svc iaas.Service, name string) (_ r
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
 	}
 
 	featureFileInstance, xerr := LoadFeatureFile(ctx, svc, name, true)

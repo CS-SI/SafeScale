@@ -244,27 +244,24 @@ type step struct {
 func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
 	outcomes := &unitResults{}
 
-	if task.Aborted() {
-		lerr, err := task.LastError()
-		if err != nil {
-			return outcomes, fail.AbortedError(nil, "aborted")
-		}
-		return outcomes, fail.AbortedError(lerr, "aborted")
+	select {
+	case <-task.Context().Done():
+		return outcomes, fail.AbortedError(task.Context().Err())
+	default:
 	}
 
 	if is.Serial || s.Serialize {
-		return is.loopSeriallyOnHosts(task, hosts, v)
+		return is.loopSeriallyOnHosts(task.Context(), hosts, v)
 	}
 
-	return is.loopConcurrentlyOnHosts(task, hosts, v)
+	return is.loopConcurrentlyOnHosts(task.Context(), hosts, v)
 }
 
-func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
-	tracer := debug.NewTracer(task, true, "").Entering()
+func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
+	tracer := debug.NewTracer(ctx, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
-	ctx := task.Context()
 	outcomes := &unitResults{}
 
 	var (
@@ -274,6 +271,12 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	)
 
 	for _, h := range hosts {
+		select {
+		case <-ctx.Done():
+			return nil, fail.AbortedError(ctx.Err())
+		default:
+		}
+
 		var xerr fail.Error
 		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 		clonedV, xerr = is.initLoopTurnForHost(ctx, h, v)
@@ -282,13 +285,13 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 			return nil, xerr
 		}
 
-		subtask, xerr = concurrency.NewTaskWithContext(task.Context(), concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
+		subtask, xerr = concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		outcome, xerr = subtask.Run(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+		outcome, xerr = is.taskRunOnHost(subtask, runOnHostParameters{Host: h, Variables: clonedV})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -318,78 +321,101 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	return outcomes, nil
 }
 
-func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
-	tracer := debug.NewTracer(task, true, "").Entering()
+func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
+	tracer := debug.NewTracer(inctx, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
-
-	ctx := task.Context()
 
 	var (
 		clonedV data.Map
 		subtask concurrency.Task
 	)
 
-	tg, xerr := concurrency.NewTaskGroupWithContext(task.Context())
-	if xerr != nil {
-		return nil, xerr
-	}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	var taskErr fail.Error
-	subtasks := map[string]concurrency.Task{}
-	for _, h := range hosts {
-		clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v) // FIXME: Profile this
-		taskErr = debug.InjectPlannedFail(taskErr)
-		if taskErr != nil {
-			abErr := tg.AbortWithCause(taskErr)
-			if abErr != nil {
-				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+	type result struct {
+		ra   resources.UnitResults
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		var taskErr fail.Error
+		subtasks := map[string]concurrency.Task{}
+		for _, h := range hosts {
+			clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v)
+			taskErr = debug.InjectPlannedFail(taskErr)
+			if taskErr != nil {
+				abErr := tg.AbortWithCause(taskErr)
+				if abErr != nil {
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
+				break
 			}
-			break
-		}
 
-		subtask, taskErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
-		taskErr = debug.InjectPlannedFail(taskErr)
-		if taskErr != nil {
-			abErr := tg.AbortWithCause(taskErr)
-			if abErr != nil {
-				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			subtask, taskErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+			taskErr = debug.InjectPlannedFail(taskErr)
+			if taskErr != nil {
+				abErr := tg.AbortWithCause(taskErr)
+				if abErr != nil {
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
+				break
 			}
-			break
+			subtasks[h.GetName()] = subtask
 		}
-		subtasks[h.GetName()] = subtask
+
+		tgr, xerr := tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			if len(subtasks) != len(hosts) {
+				logrus.Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
+			}
+			logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
+			if taskErr != nil {
+				_ = taskErr.AddConsequence(xerr)
+			} else {
+				taskErr = xerr
+			}
+		}
+
+		wrongs, outcomes, cerr := is.collectOutcomes(subtasks, tgr)
+		if cerr != nil {
+			if wrongs == 0 && len(subtasks) == len(hosts) {
+				inconsistency := fail.InconsistentError("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results: %w", cerr)
+				inconsistency.Annotate("wrongs", wrongs).Annotate("outcomes", outcomes)
+				chRes <- result{nil, inconsistency}
+				return
+			}
+
+			if taskErr != nil {
+				_ = taskErr.AddConsequence(cerr)
+				chRes <- result{nil, taskErr}
+				return
+			}
+			chRes <- result{nil, cerr}
+			return
+		}
+
+		chRes <- result{outcomes, taskErr}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.ra, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	tgr, xerr := tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		if len(subtasks) != len(hosts) {
-			logrus.Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
-		}
-		logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
-		if taskErr != nil {
-			_ = taskErr.AddConsequence(xerr)
-		} else {
-			taskErr = xerr
-		}
-	}
-
-	wrongs, outcomes, cerr := is.collectOutcomes(subtasks, tgr)
-	if cerr != nil {
-		if wrongs == 0 && len(subtasks) == len(hosts) {
-			inconsistency := fail.InconsistentError("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results: %w", cerr)
-			inconsistency.Annotate("wrongs", wrongs).Annotate("outcomes", outcomes)
-			return nil, inconsistency
-		}
-
-		if taskErr != nil {
-			_ = taskErr.AddConsequence(cerr)
-			return nil, taskErr
-		}
-		return nil, cerr
-	}
-
-	return outcomes, taskErr
 }
 
 // collectOutcomes collects results from subtasks
@@ -495,20 +521,22 @@ type runOnHostParameters struct {
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	var res concurrency.TaskResult
 
 	defer func() {
-		if result != nil {
-			if sres, ok := result.(stepResult); ok {
+		if res != nil {
+			if sres, ok := res.(stepResult); ok {
 				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
-					dur := spew.Sdump(result)
+					dur := spew.Sdump(res)
 					if !strings.Contains(dur, "check_") {
-						logrus.Debugf("task result: %s", spew.Sdump(result))
+						logrus.Debugf("task result: %s", spew.Sdump(res))
 					}
 				}
 			}
 		}
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			logrus.Debugf("task error: %v", ferr)
 		}
@@ -526,97 +554,130 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	// Updates variables in step script
-	command, xerr := replaceVariablesInString(is.Script, p.Variables)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
-		return stepResult{err: problem}, problem
-	}
+	inctx := task.Context()
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	hidesOutput := strings.Contains(command, "set +x\n")
-	if hidesOutput {
-		command = strings.Replace(command, "set +x\n", "\n", 1)
-		command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
+	type result struct {
+		rTr  concurrency.TaskResult
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	// Uploads then executes command
-	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
-	rfcItem := Item{
-		Remote: filename,
-	}
-
-	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		logrus.Warnf("failure uploading script: %v", xerr)
-		problem := fail.Wrap(xerr, "failure uploading script")
-		return stepResult{err: problem}, problem
-	}
-
-	if !hidesOutput {
-		command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; bash -x -c %s; exit ${PIPESTATUS}'", filename, filename)
-	} else {
-		command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
-	}
-
-	// If retcode is 126, iterate a few times...
-	rounds := 10
-	var (
-		retcode int
-		outrun  string
-		outerr  string
-	)
-	svc := p.Host.Service()
-	timings, xerr := svc.Timings()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	connTimeout := timings.ConnectionTimeout()
-	for {
-		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, connTimeout, is.WallTime)
-		if retcode == 126 {
-			logrus.Debugf("Text busy happened")
+		// Updates variables in step script
+		command, xerr := replaceVariablesInString(is.Script, p.Variables)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
+			chRes <- result{stepResult{err: problem}, problem}
+			return
 		}
 
-		// Executes the script on the remote host
-		if retcode != 126 || rounds == 0 {
+		hidesOutput := strings.Contains(command, "set +x\n")
+		if hidesOutput {
+			command = strings.Replace(command, "set +x\n", "\n", 1)
+			command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
+		}
+
+		// Uploads then executes command
+		filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
+		rfcItem := Item{
+			Remote: filename,
+		}
+
+		xerr = rfcItem.UploadString(ctx, command, p.Host)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			problem := fail.Wrap(xerr, "failure uploading script")
+			chRes <- result{stepResult{err: problem}, problem}
+			return
+		}
+
+		if !hidesOutput {
+			command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; bash -x -c %s; exit ${PIPESTATUS}'", filename, filename)
+		} else {
+			command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
+		}
+
+		// If retcode is 126, iterate a few times...
+		rounds := 10
+		var (
+			retcode int
+			outrun  string
+			outerr  string
+		)
+		svc := p.Host.Service()
+		timings, xerr := svc.Timings()
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		connTimeout := timings.ConnectionTimeout()
+		for {
+			select {
+			case <-ctx.Done():
+				chRes <- result{nil, fail.ConvertError(ctx.Err())}
+				return
+			default:
+			}
+
+			retcode, outrun, outerr, xerr = p.Host.Run(ctx, command, outputs.COLLECT, connTimeout, is.WallTime)
 			if retcode == 126 {
-				logrus.Warnf("Text busy killed the script")
+				logrus.Debugf("Text busy happened")
 			}
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				xerr.Annotate("retcode", retcode)
-				xerr.Annotate("stdout", outrun)
-				xerr.Annotate("stderr", outerr)
-				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-			}
-			break
-		}
 
-		if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
-			if xerr != nil {
-				if !strings.Contains(xerr.Error(), "bad interpreter") {
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						xerr.Annotate("retcode", retcode)
-						xerr.Annotate("stdout", outrun)
-						xerr.Annotate("stderr", outerr)
-						return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-					}
-					break
+			// Executes the script on the remote host
+			if retcode != 126 || rounds == 0 {
+				if retcode == 126 {
+					logrus.Warnf("Text busy killed the script")
 				}
-			} else {
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
+					chRes <- result{stepResult{err: xerr, retcode: retcode, output: outrun}, xerr}
+					return
+				}
 				break
 			}
+
+			if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
+				if xerr != nil {
+					if !strings.Contains(xerr.Error(), "bad interpreter") {
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							xerr.Annotate("retcode", retcode)
+							xerr.Annotate("stdout", outrun)
+							xerr.Annotate("stderr", outerr)
+							chRes <- result{stepResult{err: xerr, retcode: retcode, output: outrun}, xerr}
+							return
+						}
+						break
+					}
+				} else {
+					break
+				}
+			}
+
+			rounds--
+			time.Sleep(timings.SmallDelay())
 		}
 
-		rounds--
-		time.Sleep(timings.SmallDelay())
+		chRes <- result{stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil
 }
 
 // realizeVariables replaces any template occurring in every variable

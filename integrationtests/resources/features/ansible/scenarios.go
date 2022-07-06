@@ -41,17 +41,17 @@ func Ansible(t *testing.T) {
 
 	// check for success and name
 	var res string
-	res, err = helpers.RunJq(out, "-r .status")
+	res, err = helpers.RunJq(out, ".status")
 	require.Nil(t, err)
 	require.Equal(t, "success", res)
 
-	res, err = helpers.RunJq(out, "-r .result.name")
+	res, err = helpers.RunJq(out, ".result.name")
 	require.Nil(t, err)
 	require.Equal(t, name, res)
 
 	out, err = helpers.GetOutput(fmt.Sprintf("safescale host feature add gw-%s ansible", name))
 	require.Nil(t, err)
-	res, err = helpers.RunJq(out, "-r .status")
+	res, err = helpers.RunJq(out, ".status")
 	require.Nil(t, err)
 	require.Equal(t, "success", res)
 

@@ -38,9 +38,9 @@ type NetworkRequest struct {
 }
 
 // SubNetwork is deprecated
-type SubNetwork struct { // DEPRECATED
-	CIDR string `json:"subnetmask,omitempty"`
-	ID   string `json:"subnetid,omitempty"`
+type SubNetwork struct { // DEPRECATED: deprecated
+	CIDR string `json:"subnetmask,omitempty"` // DEPRECATED: deprecated
+	ID   string `json:"subnetid,omitempty"`   // DEPRECATED: deprecated
 }
 
 // Network represents a virtual network
@@ -57,7 +57,7 @@ type Network struct {
 	SecondaryGatewayID string         `json:"secondary_gateway_id,omitempty"` // DEPRECATED: contains the id of the host acting as secondary gateway for the network
 	VIP                *VirtualIP     `json:"vip,omitempty"`                  // DEPRECATED: contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum `json:"ip_version,omitempty"`           // DEPRECATED: IPVersion is IPv4 or IPv6 (see IPVersion)
-	Subnetworks        []SubNetwork   `json:"subnetworks,omitempty"`          // DEPRECATED
+	Subnetworks        []SubNetwork   `json:"subnetworks,omitempty"`          // DEPRECATED: deprecated
 }
 
 // NewNetwork initializes a new instance of Network

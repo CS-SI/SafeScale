@@ -64,7 +64,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 		return nil, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.feature"), "(%s)", targetType, targetRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s)", targetType, targetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -125,7 +125,7 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -173,7 +173,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -229,7 +229,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -312,7 +312,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -371,7 +371,7 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

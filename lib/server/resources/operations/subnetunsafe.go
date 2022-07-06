@@ -48,8 +48,6 @@ import (
 // unsafeInspectGateway returns the gateway related to Subnet
 // Note: a write lock of the instance (instance.lock.Lock() ) must have been called before calling this method
 func (instance *Subnet) unsafeInspectGateway(ctx context.Context, primary bool) (_ resources.Host, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
 	gwIdx := 0
 	if !primary {
 		gwIdx = 1
@@ -69,15 +67,19 @@ func (instance *Subnet) unsafeInspectGateway(ctx context.Context, primary bool) 
 		instance.localCache.RUnlock() // nolint
 		if out == nil {
 			return nil, fail.NotFoundError("failed to find gateway")
+		} else {
+			incrementExpVar("net.cache.hit")
 		}
+	} else {
+		incrementExpVar("net.cache.hit")
 	}
 
 	return out, nil
 }
 
 // unsafeGetDefaultRouteIP ...
-func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (ip string, ferr fail.Error) {
-	ip = ""
+func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (_ string, ferr fail.Error) {
+	var ip string
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -109,8 +111,6 @@ func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (ip string,
 
 // unsafeGetVirtualIP returns an abstract.VirtualIP used by gateway HA
 func (instance *Subnet) unsafeGetVirtualIP(ctx context.Context) (vip *abstract.VirtualIP, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
 	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -126,7 +126,7 @@ func (instance *Subnet) unsafeGetVirtualIP(ctx context.Context) (vip *abstract.V
 
 	}
 	if vip == nil {
-		return nil, fail.NotFoundError("failed to find Virtual IP binded to gateways for Subnet '%s'", instance.GetName())
+		return nil, fail.NotFoundError("failed to find Virtual IP bound to gateways for Subnet '%s'", instance.GetName())
 	}
 
 	return vip, nil
@@ -199,51 +199,97 @@ func (instance *Subnet) unsafeHasVirtualIP(ctx context.Context) (bool, fail.Erro
 // UnsafeCreateSecurityGroups creates the 3 Security Groups needed by a Subnet
 // 'ctx' may contain values "CurrentNetworkAbstractContextKey" and "CurrentNetworkPropertiesContextKey", corresponding respectively
 // to Network abstract and Network properties; these values may be used by SecurityGroup.Create() not to try to Alter networkInstance directly (might be inside a code already altering it)
-func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
-	var xerr fail.Error
-	networkID := networkInstance.GetID()
-	networkName := networkInstance.GetName()
-	subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, networkID, networkName, keepOnFailure, defaultSSHPort)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer instance.undoCreateSecurityGroup(ctx, &ferr, keepOnFailure, subnetGWSG)
+func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (sa, sb, sc resources.SecurityGroup, gerr fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, networkID, networkName, keepOnFailure)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
+	type result struct {
+		a    resources.SecurityGroup
+		b    resources.SecurityGroup
+		c    resources.SecurityGroup
+		rErr fail.Error
 	}
-	defer instance.undoCreateSecurityGroup(ctx, &ferr, keepOnFailure, subnetPublicIPSG)
 
-	subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, networkID, networkName, keepOnFailure)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer instance.undoCreateSecurityGroup(ctx, &ferr, keepOnFailure, subnetInternalSG)
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer close(chRes)
 
-	xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer func() {
-		if ferr != nil && !keepOnFailure {
-			if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(ferr)))
-			}
+		networkID := networkInstance.GetID()
+		networkName := networkInstance.GetName()
+		subnetGWSG, xerr := instance.createGWSecurityGroup(ctx, networkID, networkName, keepOnFailure, defaultSSHPort)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{nil, nil, nil, xerr}
+			return xerr
 		}
-	}()
+		defer func() {
+			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetGWSG)
+			if derr != nil {
+				logrus.Warnf(derr.Error())
+			}
+		}()
 
-	xerr = subnetInternalSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
+		subnetPublicIPSG, xerr := instance.createPublicIPSecurityGroup(ctx, networkID, networkName, keepOnFailure)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{nil, nil, nil, xerr}
+			return xerr
+		}
+		defer func() {
+			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetPublicIPSG)
+			if derr != nil {
+				logrus.Warnf(derr.Error())
+			}
+		}()
+
+		subnetInternalSG, xerr := instance.createInternalSecurityGroup(ctx, networkID, networkName, keepOnFailure)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{nil, nil, nil, xerr}
+			return xerr
+		}
+		defer func() {
+			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetInternalSG)
+			if derr != nil {
+				logrus.Warnf(derr.Error())
+			}
+		}()
+
+		xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{nil, nil, nil, xerr}
+			return xerr
+		}
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil && !keepOnFailure {
+				if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(ferr)))
+				}
+			}
+		}()
+
+		xerr = subnetInternalSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{nil, nil, nil, xerr}
+			return xerr
+		}
+
+		chRes <- result{subnetGWSG, subnetInternalSG, subnetPublicIPSG, nil}
+		return nil
+	}() // nolint
+	select {
+	case res := <-chRes:
+		return res.a, res.b, res.c, res.rErr
+	case <-ctx.Done():
+		<-chRes // wait for defer
+		return nil, nil, nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes // wait for defer
+		return nil, nil, nil, fail.ConvertError(inctx.Err())
 	}
-
-	return subnetGWSG, subnetInternalSG, subnetPublicIPSG, nil
 }
 
 // createGWSecurityGroup creates a Security Group that will be applied to gateways of the Subnet
@@ -265,6 +311,7 @@ func (instance *Subnet) createGWSecurityGroup(ctx context.Context, networkID, ne
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
 			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
@@ -369,6 +416,7 @@ func (instance *Subnet) createPublicIPSecurityGroup(
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
 			if derr := sgInstance.Delete(context.Background(), true); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
@@ -402,17 +450,20 @@ func (instance *Subnet) createPublicIPSecurityGroup(
 }
 
 // Starting from here, delete the Security Group if exiting with error
-func (instance *Subnet) undoCreateSecurityGroup(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
+func (instance *Subnet) undoCreateSecurityGroup(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) fail.Error {
 	if errorPtr == nil {
-		logrus.Errorf("trying to undo an action based on the content of a nil fail.Error; undo cannot be run") // FIXME: return error
-		return
+		return fail.NewError("trying to undo an action based on the content of a nil fail.Error; undo cannot be run")
+	}
+	if ctx != context.Background() {
+		return fail.InvalidParameterError("ctx", "has to be context.Background()")
 	}
 	if *errorPtr != nil && !keepOnFailure {
 		sgName := sg.GetName()
-		if derr := sg.Delete(context.Background(), true); derr != nil {
+		if derr := sg.Delete(ctx, true); derr != nil {
 			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Security Group for gateways '%s' of Subnet '%s'", ActionFromError(*errorPtr), sgName, instance.GetName()))
 		}
 	}
+	return nil
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
@@ -441,6 +492,7 @@ func (instance *Subnet) createInternalSecurityGroup(
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
 			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Security Group '%s'", ActionFromError(ferr), sgName))
@@ -488,401 +540,502 @@ func (instance *Subnet) createInternalSecurityGroup(
 	return sg, nil
 }
 
-func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ferr fail.Error) {
-	if req.CIDR == "" {
-		return fail.InvalidRequestError("invalid empty string value for 'req.CIDR'")
-	}
+func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.SubnetRequest) (_ fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	networkInstance, abstractNetwork, xerr := instance.validateNetwork(ctx, &req)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer close(chRes)
 
-	// Check if Subnet already exists and is managed by SafeScale
-	xerr = instance.checkUnicity(ctx, req)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Verify the CIDR is not routable
-	xerr = instance.validateCIDR(ctx, &req, *abstractNetwork)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
-	}
-
-	svc := instance.Service()
-	abstractSubnet, xerr := svc.CreateSubnet(ctx, req)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrInvalidRequest, *fail.ErrTimeout:
-			return xerr
-		default:
+		if req.CIDR == "" {
+			xerr := fail.InvalidRequestError("invalid empty string value for 'req.CIDR'")
+			chRes <- result{xerr}
 			return xerr
 		}
-	}
 
-	// Starting from here, delete Subnet if exiting with error
-	defer func() {
-		if ferr != nil && abstractSubnet != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetThenWaitCompletion(ctx, abstractSubnet.ID); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
-			}
-		}
-	}()
-
-	// Write Subnet object metadata and updates the service cache
-	xerr = instance.Carry(ctx, abstractSubnet)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Starting from here, delete Subnet metadata if exiting with error
-	defer func() {
-		if ferr != nil && !req.KeepOnFailure {
-			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
-			}
-		}
-	}()
-
-	xerr = instance.updateCachedInformation(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if req.DefaultSSHPort == 0 {
-		req.DefaultSSHPort = 22
-	}
-
-	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.unsafeCreateSecurityGroups(ctx, networkInstance, req.KeepOnFailure, int32(req.DefaultSSHPort))
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	defer func() {
-		if ferr != nil && !req.KeepOnFailure {
-			derr := instance.deleteSecurityGroups(context.Background(), [3]string{subnetGWSG.GetID(), subnetInternalSG.GetID(), subnetPublicIPSG.GetID()})
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
-			}
-		}
-	}()
-
-	caps, xerr := svc.GetCapabilities(ctx)
-	if xerr != nil {
-		return xerr
-	}
-	failover := req.HA
-	if failover {
-		if caps.PrivateVirtualIP {
-			logrus.Info("Driver support private Virtual IP, honoring the failover setup for gateways.")
-		} else {
-			logrus.Warnf("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
-			failover = false
-		}
-	}
-
-	// Creates VIP for gateways if asked for
-	var avip *abstract.VirtualIP
-	if failover {
-		avip, xerr = svc.CreateVIP(ctx, abstractSubnet.Network, abstractSubnet.ID, fmt.Sprintf(virtualIPNamePattern, abstractSubnet.Name, networkInstance.GetName()), []string{subnetGWSG.GetID()})
+		networkInstance, abstractNetwork, xerr := instance.validateNetwork(ctx, &req)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to create VIP")
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		// Starting from here, delete VIP if exists with error
-		defer func() {
-			if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && !req.KeepOnFailure {
-				if derr := svc.DeleteVIP(context.Background(), abstractSubnet.VIP); derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
-				}
-			}
-		}()
-	}
-
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// Check if Subnet already exists and is managed by SafeScale
+		xerr = instance.checkUnicity(ctx, req)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		as.VIP = avip
-		as.State = subnetstate.GatewayCreation
-		as.GWSecurityGroupID = subnetGWSG.GetID()
-		as.InternalSecurityGroupID = subnetInternalSG.GetID()
-		as.PublicIPSecurityGroupID = subnetPublicIPSG.GetID()
-
-		// Creates the bind between the Subnet default security group and the Subnet
-		return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			item := &propertiesv1.SecurityGroupBond{
-				ID:       subnetGWSG.GetID(),
-				Name:     subnetGWSG.GetName(),
-				Disabled: false,
-			}
-			ssgV1.ByID[item.ID] = item
-			ssgV1.ByName[subnetGWSG.GetName()] = item.ID
-
-			item = &propertiesv1.SecurityGroupBond{
-				ID:       subnetInternalSG.GetID(),
-				Name:     subnetInternalSG.GetName(),
-				Disabled: false,
-			}
-			ssgV1.ByID[item.ID] = item
-			ssgV1.ByName[item.Name] = item.ID
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// attach Subnet to Network
-	xerr = networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			nsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
-			nsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Starting from here, remove Subnet from Network metadata if exiting with error
-	defer func() {
-		if ferr != nil && !req.KeepOnFailure {
-			derr := networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-					nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
-
-					delete(nsV1.ByID, abstractSubnet.ID)
-					delete(nsV1.ByName, abstractSubnet.Name)
-					return nil
-				})
-			})
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Subnet from Network", ActionFromError(ferr)))
-			}
-		}
-	}()
-
-	return nil
-}
-
-func (instance *Subnet) unsafeUpdateSubnetStatus(ctx context.Context, target subnetstate.Enum) fail.Error {
-	xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// Verify the CIDR is not routable
+		xerr = instance.validateCIDR(ctx, &req, *abstractNetwork)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			xerr := fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		as.State = target
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	return instance.updateCachedInformation(ctx)
-}
-
-func (instance *Subnet) unsafeFinalizeSubnetCreation(ctx context.Context) fail.Error {
-	xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		as.State = subnetstate.Ready
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	return instance.updateCachedInformation(ctx)
-}
-
-func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (ferr fail.Error) {
-	svc := instance.Service()
-	if gwSizing == nil {
-		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
-	}
-
-	template, xerr := svc.FindTemplateBySizing(ctx, *gwSizing)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to find appropriate template")
-	}
-
-	// define image...
-	imageQuery := gwSizing.Image
-	if imageQuery == "" {
-		imageQuery = req.ImageRef
-		if imageQuery == "" {
-			cfg, xerr := svc.GetConfigurationOptions(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			imageQuery = cfg.GetString("DefaultImage")
-
-			if imageQuery == "" {
-				imageQuery = consts.DEFAULTOS
-			}
-		}
-		img, xerr := svc.SearchImage(ctx, imageQuery)
+		svc := instance.Service()
+		abstractSubnet, xerr := svc.CreateSubnet(ctx, req)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// look for an exact match by ID
-				imgs, xerr := svc.ListImages(ctx, true)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failure listing images")
-				}
-
-				img = nil
-				for _, aimg := range imgs {
-					if strings.Compare(aimg.ID, imageQuery) == 0 {
-						logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-						img = aimg
-						break
-					}
-				}
-				if img == nil {
-					return fail.Wrap(xerr, "failed to find image with ID %s", imageQuery)
-				}
-
+			case *fail.ErrNotFound, *fail.ErrInvalidRequest, *fail.ErrTimeout:
+				chRes <- result{xerr}
+				return xerr
 			default:
-				return fail.Wrap(xerr, "failed to find image '%s'", imageQuery)
+				chRes <- result{xerr}
+				return xerr
 			}
 		}
 
-		gwSizing.Image = img.ID
-	}
+		// Starting from here, delete Subnet if exiting with error
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil && abstractSubnet != nil && !req.KeepOnFailure {
+				if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), abstractSubnet.ID); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
+				}
+			}
+		}()
 
-	subnetName := instance.GetName()
-	var primaryGatewayName, secondaryGatewayName string
-	if req.HA || gwname == "" {
-		primaryGatewayName = "gw-" + subnetName
-	} else {
-		primaryGatewayName = gwname
-	}
-	if req.HA {
-		secondaryGatewayName = "gw2-" + subnetName
-	}
-
-	domain := strings.Trim(req.Domain, ".")
-	if domain != "" {
-		domain = "." + domain
-	}
-
-	keepalivedPassword, err := utils.GeneratePassword(16)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return fail.ConvertError(err)
-	}
-
-	var as *abstract.Subnet
-	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		var ok bool
-		as, ok = clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// Write Subnet object metadata and updates the service cache
+		xerr = instance.Carry(ctx, abstractSubnet)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		// IDs of Security Groups to attach to Host used as gateway
-		if len(sgs) == 0 {
-			sgs = map[string]struct{}{}
+		// Starting from here, delete Subnet metadata if exiting with error
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil && !req.KeepOnFailure {
+				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
+				}
+			}
+		}()
+
+		xerr = instance.updateCachedInformation(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
 		}
-		sgs[as.GWSecurityGroupID] = struct{}{}
-		sgs[as.InternalSecurityGroupID] = struct{}{}
-		sgs[as.PublicIPSecurityGroupID] = struct{}{}
+
+		if req.DefaultSSHPort == 0 {
+			req.DefaultSSHPort = 22
+		}
+
+		subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.unsafeCreateSecurityGroups(ctx, networkInstance, req.KeepOnFailure, int32(req.DefaultSSHPort))
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil && !req.KeepOnFailure {
+				derr := instance.deleteSecurityGroups(context.Background(), [3]string{subnetGWSG.GetID(), subnetInternalSG.GetID(), subnetPublicIPSG.GetID()})
+				if derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
+				}
+			}
+		}()
+
+		caps, xerr := svc.GetCapabilities(ctx)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+		failover := req.HA
+		if failover {
+			if caps.PrivateVirtualIP {
+				logrus.Info("Driver support private Virtual IP, honoring the failover setup for gateways.")
+			} else {
+				logrus.Warnf("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
+				failover = false
+			}
+		}
+
+		// Creates VIP for gateways if asked for
+		var avip *abstract.VirtualIP
+		if failover {
+			avip, xerr = svc.CreateVIP(ctx, abstractSubnet.Network, abstractSubnet.ID, fmt.Sprintf(virtualIPNamePattern, abstractSubnet.Name, networkInstance.GetName()), []string{subnetGWSG.GetID()})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr := fail.Wrap(xerr, "failed to create VIP")
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			// Starting from here, delete VIP if exists with error
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && !req.KeepOnFailure {
+					if derr := svc.DeleteVIP(context.Background(), abstractSubnet.VIP); derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
+					}
+				}
+			}()
+		}
+
+		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			as.VIP = avip
+			as.State = subnetstate.GatewayCreation
+			as.GWSecurityGroupID = subnetGWSG.GetID()
+			as.InternalSecurityGroupID = subnetInternalSG.GetID()
+			as.PublicIPSecurityGroupID = subnetPublicIPSG.GetID()
+
+			// Creates the bind between the Subnet default security group and the Subnet
+			return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+				ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				item := &propertiesv1.SecurityGroupBond{
+					ID:       subnetGWSG.GetID(),
+					Name:     subnetGWSG.GetName(),
+					Disabled: false,
+				}
+				ssgV1.ByID[item.ID] = item
+				ssgV1.ByName[subnetGWSG.GetName()] = item.ID
+
+				item = &propertiesv1.SecurityGroupBond{
+					ID:       subnetInternalSG.GetID(),
+					Name:     subnetInternalSG.GetName(),
+					Disabled: false,
+				}
+				ssgV1.ByID[item.ID] = item
+				ssgV1.ByName[item.Name] = item.ID
+				return nil
+			})
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		// attach Subnet to Network
+		xerr = networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+				nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				nsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
+				nsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
+				return nil
+			})
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		// Starting from here, remove Subnet from Network metadata if exiting with error
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil && !req.KeepOnFailure {
+				derr := networkInstance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+						nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+
+						delete(nsV1.ByID, abstractSubnet.ID)
+						delete(nsV1.ByName, abstractSubnet.Name)
+						return nil
+					})
+				})
+				if derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Subnet from Network", ActionFromError(ferr)))
+				}
+			}
+		}()
+
+		chRes <- result{nil}
 		return nil
-	})
-	if xerr != nil {
-		return xerr
+	}() // nolint
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		<-chRes // wait for cleanup
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes // wait for cleanup
+		return fail.ConvertError(inctx.Err())
 	}
+}
 
-	gwRequest := abstract.HostRequest{
-		ImageID:          gwSizing.Image,
-		ImageRef:         imageQuery,
-		Subnets:          []*abstract.Subnet{as},
-		SSHPort:          req.DefaultSSHPort,
-		TemplateID:       template.ID,
-		KeepOnFailure:    req.KeepOnFailure,
-		SecurityGroupIDs: sgs,
-		IsGateway:        true,
-		DiskSize:         gwSizing.MinDiskSize,
+func (instance *Subnet) unsafeUpdateSubnetStatus(inctx context.Context, target subnetstate.Enum) fail.Error {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	var (
-		primaryGateway, secondaryGateway   *Host
-		primaryUserdata, secondaryUserdata *userdata.Content
-		primaryTask, secondaryTask         concurrency.Task
-	)
+		xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-	tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/creategateways"))
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Starts primary gateway creation
-	primaryRequest := gwRequest
-	primaryRequest.ResourceName = primaryGatewayName
-	primaryRequest.HostName = primaryGatewayName + domain
-	primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
-		request: primaryRequest,
-		sizing:  *gwSizing,
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		abErr := tg.AbortWithCause(xerr)
-		if abErr != nil {
-			logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			as.State = target
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
-		return xerr
-	}
 
-	// Starts secondary gateway creation if asked for
-	if req.HA {
-		secondaryRequest := gwRequest
-		secondaryRequest.ResourceName = secondaryGatewayName
-		secondaryRequest.HostName = secondaryGatewayName
-		if req.Domain != "" {
-			secondaryRequest.HostName = secondaryGatewayName + domain
+		xerr = instance.updateCachedInformation(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
-		secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
-			request: secondaryRequest,
+
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
+}
+
+func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail.Error {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			as.State = subnetstate.Ready
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		xerr = instance.updateCachedInformation(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
+}
+
+func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (_ fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer close(chRes)
+
+		svc := instance.Service()
+		if gwSizing == nil {
+			gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
+		}
+
+		template, xerr := svc.FindTemplateBySizing(ctx, *gwSizing)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			xerr := fail.Wrap(xerr, "failed to find appropriate template")
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		// define image...
+		imageQuery := gwSizing.Image
+		if imageQuery == "" {
+			imageQuery = req.ImageRef
+			if imageQuery == "" {
+				cfg, xerr := svc.GetConfigurationOptions(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{xerr}
+					return xerr
+				}
+
+				imageQuery = cfg.GetString("DefaultImage")
+
+				if imageQuery == "" {
+					imageQuery = consts.DEFAULTOS
+				}
+			}
+			img, xerr := svc.SearchImage(ctx, imageQuery)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// look for an exact match by ID
+					imgs, xerr := svc.ListImages(ctx, true)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						xerr := fail.Wrap(xerr, "failure listing images")
+						chRes <- result{xerr}
+						return xerr
+					}
+
+					img = nil
+					for _, aimg := range imgs {
+						if strings.Compare(aimg.ID, imageQuery) == 0 {
+							logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+							img = aimg
+							break
+						}
+					}
+					if img == nil {
+						xerr := fail.Wrap(xerr, "failed to find image with ID %s", imageQuery)
+						chRes <- result{xerr}
+						return xerr
+					}
+
+				default:
+					xerr := fail.Wrap(xerr, "failed to find image '%s'", imageQuery)
+					chRes <- result{xerr}
+					return xerr
+				}
+			}
+
+			gwSizing.Image = img.ID
+		}
+
+		subnetName := instance.GetName()
+		var primaryGatewayName, secondaryGatewayName string
+		if req.HA || gwname == "" {
+			primaryGatewayName = "gw-" + subnetName
+		} else {
+			primaryGatewayName = gwname
+		}
+		if req.HA {
+			secondaryGatewayName = "gw2-" + subnetName
+		}
+
+		domain := strings.Trim(req.Domain, ".")
+		if domain != "" {
+			domain = "." + domain
+		}
+
+		keepalivedPassword, err := utils.GeneratePassword(16)
+		err = debug.InjectPlannedError(err)
+		if err != nil {
+			err := fail.ConvertError(err)
+			chRes <- result{err}
+			return err
+		}
+
+		var as *abstract.Subnet
+		xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			var ok bool
+			as, ok = clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// IDs of Security Groups to attach to Host used as gateway
+			if len(sgs) == 0 {
+				sgs = map[string]struct{}{}
+			}
+			sgs[as.GWSecurityGroupID] = struct{}{}
+			sgs[as.InternalSecurityGroupID] = struct{}{}
+			sgs[as.PublicIPSecurityGroupID] = struct{}{}
+			return nil
+		})
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		gwRequest := abstract.HostRequest{
+			ImageID:          gwSizing.Image,
+			ImageRef:         imageQuery,
+			Subnets:          []*abstract.Subnet{as},
+			SSHPort:          req.DefaultSSHPort,
+			TemplateID:       template.ID,
+			KeepOnFailure:    req.KeepOnFailure,
+			SecurityGroupIDs: sgs,
+			IsGateway:        true,
+			DiskSize:         gwSizing.MinDiskSize,
+		}
+
+		var (
+			primaryGateway, secondaryGateway   *Host
+			primaryUserdata, secondaryUserdata *userdata.Content
+			primaryTask, secondaryTask         concurrency.Task
+		)
+
+		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/creategateways"))
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		// Starts primary gateway creation
+		primaryRequest := gwRequest
+		primaryRequest.ResourceName = primaryGatewayName
+		primaryRequest.HostName = primaryGatewayName + domain
+		primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
+			request: primaryRequest,
 			sizing:  *gwSizing,
 		})
 		xerr = debug.InjectPlannedFail(xerr)
@@ -891,253 +1044,305 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			if abErr != nil {
 				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
-		}
-	}
-
-	results, groupXErr := tg.WaitGroup()
-	groupXErr = debug.InjectPlannedFail(groupXErr)
-	if groupXErr != nil {
-		return groupXErr
-	}
-	if results == nil {
-		return fail.InconsistentError("task results shouldn't be nil")
-	}
-
-	id, xerr := primaryTask.ID()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// handle primary gateway
-	{
-		var content concurrency.TaskResult
-		var ok bool
-
-		if content, ok = results[id]; !ok {
-			return fail.InconsistentError("task results does not contain %s", id)
-		}
-		if content == nil {
-			return fail.InconsistentError("task result with %s should not be nil", id)
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		result, ok := results[id].(data.Map)
-		if !ok {
-			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+		// Starts secondary gateway creation if asked for
+		if req.HA {
+			secondaryRequest := gwRequest
+			secondaryRequest.ResourceName = secondaryGatewayName
+			secondaryRequest.HostName = secondaryGatewayName
+			if req.Domain != "" {
+				secondaryRequest.HostName = secondaryGatewayName + domain
+			}
+			secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
+				request: secondaryRequest,
+				sizing:  *gwSizing,
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				abErr := tg.AbortWithCause(xerr)
+				if abErr != nil {
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
+			}
 		}
 
+		results, groupXErr := tg.WaitGroup()
+		groupXErr = debug.InjectPlannedFail(groupXErr)
+		if groupXErr != nil {
+			xerr := groupXErr
+			chRes <- result{xerr}
+			return xerr
+		}
+		if results == nil {
+			xerr := fail.InconsistentError("task results shouldn't be nil")
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		id, xerr := primaryTask.ID()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		// handle primary gateway
 		{
-			primaryGateway, ok = result["host"].(*Host)
-			if !ok {
-				return fail.InconsistentError("result[host] should be a *Host")
-			}
-			primaryUserdata, ok = result["userdata"].(*userdata.Content)
-			if !ok {
-				return fail.InconsistentError("result[userdata] should be a *userdata.Content")
-			}
-			primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+			var content concurrency.TaskResult
+			var ok bool
 
-			// delete primary gateway if something fails
+			if content, ok = results[id]; !ok {
+				xerr := fail.InconsistentError("task results does not contain %s", id)
+				chRes <- result{xerr}
+				return xerr
+			}
+			if content == nil {
+				xerr := fail.InconsistentError("task result with %s should not be nil", id)
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			aresult, ok := results[id].(data.Map)
+			if !ok {
+				xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+				chRes <- result{xerr}
+				return xerr
+			}
+
 			{
-				// Starting from here, deletes the primary gateway if exiting with error
+				primaryGateway, ok = aresult["host"].(*Host)
+				if !ok {
+					xerr := fail.InconsistentError("result[host] should be a *Host")
+					chRes <- result{xerr}
+					return xerr
+				}
+				primaryUserdata, ok = aresult["userdata"].(*userdata.Content)
+				if !ok {
+					xerr := fail.InconsistentError("result[userdata] should be a *userdata.Content")
+					chRes <- result{xerr}
+					return xerr
+				}
+				primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
+				// delete primary gateway if something fails
+				{
+					// Starting from here, deletes the primary gateway if exiting with error
+					defer func() {
+						ferr = debug.InjectPlannedFail(ferr)
+						if ferr != nil && !req.KeepOnFailure {
+							logrus.Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
+							derr := primaryGateway.RelaxedDeleteHost(context.Background())
+							derr = debug.InjectPlannedFail(derr)
+							if derr != nil {
+								switch derr.(type) {
+								case *fail.ErrTimeout:
+									logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+								default:
+								}
+								_ = ferr.AddConsequence(derr)
+							} else {
+								logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+							}
+							if req.HA {
+								if derr := instance.unbindHostFromVIP(context.Background(), as.VIP, primaryGateway); derr != nil {
+									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
+								}
+							}
+						}
+					}()
+
+					defer func() {
+						derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
+						if derr != nil {
+							logrus.Warnf(derr.Error())
+						}
+					}()
+
+					// Bind Internal Security Group to gateway
+					xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						chRes <- result{xerr}
+						return xerr
+					}
+				}
+			}
+		}
+
+		if req.HA {
+			id, xerr := secondaryTask.ID()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			var content concurrency.TaskResult
+			var ok bool
+			if content, ok = results[id]; !ok {
+				xerr := fail.InconsistentError("task results does not contain %s", id)
+				chRes <- result{xerr}
+				return xerr
+			}
+			if content == nil {
+				xerr := fail.InconsistentError("task result with %s should not be nil", id)
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			aresult, ok := results[id].(data.Map)
+			if !ok {
+				xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			// else is toxic
+			{
+				var ok bool
+				secondaryGateway, ok = aresult["host"].(*Host)
+				if !ok {
+					xerr := fail.InconsistentError("result[host] should be a *Host")
+					chRes <- result{xerr}
+					return xerr
+				}
+				secondaryUserdata, ok = aresult["userdata"].(*userdata.Content)
+				if !ok {
+					xerr := fail.InvalidParameterError("result[userdata] shoulde be a *userdate.Content")
+					chRes <- result{xerr}
+					return xerr
+				}
+				secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
+				// Starting from here, deletes the secondary gateway if exiting with error
 				defer func() {
+					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil && !req.KeepOnFailure {
-						logrus.Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
-						derr := primaryGateway.RelaxedDeleteHost(context.Background())
+						derr := secondaryGateway.RelaxedDeleteHost(context.Background())
 						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
 							switch derr.(type) {
 							case *fail.ErrTimeout:
-								logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+								logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
 							default:
 							}
 							_ = ferr.AddConsequence(derr)
-						} else {
-							logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 						}
-						if req.HA {
-							if derr := instance.unbindHostFromVIP(ctx, as.VIP, primaryGateway); derr != nil {
-								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
-							}
+						derr = instance.unbindHostFromVIP(context.Background(), as.VIP, secondaryGateway)
+						derr = debug.InjectPlannedFail(derr)
+						if derr != nil {
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
 						}
 					}
 				}()
 
-				defer instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
+				defer func() {
+					derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), secondaryGateway, req.KeepOnFailure, &ferr)
+					if derr != nil {
+						logrus.Warn(derr.Error())
+					}
+				}()
 
 				// Bind Internal Security Group to gateway
-				xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
+
+				xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
+					chRes <- result{xerr}
 					return xerr
 				}
 			}
 		}
-	}
 
-	if req.HA {
-		id, xerr := secondaryTask.ID()
+		// Update userdata of gateway(s)
+		xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// Updates userdatas to use later
+			var inErr fail.Error
+			primaryUserdata.PrimaryGatewayPrivateIP, inErr = primaryGateway.GetPrivateIP(ctx)
+			if inErr != nil {
+				return inErr
+			}
+
+			primaryUserdata.PrimaryGatewayPublicIP, inErr = primaryGateway.GetPublicIP(ctx)
+			if inErr != nil {
+				return inErr
+			}
+
+			primaryUserdata.IsPrimaryGateway = true
+			if as.VIP != nil {
+				primaryUserdata.DefaultRouteIP = as.VIP.PrivateIP
+				primaryUserdata.EndpointIP = as.VIP.PublicIP
+			} else {
+				primaryUserdata.DefaultRouteIP = primaryUserdata.PrimaryGatewayPrivateIP
+				primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
+			}
+
+			if secondaryGateway != nil {
+				// as.SecondaryGatewayID = secondaryGateway.ID()
+				primaryUserdata.SecondaryGatewayPrivateIP, inErr = secondaryGateway.GetPrivateIP(ctx)
+				if inErr != nil {
+					return inErr
+				}
+
+				secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
+				secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
+				primaryUserdata.SecondaryGatewayPublicIP, inErr = secondaryGateway.GetPublicIP(ctx)
+				if inErr != nil {
+					return inErr
+				}
+				secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
+				secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
+				secondaryUserdata.IsPrimaryGateway = false
+				if as.VIP != nil {
+					secondaryUserdata.DefaultRouteIP = primaryUserdata.DefaultRouteIP
+					secondaryUserdata.EndpointIP = primaryUserdata.EndpointIP
+				} else {
+					secondaryUserdata.DefaultRouteIP = secondaryUserdata.SecondaryGatewayPrivateIP
+					secondaryUserdata.EndpointIP = secondaryUserdata.SecondaryGatewayPublicIP
+				}
+			}
+			return nil
+		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			chRes <- result{xerr}
 			return xerr
 		}
 
-		var content concurrency.TaskResult
-		var ok bool
-		if content, ok = results[id]; !ok {
-			return fail.InconsistentError("task results does not contain %s", id)
-		}
-		if content == nil {
-			return fail.InconsistentError("task result with %s should not be nil", id)
-		}
+		// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
+		xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-		result, ok := results[id].(data.Map)
-		if !ok {
-			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+			as.State = subnetstate.GatewayConfiguration
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
 			return xerr
 		}
 
-		// else is toxic
-		{
-			var ok bool
-			secondaryGateway, ok = result["host"].(*Host)
-			if !ok {
-				return fail.InconsistentError("result[host] should be a *Host")
-			}
-			secondaryUserdata, ok = result["userdata"].(*userdata.Content)
-			if !ok {
-				return fail.InvalidParameterError("result[userdata] shoulde be a *userdate.Content")
-			}
-			secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-
-			// Starting from here, deletes the secondary gateway if exiting with error
-			defer func() {
-				if ferr != nil && !req.KeepOnFailure {
-					derr := secondaryGateway.RelaxedDeleteHost(context.Background())
-					derr = debug.InjectPlannedFail(derr)
-					if derr != nil {
-						switch derr.(type) {
-						case *fail.ErrTimeout:
-							logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
-						default:
-						}
-						_ = ferr.AddConsequence(derr)
-					}
-					derr = instance.unbindHostFromVIP(ctx, as.VIP, secondaryGateway)
-					derr = debug.InjectPlannedFail(derr)
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
-					}
-				}
-			}()
-
-			defer instance.undoBindInternalSecurityGroupToGateway(context.Background(), secondaryGateway, req.KeepOnFailure, &ferr)
-			// Bind Internal Security Group to gateway
-
-			xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-		}
-	}
-
-	// Update userdata of gateway(s)
-	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		tg, xerr = concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/configuregateways"))
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return xerr
 		}
 
-		// Updates userdatas to use later
-		var inErr fail.Error
-		primaryUserdata.PrimaryGatewayPrivateIP, inErr = primaryGateway.GetPrivateIP(ctx)
-		if inErr != nil {
-			return inErr
-		}
-
-		primaryUserdata.PrimaryGatewayPublicIP, inErr = primaryGateway.GetPublicIP(ctx)
-		if inErr != nil {
-			return inErr
-		}
-
-		primaryUserdata.IsPrimaryGateway = true
-		if as.VIP != nil {
-			primaryUserdata.DefaultRouteIP = as.VIP.PrivateIP
-			primaryUserdata.EndpointIP = as.VIP.PublicIP
-		} else {
-			primaryUserdata.DefaultRouteIP = primaryUserdata.PrimaryGatewayPrivateIP
-			primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
-		}
-
-		if secondaryGateway != nil {
-			// as.SecondaryGatewayID = secondaryGateway.ID()
-			primaryUserdata.SecondaryGatewayPrivateIP, inErr = secondaryGateway.GetPrivateIP(ctx)
-			if inErr != nil {
-				return inErr
-			}
-
-			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
-			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
-			primaryUserdata.SecondaryGatewayPublicIP, inErr = secondaryGateway.GetPublicIP(ctx)
-			if inErr != nil {
-				return inErr
-			}
-			secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
-			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
-			secondaryUserdata.IsPrimaryGateway = false
-			if as.VIP != nil {
-				secondaryUserdata.DefaultRouteIP = primaryUserdata.DefaultRouteIP
-				secondaryUserdata.EndpointIP = primaryUserdata.EndpointIP
-			} else {
-				secondaryUserdata.DefaultRouteIP = secondaryUserdata.SecondaryGatewayPrivateIP
-				secondaryUserdata.EndpointIP = secondaryUserdata.SecondaryGatewayPublicIP
-			}
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		as.State = subnetstate.GatewayConfiguration
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	tg, xerr = concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/configuregateways"))
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
-		host:     primaryGateway,
-		userdata: primaryUserdata,
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		abErr := tg.AbortWithCause(xerr)
-		if abErr != nil {
-			logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-		}
-	}
-
-	if req.HA {
 		_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
-			host:     secondaryGateway,
-			userdata: secondaryUserdata,
+			host:     primaryGateway,
+			userdata: primaryUserdata,
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1146,21 +1351,46 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 		}
-	}
 
-	_, xerr = tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "error finalizing gateway configuration")
-	}
+		if req.HA {
+			_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+				host:     secondaryGateway,
+				userdata: secondaryUserdata,
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				abErr := tg.AbortWithCause(xerr)
+				if abErr != nil {
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
+			}
+		}
 
-	return nil
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			xerr := fail.Wrap(xerr, "error finalizing gateway configuration")
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		chRes <- result{nil}
+		return nil
+	}() // nolint
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		<-chRes // wait for cleanup
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes // wait for cleanup
+		return fail.ConvertError(inctx.Err())
+	}
 }
 
 // unsafeUnbindSecurityGroup unbinds a security group from the host
 func (instance *Subnet) unsafeUnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "(%s)", sgInstance.GetID()).Entering()
 	defer tracer.Exiting()
 

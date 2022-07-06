@@ -47,7 +47,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -76,7 +76,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -109,7 +109,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
@@ -126,7 +126,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 }
 
 // Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
-func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot cleanup tenant")
 
@@ -134,21 +134,22 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("tenant/%s/metadata/delete", name))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("tenant/%s/metadata/delete", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -168,25 +169,26 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 }
 
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
-func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
+func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot scan tenant")
 
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/tenant/%s/scan", name))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/tenant/%s/scan", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -198,28 +200,29 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 }
 
 // Inspect returns information about a tenant
-func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, ferr error) {
+func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -233,29 +236,30 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 }
 
 // Upgrade upgrades metadata of a tenant if needed
-func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
+func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot upgrade tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJobWithoutService(ctx, fmt.Sprintf("/tenant/%s/metadata/upgrade", name))
+	job, xerr := PrepareJobWithoutService(inctx, fmt.Sprintf("/tenant/%s/metadata/upgrade", name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

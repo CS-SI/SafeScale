@@ -18,6 +18,7 @@ package operations
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
@@ -342,6 +343,9 @@ func TestHost_RegisterFeature(t *testing.T) {
 }
 
 func TestHost_ListEligibleFeatures(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 
 	var ohost *Host = nil
 

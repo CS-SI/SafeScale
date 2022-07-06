@@ -172,7 +172,7 @@ type VirtualIP struct {
 	PublicIP  string      `json:"public_ip,omitempty"`
 	Hosts     []*HostCore `json:"hosts,omitempty"`
 
-	NetworkID string `json:"network_id,omitempty"` // Deprecated; replaced by SubnetID
+	NetworkID string `json:"network_id,omitempty"` // DEPRECATED: deprecated, replaced by SubnetID
 }
 
 // NewVirtualIP ...

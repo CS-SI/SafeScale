@@ -670,10 +670,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 					logrus.Warnf("error creating Host: %+v", captured)
 
 					if server != nil && server.ID != "" {
-						if derr := s.DeleteHost(ctx, server.ID); derr != nil {
+						if xerr := s.DeleteHost(ctx, server.ID); xerr != nil {
 							_ = innerXErr.AddConsequence(
 								fail.Wrap(
-									derr, "cleaning up on failure, failed to delete Host '%s'", server.Name,
+									xerr, "cleaning up on failure, failed to delete Host '%s'", server.Name,
 								),
 							)
 						}
@@ -691,8 +691,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 			// Wait until Host is ready, not just until the build is started
 			if _, innerXErr = s.WaitHostReady(ctx, ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
-				if derr := s.DeleteHost(ctx, ahf.Core.ID); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+				if rerr := s.DeleteHost(ctx, ahf.Core.ID); rerr != nil {
+					_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete Host"))
 				}
 				return innerXErr
 			}
@@ -715,9 +715,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !request.KeepOnFailure {
 			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
-			if derr := s.DeleteHost(ctx, ahf.Core.ID); derr != nil {
+			if derr := s.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 				logrus.Warnf("Error deleting host in cleanup: %v", derr)
 			}

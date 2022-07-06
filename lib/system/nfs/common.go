@@ -43,7 +43,10 @@ var nfsScripts embed.FS
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-func executeScript(ctx context.Context, timings temporal.Timings, sshconfig sshapi.Connector, name string, data map[string]interface{}) (string, fail.Error) {
+func executeScript(
+	ctx context.Context, timings temporal.Timings, sshconfig sshapi.Connector, name string,
+	data map[string]interface{},
+) (string, fail.Error) {
 	currentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

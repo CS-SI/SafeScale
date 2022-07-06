@@ -19,6 +19,7 @@ package outscale
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
 
@@ -305,8 +306,9 @@ func (s stack) rpcCreateNetwork(ctx context.Context, name, cidr string) (_ osc.N
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteNetwork(ctx, resp.Net.NetId); derr != nil {
+			if derr := s.rpcDeleteNetwork(context.Background(), resp.Net.NetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", name))
 			}
 		}
@@ -451,8 +453,9 @@ func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, cidr string) (_
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteSubnet(ctx, resp.Subnet.SubnetId); derr != nil {
+			if derr := s.rpcDeleteSubnet(context.Background(), resp.Subnet.SubnetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", name))
 			}
 		}
@@ -660,8 +663,9 @@ func (s stack) rpcCreateNic(ctx context.Context, subnetID, name, description str
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteNic(ctx, resp.Nic.NicId); derr != nil {
+			if derr := s.rpcDeleteNic(context.Background(), resp.Nic.NicId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Nic '%s'", name))
 			}
 		}
@@ -963,8 +967,9 @@ func (s stack) rpcCreateVolume(ctx context.Context, name string, size int32, iop
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteVolume(ctx, resp.Volume.VolumeId); derr != nil {
+			if derr := s.rpcDeleteVolume(context.Background(), resp.Volume.VolumeId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
 			}
 		}
@@ -1217,8 +1222,9 @@ func (s stack) rpcCreateInternetService(ctx context.Context, name string) (_ osc
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteInternetService(ctx, resp.InternetService.InternetServiceId); derr != nil {
+			if derr := s.rpcDeleteInternetService(context.Background(), resp.InternetService.InternetServiceId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete internet service '%s'", name))
 			}
 		}

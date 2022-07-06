@@ -51,7 +51,7 @@ func (handler *templateHandler) List(all bool) (_ []*abstract.HostTemplate, ferr
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), true, "(all=%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), true, "(all=%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -66,7 +66,7 @@ func (handler *templateHandler) Match(sizing abstract.HostSizingRequirements) (_
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), true, "%s", sizing).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), true, "%s", sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -81,7 +81,7 @@ func (handler *templateHandler) Inspect(ref string) (_ *abstract.HostTemplate, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.template"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

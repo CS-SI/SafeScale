@@ -29,7 +29,7 @@ import (
 
 func Test_NewErrorList(t *testing.T) {
 
-	errs := []error{}
+	var errs []error
 	list := NewErrorList(errs)
 
 	require.EqualValues(t, reflect.TypeOf(list).String(), "*fail.ErrorList")

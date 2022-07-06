@@ -246,7 +246,7 @@ func TestMutableTimings_MetadataTimeout(t *testing.T) {
 func TestMutableTimings_MetadataReadAfterWriteTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.MetadataReadAfterWriteTimeout(), 90*time.Second)
+	require.EqualValues(t, mt.MetadataReadAfterWriteTimeout(), 30*time.Second)
 
 	mt = NewTimings()
 	mt.Timeouts.MetadataReadAfterWrite = 42 * time.Second

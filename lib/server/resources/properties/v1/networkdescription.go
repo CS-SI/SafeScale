@@ -33,7 +33,7 @@ import (
 type NetworkDescription struct {
 	Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
 	Created time.Time `json:"created,omitempty"` // Contains the date of creation of the network
-	Domain  string    `json:"domain,omitempty"`  // Deprecated (moved to SubnetDescription): defines the domain to use for host FQDN in this network
+	Domain  string    `json:"domain,omitempty"`  // DEPRECATED: deprecated (moved to SubnetDescription): defines the domain to use for host FQDN in this network
 }
 
 // NewNetworkDescription ...

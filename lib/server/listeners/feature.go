@@ -39,7 +39,7 @@ type FeatureListener struct {
 }
 
 // List ...
-func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequest) (_ *protocol.FeatureListResponse, ferr error) {
+func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRequest) (_ *protocol.FeatureListResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot list Features")
 	defer fail.OnPanic(&ferr)
@@ -48,8 +48,8 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
@@ -65,13 +65,14 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		return empty, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTargetRef().GetTenantId(), "/features/list")
+	job, xerr := PrepareJob(inctx, in.GetTargetRef().GetTenantId(), "/features/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%s, %s)", in.GetTargetType(), targetRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%s, %s)", in.GetTargetType(), targetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -81,7 +82,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		return empty, xerr
 	}
 
-	return converters.FeatureSliceFromResourceToProtocol(job.Context(), list), nil
+	return converters.FeatureSliceFromResourceToProtocol(ctx, list), nil
 }
 
 func convertTargetType(in protocol.FeatureTargetType) (featuretargettype.Enum, fail.Error) {
@@ -98,7 +99,7 @@ func convertTargetType(in protocol.FeatureTargetType) (featuretargettype.Enum, f
 }
 
 // Inspect ...
-func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureDetailResponse, ferr error) {
+func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureDetailResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot inspect Feature")
 	defer fail.OnPanic(&ferr)
@@ -106,8 +107,8 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -125,13 +126,14 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 		return nil, fail.InvalidRequestError("feature name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
+	job, err := PrepareJob(inctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ferr, tracer.TraceMessage())
 
@@ -147,7 +149,7 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 }
 
 // Export exports the content of the feature file
-func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureExportResponse, ferr error) {
+func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureExportResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot export Feature")
 	defer fail.OnPanic(&ferr)
@@ -155,8 +157,8 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -170,13 +172,14 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 	}
 	featureName := in.GetName()
 
-	job, xerr := PrepareJob(ctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
+	job, xerr := PrepareJob(inctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ferr, tracer.TraceMessage())
 
@@ -185,9 +188,10 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 }
 
 // Check checks if a feature installed on target
-func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
+func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer func() {
+		ferr = debug.InjectPlannedError(ferr)
 		if ferr != nil {
 			switch cerr := ferr.(type) {
 			case *fail.ErrNotFound:
@@ -206,8 +210,8 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -228,15 +232,17 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 
 	featureSettings := converters.FeatureSettingsFromProtocolToResource(in.GetSettings())
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer func() {
+		ferr = debug.InjectPlannedError(ferr)
 		if ferr != nil {
 			switch ferr.(type) {
 			case *fail.ErrNotFound:
@@ -275,7 +281,7 @@ func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
 }
 
 // Add ...
-func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
+func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot add Feature")
 	defer fail.OnPanic(&ferr)
@@ -284,8 +290,8 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -305,13 +311,14 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	}
 	featureSettings := converters.FeatureSettingsFromProtocolToResource(in.GetSettings())
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/feature/%s/add/%s/%s", featureName, targetType, targetRef))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/feature/%s/add/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -325,7 +332,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 }
 
 // Remove uninstalls a Feature
-func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
+func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot remove Feature")
 	defer fail.OnPanic(&ferr)
@@ -334,8 +341,8 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -354,13 +361,14 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	}
 	featureSettings := converters.FeatureSettingsFromProtocolToResource(in.GetSettings())
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/feature/%s/remove/%s/%s", featureName, targetType, targetRef))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/feature/%s/remove/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return empty, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

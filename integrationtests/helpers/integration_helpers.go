@@ -137,7 +137,7 @@ func RunOnlyInIntegrationTest(key string) error {
 }
 
 func RunJq(input string, query string) (string, error) {
-	jqQuery, err := gojq.Parse(".result.provider")
+	jqQuery, err := gojq.Parse(query)
 	if err != nil {
 		return "", err
 	}

@@ -20,16 +20,13 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
@@ -43,9 +40,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
+	"github.com/zserge/metric"
 )
 
 // TargetType returns the type of the target
@@ -53,6 +53,19 @@ import (
 // satisfies resources.Targetable interface
 func (instance *Cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
+}
+
+func incrementExpVar(name string) {
+	// increase counter
+	ts := expvar.Get(name)
+	if ts != nil {
+		switch casted := ts.(type) {
+		case *expvar.Int:
+			casted.Add(1)
+		case metric.Metric:
+			casted.Add(1)
+		}
+	}
 }
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
@@ -63,9 +76,8 @@ func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installm
 	}
 
 	out := make(map[uint8]installmethod.Enum)
-	instance.localCache.RLock()
-	defer instance.localCache.RUnlock()
 
+	incrementExpVar("cluster.cache.hit")
 	instance.localCache.installMethods.Range(func(k, v interface{}) bool {
 		var ok bool
 		out[k.(uint8)], ok = v.(installmethod.Enum)
@@ -357,7 +369,10 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list, _ := instance.InstalledFeatures(ctx)
+	list, xerr := instance.InstalledFeatures(ctx) // FIXME: OPP should we return xerr ?
+	if xerr != nil {
+		logrus.Warningf("something happened: %v", xerr)
+	}
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
 	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -455,7 +470,7 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 var clusterFlavorScripts embed.FS
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -469,711 +484,735 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return invalid, "", "", xerr
+	type result struct {
+		a    int
+		b    string
+		c    string
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	// Configures reserved_BashLibrary template var
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	variables["Revision"] = system.REV
-
-	if len(variables) > 64*1024 {
-		return invalid, "", "", fail.OverflowError(nil, 64*1024, "variables, value too large")
-	}
-
-	if len(bashLibraryVariables) > 64*1024 {
-		return invalid, "", "", fail.OverflowError(nil, 64*1024, "bashLibraryVariables, value too large")
-	}
-
-	var fisize = uint64(len(variables) + len(bashLibraryVariables))
-	finalVariables := make(data.Map, fisize)
-	for k, v := range variables {
-		finalVariables[k] = v
-	}
-	for k, v := range bashLibraryVariables {
-		finalVariables[k] = v
-	}
-
-	script, path, xerr := realizeTemplate("clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
-	}
-
-	hidesOutput := strings.Contains(script, "set +x\n")
-	if hidesOutput {
-		script = strings.Replace(script, "set +x\n", "\n", 1)
-		script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
-	}
-
-	// Uploads the script into remote file
-	rfcItem := Item{Remote: path}
-	xerr = rfcItem.UploadString(ctx, script, host)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", fail.Wrap(xerr, "failed to upload %s to %s", tmplName, host.GetName())
-	}
-
-	// executes remote file
-	var cmd string
-	if hidesOutput {
-		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
-	} else {
-		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
-	}
-
-	// recover current timeout settings
-	connectionTimeout := timings.ConnectionTimeout()
-	executionTimeout := timings.HostLongOperationTimeout()
-
-	// If is 126, try again 6 times, if not return the error
-	rounds := 10
-	for {
-		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
-		if rc == 126 {
-			logrus.Debugf("Text busy happened")
+		timings, xerr := instance.Service().Timings()
+		if xerr != nil {
+			chRes <- result{invalid, "", "", xerr}
+			return
 		}
 
-		if rc != 126 || rounds == 0 {
+		// Configures reserved_BashLibrary template var
+		bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{invalid, "", "", xerr}
+			return
+		}
+
+		bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+		if xerr != nil {
+			chRes <- result{invalid, "", "", xerr}
+			return
+		}
+
+		variables["Revision"] = system.REV
+
+		if len(variables) > 64*1024 {
+			chRes <- result{invalid, "", "", fail.OverflowError(nil, 64*1024, "variables, value too large")}
+			return
+		}
+
+		if len(bashLibraryVariables) > 64*1024 {
+			chRes <- result{invalid, "", "", fail.OverflowError(nil, 64*1024, "bashLibraryVariables, value too large")}
+			return
+		}
+
+		var fisize = uint64(len(variables) + len(bashLibraryVariables))
+		finalVariables := make(data.Map, fisize)
+		for k, v := range variables {
+			finalVariables[k] = v
+		}
+		for k, v := range bashLibraryVariables {
+			finalVariables[k] = v
+		}
+
+		script, path, xerr := realizeTemplate("clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)}
+			return
+		}
+
+		hidesOutput := strings.Contains(script, "set +x\n")
+		if hidesOutput {
+			script = strings.Replace(script, "set +x\n", "\n", 1)
+			script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
+		}
+
+		// Uploads the script into remote file
+		rfcItem := Item{Remote: path}
+		xerr = rfcItem.UploadString(ctx, script, host)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{invalid, "", "", fail.Wrap(xerr, "failed to upload %s to %s", tmplName, host.GetName())}
+			return
+		}
+
+		// executes remote file
+		var cmd string
+		if hidesOutput {
+			cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
+		} else {
+			cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
+		}
+
+		// recover current timeout settings
+		connectionTimeout := timings.ConnectionTimeout()
+		executionTimeout := timings.HostLongOperationTimeout()
+
+		// If is 126, try again 6 times, if not return the error
+		rounds := 10
+		for {
+			rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
 			if rc == 126 {
-				logrus.Warnf("Text busy killed the script")
+				logrus.Debugf("Text busy happened")
 			}
-			return rc, stdout, stderr, err
-		}
 
-		if !(strings.Contains(stdout, "bad interpreter") || strings.Contains(stderr, "bad interpreter")) {
-			if err != nil {
-				if !strings.Contains(err.Error(), "bad interpreter") {
-					return rc, stdout, stderr, err
+			if rc != 126 || rounds == 0 {
+				if rc == 126 {
+					logrus.Warnf("Text busy killed the script")
 				}
-			} else {
-				return rc, stdout, stderr, nil
+				chRes <- result{rc, stdout, stderr, err}
+				return
 			}
-		}
 
-		rounds--
-		time.Sleep(timings.SmallDelay())
+			if !(strings.Contains(stdout, "bad interpreter") || strings.Contains(stderr, "bad interpreter")) {
+				if err != nil {
+					if !strings.Contains(err.Error(), "bad interpreter") {
+						chRes <- result{rc, stdout, stderr, err}
+						return
+					}
+				} else {
+					chRes <- result{rc, stdout, stderr, nil}
+					return
+				}
+			}
+
+			rounds--
+			time.Sleep(timings.SmallDelay())
+		}
+	}()
+	select {
+	case res := <-chRes:
+		return res.a, res.b, res.c, res.rErr
+	case <-ctx.Done():
+		return invalid, "", "", fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return invalid, "", "", fail.ConvertError(inctx.Err())
 	}
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
+func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
 
-	netCfg, xerr := instance.GetNetworkConfig(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	params := data.Map{}
-	if nodeType == clusternodetype.Master {
-		tp, xerr := instance.Service().GetTenantParameters()
+		netCfg, xerr := instance.GetNetworkConfig(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
-		}
-		content := map[string]interface{}{
-			"tenants": []map[string]interface{}{tp},
-		}
-		jsoned, err := json.MarshalIndent(content, "", "    ")
-		err = debug.InjectPlannedError(err)
-		if err != nil {
-			return fail.ConvertError(err)
-		}
-		params["reserved_TenantJSON"] = string(jsoned)
-
-		// Finds the MetadataFolder where the current binary resides
-		var (
-			binaryDir string
-			path      string
-		)
-		exe, _ := os.Executable()
-		if exe != "" {
-			binaryDir = filepath.Dir(exe)
+			chRes <- result{xerr}
+			return
 		}
 
-		_, _ = binaryDir, path
-		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-		               probably a feature safescale-binaries to build SafeScale from source...
-				// Uploads safescale binary
-				if binaryDir != "" {
-					path = binaryDir + "/safescale"
-				}
-				if path == "" {
-					path, err = exec.LookPath("safescale")
-					err = debug.InjectPlannedError((err)
-		if err != nil {
-						return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
-					}
-				}
+		timings, xerr := instance.Service().Timings()
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
 
-				retcode, stdout, stderr, xerr := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.ExecutionTimeout())
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to upload 'safescale' binary")
-				}
-				if retcode != 0 {
-					output := stdout
-					if output != "" && stderr != "" {
-						output += "\n" + stderr
-					} else if stderr != "" {
-						output = stderr
-					}
-					return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
-				}
-
-				// Uploads safescaled binary
-				path = ""
-				if binaryDir != "" {
-					path = binaryDir + "/safescaled"
-				}
-				if path == "" {
-					path, err = exec.LookPath("safescaled")
-					err = debug.InjectPlannedError((err)
-		if err != nil {
-						return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
-					}
-				}
-				if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.ExecutionTimeout()); xerr != nil {
-					return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
-				}
-				if retcode != 0 {
-					output := stdout
-					if output != "" && stderr != "" {
-						output += "\n" + stderr
-					} else if stderr != "" {
-						output = stderr
-					}
-					return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
-				}
-		*/
-		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
-		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
-			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
-			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), 2*timings.HostLongOperationTimeout())
-			xerr = debug.InjectPlannedFail(xerr)
+		params := data.Map{}
+		if nodeType == clusternodetype.Master {
+			tp, xerr := instance.Service().GetTenantParameters()
 			if xerr != nil {
-				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())
+				chRes <- result{xerr}
+				return
 			}
-			if retcode != 0 {
-				output := stdout
-				if output != "" && stderr != "" {
-					output += "\n" + stderr
-				} else if stderr != "" {
-					output = stderr
+			content := map[string]interface{}{
+				"tenants": []map[string]interface{}{tp},
+			}
+			jsoned, err := json.MarshalIndent(content, "", "    ")
+			err = debug.InjectPlannedError(err)
+			if err != nil {
+				chRes <- result{fail.ConvertError(err)}
+				return
+			}
+			params["reserved_TenantJSON"] = string(jsoned)
+
+			// Finds the MetadataFolder where the current binary resides
+			var (
+				binaryDir string
+				path      string
+			)
+			exe, _ := os.Executable()
+			if exe != "" {
+				binaryDir = filepath.Dir(exe)
+			}
+
+			_, _ = binaryDir, path
+			/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
+			               probably a feature safescale-binaries to build SafeScale from source...
+					// Uploads safescale binary
+					if binaryDir != "" {
+						path = binaryDir + "/safescale"
+					}
+					if path == "" {
+						path, err = exec.LookPath("safescale")
+						err = debug.InjectPlannedError((err)
+			if err != nil {
+							return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
+						}
+					}
+
+					retcode, stdout, stderr, xerr := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.ExecutionTimeout())
+					if xerr != nil {
+						return fail.Wrap(xerr, "failed to upload 'safescale' binary")
+					}
+					if retcode != 0 {
+						output := stdout
+						if output != "" && stderr != "" {
+							output += "\n" + stderr
+						} else if stderr != "" {
+							output = stderr
+						}
+						return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
+					}
+
+					// Uploads safescaled binary
+					path = ""
+					if binaryDir != "" {
+						path = binaryDir + "/safescaled"
+					}
+					if path == "" {
+						path, err = exec.LookPath("safescaled")
+						err = debug.InjectPlannedError((err)
+			if err != nil {
+							return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
+						}
+					}
+					if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.ExecutionTimeout()); xerr != nil {
+						return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
+					}
+					if retcode != 0 {
+						output := stdout
+						if output != "" && stderr != "" {
+							output += "\n" + stderr
+						} else if stderr != "" {
+							output = stderr
+						}
+						return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
+					}
+			*/
+			// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
+			if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
+				cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
+				cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
+				retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), 2*timings.HostLongOperationTimeout())
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())}
+					return
 				}
-				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to Host '%s': %s", host.GetName(), output)
-				return fail.NewError(strprocess.Capitalize(msg))
+				if retcode != 0 {
+					output := stdout
+					if output != "" && stderr != "" {
+						output += "\n" + stderr
+					} else if stderr != "" {
+						output = stderr
+					}
+					msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to Host '%s': %s", host.GetName(), output)
+					chRes <- result{fail.NewError(strprocess.Capitalize(msg))}
+					return
+				}
 			}
 		}
+
+		// FIXME: reuse ComplementFeatureParameters?
+		var dnsServers []string
+		cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		dnsServers = cfg.GetSliceOfStrings("DNSList")
+		identity, xerr := instance.unsafeGetIdentity(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		params["ClusterName"] = identity.Name
+		params["DNSServerIPs"] = dnsServers
+		params["MasterIPs"], xerr = instance.unsafeListMasterIPs(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		params["ClusterAdminUsername"] = "cladm"
+		params["ClusterAdminPassword"] = identity.AdminPassword
+		params["DefaultRouteIP"] = netCfg.DefaultRouteIP
+		params["EndpointIP"] = netCfg.EndpointIP
+		params["IPRanges"] = netCfg.CIDR
+		params["SSHPublicKey"] = identity.Keypair.PublicKey
+		params["SSHPrivateKey"] = identity.Keypair.PrivateKey
+
+		retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{fail.Wrap(xerr, "[%s] system dependencies installation failed", hostLabel)}
+			return
+		}
+		if retcode != 0 {
+			xerr = fail.ExecutionError(nil, "failed to install common node dependencies")
+			xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+			chRes <- result{xerr}
+			return
+		}
+
+		logrus.Debugf("[%s] system dependencies installation successful.", hostLabel)
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
 
-	// FIXME: reuse ComplementFeatureParameters?
-	var dnsServers []string
-	cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	dnsServers = cfg.GetSliceOfStrings("DNSList")
-	identity, xerr := instance.unsafeGetIdentity(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	params["ClusterName"] = identity.Name
-	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"], xerr = instance.unsafeListMasterIPs(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	params["ClusterAdminUsername"] = "cladm"
-	params["ClusterAdminPassword"] = identity.AdminPassword
-	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
-	params["EndpointIP"] = netCfg.EndpointIP
-	params["IPRanges"] = netCfg.CIDR
-	params["SSHPublicKey"] = identity.Keypair.PublicKey
-	params["SSHPrivateKey"] = identity.Keypair.PrivateKey
-
-	retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "[%s] system dependencies installation failed", hostLabel)
-	}
-	if retcode != 0 {
-		xerr = fail.ExecutionError(nil, "failed to install common node dependencies")
-		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
-		return xerr
-	}
-
-	logrus.Debugf("[%s] system dependencies installation successful.", hostLabel)
-	return nil
 }
 
 // installReverseProxy installs reverseproxy
-func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installReverseProxy(inctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	identity, xerr := instance.unsafeGetIdentity(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	dockerDisabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			_, dockerDisabled = featuresV1.Disabled["docker"]
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	if dockerDisabled {
-		return nil
-	}
-
-	clusterName := identity.Name
-	disabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			_, disabled = featuresV1.Disabled["reverseproxy"]
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if !disabled {
-		logrus.Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
-		feat, xerr := NewFeature(ctx, instance.Service(), "edgeproxy4subnet")
+		identity, xerr := instance.unsafeGetIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			chRes <- result{xerr}
+			return
 		}
 
-		if params == nil {
-			params = data.Map{}
+		dockerDisabled := false
+		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				_, dockerDisabled = featuresV1.Disabled["docker"]
+				return nil
+			})
+		})
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
-		results, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
+
+		if dockerDisabled {
+			chRes <- result{nil}
+			return
+		}
+
+		clusterName := identity.Name
+		disabled := false
+		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				_, disabled = featuresV1.Disabled["reverseproxy"]
+				return nil
+			})
+		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			chRes <- result{xerr}
+			return
 		}
 
-		if !results.Successful() {
-			msg := results.AllErrorMessages()
-			return fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
+		if !disabled {
+			logrus.Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
+			feat, xerr := NewFeature(ctx, instance.Service(), "edgeproxy4subnet")
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
+			if params == nil {
+				params = data.Map{}
+			}
+			results, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
+			if !results.Successful() {
+				msg := results.AllErrorMessages()
+				chRes <- result{fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)}
+				return
+			}
+			logrus.Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
+			chRes <- result{nil}
+			return
 		}
-		logrus.Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
-		return nil
+
+		logrus.Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-
-	logrus.Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
-	return nil
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	identity, xerr := instance.unsafeGetIdentity(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	dockerDisabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			_, dockerDisabled = featuresV1.Disabled["docker"]
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	if dockerDisabled {
-		return nil
-	}
-
-	disabled := false
-	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			_, disabled = featuresV1.Disabled["remotedesktop"]
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if !disabled {
-		logrus.Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
-
-		feat, xerr := NewFeature(ctx, instance.Service(), "remotedesktop")
+		identity, xerr := instance.unsafeGetIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			chRes <- result{xerr}
+			return
 		}
 
-		// Adds remotedesktop feature on Cluster (ie masters)
-		if params == nil {
-			params = data.Map{}
+		dockerDisabled := false
+		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				_, dockerDisabled = featuresV1.Disabled["docker"]
+				return nil
+			})
+		})
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
 		}
-		params["Username"] = "cladm"
-		params["Password"] = identity.AdminPassword
 
-		// FIXME: Bug mitigations
-		params["GuacamolePort"] = 63011
-		params["TomcatPort"] = 9009
+		if dockerDisabled {
+			chRes <- result{nil}
+			return
+		}
 
-		r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
+		disabled := false
+		xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				_, disabled = featuresV1.Disabled["remotedesktop"]
+				return nil
+			})
+		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			chRes <- result{xerr}
+			return
 		}
 
-		if !r.Successful() {
-			msg := r.AllErrorMessages()
-			xerr := fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
-			_ = xerr.Annotate("ran_but_failed", true)
-			return xerr
-		}
+		if !disabled {
+			logrus.Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
 
-		logrus.Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
+			feat, xerr := NewFeature(ctx, instance.Service(), "remotedesktop")
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
+			// Adds remotedesktop feature on Cluster (ie masters)
+			if params == nil {
+				params = data.Map{}
+			}
+			params["Username"] = "cladm"
+			params["Password"] = identity.AdminPassword
+
+			// FIXME: Bug mitigations
+			params["GuacamolePort"] = 63011
+			params["TomcatPort"] = 9009
+
+			r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
+			if !r.Successful() {
+				msg := r.AllErrorMessages()
+				xerr := fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
+				_ = xerr.Annotate("ran_but_failed", true)
+				chRes <- result{xerr}
+				return
+			}
+
+			logrus.Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
+		}
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-	return nil
 }
 
 // installAnsible installs feature ansible on all masters of the Cluster
-func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	identity, xerr := instance.unsafeGetIdentity(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	disabled := false
-	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		identity, xerr := instance.unsafeGetIdentity(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		disabled := false
+		xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				_, disabled = featuresV1.Disabled["ansible"]
+				return nil
+			})
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		if !disabled {
+			logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
+
+			// 1st, Feature 'ansible'
+			feat, xerr := NewFeature(ctx, instance.Service(), "ansible")
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
 			}
 
-			_, disabled = featuresV1.Disabled["ansible"]
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if !disabled {
-		logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
-
-		// 1st, Feature 'ansible'
-		feat, xerr := NewFeature(ctx, instance.Service(), "ansible")
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		// Adds ansible feature on Cluster (ie masters)
-		if params == nil {
-			params = data.Map{}
-		}
-		params["Username"] = "cladm"
-		params["Password"] = identity.AdminPassword
-		r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		if !r.Successful() {
-			msg := r.AllErrorMessages()
-			return fail.NewError("[Cluster %s] failed to add 'ansible': %s", identity.Name, msg)
-		}
-		logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
-
-		// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
-		feat, xerr = NewFeature(ctx, instance.Service(), "ansible-for-cluster")
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		r, xerr = feat.Add(ctx, instance, params, resources.FeatureSettings{})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		if !r.Successful() {
-			msg := r.AllErrorMessages()
-			return fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)
-		}
-		logrus.Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
-	}
-	return nil
-}
-
-// install proxycache-client feature if not disabled
-func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
-
-	if host == nil {
-		return fail.InvalidParameterCannotBeNilError("host")
-	}
-	if hostLabel == "" {
-		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
-	}
-
-	dockerDisabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// Adds ansible feature on Cluster (ie masters)
+			if params == nil {
+				params = data.Map{}
+			}
+			params["Username"] = "cladm"
+			params["Password"] = identity.AdminPassword
+			r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
 			}
 
-			_, dockerDisabled = featuresV1.Disabled["docker"]
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-	if dockerDisabled {
-		return nil
-	}
+			if !r.Successful() {
+				msg := r.AllErrorMessages()
+				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible': %s", identity.Name, msg)}
+				return
+			}
+			logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
 
-	disabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
+			feat, xerr = NewFeature(ctx, instance.Service(), "ansible-for-cluster")
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
 			}
 
-			_, disabled = featuresV1.Disabled["proxycache"]
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-	if !disabled {
-		feat, xerr := NewFeature(ctx, instance.Service(), "proxycache-client")
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		if params == nil {
-			params = data.Map{}
-		}
-		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		if !r.Successful() {
-			msg := r.AllErrorMessages()
-			return fail.NewError("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
-		}
-	}
-	return nil
-}
-
-// install proxycache-server feature if not disabled
-func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
-
-	if host == nil {
-		return fail.InvalidParameterCannotBeNilError("host")
-	}
-	if hostLabel == "" {
-		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
-	}
-
-	dockerDisabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			r, xerr = feat.Add(ctx, instance, params, resources.FeatureSettings{})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
 			}
 
-			_, dockerDisabled = featuresV1.Disabled["docker"]
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	if dockerDisabled {
-		return nil
-	}
-
-	disabled := false
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			if !r.Successful() {
+				msg := r.AllErrorMessages()
+				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)}
+				return
 			}
-			_, disabled = featuresV1.Disabled["proxycache"]
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+			logrus.Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
+		}
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-
-	if !disabled {
-		feat, xerr := NewFeature(ctx, instance.Service(), "proxycache-server")
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		if params == nil {
-			params = data.Map{}
-		}
-		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		if !r.Successful() {
-			msg := r.AllErrorMessages()
-			return fail.NewError("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
-		}
-	}
-	return nil
 }
 
 // installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installDocker(inctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	dockerDisabled := false
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			_, dockerDisabled = featuresV1.Disabled["docker"]
-			return nil
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		dockerDisabled := false
+		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				_, dockerDisabled = featuresV1.Disabled["docker"]
+				return nil
+			})
 		})
-	})
-	if xerr != nil {
-		return xerr
-	}
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
 
-	if dockerDisabled {
-		return nil
-	}
+		if dockerDisabled {
+			chRes <- result{nil}
+			return
+		}
 
-	// uses NewFeature() to let a chance to the user to use its own docker feature
-	feat, xerr := NewFeature(ctx, instance.Service(), "docker")
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+		// uses NewFeature() to let a chance to the user to use its own docker feature
+		feat, xerr := NewFeature(ctx, instance.Service(), "docker")
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
 
-	if params == nil {
-		params = data.Map{}
-	}
-	r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+		if params == nil {
+			params = data.Map{}
+		}
+		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
 
-	reason := false
-	if !r.Successful() {
-		for _, k := range r.Keys() {
-			rk := r.ResultsOfKey(k)
-			if !rk.Successful() {
-				if len(rk.ErrorMessages()) == 0 {
-					logrus.Warnf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
-				} else {
-					reason = true
-					logrus.Warnf("This failed: %s with %s", k, spew.Sdump(rk))
+		reason := false
+		if !r.Successful() {
+			for _, k := range r.Keys() {
+				rk := r.ResultsOfKey(k)
+				if !rk.Successful() {
+					if len(rk.ErrorMessages()) == 0 {
+						logrus.Warnf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
+					} else {
+						reason = true
+						logrus.Warnf("This failed: %s with %s", k, spew.Sdump(rk))
+					}
 				}
 			}
-		}
 
-		if reason {
-			return fail.NewError("[%s] failed to add feature 'docker' on host '%s': %s", hostLabel, host.GetName(), r.AllErrorMessages())
+			if reason {
+				chRes <- result{fail.NewError("[%s] failed to add feature 'docker' on host '%s': %s", hostLabel, host.GetName(), r.AllErrorMessages())}
+				return
+			}
 		}
+		logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
+		chRes <- result{nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
-	return nil
 }

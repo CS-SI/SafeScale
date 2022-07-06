@@ -156,14 +156,14 @@ func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.C
 		err error
 	}
 
-	rCh := make(chan result)
+	chRes := make(chan result)
 
 	go func() {
-		defer close(rCh)
+		defer close(chRes)
 		conn, err := listener.Accept()
 		if err != nil {
 			err = convertErrorToTunnelError(err)
-			rCh <- result{
+			chRes <- result{
 				nil,
 				fmt.Errorf("error in listener waiting for a connection: %w", err),
 			}
@@ -172,7 +172,7 @@ func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.C
 		if tunnel.withKeepAlive {
 			conn, _ = setConnectionDeadlines(conn, tunnel.timeKeepAliveRead, tunnel.timeKeepAliveWrite)
 		}
-		rCh <- result{
+		chRes <- result{
 			cha: conn,
 			err: nil,
 		}
@@ -182,9 +182,9 @@ func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.C
 	case <-end:
 		tunnel.logf("connection waiting is over")
 		_ = listener.Close()
-		<-rCh // drain channel
+		<-chRes // drain channel
 		return nil
-	case kc := <-rCh:
+	case kc := <-chRes:
 		if kc.err != nil {
 			return kc.err
 		}

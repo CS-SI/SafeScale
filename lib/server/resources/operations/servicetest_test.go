@@ -63,7 +63,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 
-	//"github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
+	// "github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -73,7 +73,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var SHORTEN_TIMINGS *temporal.MutableTimings = &temporal.MutableTimings{
+var SHORTEN_TIMINGS = &temporal.MutableTimings{
 	Timeouts: temporal.Timeouts{
 		Communication:          100 * time.Millisecond,
 		Connection:             100 * time.Millisecond,
@@ -108,7 +108,7 @@ type ServiceTestBucketData struct {
 }
 
 type ServiceTestCacheData struct {
-	//data map[string]cache.Store
+	// data map[string]cache.Store
 	data map[string]interface{}
 	mu   sync.Mutex
 }
@@ -430,7 +430,7 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 				mu:   sync.Mutex{},
 			},
 			cache: ServiceTestCacheData{
-				//data: make(map[string]cache.Store),
+				// data: make(map[string]cache.Store),
 				data: make(map[string]interface{}),
 				mu:   sync.Mutex{},
 			},
@@ -464,7 +464,7 @@ func (e *ServiceTest) _reset() {
 	e.internals.bucketData.mu.Unlock()
 
 	e.internals.cache.mu.Lock()
-	//e.internals.cache.data = make(map[string]cache.Store)
+	// e.internals.cache.data = make(map[string]cache.Store)
 	e.internals.cache.data = make(map[string]interface{})
 	e.internals.cache.mu.Unlock()
 
@@ -810,6 +810,7 @@ func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectSto
 	}
 	return e.options.metadatabucket, nil
 }
+
 func (e *ServiceTest) ListHostsByName(ctx context.Context, value bool) (map[string]*abstract.HostFull, fail.Error) {
 	e._survey("ServiceTest::ListHostsByName (not implemented)")
 	return map[string]*abstract.HostFull{}, nil
@@ -866,7 +867,7 @@ func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum,
 	return nil, nil
 }
 
-//func (e *ServiceTest) GetCache(ctx context.Context, name string) (cache.Cache, fail.Error) {
+// func (e *ServiceTest) GetCache(ctx context.Context, name string) (cache.Cache, fail.Error) {
 func (e *ServiceTest) GetCache(ctx context.Context, name string) (interface{}, fail.Error) {
 	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", name, e.options.enablecache)
 	/*
@@ -1246,7 +1247,7 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 		return xerr
 	}
 	hostName := ahf.Core.Name
-	if hostName == "" { //nolint
+	if hostName == "" { // nolint
 		hostName = ahf.Core.ID
 	}
 	if hostName == "" {
@@ -1300,7 +1301,7 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 		return xerr
 	}
 	hostName := ahf.Core.Name
-	if hostName == "" { //nolint
+	if hostName == "" { // nolint
 		hostName = ahf.Core.ID
 	}
 	if hostName == "" {
@@ -1422,7 +1423,7 @@ func (e *ServiceTest) InspectNetwork(ctx context.Context, id string) (an *abstra
 	defer fail.OnPanic(&ferr)
 
 	data, err := e._getInternalData(fmt.Sprintf("networks/byID/%s", id))
-	if err != nil { //nolint
+	if err != nil { // nolint
 		data, err = e._getInternalData(fmt.Sprintf("networks/byName/%s", id))
 	}
 	if err != nil {
@@ -2180,7 +2181,7 @@ func (e *ServiceTest) StopHost(ctx context.Context, params stacks.HostParameter,
 		return xerr
 	}
 	name := ahf.Core.Name
-	if name == "" { //nolint
+	if name == "" { // nolint
 		name = ahf.Core.ID
 	}
 	if name == "" {
@@ -2217,7 +2218,7 @@ func (e *ServiceTest) StartHost(ctx context.Context, params stacks.HostParameter
 	}
 
 	name := ahf.Core.Name
-	if name == "" { //nolint
+	if name == "" { // nolint
 		name = ahf.Core.ID
 	}
 	if name == "" {
@@ -2859,11 +2860,11 @@ func (e *ServiceTest) Configuration() (objectstorage.Config, fail.Error) {
 	e._survey("ServiceTest::Configuration (not implemented)")
 	return objectstorage.Config{}, nil
 }
-func (e *ServiceTest) ListBuckets(string) ([]string, fail.Error) {
+func (e *ServiceTest) ListBuckets(context.Context, string) ([]string, fail.Error) {
 	e._survey("ServiceTest::ListBuckets (not implemented)")
 	return []string{}, nil
 }
-func (e *ServiceTest) FindBucket(name string) (bool, fail.Error) {
+func (e *ServiceTest) FindBucket(ctx context.Context, name string) (bool, fail.Error) {
 	e._logf("ServiceTest::FindBucket { name: \"%s\"}", name)
 	e.internals.bucketData.mu.Lock()
 	_, ok := e.internals.bucketData.data[fmt.Sprintf("buckets/byID/%s", name)]
@@ -2873,11 +2874,11 @@ func (e *ServiceTest) FindBucket(name string) (bool, fail.Error) {
 	e.internals.bucketData.mu.Unlock()
 	return ok, nil
 }
-func (e *ServiceTest) InspectBucket(name string) (abstract.ObjectStorageBucket, fail.Error) {
+func (e *ServiceTest) InspectBucket(ctx context.Context, name string) (abstract.ObjectStorageBucket, fail.Error) {
 	e._surveyf("ServiceTest::InspectBucket { name: \"%s\"} (not implemented)", name)
 	return abstract.ObjectStorageBucket{}, nil
 }
-func (e *ServiceTest) CreateBucket(name string) (abstract.ObjectStorageBucket, fail.Error) {
+func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.ObjectStorageBucket, fail.Error) {
 	e._logf("ServiceTest::CreateBucket { name: \"%s\"}", name)
 	b := abstract.ObjectStorageBucket{
 		ID:         name,
@@ -2921,7 +2922,7 @@ func (e *ServiceTest) CreateBucket(name string) (abstract.ObjectStorageBucket, f
 
 	return b, nil
 }
-func (e *ServiceTest) DeleteBucket(name string) fail.Error {
+func (e *ServiceTest) DeleteBucket(ctx context.Context, name string) fail.Error {
 	e._logf("ServiceTest::DeleteBucket { name: \"%s\"}\n", name)
 	err := e._deleteInternalData(fmt.Sprintf("buckets/byID/%s", name))
 	if err != nil {
@@ -2933,11 +2934,11 @@ func (e *ServiceTest) DeleteBucket(name string) fail.Error {
 	}
 	return nil
 }
-func (e *ServiceTest) ClearBucket(bucketname string, path string, prefix string) fail.Error {
+func (e *ServiceTest) ClearBucket(ctx context.Context, bucketname string, path string, prefix string) fail.Error {
 	e._logf("ServiceTest::ClearBucket { bucketname: \"%s\", path: \"%s\", prefix: \"%s\"}\n", bucketname, path, prefix)
 	return nil
 }
-func (e *ServiceTest) ListObjects(bucketname string, path string, prefix string) ([]string, fail.Error) {
+func (e *ServiceTest) ListObjects(ctx context.Context, bucketname string, path string, prefix string) ([]string, fail.Error) {
 	if e.options.listobjectsErr != nil {
 		e._logf("ServiceTest::ListObjects { bucketname: \"%s\", path: \"%s\", prefix: \"%s\"} forced error \"%s\"\n", bucketname, path, prefix, e.options.listobjectsErr.Error())
 		return []string{}, e.options.listobjectsErr
@@ -2951,7 +2952,7 @@ func (e *ServiceTest) ListObjects(bucketname string, path string, prefix string)
 	return keys, nil
 }
 
-func (e *ServiceTest) InspectObject(bucketname string, path string) (abstract.ObjectStorageItem, fail.Error) {
+func (e *ServiceTest) InspectObject(ctx context.Context, bucketname string, path string) (abstract.ObjectStorageItem, fail.Error) {
 
 	osi := abstract.ObjectStorageItem{
 		BucketName: "bucketname",
@@ -2963,12 +2964,12 @@ func (e *ServiceTest) InspectObject(bucketname string, path string) (abstract.Ob
 	return osi, nil
 }
 
-func (e *ServiceTest) InvalidateObject(bucketname string, path string) fail.Error {
+func (e *ServiceTest) InvalidateObject(ctx context.Context, bucketname string, path string) fail.Error {
 	e._surveyf("ServiceTest::InvalidateObject { bucketname: \"%s\", path: \"%s\"} (not implemented)\n", bucketname, path)
 	return nil
 }
 
-func (e *ServiceTest) HasObject(bucketname string, path string) (has bool, ferr fail.Error) {
+func (e *ServiceTest) HasObject(ctx context.Context, bucketname string, path string) (has bool, ferr fail.Error) {
 	has = e._hasInternalData(path)
 	if has {
 		e._logf("ServiceTest::HasObject { bucketname: \"%s\", path: \"%s\", has: %t}\n", bucketname, path, has)
@@ -2977,7 +2978,7 @@ func (e *ServiceTest) HasObject(bucketname string, path string) (has bool, ferr 
 	}
 	return has, nil
 }
-func (e *ServiceTest) ReadObject(bucketname string, path string, buffer io.Writer, offset int64, length int64) (ferr fail.Error) { // nolint
+func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path string, buffer io.Writer, offset int64, length int64) (ferr fail.Error) { // nolint
 
 	defer fail.OnPanic(&ferr)
 
@@ -3013,11 +3014,11 @@ func (e *ServiceTest) ReadObject(bucketname string, path string, buffer io.Write
 	}
 	return nil
 }
-func (e *ServiceTest) WriteMultiPartObject(string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
+func (e *ServiceTest) WriteMultiPartObject(context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	e._warnf("ServiceTest::WriteObject (not implemented)")
 	return abstract.ObjectStorageItem{}, nil
 }
-func (e *ServiceTest) WriteObject(bucketname string, path string, buffer io.Reader, length int64, item abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
+func (e *ServiceTest) WriteObject(ctx context.Context, bucketname string, path string, buffer io.Reader, length int64, item abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	tmp := make([]byte, length)
 	if _, err := io.ReadFull(buffer, tmp); err != nil {
 		e._warnf("ServiceTest::WriteObject { bucketname: \"%s\", path: \"%s\", value: ? } error: %s\n", bucketname, path, err.Error())
@@ -3033,7 +3034,7 @@ func (e *ServiceTest) WriteObject(bucketname string, path string, buffer io.Read
 	e.internals.bucketData.mu.Unlock()
 	return abstract.ObjectStorageItem{}, nil
 }
-func (e *ServiceTest) DeleteObject(bucketname string, path string) fail.Error {
+func (e *ServiceTest) DeleteObject(ctx context.Context, bucketname string, path string) fail.Error {
 
 	if e._hasInternalData(path) {
 		e._logf("ServiceTest::DeleteObject { bucketname: \"%s\", path: \"%s\"}", bucketname, path)

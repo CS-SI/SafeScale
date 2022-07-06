@@ -76,10 +76,11 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	asg.Rules = rules
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for _, v := range asg.Rules {
 				for _, r := range v.IDs {
-					if derr := s.rpcDeleteFirewallRuleByID(ctx, r); derr != nil {
+					if derr := s.rpcDeleteFirewallRuleByID(context.Background(), r); derr != nil {
 						switch ferr.(type) {
 						case *fail.ErrNotFound:
 							// rule not found, considered as a removal success

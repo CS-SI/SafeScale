@@ -49,7 +49,7 @@ func TestSecurityGroupRule_IsNull(t *testing.T) {
 		t.Fail()
 	}
 	sgr.Sources = []string{}
-	sgr.Targets = append(sgr.Sources, "Target 1") //nolint
+	sgr.Targets = append(sgr.Sources, "Target 1") // nolint
 	if sgr.IsNull() {
 		t.Error("SecurityGroupRule is not null")
 		t.Fail()

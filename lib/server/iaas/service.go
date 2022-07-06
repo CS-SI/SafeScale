@@ -233,7 +233,7 @@ func (instance service) WaitHostState(ctx context.Context, hostID string, state 
 			default:
 			}
 
-			host, rerr = instance.InspectHost(ctx, host) // FIXME: all service functions should accept ctx in order to be canceled
+			host, rerr = instance.InspectHost(ctx, host)
 			if rerr != nil {
 				errCh <- rerr
 				return

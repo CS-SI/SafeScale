@@ -231,6 +231,12 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 		return instance, fail.InvalidInstanceError()
 	}
 
+	select {
+	case <-instance.Context().Done():
+		return nil, fail.AbortedError(instance.Context().Err())
+	default:
+	}
+
 	return instance.StartWithTimeout(action, params, 0, options...)
 }
 
@@ -240,6 +246,12 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return instance, fail.InvalidInstanceError()
+	}
+
+	select {
+	case <-instance.Context().Done():
+		return nil, fail.AbortedError(instance.Context().Err())
+	default:
 	}
 
 	instance.children.lock.Lock()

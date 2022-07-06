@@ -235,19 +235,19 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 					return NullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
 				}
 			}
-			found, err = metadataLocation.FindBucket(metadataLocationConfig.BucketName)
+			found, err = metadataLocation.FindBucket(ctx, metadataLocationConfig.BucketName)
 			if err != nil {
 				return NullService(), fail.Wrap(err, "error accessing metadata location: %s", metadataLocationConfig.BucketName)
 			}
 
 			if found {
-				metadataBucket, err = metadataLocation.InspectBucket(metadataLocationConfig.BucketName)
+				metadataBucket, err = metadataLocation.InspectBucket(ctx, metadataLocationConfig.BucketName)
 				if err != nil {
 					return NullService(), err
 				}
 			} else {
 				// create bucket
-				metadataBucket, err = metadataLocation.CreateBucket(metadataLocationConfig.BucketName)
+				metadataBucket, err = metadataLocation.CreateBucket(ctx, metadataLocationConfig.BucketName)
 				if err != nil {
 					return NullService(), err
 				}
@@ -255,7 +255,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 				// Creates metadata version file
 				if metadataVersion != "" {
 					content := bytes.NewBuffer([]byte(metadataVersion))
-					_, xerr := metadataLocation.WriteObject(metadataLocationConfig.BucketName, "version", content, int64(content.Len()), nil)
+					_, xerr := metadataLocation.WriteObject(ctx, metadataLocationConfig.BucketName, "version", content, int64(content.Len()), nil)
 					if xerr != nil {
 						return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
 					}

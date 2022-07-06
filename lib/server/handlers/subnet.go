@@ -71,7 +71,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "('%s')", networkRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -118,7 +118,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "(%v, %v)", networkRef, all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "(%v, %v)", networkRef, all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -163,7 +163,7 @@ func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "'%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "'%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -184,7 +184,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 		return fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), true, "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), true, "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -263,7 +263,7 @@ func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef str
 		return fail.InvalidParameterError("enable", "must be either 'resources.SecurityGroupEnable' or 'resources.SecurityGroupDisable'")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -294,7 +294,7 @@ func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef s
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -334,7 +334,7 @@ func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef s
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -370,7 +370,7 @@ func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef 
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -406,7 +406,7 @@ func (handler *subnetHandler) ListSecurityGroups(networkRef, subnetRef string, s
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

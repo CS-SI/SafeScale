@@ -58,7 +58,7 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -105,7 +105,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -138,7 +138,7 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -169,7 +169,7 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tag"), "('%s', %d, %s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "('%s', %d, %s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

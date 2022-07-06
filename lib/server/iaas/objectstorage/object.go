@@ -206,6 +206,7 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 		return fail.ConvertError(err)
 	}
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if clerr := source.Close(); clerr != nil {
 			if ferr != nil {
 				_ = ferr.AddConsequence(clerr)

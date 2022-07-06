@@ -46,7 +46,7 @@ type VolumeListener struct {
 }
 
 // List the available volumes
-func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
+func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list volume")
 
@@ -56,18 +56,19 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "/volumes/list")
+	job, err := PrepareJob(inctx, in.GetTenantId(), "/volumes/list")
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
 	all := in.GetAll()
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -80,7 +81,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.VolumeInspectResponse
 	for _, v := range volumes {
-		pbVolume, xerr := v.ToProtocol(job.Context())
+		pbVolume, xerr := v.ToProtocol(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -92,7 +93,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 }
 
 // Create a new volume
-func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRequest) (_ *protocol.VolumeInspectResponse, err error) {
+func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreateRequest) (_ *protocol.VolumeInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create volume")
 
@@ -102,12 +103,12 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/create", name))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -115,7 +116,8 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 
 	speed := in.GetSpeed()
 	size := in.GetSize()
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -125,11 +127,11 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, xerr
 	}
 
-	return volumeInstance.ToProtocol(job.Context())
+	return volumeInstance.ToProtocol(ctx)
 }
 
 // Attach a volume to a host and create a mount point
-func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot attach volume")
 
@@ -140,8 +142,8 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -165,13 +167,14 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		doNotFormatStr = "FORMAT"
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetVolume().GetTenantId(), fmt.Sprintf("/volume/%s/host/%s/attach", volumeRef, hostRef))
+	job, xerr := PrepareJob(inctx, in.GetVolume().GetTenantId(), fmt.Sprintf("/volume/%s/host/%s/attach", volumeRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -184,7 +187,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 }
 
 // Detach a volume from a host. It umount associated mountpoint
-func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot detach volume")
 
@@ -195,8 +198,8 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -208,13 +211,14 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetVolume().GetTenantId(), fmt.Sprintf("/volume/%s/host/%s/detach", volumeRef, hostRef))
+	job, xerr := PrepareJob(inctx, in.GetVolume().GetTenantId(), fmt.Sprintf("/volume/%s/host/%s/detach", volumeRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%s, %s)", volumeRefLabel, hostRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s, %s)", volumeRefLabel, hostRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -228,7 +232,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete volume")
 
@@ -239,21 +243,22 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/delete", ref))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "(%s)", refLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -267,7 +272,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 }
 
 // Inspect a volume
-func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInspectResponse, err error) {
+func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInspectResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect volume")
 
@@ -277,21 +282,22 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/inspect", ref))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -301,5 +307,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, xerr
 	}
 
-	return volumeInstance.ToProtocol(job.Context())
+	return volumeInstance.ToProtocol(ctx)
 }

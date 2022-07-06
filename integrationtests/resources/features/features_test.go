@@ -35,7 +35,7 @@ func Test_DockerNotGateway(t *testing.T) {
 	helpers.RunScenarios(t)
 }
 
-//FIXME: disabled, remotedesktop seems to not be complete on Single Host
+// FIXME: disabled, remotedesktop seems to not be complete on Single Host
 // func Test_RemoteDesktopOnSingleHost(t *testing.T) {
 // 	helpers.InSection("features").Clear().AddScenario(RemoteDesktopOnSingleHost)
 // 	helpers.RunScenarios(t)

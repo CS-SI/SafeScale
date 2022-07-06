@@ -56,10 +56,10 @@ var HostCommand = cli.Command{
 		hostReboot,
 		hostStart,
 		hostStop,
-		hostCheckFeatureCommand,  // Deprecated
-		hostAddFeatureCommand,    // Deprecated
-		hostRemoveFeatureCommand, // Deprecated
-		hostListFeaturesCommand,  // Deprecated
+		hostCheckFeatureCommand,  // DEPRECATED: deprecated
+		hostAddFeatureCommand,    // DEPRECATED: deprecated
+		hostRemoveFeatureCommand, // DEPRECATED: deprecated
+		hostListFeaturesCommand,  // DEPRECATED: deprecated
 		hostSecurityCommands,
 		hostFeatureCommands,
 		hostTagCommands,

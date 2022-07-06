@@ -58,12 +58,12 @@ func (handler *bucketHandler) List(all bool) (_ []string, ferr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	if all {
-		return handler.job.Service().ListBuckets(objectstorage.RootPath)
+		return handler.job.Service().ListBuckets(handler.job.Context(), objectstorage.RootPath)
 	}
 
 	bucketBrowser, xerr := bucketfactory.New(handler.job.Service())
@@ -94,7 +94,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -127,7 +127,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -149,12 +149,12 @@ func (handler *bucketHandler) Download(name string) (bytes []byte, ferr fail.Err
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	// -- download bucket
-	ct, xerr := handler.job.Service().DownloadBucket(name, "")
+	ct, xerr := handler.job.Service().DownloadBucket(task.Context(), name, "")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -172,7 +172,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -198,11 +198,12 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			ferr = fail.Wrap(ferr, "failed to mount bucket '%s' on '%s:%s'", bucketName, hostName, path)
 		}
@@ -231,11 +232,12 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 	}
 
 	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			ferr = fail.Wrap(ferr, "failed to unmount bucket '%s' from host '%s'", bucketName, hostName)
 		}

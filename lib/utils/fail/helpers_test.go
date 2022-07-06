@@ -50,17 +50,17 @@ func TestIsNull(t *testing.T) {
 }
 
 func TestNotNulls(t *testing.T) {
-	var err error = fmt.Errorf("")
-	var ptrerr *error = &err
-	var dblptrerr **error = &ptrerr
+	var err = fmt.Errorf("")
+	var ptrerr = &err
+	var dblptrerr = &ptrerr
 
-	var ourErr Error = NewError("")
-	var ptrOurErr *Error = &ourErr
-	var dblptrOurErr **Error = &ptrOurErr
+	var ourErr = NewError("")
+	var ptrOurErr = &ourErr
+	var dblptrOurErr = &ptrOurErr
 
-	var ptrOurConcreteErr *ErrNotFound = NotFoundError("")
-	var ourConcreteErr ErrNotFound = *ptrOurConcreteErr
-	var dlbPtrOurConcreteErr **ErrNotFound = &ptrOurConcreteErr
+	var ptrOurConcreteErr = NotFoundError("")
+	var ourConcreteErr = *ptrOurConcreteErr
+	var dlbPtrOurConcreteErr = &ptrOurConcreteErr
 
 	var emptyStrArray []string
 

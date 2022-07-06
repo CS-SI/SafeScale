@@ -56,7 +56,7 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 

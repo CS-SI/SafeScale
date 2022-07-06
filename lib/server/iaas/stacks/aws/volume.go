@@ -57,8 +57,9 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteVolume(ctx, resp.VolumeId); derr != nil {
+			if derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
 			}
 		}

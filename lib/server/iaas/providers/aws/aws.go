@@ -157,7 +157,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string) // nolint
 	if identityEndpoint == "" {
-		identityEndpoint, ok = identityCfg["auth_uri"].(string) // deprecated, kept until next release
+		identityEndpoint, ok = identityCfg["auth_uri"].(string) // DEPRECATED: deprecated, kept until next release
 		if !ok || identityEndpoint == "" {
 			identityEndpoint = "https://iam.amazonaws.com"
 		}

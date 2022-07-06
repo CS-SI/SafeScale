@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -171,6 +172,9 @@ func TestCluster_IsNull(t *testing.T) {
 }
 
 func TestCluster_Create(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -183,13 +187,13 @@ func TestCluster_Create(t *testing.T) {
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
-		//svc._setLogLevel(0)
+		// svc._setLogLevel(0)
 
 		ocluster, xerr = NewCluster(ctx, svc)
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(ocluster).String(), "*operations.Cluster")
 
-		//svc._setLogLevel(2)
+		// svc._setLogLevel(2)
 
 		request := createClusterRequest()
 

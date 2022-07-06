@@ -43,24 +43,25 @@ type BucketListener struct {
 }
 
 // List available buckets
-func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListRequest) (bl *protocol.BucketListResponse, err error) {
+func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequest) (bl *protocol.BucketListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list Buckets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(ctx, "", "/buckets/list")
+	job, xerr := PrepareJob(inctx, "", "/buckets/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -74,7 +75,7 @@ func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListReques
 }
 
 // Create a new bucket
-func (s *BucketListener) Create(ctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create bucket")
 
@@ -85,18 +86,19 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.BucketRequest)
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetName()
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/create", bucketName))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/create", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -109,7 +111,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.BucketRequest)
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(ctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete bucket")
 
@@ -120,18 +122,19 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.BucketRequest)
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetName()
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/delete", bucketName))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/delete", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -139,7 +142,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.BucketRequest)
 }
 
 // Download a bucket
-func (s *BucketListener) Download(ctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketDownloadResponse, err error) {
+func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketDownloadResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot download bucket")
 
@@ -151,8 +154,8 @@ func (s *BucketListener) Download(ctx context.Context, in *protocol.BucketReques
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	bucketName := in.GetName()
@@ -160,13 +163,14 @@ func (s *BucketListener) Download(ctx context.Context, in *protocol.BucketReques
 		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
 	}
 
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/download", bucketName))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/download", bucketName))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -180,7 +184,7 @@ func (s *BucketListener) Download(ctx context.Context, in *protocol.BucketReques
 }
 
 // Inspect a bucket
-func (s *BucketListener) Inspect(ctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketResponse, err error) {
+func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect bucket")
 
@@ -190,18 +194,19 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.BucketRequest
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "can't be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	bucketName := in.GetName()
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/inspect", bucketName))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/inspect", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -216,11 +221,11 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.BucketRequest
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
 
-	return resp.ToProtocol(job.Context())
+	return resp.ToProtocol(ctx)
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot mount bucket")
 
@@ -231,19 +236,20 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountRequ
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -251,7 +257,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountRequ
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot unmount bucket")
 
@@ -262,19 +268,20 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountRe
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
-	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

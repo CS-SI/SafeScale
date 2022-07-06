@@ -44,35 +44,33 @@ const (
 
 // Bucket interface
 type Bucket interface {
-	//	data.Identifiable
-
 	// ListObjects list object names in a GetBucket
-	ListObjects(string, string) ([]string, fail.Error)
+	ListObjects(context.Context, string, string) ([]string, fail.Error)
 	// Browse browses inside the GetBucket and execute a callback on each Object found
-	Browse(string, string, func(Object) fail.Error) fail.Error
+	Browse(context.Context, string, string, func(Object) fail.Error) fail.Error
 	// Clear deletes all the objects in path inside a bucket
-	Clear(path, prefix string) fail.Error
+	Clear(ctx context.Context, path, prefix string) fail.Error
 	// CreateObject creates a new object in the bucket
-	CreateObject(string) (Object, fail.Error)
+	CreateObject(context.Context, string) (Object, fail.Error)
 	// InspectObject returns Object instance of an object in the GetBucket
-	InspectObject(string) (Object, fail.Error)
+	InspectObject(context.Context, string) (Object, fail.Error)
 	// DeleteObject delete an object from a stowContainer
-	DeleteObject(string) fail.Error
+	DeleteObject(context.Context, string) fail.Error
 	// ReadObject reads the content of an object
-	ReadObject(string, io.Writer, int64, int64) (Object, fail.Error)
+	ReadObject(context.Context, string, io.Writer, int64, int64) (Object, fail.Error)
 	// WriteObject writes into an object
-	WriteObject(string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
+	WriteObject(context.Context, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
 	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
-	WriteMultiPartObject(string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
+	WriteMultiPartObject(context.Context, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
 	// // CopyObject copies an object
 	// CopyObject(string, string) fail.Error
 
 	// GetName returns the name of the bucket
 	GetName() (string, fail.Error)
 	// GetCount returns the number of objects in the GetBucket
-	GetCount(string, string) (int64, fail.Error)
+	GetCount(context.Context, string, string) (int64, fail.Error)
 	// GetSize returns the total size of all objects in the bucket
-	GetSize(string, string) (int64, string, fail.Error)
+	GetSize(context.Context, string, string) (int64, string, fail.Error)
 }
 
 // bucket describes a GetBucket
@@ -97,13 +95,13 @@ func (instance *bucket) IsNull() bool {
 }
 
 // CreateObject ...
-func (instance bucket) CreateObject(objectName string) (_ Object, ferr fail.Error) {
+func (instance bucket) CreateObject(ctx context.Context, objectName string) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -113,13 +111,13 @@ func (instance bucket) CreateObject(objectName string) (_ Object, ferr fail.Erro
 }
 
 // InspectObject ...
-func (instance bucket) InspectObject(objectName string) (_ Object, ferr fail.Error) {
+func (instance bucket) InspectObject(ctx context.Context, objectName string) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -170,13 +168,13 @@ func (instance bucket) estimateSize(path, prefix string) (int, error) {
 }
 
 // ListObjects list objects of a GetBucket
-func (instance bucket) ListObjects(path, prefix string) (_ []string, ferr fail.Error) {
+func (instance bucket) ListObjects(ctx context.Context, path string, prefix string) (_ []string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s, %s)", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s, %s)", path, prefix).Entering().Exiting()
 
 	var list []string
 
@@ -206,13 +204,13 @@ func (instance bucket) ListObjects(path, prefix string) (_ []string, ferr fail.E
 }
 
 // Browse walks through the objects in the GetBucket and executes callback on each Object found
-func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Error) (ferr fail.Error) {
+func (instance bucket) Browse(ctx context.Context, path string, prefix string, callback func(Object) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -237,13 +235,13 @@ func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Er
 }
 
 // Clear empties a bucket
-func (instance bucket) Clear(path, prefix string) (ferr fail.Error) {
+func (instance bucket) Clear(ctx context.Context, path, prefix string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -270,7 +268,7 @@ func (instance bucket) Clear(path, prefix string) (ferr fail.Error) {
 }
 
 // DeleteObject deletes an object from a bucket
-func (instance bucket) DeleteObject(objectName string) (ferr fail.Error) {
+func (instance bucket) DeleteObject(ctx context.Context, objectName string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -279,7 +277,7 @@ func (instance bucket) DeleteObject(objectName string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -289,13 +287,13 @@ func (instance bucket) DeleteObject(objectName string) (ferr fail.Error) {
 }
 
 // ReadObject ...
-func (instance bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (_ Object, ferr fail.Error) {
+func (instance bucket) ReadObject(ctx context.Context, objectName string, target io.Writer, from int64, to int64) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -309,13 +307,13 @@ func (instance bucket) ReadObject(objectName string, target io.Writer, from int6
 }
 
 // WriteObject ...
-func (instance bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
+func (instance bucket) WriteObject(ctx context.Context, objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -336,18 +334,13 @@ func (instance bucket) WriteObject(objectName string, source io.Reader, sourceSi
 }
 
 // WriteMultiPartObject ...
-func (instance bucket) WriteMultiPartObject(
-	objectName string,
-	source io.Reader, sourceSize int64,
-	chunkSize int,
-	metadata abstract.ObjectStorageItemMetadata,
-) (_ Object, ferr fail.Error) {
+func (instance bucket) WriteMultiPartObject(ctx context.Context, objectName string, source io.Reader, sourceSize int64, chunkSize int, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -375,13 +368,13 @@ func (instance bucket) GetName() (_ string, ferr fail.Error) {
 
 // GetCount returns the count of objects in the GetBucket
 // 'path' corresponds to stow prefix, and 'prefix' allows filtering what to count
-func (instance bucket) GetCount(path, prefix string) (_ int64, ferr fail.Error) {
+func (instance bucket) GetCount(ctx context.Context, path string, prefix string) (_ int64, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	var count int64
 	fullPath := buildFullPath(path, prefix)
@@ -409,13 +402,13 @@ func (instance bucket) GetCount(path, prefix string) (_ int64, ferr fail.Error) 
 }
 
 // GetSize returns the total size of the Objects inside the GetBucket
-func (instance bucket) GetSize(path, prefix string) (_ int64, _ string, ferr fail.Error) {
+func (instance bucket) GetSize(ctx context.Context, path string, prefix string) (_ int64, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return 0, "", fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 

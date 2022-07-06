@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
@@ -1336,8 +1337,9 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteInstance(ctx, name); derr != nil {
+			if derr := s.rpcDeleteInstance(context.Background(), name); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
 			}
 		}

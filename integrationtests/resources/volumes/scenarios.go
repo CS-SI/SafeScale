@@ -328,8 +328,4 @@ func UntilVolumeCreated(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("volumes").Clear().
-		AddScenario(VolumeError).
-		AddScenario(DeleteVolumeMounted).
-		AddScenario(UntilVolumeCreated)
 }

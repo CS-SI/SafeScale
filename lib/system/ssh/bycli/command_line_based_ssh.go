@@ -443,7 +443,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	}, nil
 }
 
-// Command defines a SSH command
+// CliCommand defines a SSH command
 type CliCommand struct {
 	hostname     string
 	runCmdString string
@@ -607,7 +607,6 @@ func (scmd *CliCommand) Start() fail.Error {
 //   . *fail.ErrTimeout if 'timeout' is reached
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
-// FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
 func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -621,7 +620,7 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 	}
 	chRes := make(chan result)
 	go func() {
-
+		defer close(chRes)
 		if scmd == nil {
 			chRes <- result{invalid, "", "", fail.InvalidInstanceError()}
 			return
@@ -709,9 +708,6 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 
 	params, ok := p.(taskExecuteParameters)
 	if !ok {
@@ -733,6 +729,11 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	}
 
 	ctx := task.Context()
+	select {
+	case <-ctx.Done():
+		return nil, fail.AbortedError(ctx.Err())
+	default:
+	}
 
 	// Prepare command
 	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
@@ -980,6 +981,7 @@ func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error)
 
 	var tunnels Tunnels
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			derr := tunnels.Close()
 			if derr != nil {
@@ -1307,6 +1309,7 @@ func (sconf *Profile) copy(
 	defer func() {
 		derr := sshCommand.Close()
 		if derr != nil {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 			} else {
@@ -1337,6 +1340,7 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	defer func() {
 		derr := tunnels.Close()
 		if derr != nil {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
 			} else {
