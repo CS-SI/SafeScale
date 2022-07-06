@@ -287,7 +287,7 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 			return innerXErr
 		})
 		chRes <- result{xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -338,7 +338,7 @@ func (instance *SecurityGroup) unsafeAddRule(inctx context.Context, rule *abstra
 			return nil
 		})
 		chRes <- result{xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -409,7 +409,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 			})
 		})
 		chRes <- result{xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
@@ -498,7 +498,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(inctx context.Context, abstrac
 			})
 		})
 		chRes <- result{xerr}
-		return
+		return // nolint
 	}()
 	select {
 	case res := <-chRes:
