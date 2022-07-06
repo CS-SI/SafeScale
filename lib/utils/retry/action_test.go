@@ -28,6 +28,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
@@ -38,13 +39,13 @@ import (
 func Test_NewAction(t *testing.T) {
 
 	var (
-		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
-		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
-		run     func() error = func() (nested error) {
+		officer = BackoffSelector()(100 * time.Millisecond)
+		arbiter = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		run     = func() (nested error) {
 			return nil
 		}
 		notify  Notify
-		timeout time.Duration = 5 * time.Second
+		timeout = 5 * time.Second
 	)
 
 	action := NewAction(officer, arbiter, run, notify, timeout)
@@ -55,15 +56,15 @@ func Test_NewAction(t *testing.T) {
 func Test_Action(t *testing.T) {
 
 	var (
-		run func() error = func() (nested error) {
+		run = func() (nested error) {
 			return nil
 		}
-		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
-		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
-		first   func() error = func() (nested error) {
+		arbiter = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		officer = BackoffSelector()(100 * time.Millisecond)
+		first   = func() (nested error) {
 			return nil
 		}
-		last func() error = func() (nested error) {
+		last = func() (nested error) {
 			return nil
 		}
 		notify Notify
@@ -705,6 +706,7 @@ func JustThrowComplexError() (ferr fail.Error) {
 
 func CreateDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
@@ -719,6 +721,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 
 func CreateWrappedDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")

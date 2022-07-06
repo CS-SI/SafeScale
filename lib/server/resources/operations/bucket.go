@@ -79,6 +79,12 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
@@ -128,7 +134,7 @@ func (instance *bucket) IsNull() bool {
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *bucket) Exists(ctx context.Context) (bool, fail.Error) {
 	theID := instance.GetID()
-	_, err := instance.Service().InspectBucket(theID)
+	_, err := instance.Service().InspectBucket(ctx, theID)
 	if err != nil {
 		switch err.(type) {
 		case *fail.ErrNotFound:
@@ -302,7 +308,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- check if bucket already exist on provider side
-	ab, xerr := svc.InspectBucket(name)
+	ab, xerr := svc.InspectBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -321,7 +327,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- create bucket
-	ab, xerr = svc.CreateBucket(name)
+	ab, xerr = svc.CreateBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -368,7 +374,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// -- delete Bucket
-	xerr = instance.Service().DeleteBucket(instance.GetName())
+	xerr = instance.Service().DeleteBucket(ctx, instance.GetName())
 	if xerr != nil {
 		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())

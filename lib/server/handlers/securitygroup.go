@@ -63,7 +63,7 @@ func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -81,7 +81,7 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s', '%s')", networkRef, sgName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', '%s')", networkRef, sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -114,7 +114,7 @@ func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -134,7 +134,7 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -154,7 +154,7 @@ func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.Security
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "(%s)", sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "(%s)", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -172,7 +172,7 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -198,7 +198,7 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -229,7 +229,7 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s', %v)", sgRef, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', %v)", sgRef, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -257,7 +257,7 @@ func (handler *securityGroupHandler) Sanitize(sgRef string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -285,7 +285,7 @@ func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*prop
 		return nil, nil, fail.InvalidRequestError("invalid value '%s' in field 'Kind'", kind)
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.security-group"), "('%s', %s)", sgRef, kind).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', %s)", sgRef, kind).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

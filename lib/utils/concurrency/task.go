@@ -255,6 +255,12 @@ func NewTaskWithContext(ctx context.Context, options ...data.ImmutableKeyValue) 
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.AbortedError(ctx.Err())
+	default:
+	}
+
 	return newTask(ctx, nil, options...)
 }
 
@@ -472,6 +478,12 @@ func (instance *task) SetID(id string) fail.Error {
 func (instance *task) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
+	}
+
+	select {
+	case <-instance.Context().Done():
+		return nil, fail.AbortedError(instance.Context().Err())
+	default:
 	}
 
 	return instance.StartWithTimeout(action, params, 0, options...)
@@ -993,6 +1005,12 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 func (instance *task) Run(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
+	}
+
+	select {
+	case <-instance.Context().Done():
+		return nil, fail.AbortedError(instance.Context().Err())
+	default:
 	}
 
 	_, err := instance.Start(action, params, options...)

@@ -76,8 +76,8 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -86,7 +86,7 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 		return nil, xerr
 	}
 
-	xerr = browseInstance.Browse(task.Context(), func(volume *abstract.Volume) fail.Error {
+	xerr = browseInstance.Browse(ctx, func(volume *abstract.Volume) fail.Error {
 		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
@@ -116,8 +116,8 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -132,7 +132,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		}
 	}
 
-	xerr = volumeInstance.Inspect(task.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = volumeInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
@@ -154,7 +154,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		return xerr
 	}
 
-	return volumeInstance.Delete(task.Context())
+	return volumeInstance.Delete(ctx)
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
@@ -171,8 +171,8 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -200,7 +200,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -243,7 +243,7 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 		return fail.InvalidParameterCannotBeEmptyStringError("format")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -279,7 +279,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

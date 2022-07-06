@@ -27,12 +27,12 @@ import (
 )
 
 // List retrieves all available buckets
-func List(svc iaas.Service) ([]string, fail.Error) {
+func List(ctx context.Context, svc iaas.Service) ([]string, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	return svc.ListBuckets(objectstorage.RootPath)
+	return svc.ListBuckets(ctx, objectstorage.RootPath)
 }
 
 // New creates a bucket instance

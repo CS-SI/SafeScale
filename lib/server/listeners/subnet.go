@@ -48,7 +48,7 @@ type SubnetListener struct {
 // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // Create a new subnet
-func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
+func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot create Subnet")
@@ -59,8 +59,8 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
@@ -68,13 +68,14 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/subnet/%s/create", networkRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/subnet/%s/create", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -110,11 +111,11 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 
 	tracer.Trace("Subnet '%s' successfully created.", req.Name)
-	return subnetInstance.ToProtocol(job.Context())
+	return subnetInstance.ToProtocol(ctx)
 }
 
 // List existing networks
-func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, ferr error) {
+func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitLogError(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot list Subnets")
@@ -125,21 +126,22 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Network")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "/subnets/list")
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), "/subnets/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %v)", networkRefLabel, in.All).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %v)", networkRefLabel, in.All).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -159,7 +161,7 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 }
 
 // Inspect returns infos on a subnet
-func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspectRequest) (_ *protocol.Subnet, err error) {
+func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspectRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect Subnet")
@@ -171,8 +173,8 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -181,13 +183,14 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnetInstance/%s/inspect", networkRef, subnetRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnetInstance/%s/inspect", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnetInstance"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnetInstance"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -197,11 +200,11 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 		return nil, xerr
 	}
 
-	return subnetInstance.ToProtocol(job.Context())
+	return subnetInstance.ToProtocol(ctx)
 }
 
 // Delete a/many subnet/s
-func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Subnet")
@@ -213,8 +216,8 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -223,13 +226,14 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/delete", networkRef, subnetRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/delete", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -244,7 +248,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 }
 
 // BindSecurityGroup attaches a Security Group to a hostnetwork
-func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Subnet")
@@ -256,8 +260,8 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -271,13 +275,14 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/bind", networkRef, subnetRef, sgRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/bind", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -294,7 +299,7 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 }
 
 // UnbindSecurityGroup detaches a Security Group from a subnet
-func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Subnet")
@@ -306,8 +311,8 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -321,13 +326,14 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/unbind", networkRef, subnetRef, sgRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/unbind", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -336,7 +342,7 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 }
 
 // EnableSecurityGroup applies the rules of a bound security group on a network
-func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot enable Security Group of Subnet")
@@ -348,8 +354,8 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -363,13 +369,14 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/enable", networkRef, subnetRef, sgRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/enable", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -378,7 +385,7 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 }
 
 // DisableSecurityGroup detaches a Security Group from a subnet
-func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot disable Security Group of Subnet")
@@ -390,8 +397,8 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -405,13 +412,14 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/disable", networkRef, subnetRef, sgRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/disable", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -420,7 +428,7 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 }
 
 // ListSecurityGroups lists the Security Group bound to subnet
-func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
+func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot list Security Groups bound to Subnet")
@@ -431,8 +439,8 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -441,13 +449,14 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("network/%s/subnet/%s/securitygroups/list", networkRef, subnetRef))
+	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("network/%s/subnet/%s/securitygroups/list", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

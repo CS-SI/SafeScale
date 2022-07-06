@@ -713,6 +713,8 @@ func TestHost_setSecurityGroups(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
+		host.GetView(ctx)
+
 		ohost := host.(*Host)
 
 		xerr = ohost.setSecurityGroups(ctx, hostReq, subnet)

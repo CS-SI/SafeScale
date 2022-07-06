@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -84,6 +84,8 @@ type Host struct {
 		installMethods                sync.Map
 		privateIP, publicIP, accessIP string
 		sshProfile                    sshapi.Connector
+		sshCfg                        sshapi.Config
+		once                          bool
 	}
 }
 
@@ -116,6 +118,12 @@ func LoadHost(ctx context.Context, svc iaas.Service, ref string, options ...data
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
 	}
 
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onHostCacheMiss(ctx, svc, ref) }
@@ -195,7 +203,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
 
-	return instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -221,8 +229,8 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 
 			// FIXME: find a better way to handle the use case (adjust SG? something else?)
 			// Workaround for a specific use: safescaled inside a cluster, to force access to host using internal IP
-			from_inside := os.Getenv("SAFESCALED_FROM_INSIDE")
-			if instance.localCache.publicIP == "" || from_inside == "true" {
+			fromInside := os.Getenv("SAFESCALED_FROM_INSIDE")
+			if instance.localCache.publicIP == "" || fromInside == "true" {
 				instance.localCache.accessIP = instance.localCache.privateIP
 			} else {
 				instance.localCache.accessIP = instance.localCache.publicIP
@@ -314,6 +322,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return innerXErr
 		}
 
+		instance.localCache.sshCfg = cfg
 		instance.localCache.sshProfile = conn
 
 		var index uint8
@@ -349,6 +358,12 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 		instance.localCache.installMethods.Store(index, installmethod.None)
 		return nil
 	})
+
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, fail.Error) {
@@ -612,6 +627,40 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 	return state, nil
 }
 
+// GetView returns a view of the Host, without forced inspect
+func (instance *Host) GetView(ctx context.Context) (*abstract.HostCore, *serialize.JSONProperties, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, nil, fail.InvalidInstanceError()
+	}
+
+	state := abstract.NewHostCore()
+	var propos *serialize.JSONProperties
+	var netInfo *propertiesv2.HostNetworking
+
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		*state = *ahc
+		propos = props
+		return nil
+	})
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	netInfo, xerr = propertiesv2.NewHostNetworkingFromProperty(propos)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	logrus.Debugf("%s", spew.Sdump(netInfo))
+
+	return state, propos, nil
+}
+
 // Create creates a new Host and its metadata
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
 // In case of error occurring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
@@ -642,19 +691,19 @@ func (instance *Host) Create(
 		err fail.Error
 	}
 
-	rCh := make(chan result)
+	chRes := make(chan result)
 	go func() {
-		defer close(rCh)
+		defer close(chRes)
 
 		a, err := instance.implCreate(ctx, hostReq, hostDef)
-		rCh <- result{
+		chRes <- result{
 			ct:  a,
 			err: err,
 		}
 	}()
 
 	select {
-	case res := <-rCh: // if it works return the result
+	case res := <-chRes: // if it works return the result
 		return res.ct, res.err
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
@@ -674,14 +723,14 @@ func (instance *Host) implCreate(
 		err fail.Error
 	}
 
-	rCh := make(chan result)
-	gfu := func() (ferr fail.Error) {
-		defer close(rCh)
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer close(chRes)
 		svc := instance.Service()
 
 		timings, xerr := instance.Service().Timings()
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
@@ -694,11 +743,11 @@ func (instance *Host) implCreate(
 				// continue
 				debug.IgnoreError(xerr)
 			default:
-				rCh <- result{nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)}
+				chRes <- result{nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)}
 				return xerr
 			}
 		} else {
-			rCh <- result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
+			chRes <- result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
 			return fail.NewError("something happened")
 		}
 
@@ -711,11 +760,11 @@ func (instance *Host) implCreate(
 				// continue
 				debug.IgnoreError(xerr)
 			default:
-				rCh <- result{nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)}
+				chRes <- result{nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)}
 				return xerr
 			}
 		} else {
-			rCh <- result{nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)}
+			chRes <- result{nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)}
 			return fail.NewError("something happened")
 		}
 
@@ -731,8 +780,9 @@ func (instance *Host) implCreate(
 			tmpl, xerr := svc.FindTemplateBySizing(ctx, newHostDef)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				rCh <- result{nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")}
-				return xerr
+				aCh := result{nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")}
+				chRes <- aCh
+				return aCh.err
 			}
 
 			hostDef.Template = tmpl.ID
@@ -751,7 +801,7 @@ func (instance *Host) implCreate(
 
 			hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(ctx, svc, imageQuery)
 			if xerr != nil {
-				rCh <- result{nil, xerr}
+				chRes <- result{nil, xerr}
 				return xerr
 			}
 		}
@@ -766,11 +816,12 @@ func (instance *Host) implCreate(
 			defaultSubnet, undoCreateSingleHostNetworking, xerr = createSingleHostNetworking(ctx, svc, hostReq)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				rCh <- result{nil, xerr}
+				chRes <- result{nil, xerr}
 				return xerr
 			}
 
 			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !hostReq.KeepOnFailure {
 					derr := undoCreateSingleHostNetworking()
 					if derr != nil {
@@ -794,7 +845,7 @@ func (instance *Host) implCreate(
 				return nil
 			})
 			if xerr != nil {
-				rCh <- result{nil, xerr}
+				chRes <- result{nil, xerr}
 				return xerr
 			}
 		} else {
@@ -803,19 +854,19 @@ func (instance *Host) implCreate(
 			defaultSubnet, xerr = LoadSubnet(ctx, svc, "", as.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				rCh <- result{nil, xerr}
+				chRes <- result{nil, xerr}
 				return xerr
 			}
 
 			if !hostReq.IsGateway && hostReq.DefaultRouteIP == "" {
 				s, ok := defaultSubnet.(*Subnet)
 				if !ok {
-					rCh <- result{nil, fail.InconsistentError("failed to cast 'defaultSubnet' to '*Subnet'")}
+					chRes <- result{nil, fail.InconsistentError("failed to cast 'defaultSubnet' to '*Subnet'")}
 					return xerr
 				}
 				hostReq.DefaultRouteIP, xerr = s.unsafeGetDefaultRouteIP(ctx)
 				if xerr != nil {
-					rCh <- result{nil, xerr}
+					chRes <- result{nil, xerr}
 					return xerr
 				}
 			}
@@ -830,7 +881,7 @@ func (instance *Host) implCreate(
 				opts, xerr := svc.GetConfigurationOptions(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					rCh <- result{nil, xerr}
+					chRes <- result{nil, xerr}
 					return xerr
 				}
 
@@ -854,8 +905,9 @@ func (instance *Host) implCreate(
 					)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						rCh <- result{nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())}
-						return xerr
+						aCh := result{nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())}
+						chRes <- aCh
+						return aCh.err
 					}
 				}
 			}
@@ -865,6 +917,7 @@ func (instance *Host) implCreate(
 		var userdataContent *userdata.Content
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !hostReq.KeepOnFailure {
 				if ahf != nil {
 					if ahf.Core != nil {
@@ -883,11 +936,12 @@ func (instance *Host) implCreate(
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
-				rCh <- result{nil, xerr}
+				chRes <- result{nil, xerr}
 				return xerr
 			}
-			rCh <- result{nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)}
-			return xerr
+			aCh := result{nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)}
+			chRes <- aCh
+			return aCh.err
 		}
 
 		// Make sure ssh port wanted is set
@@ -906,11 +960,12 @@ func (instance *Host) implCreate(
 		xerr = instance.carry(ctx, ahf.Core)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !hostReq.KeepOnFailure {
 				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
 					logrus.Errorf(
@@ -923,6 +978,7 @@ func (instance *Host) implCreate(
 		}()
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				if !valid.IsNil(ahf) {
 					if !valid.IsNil(ahf.Core) {
@@ -1023,24 +1079,29 @@ func (instance *Host) implCreate(
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		xerr = instance.updateCachedInformation(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
-		defer instance.undoSetSecurityGroups(context.Background(), &ferr, hostReq.KeepOnFailure)
+		defer func() {
+			derr := instance.undoSetSecurityGroups(context.Background(), &ferr, hostReq.KeepOnFailure)
+			if derr != nil {
+				logrus.Warnf(derr.Error())
+			}
+		}()
 
 		logrus.Infof("Compute resource '%s' created", instance.GetName())
 
@@ -1054,14 +1115,14 @@ func (instance *Host) implCreate(
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
-				rCh <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
+				chRes <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
 				return xerr
 			default:
 				if abstract.IsProvisioningError(xerr) {
-					rCh <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
+					chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
 					return
 				}
-				rCh <- result{nil, xerr}
+				chRes <- result{nil, xerr}
 				return xerr
 			}
 		}
@@ -1085,7 +1146,7 @@ func (instance *Host) implCreate(
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
@@ -1093,11 +1154,12 @@ func (instance *Host) implCreate(
 		xerr = instance.updateSubnets(ctx, hostReq)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				instance.undoUpdateSubnets(context.Background(), hostReq, &ferr)
 			}
@@ -1111,28 +1173,28 @@ func (instance *Host) implCreate(
 		xerr = instance.finalizeProvisioning(ctx, userdataContent)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		// Unbind default security group if needed
 		networkInstance, xerr := defaultSubnet.InspectNetwork(ctx)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		xerr = instance.unbindDefaultSecurityGroupIfNeeded(ctx, networkInstance.GetID())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			rCh <- result{nil, xerr}
+			chRes <- result{nil, xerr}
 			return xerr
 		}
 
 		if !valid.IsNil(ahf) {
 			if !valid.IsNil(ahf.Core) {
 				logrus.Debugf("Marking instance '%s' as started", instance.GetName())
-				derr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				rerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError(
@@ -1143,27 +1205,23 @@ func (instance *Host) implCreate(
 					ahc.LastState = hoststate.Started
 					return nil
 				})
-				if derr != nil {
-					rCh <- result{userdataContent, derr}
+				if rerr != nil {
+					chRes <- result{userdataContent, rerr}
 					return
 				}
 			}
 		}
 
 		logrus.Infof("Host '%s' created successfully", instance.GetName())
-		rCh <- result{userdataContent, nil}
+		chRes <- result{userdataContent, nil}
 		return nil
-	}
-
-	go func() {
-		_ = gfu()
-	}()
+	}() // nolint
 
 	select {
-	case res := <-rCh: // if it works return the result
+	case res := <-chRes: // if it works return the result
 		return res.ct, res.err
 	case <-ctx.Done(): // if not because parent context was canceled
-		<-rCh // wait for cleanup
+		<-chRes // wait for cleanup
 		return nil, fail.Wrap(ctx.Err(), "cancelled by parent")
 	}
 }
@@ -1307,7 +1365,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				defer func() {
 					if finnerXErr != nil && !req.KeepOnFailure {
-						derr := gwsg.UnbindFromHost(ctx, instance)
+						derr := gwsg.UnbindFromHost(context.Background(), instance)
 						if derr != nil {
 							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), gwsg.GetName(), instance.GetName()))
 						}
@@ -1338,7 +1396,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				defer func() {
 					if finnerXErr != nil && !req.KeepOnFailure {
-						derr := pubipsg.UnbindFromHost(ctx, instance)
+						derr := pubipsg.UnbindFromHost(context.Background(), instance)
 						if derr != nil {
 							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), pubipsg.GetName(), instance.GetName()))
 						}
@@ -1368,14 +1426,14 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 							continue
 						}
 
-						subnetInstance, deeperXErr := LoadSubnet(ctx, svc, "", v.ID)
+						subnetInstance, deeperXErr := LoadSubnet(context.Background(), svc, "", v.ID)
 						if deeperXErr != nil {
 							_ = innerXErr.AddConsequence(deeperXErr)
 							continue
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(ctx, func(
+						deeperXErr = subnetInstance.Review(context.Background(), func(
 							clonable data.Clonable, _ *serialize.JSONProperties,
 						) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
@@ -1384,11 +1442,11 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 							}
 
 							if abstractSubnet.InternalSecurityGroupID != "" {
-								sg, derr = LoadSecurityGroup(ctx, svc, abstractSubnet.InternalSecurityGroupID)
+								sg, derr = LoadSecurityGroup(context.Background(), svc, abstractSubnet.InternalSecurityGroupID)
 								if derr != nil {
 									errs = append(errs, derr)
 								} else {
-									derr = sg.UnbindFromHost(ctx, instance)
+									derr = sg.UnbindFromHost(context.Background(), instance)
 									if derr != nil {
 										errs = append(errs, derr)
 									}
@@ -1463,11 +1521,14 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 	})
 }
 
-func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool) {
+func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool) fail.Error {
 	if errorPtr == nil {
-		logrus.Errorf("trying to call a cancel function from a nil error; cancel not run") // FIXME: return error
-		return
+		return fail.NewError("trying to call a cancel function from a nil error; cancel not run")
 	}
+	if ctx != context.Background() {
+		return fail.NewError("wrong context")
+	}
+
 	if *errorPtr != nil && !keepOnFailure {
 		svc := instance.Service()
 		derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1514,6 +1575,7 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 			)
 		}
 	}
+	return nil
 }
 
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
@@ -1607,6 +1669,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	if notok {
 		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
+	incrementExpVar("host.cache.hit")
 
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1623,6 +1686,12 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 
 	rounds := 10
 	for {
+		select {
+		case <-ctx.Done():
+			return fail.ConvertError(ctx.Err())
+		default:
+		}
+
 		rc, _, _, xerr := instance.unsafeRun(ctx, "sudo sync", outputs.COLLECT, 0, 10*time.Second)
 		if xerr != nil {
 			rounds--
@@ -1713,6 +1782,7 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 	}
 	chRes := make(chan result)
 	go func() {
+		defer close(chRes)
 		defer temporal.NewStopwatch().OnExitLogInfo(
 			fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()),
 			fmt.Sprintf("Finish Waiting install phase %s on '%s'...", phase, instance.GetName()),
@@ -1874,11 +1944,13 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 }
 
 // undoUpdateSubnets removes what updateSubnets have done
-func (instance *Host) undoUpdateSubnets(ctx context.Context, req abstract.HostRequest, errorPtr *fail.Error) {
-	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && !req.KeepOnFailure {
-		// Without this, 'undo' won't be able to complete in case it's called on an abort...
-		// defer task.DisarmAbortSignal()()
+func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.HostRequest, errorPtr *fail.Error) {
+	ctx := inctx
+	if ctx != context.Background() {
+		logrus.Warningf("This should NOT happen")
+	}
 
+	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && !req.KeepOnFailure {
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(
 				hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
@@ -1947,6 +2019,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	if notok {
 		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
+	incrementExpVar("host.cache.hit")
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
@@ -2221,6 +2294,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			}
 
 			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !singleHostRequest.KeepOnFailure {
 					derr := subnetInstance.Delete(context.Background())
 					if derr != nil {
@@ -2259,7 +2333,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 	undoFunc := func() fail.Error {
 		var errs []error
 		if !singleHostRequest.KeepOnFailure {
-			derr := subnetInstance.Delete(ctx)
+			derr := subnetInstance.Delete(context.Background())
 			if derr != nil {
 				errs = append(
 					errs, fail.Wrap(
@@ -2267,7 +2341,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 					),
 				)
 			}
-			derr = FreeCIDRForSingleHost(ctx, networkInstance, cidrIndex)
+			derr = FreeCIDRForSingleHost(context.Background(), networkInstance, cidrIndex)
 			if derr != nil {
 				errs = append(
 					errs, fail.Wrap(
@@ -2545,26 +2619,26 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			// Unbind Security Groups from Host
 			var errs []error
 			for _, v := range hsgV1.ByID {
-				sgInstance, derr := LoadSecurityGroup(ctx, svc, v.ID)
-				if derr != nil {
-					switch derr.(type) {
+				sgInstance, rerr := LoadSecurityGroup(ctx, svc, v.ID)
+				if rerr != nil {
+					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(derr)
+						debug.IgnoreError(rerr)
 					default:
-						errs = append(errs, derr)
+						errs = append(errs, rerr)
 					}
 					continue
 				}
 
-				derr = sgInstance.UnbindFromHost(ctx, instance)
-				if derr != nil {
-					switch derr.(type) {
+				rerr = sgInstance.UnbindFromHost(ctx, instance)
+				if rerr != nil {
+					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(derr)
+						debug.IgnoreError(rerr)
 					default:
-						errs = append(errs, derr)
+						errs = append(errs, rerr)
 					}
 				}
 			}
@@ -2588,26 +2662,26 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			// Unbind Security Groups from Host
 			var errs []error
 			for k := range hlV1.ByID {
-				labelInstance, derr := LoadLabel(ctx, svc, k)
-				if derr != nil {
-					switch derr.(type) {
+				labelInstance, rerr := LoadLabel(ctx, svc, k)
+				if rerr != nil {
+					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(derr)
+						debug.IgnoreError(rerr)
 					default:
-						errs = append(errs, derr)
+						errs = append(errs, rerr)
 					}
 					continue
 				}
 
-				derr = labelInstance.UnbindFromHost(ctx, instance)
-				if derr != nil {
-					switch derr.(type) {
+				rerr = labelInstance.UnbindFromHost(ctx, instance)
+				if rerr != nil {
+					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(derr)
+						debug.IgnoreError(rerr)
 					default:
-						errs = append(errs, derr)
+						errs = append(errs, rerr)
 					}
 				}
 			}
@@ -2631,14 +2705,14 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				default:
 				}
 
-				if derr := svc.DeleteHost(ctx, instance.GetID()); derr != nil {
-					switch derr.(type) {
+				if rerr := svc.DeleteHost(ctx, instance.GetID()); rerr != nil {
+					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
 						logrus.Tracef("Host not found, deletion considered as a success")
-						debug.IgnoreError(derr)
+						debug.IgnoreError(rerr)
 					default:
-						return fail.Wrap(derr, "cannot delete Host")
+						return fail.Wrap(rerr, "cannot delete Host")
 					}
 					waitForDeletion = false
 				}
@@ -2749,6 +2823,8 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 		if xerr != nil {
 			return xerr
 		}
+	} else {
+		incrementExpVar("host.cache.hit")
 	}
 	return nil
 }
@@ -2772,6 +2848,7 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Connector, fer
 	if valid.IsNil(sshProfile) {
 		return nil, fail.NotFoundError("failed to find SSH Config of Host '%s'", instance.GetName())
 	}
+	incrementExpVar("host.cache.hit")
 
 	return sshProfile, nil
 }
@@ -2790,6 +2867,8 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	if notok {
 		return invalid, "", "", fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
+	incrementExpVar("host.cache.hit")
+
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -3309,6 +3388,7 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Public IP of Host '%s'", instance.GetName())
 	}
+	incrementExpVar("host.cache.hit")
 
 	return ip, nil
 }
@@ -3332,6 +3412,7 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Private IP of Host '%s'", instance.GetName())
 	}
+	incrementExpVar("host.cache.hit")
 
 	return ip, nil
 }
@@ -3385,6 +3466,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
 	}
+	incrementExpVar("host.cache.hit")
 
 	return ip, nil
 }
@@ -4056,8 +4138,9 @@ func ReserveCIDRForSingleHost(ctx context.Context, networkInstance resources.Net
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := FreeCIDRForSingleHost(ctx, networkInstance, index)
+			derr := FreeCIDRForSingleHost(context.Background(), networkInstance, index)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
 			}
@@ -4134,21 +4217,11 @@ func (instance *Host) ListLabels(ctx context.Context) (_ map[string]string, ferr
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var labelsV1 *propertiesv1.HostLabels
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			labelsV1, ok = clonable.(*propertiesv1.HostLabels)
@@ -4181,31 +4254,22 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return fail.InvalidParameterCannotBeNilError("label")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	labelName := labelInstance.GetName()
 	labelID := labelInstance.GetID()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Inform Label we want it bound to Host (updates its metadata)
-	xerr = labelInstance.BindToHost(ctx, instance, value)
+	xerr := labelInstance.BindToHost(ctx, instance, value)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := labelInstance.UnbindFromHost(ctx, instance)
+			derr := labelInstance.UnbindFromHost(context.Background(), instance)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure"))
 			}
@@ -4257,22 +4321,12 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 		return fail.InvalidParameterCannotBeNilError("labelInstance")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	labelName := labelInstance.GetName()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			hostLabelsV1, ok := clonable.(*propertiesv1.HostLabels)
 			if !ok {
@@ -4316,16 +4370,6 @@ func (instance *Host) ResetLabel(ctx context.Context, labelInstance resources.La
 		return fail.InvalidParameterCannotBeNilError("tag")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	defaultValue, xerr := labelInstance.DefaultValue(ctx)
 	if xerr != nil {
 		return xerr
@@ -4348,24 +4392,14 @@ func (instance *Host) UpdateLabel(ctx context.Context, labelInstance resources.L
 		return fail.InvalidParameterCannotBeNilError("labelInstance")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	labelName := labelInstance.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var alabel *abstract.Label
 	hostID := instance.GetID()
 	hostName := instance.GetName()
-	xerr = labelInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := labelInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		alabel, ok = clonable.(*abstract.Label)
 		if !ok {

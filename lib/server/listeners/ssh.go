@@ -37,7 +37,7 @@ type SSHListener struct {
 }
 
 // Run executes an ssh command on a host
-func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, ferr error) {
+func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot run by ssh")
 	defer fail.OnPanic(&ferr)
@@ -48,8 +48,8 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	hostRef := in.GetHost().GetName()
@@ -62,13 +62,14 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 
 	command := in.GetCommand()
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
+	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
@@ -88,7 +89,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 }
 
 // Copy copies file from/to a host
-func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
+func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
 
@@ -98,8 +99,8 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	var hostRef string
@@ -107,13 +108,14 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	source := in.Source
 	dest := in.Destination
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/ssh/%s", hostRef))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/ssh/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

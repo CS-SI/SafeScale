@@ -259,12 +259,6 @@ var networkInspect = cli.Command{
 					mapped[k] = v
 				}
 
-				// Deprecated
-				// stnum, ok := mapped["state"].(float64)
-				// if ok {
-				// 	mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
-				// }
-
 				staltnum, ok := mapped["subnet_state"].(float64)
 				if ok {
 					mapped["subnet_state_label"] = subnetstate.Enum(int32(staltnum)).String()

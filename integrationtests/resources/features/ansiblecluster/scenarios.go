@@ -40,11 +40,11 @@ func AnsibleWrongZipPlaylist(t *testing.T) {
 
 	// check for success and name
 	var res string
-	res, err = helpers.RunJq(out, "-r .status")
+	res, err = helpers.RunJq(out, ".status")
 	require.Nil(t, err)
 	require.Equal(t, "success", res)
 
-	res, err = helpers.RunJq(out, "-r .result.name")
+	res, err = helpers.RunJq(out, ".result.name")
 	require.Nil(t, err)
 	require.Equal(t, name, res)
 
@@ -66,11 +66,11 @@ func AnsibleGoodZipPlaylist(t *testing.T) {
 
 	// check for success and name
 	var res string
-	res, err = helpers.RunJq(out, "-r .status")
+	res, err = helpers.RunJq(out, ".status")
 	require.Nil(t, err)
 	require.Equal(t, "success", res)
 
-	res, err = helpers.RunJq(out, "-r .result.name")
+	res, err = helpers.RunJq(out, ".result.name")
 	require.Nil(t, err)
 	require.Equal(t, name, res)
 

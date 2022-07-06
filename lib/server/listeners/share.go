@@ -43,7 +43,7 @@ type ShareListener struct {
 }
 
 // Create calls share service creation
-func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
+func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create share")
 	defer fail.OnPanic(&err)
@@ -54,21 +54,22 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	shareName := in.GetName()
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/create", shareName))
+	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/create", shareName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
+	ctx := job.Context()
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
 	shareType := in.GetType()
-	tracer := debug.NewTracer(job.Task(), true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -83,7 +84,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 
-	out, xerr := shareInstance.ToProtocol(job.Context())
+	out, xerr := shareInstance.ToProtocol(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -92,7 +93,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 }
 
 // Delete call share service deletion
-func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete share")
 	defer fail.OnPanic(&err)
@@ -101,21 +102,22 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	shareName := in.GetName()
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/share/%s/delete", shareName))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/share/%s/delete", shareName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -124,7 +126,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 }
 
 // List return the list of all available shares
-func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *protocol.ShareList, err error) {
+func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *protocol.ShareList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list shares")
 	defer fail.OnPanic(&err)
@@ -132,17 +134,18 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/shares/list")
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/shares/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share")).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -163,7 +166,7 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 }
 
 // Mount mounts share on a local directory of the given host
-func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
+func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot mount share")
 	defer fail.OnPanic(&err)
@@ -171,8 +174,8 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
@@ -180,15 +183,16 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
+	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
+	ctx := job.Context()
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -202,7 +206,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 }
 
 // Unmount unmounts share from the given host
-func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
+func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot unmount share")
 
@@ -210,8 +214,8 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
@@ -219,15 +223,16 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
+	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
+	ctx := job.Context()
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -239,7 +244,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 }
 
 // Inspect shows the detail of a share and all connected clients
-func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
+func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect share")
 	defer fail.OnPanic(&err)
@@ -247,22 +252,22 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	shareRef, _ := srvutils.GetReference(in)
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/share/%s/inspect", shareRef))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/share/%s/inspect", shareRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.Task()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.share"), "('%s')", shareRef).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -278,5 +283,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	//	return nil, abstract.ResourceNotFoundError("share", shareRef)
 	// }
 
-	return shareInstance.ToProtocol(job.Context())
+	return shareInstance.ToProtocol(ctx)
 }

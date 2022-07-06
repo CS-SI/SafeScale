@@ -121,8 +121,9 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 
 	// Starting from here, delete security group on error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.DeleteSecurityGroup(ctx, asg); derr != nil {
+			if derr := s.DeleteSecurityGroup(context.Background(), asg); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
 			}
 		}
@@ -276,6 +277,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
 				continue
 			default:
 				return asg, xerr
@@ -531,6 +533,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 
 	return asg, stacks.RetryableRemoteCall(ctx,
 		func() error {
+			breakIt := false
 			for k, v := range ruleIDs {
 				innerErr := secrules.Delete(s.NetworkClient, v).ExtractErr()
 				if innerErr != nil {
@@ -538,10 +541,14 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// If rule not found on provider side, consider the deletion as successful and continue the loop
-						break
+						debug.IgnoreError(innerXErr)
+						breakIt = true
 					default:
 						return fail.Wrap(innerErr, "failed to delete provider rule #%d", k)
 					}
+				}
+				if breakIt {
+					break
 				}
 			}
 			innerXErr := asg.RemoveRuleByIndex(index)

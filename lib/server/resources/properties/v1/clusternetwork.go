@@ -30,9 +30,9 @@ import (
 // !!! DEPRECATED !!! superseded by propertiesv2.ClusterNetwork
 type ClusterNetwork struct {
 	NetworkID string `json:"network_id,omitempty"` // contains the ID of the network
-	GatewayID string `json:"gateway_id,omitempty"` // DEPRECATED
-	GatewayIP string `json:"gateway_ip,omitempty"` // DEPRECATED
-	PublicIP  string `json:"public_ip,omitempty"`  // DEPRECATED
+	GatewayID string `json:"gateway_id,omitempty"` // DEPRECATED: deprecated
+	GatewayIP string `json:"gateway_ip,omitempty"` // DEPRECATED: deprecated
+	PublicIP  string `json:"public_ip,omitempty"`  // DEPRECATED: deprecated
 	CIDR      string `json:"cidr,omitempty"`       // the network CIDR
 }
 

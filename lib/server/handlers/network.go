@@ -68,7 +68,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkReq.Name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), true, "('%s')", networkReq.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), true, "('%s')", networkReq.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -97,6 +97,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !networkReq.KeepOnFailure {
 			if derr := networkInstance.Delete(context.Background()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", networkReq.Name))
@@ -143,7 +144,7 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -166,7 +167,7 @@ func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, 
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -188,7 +189,7 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 		logrus.Tracef("forcing network deletion")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

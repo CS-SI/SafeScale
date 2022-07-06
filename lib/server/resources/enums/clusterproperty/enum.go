@@ -23,30 +23,25 @@ const (
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
 	DescriptionV1 Enum = "1"
 	// DefaultsV1 contains additional info about default settings (node sizing, default image, ...)
-	// Deprecated by DefaultsV2 (but kept for compatibility)
-	DefaultsV1 = "2"
+	DefaultsV1 = "2" // DEPRECATED: deprecated by DefaultsV2 (but kept for compatibility)
 	// CompositeV1 contains optional additional info about the composite build of the cluster (multi-tenant)
 	CompositeV1 = "3"
 	// FeaturesV1 contains optional additional info describing installed features on cluster
 	FeaturesV1 = "4"
-	// NasV1 contains optional additional info describing Nases and shared folders on cluster
+	// NasV1 contains optional additional info describing Nas and shared folders on cluster
 	NasV1 = "5"
 	// NodesV1 contains optional additional info describing Nodes inside the cluster
 	NodesV1 = "6"
 	// StateV1 contains optional additional info describing cluster state
 	StateV1 = "7"
 	// NetworkV1 contains optional additional info about network of the cluster
-	// Deprecated by NetworkV2 (but kept for compatibility)
-	NetworkV1 = "8"
+	NetworkV1 = "8" // DEPRECATED: deprecated by NetworkV2 (but kept for compatibility)
 	// DefaultsV2 contains optional additional info about default settings of the cluster
-	// Deprecated by DefaultV3 (but kept for compatibility)
-	DefaultsV2 = "9"
+	DefaultsV2 = "9" // DEPRECATED: deprecated by DefaultV3 (but kept for compatibility)
 	// NetworkV2 contains optional additional info about network of the cluster
-	// Deprecated by NetworkV3 (but kept for compatibility)
-	NetworkV2 = "10"
+	NetworkV2 = "10" // DEPRECATED: deprecated by NetworkV3 (but kept for compatibility)
 	// NodesV2 contains optional additional info describing Nodes inside the cluster
-	// Deprecated by NodesV3 (but kept for compatibility)
-	NodesV2 = "11"
+	NodesV2 = "11" // DEPRECATED: deprecated by NodesV3 (but kept for compatibility)
 	// ControlPlaneV1 contains optional additional info describing control plane settings inside the cluster
 	ControlPlaneV1 = "12"
 	// NetworkV3 contains optional additional info about network of the cluster

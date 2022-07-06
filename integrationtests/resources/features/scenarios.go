@@ -302,10 +302,4 @@ func NvidiaDocker(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("features").Clear().
-		AddScenario(Docker).
-		AddScenario(DockerNotGateway).
-		AddScenario(RemoteDesktopOnSingleHost).
-		AddScenario(RemoteDesktopOnSubnetHost).
-		AddScenario(ReverseProxy)
 }

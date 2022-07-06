@@ -61,7 +61,7 @@ const (
 	defaultExecutionTimeout = 8 * time.Minute
 
 	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
-	defaultMetadataReadAfterWriteTimeout = 90 * time.Second
+	defaultMetadataReadAfterWriteTimeout = 30 * time.Second
 
 	// defaultSmallDelay is the predefined small delay
 	defaultSmallDelay = 1 * time.Second
@@ -109,7 +109,7 @@ type Timings interface {
 	// MetadataTimeout ...
 	MetadataTimeout() time.Duration
 
-	// RebootTimeout
+	// RebootTimeout ...
 	RebootTimeout() time.Duration
 
 	// MetadataReadAfterWriteTimeout ...

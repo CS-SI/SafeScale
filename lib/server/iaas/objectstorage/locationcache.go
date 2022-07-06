@@ -50,72 +50,72 @@ func (l locationcache) Configuration() (Config, fail.Error) {
 	return l.inner.Configuration()
 }
 
-func (l locationcache) ListBuckets(s string) ([]string, fail.Error) {
-	return l.inner.ListBuckets(s)
+func (l locationcache) ListBuckets(ctx context.Context, s string) ([]string, fail.Error) {
+	return l.inner.ListBuckets(ctx, s)
 }
 
-func (l locationcache) FindBucket(s string) (bool, fail.Error) {
-	return l.inner.FindBucket(s)
+func (l locationcache) FindBucket(ctx context.Context, s string) (bool, fail.Error) {
+	return l.inner.FindBucket(ctx, s)
 }
 
-func (l locationcache) InspectBucket(s string) (abstract.ObjectStorageBucket, fail.Error) {
-	return l.inner.InspectBucket(s)
+func (l locationcache) InspectBucket(ctx context.Context, s string) (abstract.ObjectStorageBucket, fail.Error) {
+	return l.inner.InspectBucket(ctx, s)
 }
 
-func (l locationcache) CreateBucket(s string) (abstract.ObjectStorageBucket, fail.Error) {
-	return l.inner.CreateBucket(s)
+func (l locationcache) CreateBucket(ctx context.Context, s string) (abstract.ObjectStorageBucket, fail.Error) {
+	return l.inner.CreateBucket(ctx, s)
 }
 
-func (l locationcache) DeleteBucket(s string) fail.Error {
-	return l.inner.DeleteBucket(s)
+func (l locationcache) DeleteBucket(ctx context.Context, s string) fail.Error {
+	return l.inner.DeleteBucket(ctx, s)
 }
 
-func (l locationcache) HasObject(s string, s2 string) (bool, fail.Error) {
-	return l.inner.HasObject(s, s2)
+func (l locationcache) HasObject(ctx context.Context, s string, s2 string) (bool, fail.Error) {
+	return l.inner.HasObject(ctx, s, s2)
 }
 
-func (l locationcache) ClearBucket(s string, s2 string, s3 string) fail.Error {
-	return l.inner.ClearBucket(s, s2, s3)
+func (l locationcache) ClearBucket(ctx context.Context, s string, s2 string, s3 string) fail.Error {
+	return l.inner.ClearBucket(ctx, s, s2, s3)
 }
 
-func (l locationcache) ListObjects(s string, s2 string, s3 string) ([]string, fail.Error) {
-	return l.inner.ListObjects(s, s2, s3)
+func (l locationcache) ListObjects(ctx context.Context, s string, s2 string, s3 string) ([]string, fail.Error) {
+	return l.inner.ListObjects(ctx, s, s2, s3)
 }
 
-func (l locationcache) InvalidateObject(bucketName string, objectName string) fail.Error {
+func (l locationcache) InvalidateObject(ctx context.Context, bucketName string, objectName string) fail.Error {
 	mu := l.getLock(bucketName, objectName)
 	mu.Lock()
 	defer mu.Unlock()
 
 	// just cache update
-	_ = l.cacheManager.Delete(context.Background(), fmt.Sprintf("%s:%s", bucketName, objectName))
+	_ = l.cacheManager.Delete(ctx, fmt.Sprintf("%s:%s", bucketName, objectName))
 	time.Sleep(10 * time.Millisecond)
 
 	return nil
 }
 
-func (l locationcache) DownloadBucket(bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {
+func (l locationcache) DownloadBucket(ctx context.Context, bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {
 	mu := l.getLock(bucketName, "download")
 	mu.RLock()
 	defer mu.RUnlock()
 
-	return l.inner.DownloadBucket(bucketName, decryptionKey)
+	return l.inner.DownloadBucket(ctx, bucketName, decryptionKey)
 }
 
-func (l locationcache) InspectObject(s string, s2 string) (abstract.ObjectStorageItem, fail.Error) {
+func (l locationcache) InspectObject(ctx context.Context, s string, s2 string) (abstract.ObjectStorageItem, fail.Error) {
 	mu := l.getLock(s, s2)
 	mu.RLock()
 	defer mu.RUnlock()
 
-	return l.inner.InspectObject(s, s2)
+	return l.inner.InspectObject(ctx, s, s2)
 }
 
-func (l locationcache) ItemEtag(bucketName, objectName string) (_ string, ferr fail.Error) {
+func (l locationcache) ItemEtag(ctx context.Context, bucketName string, objectName string) (_ string, ferr fail.Error) {
 	mu := l.getLock(bucketName, objectName)
 	mu.RLock()
 	defer mu.RUnlock()
 
-	return l.inner.ItemEtag(bucketName, objectName)
+	return l.inner.ItemEtag(ctx, bucketName, objectName)
 }
 
 func incrementExpVar(name string) {
@@ -154,13 +154,12 @@ func (l locationcache) getLock(s string, s2 string) *sync.RWMutex {
 	return mu
 }
 
-func (l locationcache) ReadObject(s string, s2 string, writer io.Writer, i int64, i2 int64) fail.Error {
+func (l locationcache) ReadObject(inctx context.Context, s string, s2 string, writer io.Writer, i int64, i2 int64) fail.Error {
 	mu := l.getLock(s, s2)
 	mu.RLock()
 	defer mu.RUnlock()
 
-	bgctx := context.Background()
-	ctx, cancel := context.WithCancel(bgctx)
+	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	var buffer2 bytes.Buffer
@@ -182,7 +181,7 @@ func (l locationcache) ReadObject(s string, s2 string, writer io.Writer, i int64
 	incrementExpVar("readobject")
 	incrementExpVar("metadata.reads")
 
-	xerr := l.inner.ReadObject(s, s2, rewriter, i, i2)
+	xerr := l.inner.ReadObject(ctx, s, s2, rewriter, i, i2)
 	if xerr != nil {
 		return xerr
 	}
@@ -194,7 +193,7 @@ func (l locationcache) ReadObject(s string, s2 string, writer io.Writer, i int64
 	return nil
 }
 
-func (l locationcache) WriteMultiPartObject(s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
+func (l locationcache) WriteMultiPartObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	mu := l.getLock(s, s2)
 	mu.Lock()
 	defer mu.Unlock()
@@ -204,19 +203,19 @@ func (l locationcache) WriteMultiPartObject(s string, s2 string, reader io.Reade
 
 	var buf bytes.Buffer
 	nr := io.TeeReader(reader, &buf)
-	chunk, err := l.inner.WriteMultiPartObject(s, s2, nr, i, i2, metadata)
+	chunk, err := l.inner.WriteMultiPartObject(ctx, s, s2, nr, i, i2, metadata)
 	if err != nil {
 		return abstract.ObjectStorageItem{}, err
 	}
 
 	// now we have stuff for our cache in buffer2
-	_ = l.cacheManager.Set(context.Background(), fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
+	_ = l.cacheManager.Set(ctx, fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
 	time.Sleep(10 * time.Millisecond)
 
 	return chunk, nil
 }
 
-func (l locationcache) WriteObject(s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
+func (l locationcache) WriteObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	mu := l.getLock(s, s2)
 	mu.Lock()
 	defer mu.Unlock()
@@ -227,30 +226,30 @@ func (l locationcache) WriteObject(s string, s2 string, reader io.Reader, i int6
 	var buf bytes.Buffer
 	nr := io.TeeReader(reader, &buf)
 
-	chunk, err := l.inner.WriteObject(s, s2, nr, i, metadata)
+	chunk, err := l.inner.WriteObject(ctx, s, s2, nr, i, metadata)
 	if err != nil {
 		return abstract.ObjectStorageItem{}, err
 	}
 
 	// now we have stuff for our cache in buffer2
-	_ = l.cacheManager.Set(context.Background(), fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
+	_ = l.cacheManager.Set(ctx, fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
 	time.Sleep(10 * time.Millisecond)
 
 	return chunk, nil
 }
 
-func (l locationcache) DeleteObject(s string, s2 string) fail.Error {
+func (l locationcache) DeleteObject(ctx context.Context, s string, s2 string) fail.Error {
 	mu := l.getLock(s, s2)
 	mu.Lock()
 	defer mu.Unlock()
 
-	err := l.inner.DeleteObject(s, s2)
+	err := l.inner.DeleteObject(ctx, s, s2)
 	if err != nil {
 		return err
 	}
 
 	// now the cache update
-	_ = l.cacheManager.Delete(context.Background(), fmt.Sprintf("%s:%s", s, s2))
+	_ = l.cacheManager.Delete(ctx, fmt.Sprintf("%s:%s", s, s2))
 	time.Sleep(10 * time.Millisecond)
 	return nil
 }

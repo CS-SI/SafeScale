@@ -787,12 +787,12 @@ func (sconf *Profile) CopyWithTimeout(ctx context.Context, remotePath string, lo
 		err    error
 	}
 
-	rCh := make(chan result)
+	chRes := make(chan result)
 	go func() {
-		defer close(rCh)
+		defer close(chRes)
 
 		ac, ao, ae, err := sconf.copy(currentCtx, remotePath, localPath, isUpload)
-		rCh <- result{
+		chRes <- result{
 			code:   ac,
 			stdout: ao,
 			stderr: ae,
@@ -801,7 +801,7 @@ func (sconf *Profile) CopyWithTimeout(ctx context.Context, remotePath string, lo
 	}()
 
 	select {
-	case res := <-rCh: // if it works return the return
+	case res := <-chRes: // if it works return the return
 		return res.code, res.stderr, res.stderr, fail.Wrap(res.err)
 	case <-ctx.Done(): // if not because parent context was canceled
 	case <-currentCtx.Done(): // or timeout hits
@@ -811,7 +811,7 @@ func (sconf *Profile) CopyWithTimeout(ctx context.Context, remotePath string, lo
 	// if sc.Copy can handle contexts well, we don't have to wait until it's finished
 	// however is not the case here
 	select {
-	case <-rCh:
+	case <-chRes:
 	case <-time.After(5 * time.Second): // grace period
 	}
 

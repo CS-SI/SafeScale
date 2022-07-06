@@ -117,8 +117,9 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 	// Starting from here, delete network if exit with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := stacks.RetryableRemoteCall(ctx,
+			derr := stacks.RetryableRemoteCall(context.Background(),
 				func() error {
 					return networks.Delete(s.NetworkClient, network.ID).ExtractErr()
 				},
@@ -406,8 +407,9 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ne
 
 	// Starting from here, delete subnet if exit with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.DeleteSubnet(ctx, subnet.ID)
+			derr := s.DeleteSubnet(context.Background(), subnet.ID)
 			if derr != nil {
 				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
 				logrus.Error(wrapErr.Error())
@@ -427,8 +429,9 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ne
 
 		// Starting from here, delete router if exit with error
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.deleteRouter(ctx, router.ID)
+				derr := s.deleteRouter(context.Background(), router.ID)
 				if derr != nil {
 					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
 					_ = ferr.AddConsequence(wrapErr)

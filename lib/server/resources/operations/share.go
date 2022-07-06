@@ -149,6 +149,12 @@ func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...dat
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
@@ -458,7 +464,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := server.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -764,7 +770,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := serverInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := serverInstance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -787,7 +793,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 				return
 			}
 
-			derr = nfsClient.Unmount(ctx, instance.Service(), export)
+			derr = nfsClient.Unmount(context.Background(), instance.Service(), export)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
 				return

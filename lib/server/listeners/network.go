@@ -43,7 +43,7 @@ type NetworkListener struct {
 }
 
 // Create a new network
-func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, ferr error) {
+func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitLogError(&ferr, "cannot create network")
 
@@ -53,8 +53,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkName := in.GetName()
@@ -62,13 +62,14 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/create", networkName))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/network/%s/create", networkName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "('%s')", networkName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -128,7 +129,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 }
 
 // List existing networks
-func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequest) (_ *protocol.NetworkList, err error) {
+func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRequest) (_ *protocol.NetworkList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list networks")
 
@@ -138,17 +139,18 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/networks/list")
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/networks/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.network")).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.network")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -168,7 +170,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 }
 
 // Inspect returns infos on a network
-func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
+func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect network")
 
@@ -178,8 +180,8 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in)
@@ -187,13 +189,14 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/inspect", networkRef))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/network/%s/inspect", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -207,7 +210,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 }
 
 // Delete a network
-func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDeleteRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete network")
 
@@ -218,8 +221,8 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.Network)
@@ -232,13 +235,14 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 		logrus.Tracef("forcing network deletion")
 	}
 
-	job, xerr := PrepareJob(ctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", networkRef))
+	job, xerr := PrepareJob(inctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

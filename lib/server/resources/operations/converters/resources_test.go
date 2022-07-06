@@ -73,7 +73,7 @@ func Test_IndexedListOfClusterNodesFromResourceToProtocol(t *testing.T) {
 
 func Test_FeatureSliceFromResourceToProtocol(t *testing.T) {
 
-	rf := []resources.Feature{}
+	var rf []resources.Feature
 	flr := FeatureSliceFromResourceToProtocol(context.Background(), rf)
 	if len(flr.Features) != 0 {
 		t.Error("Invalid FeatureListResponse len")

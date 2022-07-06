@@ -108,7 +108,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -317,16 +317,16 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 		return fail.InvalidParameterError("hostParam", "cannot be nil!")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	ssh, xerr := handler.GetConfig(hostParam)
+	sshCfg, xerr := handler.GetConfig(hostParam)
 	if xerr != nil {
 		return xerr
 	}
-	_, xerr = ssh.WaitServerReady(task.Context(), "ready", timeout)
+	_, xerr = sshCfg.WaitServerReady(ctx, "ready", timeout)
 	return xerr
 }
 
@@ -352,9 +352,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	stdOut := ""
 	stdErr := ""
 
-	task := handler.job.Task()
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -516,8 +515,8 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -596,7 +595,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				theTime = time.Duration(size)*time.Second/(64*1024) + 30*time.Second
 			}
 
-			iretcode, istdout, istderr, innerXErr := sshCfg.CopyWithTimeout(task.Context(), remotePath, localPath, upload, theTime)
+			iretcode, istdout, istderr, innerXErr := sshCfg.CopyWithTimeout(ctx, remotePath, localPath, upload, theTime)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -697,7 +696,7 @@ func (handler *sshHandler) Copy(from, to, owner, mode string) (_ int, _ string, 
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 

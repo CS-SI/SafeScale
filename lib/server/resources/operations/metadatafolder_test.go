@@ -237,7 +237,7 @@ func TestMetadataFolder_Delete(t *testing.T) {
 		mf, xerr = NewMetadataFolder(svc, "networks")
 		require.Nil(t, xerr)
 		xerr = mf.Delete(ctx, "byName", "Network_Name2")
-		require.Contains(t, xerr.Error(), "failed to remove metadata in Object Storage: path \"networks/byName/Network_Name2\" not found")
+		require.Nil(t, xerr)
 		xerr = mf.Delete(ctx, "byName", "Network_Name")
 		require.Nil(t, xerr)
 		xerr = mf.Lookup(ctx, "byName", "Network_Name")

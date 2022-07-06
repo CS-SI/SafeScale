@@ -67,8 +67,4 @@ func Kubectl(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("clusters").Clear().
-		AddScenario(ClusterK8S).
-		AddScenario(Helm).
-		AddScenario(Kubectl)
 }

@@ -34,7 +34,7 @@ type ImageListener struct {
 }
 
 // List available images
-func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
+func (s *ImageListener) List(inctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list image")
 
@@ -44,17 +44,18 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "/images/list")
+	job, err := PrepareJob(inctx, in.GetTenantId(), "/images/list")
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), true, "").WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

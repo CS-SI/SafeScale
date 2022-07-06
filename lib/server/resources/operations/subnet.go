@@ -141,6 +141,12 @@ func LoadSubnet(ctx context.Context, svc iaas.Service, networkRef, subnetRef str
 		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	// -- First step: identify subnetID from (networkRef, subnetRef) --
 	var (
 		xerr            fail.Error
@@ -313,6 +319,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 			}
 		}
 	}
+
 	if secondaryGatewayID != "" {
 		hostInstance, xerr := LoadHost(ctx, instance.Service(), secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -405,6 +412,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if !req.KeepOnFailure {
 				if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), instance.GetID()); derr != nil {
@@ -419,6 +427,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// FIXME: What about host metadata itself ?
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if instance != nil {
 				derr := instance.unsafeUpdateSubnetStatus(context.Background(), subnetstate.Error)
@@ -473,7 +482,11 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 }
 
 // undoBindInternalSecurityGroupToGateway does what its name says
-func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) {
+func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) fail.Error {
+	if ctx != context.Background() {
+		return fail.InvalidParameterError("ctx", "has to be context.Background()")
+	}
+
 	if xerr != nil && *xerr != nil && keepOnFailure {
 		_ = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
@@ -496,6 +509,8 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 			return nil
 		})
 	}
+
+	return nil
 }
 
 // deleteSubnetThenWaitCompletion deletes the Subnet identified by 'id' and wait for deletion confirmation
@@ -1040,6 +1055,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 	chRes := make(chan result)
 	go func() (ferr fail.Error) {
 		defer fail.OnPanic(&ferr)
+		defer close(chRes)
 
 		var force bool
 		var ok bool
@@ -1059,16 +1075,16 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 		var (
 			subnetAbstract *abstract.Subnet
 			subnetHosts    *propertiesv1.SubnetHosts
+			outprops       *serialize.JSONProperties
 		)
 		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ctx := ctx
 			var ok bool
 			subnetAbstract, ok = clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
-			ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)        // nolint
+
+			outprops = props
 
 			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				var ok bool
@@ -1085,6 +1101,9 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			chRes <- ar
 			return
 		}
+
+		ctx := context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
+		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, outprops)      // nolint
 
 		tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("operations.Subnet")*/).WithStopwatch().Entering()
 		defer tracer.Exiting()
@@ -1230,7 +1249,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 		logrus.Infof("Subnet '%s' successfully deleted.", subnetName)
 		ar := result{nil}
 		chRes <- ar
-		return
+		return // nolint
 	}() // nolint
 	select {
 	case res := <-chRes:

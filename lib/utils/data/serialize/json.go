@@ -267,7 +267,10 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		x.Properties[key] = item
 	}
 
-	clone, _ := item.Clone()
+	clone, err := item.Clone()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 	castedClone, ok := clone.(*jsonProperty)
 	if !ok {
 		return fail.InconsistentError("failed to cast clone to '*jsonProperty'")
@@ -278,7 +281,7 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		return xerr
 	}
 
-	_, err := item.Replace(clone)
+	_, err = item.Replace(clone)
 	if err != nil {
 		return fail.Wrap(err)
 	}

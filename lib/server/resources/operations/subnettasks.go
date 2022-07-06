@@ -41,9 +41,7 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -51,135 +49,169 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+	inctx := task.Context()
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  concurrency.TaskResult
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() (ferr fail.Error) {
+		defer fail.OnPanic(&ferr)
+		defer close(chRes)
 
-	ctx := task.Context()
-
-	castedParams, ok := params.(taskCreateGatewayParameters)
-	if !ok {
-		return nil, fail.InconsistentError("failed to cast params to 'taskCreateGatewayParameters'")
-	}
-
-	hostReq := castedParams.request
-	if hostReq.TemplateID == "" {
-		return nil, fail.InvalidRequestError("params.request.TemplateID cannot be empty string")
-	}
-	if len(hostReq.Subnets) == 0 {
-		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
-	}
-
-	hostSizing := castedParams.sizing
-
-	logrus.Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
-	svc := instance.Service()
-	hostReq.PublicIP = true
-	hostReq.IsGateway = true
-
-	rgw, xerr := NewHost(svc)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	userData, createXErr := rgw.Create(task.Context(), hostReq, hostSizing) // createXErr is tested later
-
-	// Set link to Subnet before testing if Host has been successfully created;
-	// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
-	// be able to delete subnet on later safescale command
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
+		castedParams, ok := params.(taskCreateGatewayParameters)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			ar := result{nil, fail.InconsistentError("failed to cast params to 'taskCreateGatewayParameters'")}
+			chRes <- ar
+			return ar.rErr
 		}
 
-		// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
-		if rgw.IsTaken() {
-			if id := rgw.GetID(); id != "" {
-				as.GatewayIDs = append(as.GatewayIDs, id)
+		hostReq := castedParams.request
+		if hostReq.TemplateID == "" {
+			ar := result{nil, fail.InvalidRequestError("params.request.TemplateID cannot be empty string")}
+			chRes <- ar
+			return ar.rErr
+		}
+		if len(hostReq.Subnets) == 0 {
+			ar := result{nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")}
+			chRes <- ar
+			return ar.rErr
+		}
+
+		hostSizing := castedParams.sizing
+
+		logrus.Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
+		svc := instance.Service()
+		hostReq.PublicIP = true
+		hostReq.IsGateway = true
+
+		rgw, xerr := NewHost(svc)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			ar := result{nil, xerr}
+			chRes <- ar
+			return ar.rErr
+		}
+
+		userData, createXErr := rgw.Create(ctx, hostReq, hostSizing) // createXErr is tested later
+
+		// Set link to Subnet before testing if Host has been successfully created;
+		// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
+		// be able to delete subnet on later safescale command
+		xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
+			// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
+			if rgw.IsTaken() {
+				if id := rgw.GetID(); id != "" {
+					as.GatewayIDs = append(as.GatewayIDs, id)
+				}
+			}
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			ar := result{nil, xerr}
+			chRes <- ar
+			return ar.rErr
 		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
 
-	// Now test result of gateway creation
-	if createXErr != nil {
-		return nil, createXErr
-	}
+		// Now test result of gateway creation
+		if createXErr != nil {
+			ar := result{nil, createXErr}
+			chRes <- ar
+			return ar.rErr
+		}
 
-	// Starting from here, deletes the gateway if exiting with error
-	defer func() {
-		if ferr != nil {
-			if !hostReq.KeepOnFailure {
-				// Disable abort signal during clean up
-
-				logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-				derr := rgw.Delete(context.Background())
-				if derr != nil {
-					msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// missing Host is considered as a successful deletion, continue
-						debug.IgnoreError(derr)
-					case *fail.ErrTimeout:
-						logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
-					default:
-						logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+		// Starting from here, deletes the gateway if exiting with error
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil {
+				if !hostReq.KeepOnFailure {
+					logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
+					derr := rgw.Delete(context.Background())
+					if derr != nil {
+						msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
+						switch derr.(type) {
+						case *fail.ErrNotFound:
+							// missing Host is considered as a successful deletion, continue
+							debug.IgnoreError(derr)
+						case *fail.ErrTimeout:
+							logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
+						default:
+							logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+						}
+						_ = ferr.AddConsequence(derr)
+					} else {
+						logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
-					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
-				}
-				_ = ferr.AddConsequence(derr)
-			} else {
-				xerr = rgw.Alter(context.Background(), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-					as, ok := clonable.(*abstract.HostCore)
-					if !ok {
-						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
+					xerr = rgw.Alter(context.Background(), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+						as, ok := clonable.(*abstract.HostCore)
+						if !ok {
+							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
 
-					as.LastState = hoststate.Failed
-					return nil
-				})
+						as.LastState = hoststate.Failed
+						return nil
+					})
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						logrus.Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+					}
+				}
+			}
+		}()
+
+		// Binds gateway to VIP if needed
+		xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if as != nil && as.VIP != nil {
+				xerr = svc.BindHostToVIP(ctx, as.VIP, rgw.GetID())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					logrus.Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+					return xerr
 				}
 			}
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			ar := result{nil, xerr}
+			chRes <- ar
+			return ar.rErr
 		}
-	}()
 
-	// Binds gateway to VIP if needed
-	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		r := data.Map{
+			"host":     rgw,
+			"userdata": userData,
 		}
-
-		if as != nil && as.VIP != nil {
-			xerr = svc.BindHostToVIP(ctx, as.VIP, rgw.GetID())
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+		ar := result{r, nil}
+		chRes <- ar
+		return ar.rErr // nolint
+	}() // nolint
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		<-chRes // wait for defer finishes
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes // wait for defer finishes
+		return nil, fail.ConvertError(inctx.Err())
 	}
 
-	r := data.Map{
-		"host":     rgw,
-		"userdata": userData,
-	}
-	return r, nil
 }
 
 type taskFinalizeGatewayConfigurationParameters struct {
@@ -187,7 +219,7 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -196,94 +228,122 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+
+	inctx := task.Context()
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  concurrency.TaskResult
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	castedParams, ok := params.(taskFinalizeGatewayConfigurationParameters)
-	if !ok {
-		return nil, fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	objgw := castedParams.host
-	if valid.IsNil(objgw) {
-		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
-	}
-
-	userData := castedParams.userdata
-	gwname := objgw.GetName()
-
-	// Executes userdata phase2 script to finalize host installation
-	tracer := debug.NewTracer(task.Context(), true, "(%s)", gwname).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
-	defer temporal.NewStopwatch().OnExitLogInfo(
-		fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
-		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
-	)()
-
-	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
-
-	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
-		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
+		castedParams, ok := params.(taskFinalizeGatewayConfigurationParameters)
+		if !ok {
+			chRes <- result{nil, fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")}
+			return
 		}
-	} else {
-		logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY)
-	}
 
-	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData) {
-		// If we have an error here, we just ignore it
-		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData, waitingTime)
-		xerr = debug.InjectPlannedFail(xerr)
+		timings, xerr := instance.Service().Timings()
 		if xerr != nil {
-			theCause := fail.ConvertError(fail.Cause(xerr))
-			if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
-				return nil, xerr
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		objgw := castedParams.host
+		if valid.IsNil(objgw) {
+			chRes <- result{nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")}
+			return
+		}
+
+		userData := castedParams.userdata
+		gwname := objgw.GetName()
+
+		// Executes userdata phase2 script to finalize host installation
+		tracer := debug.NewTracer(ctx, true, "(%s)", gwname).WithStopwatch().Entering()
+		defer tracer.Exiting()
+		defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+		defer temporal.NewStopwatch().OnExitLogInfo(
+			fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
+			fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
+		)()
+
+		waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
+
+		if objgw.thePhaseDoesSomething(ctx, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
+			xerr = objgw.runInstallPhase(ctx, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return
+			}
+		} else {
+			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY)
+		}
+
+		if objgw.thePhaseDoesSomething(ctx, userdata.PHASE4_SYSTEM_FIXES, userData) {
+			// If we have an error here, we just ignore it
+			xerr = objgw.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userData, waitingTime)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				theCause := fail.ConvertError(fail.Cause(xerr))
+				if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
+					chRes <- result{nil, xerr}
+					return
+				}
+
+				debug.IgnoreError(xerr)
 			}
 
-			debug.IgnoreError(xerr)
+			// intermediate gateway reboot
+			logrus.Infof("Rebooting gateway '%s'", gwname)
+			xerr = objgw.Reboot(ctx, true)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return
+			}
+
+			time.Sleep(timings.RebootTimeout())
+
+			_, xerr = objgw.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, waitingTime)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return
+			}
+		} else {
+			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
 		}
 
-		// intermediate gateway reboot
-		logrus.Infof("Rebooting gateway '%s'", gwname)
-		xerr = objgw.Reboot(task.Context(), true)
+		// final phase...
+		xerr = objgw.runInstallPhase(ctx, userdata.PHASE5_FINAL, userData, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, xerr
+			chRes <- result{nil, xerr}
+			return
 		}
 
-		time.Sleep(timings.RebootTimeout())
-
-		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, waitingTime)
+		// By design, phase 5 doesn't  touch network cfg, so no reboot needed
+		_, xerr = objgw.waitInstallPhase(ctx, userdata.PHASE5_FINAL, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, xerr
+			chRes <- result{nil, xerr}
+			return
 		}
-	} else {
-		logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
-	}
 
-	// final phase...
-	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE5_FINAL, userData, waitingTime)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+		chRes <- result{nil, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	// By design, phase 5 doesn't  touch network cfg, so no reboot needed
-	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, waitingTime)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return nil, nil
 }

@@ -144,8 +144,12 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+
+	ctx := task.Context()
+	select {
+	case <-ctx.Done():
+		return fail.AbortedError(ctx.Err())
+	default:
 	}
 
 	pipeCount := uint(len(pbc.bridges))
@@ -156,7 +160,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 
 	// First starts the "displayer" routine...
 	var xerr fail.Error
-	if pbc.displayTask, xerr = concurrency.NewTaskWithContext(task.Context()); xerr != nil {
+	if pbc.displayTask, xerr = concurrency.NewTaskWithContext(ctx); xerr != nil {
 		return xerr
 	}
 
@@ -166,7 +170,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	// ... then starts the "pipe readers"
-	taskGroup, xerr := concurrency.NewTaskGroupWithContext(task.Context(), concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
+	taskGroup, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
 	if xerr != nil {
 		return xerr
 	}
@@ -200,8 +204,15 @@ type taskReadParameters struct {
 func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+
+	ctx := task.Context()
+	select {
+	case <-ctx.Done():
+		return nil, fail.AbortedError(ctx.Err())
+	default:
 	}
 
 	if p == nil {
@@ -223,8 +234,12 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	var err error
 	for {
 		// If task aborted, stop the loop
-		if task.Aborted() {
-			err = fail.AbortedError(nil, "aborted")
+		select {
+		case <-ctx.Done():
+			err = fail.AbortedError(ctx.Err())
+		default:
+		}
+		if err != nil {
 			break
 		}
 
@@ -264,8 +279,12 @@ func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ co
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+
+	ctx := task.Context()
+	select {
+	case <-ctx.Done():
+		return nil, fail.AbortedError(ctx.Err())
+	default:
 	}
 
 	p, ok := params.(taskDisplayParameters)

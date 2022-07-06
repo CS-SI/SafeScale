@@ -83,8 +83,8 @@ type CPUInfo struct {
 	MainDiskSpeed  float64     `json:"main_disk_speed_MBps"`
 	SampleNetSpeed float64     `json:"sample_net_speed_KBps"`
 	EphDiskSize    int64       `json:"eph_disk_size_Gb"`
-	PricePerSecond float64     `json:"price_in_dollars_second"` // DEPRECATED, use field Prices
-	PricePerHour   float64     `json:"price_in_dollars_hour"`   // DEPRECATED, use field Prices
+	PricePerSecond float64     `json:"price_in_dollars_second"` // DEPRECATED: use field Prices
+	PricePerHour   float64     `json:"price_in_dollars_hour"`   // DEPRECATED: use field Prices
 	Prices         []PriceInfo `json:"prices,omitempty"`
 }
 
@@ -176,7 +176,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -319,7 +319,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 

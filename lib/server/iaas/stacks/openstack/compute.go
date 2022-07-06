@@ -761,9 +761,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			logrus.Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
-			if derr := s.DeleteHost(ctx, ahc.ID); derr != nil {
+			if derr := s.DeleteHost(context.Background(), ahc.ID); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
@@ -803,7 +804,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			// Starting from here, delete created ports if exiting with error
 			defer func() {
 				if innerXErr != nil {
-					if derr := s.deletePortsInSlice(ctx, createdPorts); derr != nil {
+					if derr := s.deletePortsInSlice(context.Background(), createdPorts); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 					}
 				}
@@ -820,10 +821,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 					return retry.StopRetryError(innerXErr)
 				}
 				if server != nil && server.ID != "" {
-					if derr := s.DeleteHost(ctx, server.ID); derr != nil {
+					if rerr := s.DeleteHost(ctx, server.ID); rerr != nil {
 						_ = innerXErr.AddConsequence(
 							fail.Wrap(
-								derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName,
+								rerr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName,
 							),
 						)
 					}
@@ -842,7 +843,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			defer func() {
 				if innerXErr != nil {
 					logrus.Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-					if derr := s.DeleteHost(ctx, ahc.ID); derr != nil {
+					if derr := s.DeleteHost(context.Background(), ahc.ID); derr != nil {
 						logrus.Debugf(derr.Error())
 						_ = innerXErr.AddConsequence(
 							fail.Wrap(
@@ -932,9 +933,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				if derr := s.rpcDeleteFloatingIP(ctx, ip.ID); derr != nil {
+				if derr := s.rpcDeleteFloatingIP(context.Background(), ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = ferr.AddConsequence(derr)
 					logrus.Error(derr.Error())
@@ -975,13 +977,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 func (s stack) deletePortsInSlice(ctx context.Context, ports []string) fail.Error {
 	var errors []error
 	for _, v := range ports {
-		if derr := s.rpcDeletePort(ctx, v); derr != nil {
-			switch derr.(type) {
+		if rerr := s.rpcDeletePort(ctx, v); rerr != nil {
+			switch rerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
-				debug.IgnoreError(derr)
+				debug.IgnoreError(rerr)
 			default:
-				errors = append(errors, fail.Wrap(derr, "failed to delete port %s", v))
+				errors = append(errors, fail.Wrap(rerr, "failed to delete port %s", v))
 			}
 		}
 	}
@@ -1009,8 +1011,9 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 
 	// cleanup if exiting with error
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.deletePortsInSlice(ctx, createdPorts); derr != nil {
+			if derr := s.deletePortsInSlice(context.Background(), createdPorts); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 			}
 		}
@@ -1516,13 +1519,13 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	// Remove ports freed from host
 	var errors []error
 	for _, v := range portList {
-		if derr := s.rpcDeletePort(ctx, v.ID); derr != nil {
-			switch derr.(type) {
+		if rerr := s.rpcDeletePort(ctx, v.ID); rerr != nil {
+			switch rerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
-				debug.IgnoreError(derr)
+				debug.IgnoreError(rerr)
 			default:
-				errors = append(errors, fail.Wrap(derr, "failed to delete port %s (%s)", v.ID, v.Description))
+				errors = append(errors, fail.Wrap(rerr, "failed to delete port %s (%s)", v.ID, v.Description))
 			}
 		}
 	}

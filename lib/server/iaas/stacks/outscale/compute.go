@@ -339,6 +339,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 	defer tracer.Exiting()
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			ferr = fail.Wrap(ferr, fmt.Sprintf("failed to get image '%s'", id))
 		}
@@ -624,10 +625,11 @@ func (s stack) addGPUs(ctx context.Context, request *abstract.HostRequest, tpl a
 	}
 	if xerr != nil {
 		for _, gpu := range flexibleGpus {
-			if derr := s.rpcDeleteFlexibleGpu(ctx, gpu.FlexibleGpuId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Flexible GPU"))
+			if rerr := s.rpcDeleteFlexibleGpu(ctx, gpu.FlexibleGpuId); rerr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete Flexible GPU"))
 			}
 		}
+		return xerr
 	}
 	return createErr
 }
@@ -647,8 +649,9 @@ func (s stack) addVolume(ctx context.Context, request *abstract.HostRequest, vmI
 		return xerr
 	}
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.DeleteVolume(ctx, v.ID)
+			derr := s.DeleteVolume(context.Background(), v.ID)
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
@@ -683,8 +686,9 @@ func (s stack) addPublicIP(ctx context.Context, nic osc.Nic) (_ osc.PublicIp, fe
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeletePublicIPByID(ctx, resp.PublicIpId); derr != nil {
+			if derr := s.rpcDeletePublicIPByID(context.Background(), resp.PublicIpId); derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
 						derr, "cleaning up on failure, failed to delete public IP with ID %s", resp.PublicIpId,
@@ -859,7 +863,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}
 
 	defer func() {
-		if derr := s.DeleteKeyPair(ctx, creationKeyPair.Name); derr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if derr := s.DeleteKeyPair(context.Background(), creationKeyPair.Name); derr != nil {
 			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
 			if ferr != nil {
 				_ = ferr.AddConsequence(derr)
@@ -976,9 +981,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 			// Delete instance if created to be in good shape to retry in case of error
 			defer func() {
+				ferr = debug.InjectPlannedError(ferr)
 				if ferr != nil {
 					logrus.Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
-					if derr := s.DeleteHost(ctx, vm.VmId); derr != nil {
+					if derr := s.DeleteHost(context.Background(), vm.VmId); derr != nil {
 						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
 						logrus.Errorf(strprocess.Capitalize(msg))
 						ferr = fail.AddConsequence(ferr, fail.Wrap(derr, msg))

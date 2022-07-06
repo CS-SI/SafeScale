@@ -77,6 +77,12 @@ func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...d
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
@@ -171,6 +177,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 	chRes := make(chan result)
 	go func() (ferr fail.Error) {
 		defer fail.OnPanic(&ferr)
+		defer close(chRes)
 
 		// Check if Network already exists and is managed by SafeScale
 		_, xerr := LoadNetwork(ctx, svc, req.Name)
@@ -229,8 +236,9 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		var abstractNetwork *abstract.Network
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				derr := svc.DeleteNetwork(ctx, abstractNetwork.ID)
+				derr := svc.DeleteNetwork(context.Background(), abstractNetwork.ID)
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
@@ -397,20 +405,29 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 	}
 	chRes := make(chan result)
 	go func() {
-		ctx := ctx
+		defer close(chRes)
+
+		var outprops *serialize.JSONProperties
+		var networkAbstract *abstract.Network
+
 		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			networkAbstract, ok := clonable.(*abstract.Network)
+			var ok bool
+			networkAbstract, ok = clonable.(*abstract.Network)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
-			ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)         // nolint
+
+			outprops = props
+
 			return nil
 		})
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
+
+		ctx := context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
+		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, outprops)       // nolint
 
 		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 		defer tracer.Exiting()
@@ -499,6 +516,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 						if propsXErr != nil {
 							switch propsXErr.(type) {
 							case *fail.ErrNotFound:
+								debug.IgnoreError(propsXErr)
 								continue
 							default:
 								return propsXErr

@@ -395,6 +395,7 @@ func (instance *mapStore) Add(ctx context.Context, content Cacheable) (_ *Entry,
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			derr := instance.Free(ctx, id)
 			if derr != nil {

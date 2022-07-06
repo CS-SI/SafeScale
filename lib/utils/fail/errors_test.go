@@ -39,29 +39,29 @@ type BrokenError struct {
 	grpcCode uint
 }
 
-//data.Annotatable
+// data.Annotatable
 func (e *BrokenError) Annotate(key string, value data.Annotation) data.Annotatable { return nil }
 func (e *BrokenError) Annotations() data.Annotations                               { return nil }
 func (e *BrokenError) Annotation(key string) (data.Annotation, bool)               { return nil, false }
 
-//causer
+// causer
 func (e *BrokenError) Cause() error     { return nil }
 func (e *BrokenError) RootCause() error { return nil }
 
-//consequencer
+// consequencer
 func (e *BrokenError) Consequences() []error      { return make([]error, 0) }
 func (e *BrokenError) AddConsequence(error) Error { return nil }
 
-//error
+// error
 func (e *BrokenError) Error() string { return e.msg }
 
-//NullValue
+// NullValue
 func (e *BrokenError) IsNull() bool { return e.msg == "" }
 
-//ToGRPCStatus
+// ToGRPCStatus
 func (e *BrokenError) Valid() bool { return e.msg != "" }
 
-//Error
+// Error
 func (e *BrokenError) UnformattedError() string { return e.msg }
 func (e *BrokenError) ToGRPCStatus() error      { return nil }
 

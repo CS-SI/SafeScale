@@ -86,6 +86,12 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
+	}
+
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
 	anon, xerr := cacheMissLoader()
 	if xerr != nil {
@@ -391,14 +397,18 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteVolume(ctx, av.ID); derr != nil {
+			if derr := svc.DeleteVolume(context.Background(), av.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
 	}()
 
-	// Sets err to possibly trigger defer calls
-	return instance.carry(ctx, av)
+	xerr = instance.carry(ctx, av)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Attach a volume to a host
@@ -569,7 +579,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteVolumeAttachment(ctx, targetID, vaID); derr != nil {
+			if derr := svc.DeleteVolumeAttachment(context.Background(), targetID, vaID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 		}
@@ -641,6 +651,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				}
 
 				defer func() {
+					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil {
 						if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
@@ -665,7 +676,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 		defer func() {
 			if innerXErr != nil {
-				// Disable abort signal during the cleanup
 				if !doNotMount {
 					if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
@@ -708,7 +718,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 				}
 			}
-			derr := host.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := host.Alter(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
@@ -824,7 +834,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	return set, nil
 }
 
-// Detach detach the volume identified by ref, ref can be the name or the id
+// Detach detaches the volume identified by ref, ref can be the name or the id
 func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -841,9 +851,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	targetID := host.GetID()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
 	defer tracer.Exiting()
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	var (
 		volumeID, volumeName string

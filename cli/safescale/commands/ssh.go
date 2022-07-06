@@ -94,7 +94,7 @@ var sshRun = cli.Command{
 	},
 }
 
-func normalizeFileName(fileName string) string {
+func normalizeFileName(fileName string) string { // FIXME: OPP Don't ignore errors
 	absPath, _ := filepath.Abs(fileName)
 	if _, err := os.Stat(absPath); err != nil {
 		return fileName

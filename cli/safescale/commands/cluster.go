@@ -1080,7 +1080,7 @@ var clusterHelmCommand = cli.Command{
 
 		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		return clitools.SuccessResponse(nil)
@@ -2251,7 +2251,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 			switch arg {
 			case "-i":
 			case "--inventory":
-			case "--inventory-file": // Deprecated
+			case "--inventory-file": // DEPRECATED: deprecated
 				/* Expect here
 				[-i INVENTORY]
 				*/
@@ -2383,7 +2383,7 @@ var clusterAnsibleRunCommands = cli.Command{
 			switch arg {
 			case "-i":
 			case "--inventory":
-			case "--inventory-file": // Deprecated
+			case "--inventory-file": // DEPRECATED: deprecated
 				/* Expect here
 				[-i INVENTORY]
 				*/
@@ -2529,7 +2529,7 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 			switch arg {
 			case "-i":
 			case "--inventory":
-			case "--inventory-file": // Deprecated
+			case "--inventory-file": // DEPRECATED: deprecated
 				/* Expect here
 				[-i INVENTORY]
 				*/

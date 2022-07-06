@@ -345,8 +345,9 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ 
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.rpcDeleteSubnetByName(ctx, req.Name); derr != nil {
+			if derr := s.rpcDeleteSubnetByName(context.Background(), req.Name); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", req.Name))
 			}
 		}
@@ -365,8 +366,9 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ 
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.rpcDeleteRoute(ctx, route.Name); derr != nil {
+			if derr := s.rpcDeleteRoute(context.Background(), route.Name); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", route.Name))
 			}
 		}

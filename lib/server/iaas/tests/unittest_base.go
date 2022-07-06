@@ -669,19 +669,19 @@ func (tester *ServiceTester) Volumes(t *testing.T) {
 
 // Buckets test
 func (tester *ServiceTester) Buckets(t *testing.T) {
-	_, err := tester.Service.CreateBucket("testC")
+	_, err := tester.Service.CreateBucket(context.Background(), "testC")
 	assert.Nil(t, err)
-	_, err = tester.Service.CreateBucket("testC2")
+	_, err = tester.Service.CreateBucket(context.Background(), "testC2")
 	assert.Nil(t, err)
 
-	cl, err := tester.Service.ListBuckets("")
+	cl, err := tester.Service.ListBuckets(context.Background(), "")
 	require.NotNil(t, err)
 	assert.Contains(t, cl, "testC", "testC2")
-	err = tester.Service.DeleteBucket("testC")
+	err = tester.Service.DeleteBucket(context.Background(), "testC")
 	assert.Nil(t, err)
-	err = tester.Service.DeleteBucket("testC2")
+	err = tester.Service.DeleteBucket(context.Background(), "testC2")
 	assert.Nil(t, err)
-	cl, err = tester.Service.ListBuckets("")
+	cl, err = tester.Service.ListBuckets(context.Background(), "")
 	assert.Nil(t, err)
 	assert.NotContains(t, cl, "testC", "testC2")
 }

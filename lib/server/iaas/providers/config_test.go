@@ -57,7 +57,7 @@ func TestConfigMap_GetSliceOfStrings(t *testing.T) {
 	c.Set("value2", v)
 
 	result := c.GetSliceOfStrings("value3")
-	emptySliceOfString := []string{}
+	var emptySliceOfString []string
 	areEqual := reflect.DeepEqual(result, emptySliceOfString)
 	if !areEqual {
 		t.Error("Wrong GetString value restitution when no key")

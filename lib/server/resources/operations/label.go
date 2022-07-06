@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/labelproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -79,6 +78,12 @@ func LoadLabel(ctx context.Context, svc iaas.Service, ref string, options ...dat
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	default:
 	}
 
 	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, svc, ref) }
@@ -166,37 +171,15 @@ func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.label")).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
 		at := abstract.NewLabel()
-		xerr = at.Deserialize(buf)
+		xerr := at.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
-		}
-
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
 		}
 
 		return callback(at)
@@ -214,20 +197,10 @@ func (instance *label) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.label")).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label")).Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			lhV1, ok := clonable.(*propertiesv1.LabelHosts)
 			if !ok {
@@ -277,17 +250,7 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.label"), "('%s')", name).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s')", name).Entering()
 	defer tracer.Exiting()
 
 	var kind string
@@ -300,7 +263,7 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 
 	// Check if Label exists and is managed by SafeScale
 	svc := instance.Service()
-	_, xerr = LoadLabel(ctx, svc, name)
+	_, xerr := LoadLabel(ctx, svc, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -323,10 +286,6 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 		ID:           uuid.String(),
 		HasDefault:   hasDefault,
 		DefaultValue: defaultValue,
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Sets err to possibly trigger defer calls
@@ -436,20 +395,10 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -498,20 +447,10 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.label"), "(label='%s', host='%s')", instance.GetName(), hostInstance.GetName()).Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "(label='%s', host='%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
 			if !ok {

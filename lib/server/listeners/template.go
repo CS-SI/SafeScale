@@ -42,18 +42,18 @@ type TemplateListener struct {
 }
 
 // List available templates
-func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (_ *protocol.TemplateList, err error) {
+func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateListRequest) (_ *protocol.TemplateList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list templates")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/templates/list")
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/templates/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -61,7 +61,9 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 
 	scannedOnly := in.GetScannedOnly()
 	all := in.GetAll()
-	tracer := debug.NewTracer(job.Task(), true, "(scannedOnly=%v, all=%v)", scannedOnly, all).WithStopwatch().Entering()
+	ctx := job.Context()
+
+	tracer := debug.NewTracer(ctx, true, "(scannedOnly=%v, all=%v)", scannedOnly, all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -71,7 +73,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 		return nil, xerr
 	}
 
-	finalList, xerr := complementWithScan(job.Context(), job.Service(), scannedOnly, originalList...)
+	finalList, xerr := complementWithScan(ctx, job.Service(), scannedOnly, originalList...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -80,25 +82,26 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 }
 
 // Match lists templates that match the sizing
-func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatchRequest) (tl *protocol.TemplateList, err error) {
+func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMatchRequest) (tl *protocol.TemplateList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list templates")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/template/match")
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/template/match")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
 	sizing := in.GetSizing()
-	tracer := debug.NewTracer(job.Task(), true, "%s", sizing).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, true, "%s", sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -122,28 +125,29 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 }
 
 // Inspect returns information about a tenant
-func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, ferr error) {
+func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ref, _ := srvutils.GetReference(in.GetTemplate())
-	job, xerr := PrepareJob(ctx, in.GetTemplate().GetTenantId(), fmt.Sprintf("template/%s/inspect", ref))
+	job, xerr := PrepareJob(inctx, in.GetTemplate().GetTenantId(), fmt.Sprintf("template/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
@@ -153,7 +157,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 		return nil, xerr
 	}
 
-	out, xerr := complementWithScan(job.Context(), job.Service(), false, at)
+	out, xerr := complementWithScan(ctx, job.Service(), false, at)
 	if xerr != nil {
 		return nil, xerr
 	}

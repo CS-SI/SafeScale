@@ -181,7 +181,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 	}
 
 	// Junked serial
-	var junkedSerial []byte = make([]byte, 0)
+	var junkedSerial = make([]byte, 0)
 	err = c1.Deserialize(junkedSerial)
 	if err == nil {
 		t.Error("Should throw a fail.ErrUnqualified")

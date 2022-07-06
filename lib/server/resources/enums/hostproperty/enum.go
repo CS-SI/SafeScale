@@ -18,8 +18,8 @@ package hostproperty
 
 const (
 	DescriptionV1       = "1"  // (optional) additional info describing host (purpose, ...)
-	NetworkV1           = "2"  // Deprecated: additional info about the network of the host
-	SizingV1            = "3"  // Deprecated: optional additional info about the sizing of the host
+	NetworkV1           = "2"  // DEPRECATED: deprecated additional info about the network of the host
+	SizingV1            = "3"  // DEPRECATED: deprecated optional additional info about the sizing of the host
 	FeaturesV1          = "4"  // optional additional info describing installed features on a host
 	VolumesV1           = "5"  // optional additional info about attached volumes on the host
 	SharesV1            = "6"  // optional additional info about Nas role of the host

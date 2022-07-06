@@ -204,8 +204,9 @@ func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteVpc(ctx, resp.Vpc.VpcId); derr != nil {
+			if derr := s.rpcDeleteVpc(context.Background(), resp.Vpc.VpcId); derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
 						derr, "cleaning up on failure, failed to delete Network/VPC %s",
@@ -443,8 +444,9 @@ func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *str
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteSubnet(ctx, resp.Subnet.SubnetId); derr != nil {
+			if derr := s.rpcDeleteSubnet(context.Background(), resp.Subnet.SubnetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
 			}
 		}
@@ -811,8 +813,9 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcReleaseAddress(ctx, resp.AllocationId)
+			derr := s.rpcReleaseAddress(context.Background(), resp.AllocationId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP"))
 			}
@@ -1648,8 +1651,9 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcDeleteNetworkInterface(ctx, nic.NetworkInterfaceId)
+			derr := s.rpcDeleteNetworkInterface(context.Background(), nic.NetworkInterfaceId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete network interface"))
 			}
@@ -1668,8 +1672,9 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 		}
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.rpcReleaseAddress(ctx, addrAllocID)
+				derr := s.rpcReleaseAddress(context.Background(), addrAllocID)
 				if derr != nil {
 					_ = ferr.AddConsequence(
 						fail.Wrap(
@@ -1687,8 +1692,9 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 		}
 
 		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.rpcDisassociateAddress(ctx, attachID)
+				derr := s.rpcDisassociateAddress(context.Background(), attachID)
 				if derr != nil {
 					_ = ferr.AddConsequence(
 						fail.Wrap(
@@ -1777,9 +1783,10 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for _, v := range resp.Instances {
-				derr := s.rpcTerminateInstance(ctx, v)
+				derr := s.rpcTerminateInstance(context.Background(), v)
 				if derr != nil {
 					_ = ferr.AddConsequence(
 						fail.Wrap(
@@ -2313,8 +2320,9 @@ func (s stack) rpcCreateVolume(ctx context.Context, name *string, size int64, sp
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteVolume(ctx, resp.VolumeId); derr != nil {
+			if derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
 			}
 		}

@@ -71,8 +71,9 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.DeleteNetwork(ctx, resp.NetId); derr != nil {
+			if derr := s.DeleteNetwork(context.Background(), resp.NetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
 			}
 		}
@@ -116,8 +117,9 @@ func (s stack) createDHCPOptionSet(ctx context.Context, req abstract.NetworkRequ
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.deleteDhcpOptions(ctx, net, false)
+			derr := s.deleteDhcpOptions(context.Background(), net, false)
 			_ = ferr.AddConsequence(derr)
 		}
 	}()
@@ -376,8 +378,9 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (as
 	}
 
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := s.rpcDeleteSubnet(ctx, resp.SubnetId); derr != nil {
+			if derr := s.rpcDeleteSubnet(context.Background(), resp.SubnetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}

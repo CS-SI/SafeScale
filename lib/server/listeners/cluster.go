@@ -41,24 +41,25 @@ type ClusterListener struct {
 }
 
 // List lists clusters
-func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl *protocol.ClusterListResponse, err error) {
+func (s *ClusterListener) List(inctx context.Context, in *protocol.Reference) (hl *protocol.ClusterListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list clusters")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/clusters/list")
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/clusters/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -72,7 +73,7 @@ func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl 
 }
 
 // Create creates a new cluster
-func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreateRequest) (_ *protocol.ClusterResponse, err error) {
+func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCreateRequest) (_ *protocol.ClusterResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create cluster")
 
@@ -82,18 +83,19 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/create", name))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -112,11 +114,11 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, xerr
 	}
 
-	return instance.ToProtocol(job.Context())
+	return instance.ToProtocol(ctx)
 }
 
 // State returns the status of a cluster
-func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht *protocol.ClusterStateResponse, err error) {
+func (s *ClusterListener) State(inctx context.Context, in *protocol.Reference) (ht *protocol.ClusterStateResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get cluster status")
 
@@ -126,21 +128,22 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/state", ref))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/state", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -154,7 +157,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 }
 
 // Inspect a cluster
-func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterResponse, err error) {
+func (s *ClusterListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.ClusterResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect cluster")
 
@@ -164,8 +167,8 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	ref, _ := srvutils.GetReference(in)
@@ -173,13 +176,14 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/inspect", ref))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/inspect", ref))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -189,11 +193,11 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	return instance.ToProtocol(job.Context())
+	return instance.ToProtocol(ctx)
 }
 
 // Start ...
-func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) Start(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot start cluster")
 
@@ -205,17 +209,18 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	if ref == "" {
 		return empty, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/start", ref))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -224,7 +229,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 }
 
 // Stop shutdowns an entire cluster (including the gateways)
-func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop cluster")
 
@@ -232,8 +237,8 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
@@ -243,13 +248,14 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/stop", ref))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -258,7 +264,7 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 }
 
 // Delete a cluster
-func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDeleteRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) Delete(inctx context.Context, in *protocol.ClusterDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Cluster")
 
@@ -266,8 +272,8 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
@@ -278,13 +284,14 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/delete", ref))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -293,15 +300,15 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 }
 
 // Expand adds node(s) to a cluster
-func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, ferr error) {
+func (s *ClusterListener) Expand(inctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(&ferr)
 	defer fail.OnExitWrapError(&ferr, "cannot expand cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
@@ -312,13 +319,14 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/expand", ref))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/expand", ref))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -340,7 +348,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	out := &protocol.ClusterNodeListResponse{}
 	out.Nodes = make([]*protocol.Host, 0, len(resp))
 	for _, v := range resp {
-		h, xerr := v.ToProtocol(job.Context())
+		h, xerr := v.ToProtocol(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -351,15 +359,15 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 }
 
 // Shrink removes node(s) from a cluster
-func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, err error) {
+func (s *ClusterListener) Shrink(inctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot shrink cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
@@ -370,13 +378,14 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/shrink", clusterName))
+	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/shrink", clusterName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -405,15 +414,15 @@ func fromClusterNodes(in []*propertiesv3.ClusterNode) []*protocol.Host {
 }
 
 // ListNodes lists node(s) of a cluster
-func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
+func (s *ClusterListener) ListNodes(inctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list cluster nodes")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
@@ -424,13 +433,14 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/nodes/list", ref))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/nodes/list", ref))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -453,15 +463,15 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 }
 
 // InspectNode inspects a node of the cluster
-func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
+func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect cluster node")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
@@ -477,13 +487,14 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/inspect", clusterName, nodeRef))
+	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/inspect", clusterName, nodeRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -498,11 +509,11 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 		}
 	}
 
-	return hostInstance.ToProtocol(job.Context())
+	return hostInstance.ToProtocol(ctx)
 }
 
 // DeleteNode removes node(s) from a cluster
-func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Cluster Node")
 
@@ -510,8 +521,8 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
@@ -524,14 +535,15 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	nodeRef, nodeRefLabel := srvutils.GetReference(in.GetHost()) // If NodeRef is empty string, asks to delete the last added node
 
 	job, err := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/delete", clusterName, nodeRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/delete", clusterName, nodeRef),
 	)
 	if err != nil {
 		return empty, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -550,7 +562,7 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 }
 
 // StopNode stops a node of the cluster
-func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) StopNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop cluster node")
 
@@ -558,8 +570,8 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
@@ -575,14 +587,15 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	}
 
 	job, xerr := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/stop", clusterName, nodeRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/stop", clusterName, nodeRef),
 	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -601,7 +614,7 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 }
 
 // StartNode starts a stopped node of the cluster
-func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) StartNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot start cluster node")
 
@@ -612,8 +625,8 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName := in.GetName()
@@ -626,14 +639,15 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	}
 
 	job, xerr := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/start", clusterName, nodeRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/start", clusterName, nodeRef),
 	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -652,7 +666,7 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 }
 
 // StateNode returns the state of a node of the cluster
-func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
+func (s *ClusterListener) StateNode(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get cluster node state")
 
@@ -662,8 +676,8 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName := in.GetName()
@@ -676,14 +690,15 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	}
 
 	job, err := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, nodeRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, nodeRef),
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -703,7 +718,7 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 }
 
 // ListMasters returns the list of masters of the cluster
-func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
+func (s *ClusterListener) ListMasters(inctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list masters")
 
@@ -713,8 +728,8 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName, _ := srvutils.GetReference(in)
@@ -722,13 +737,14 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/masters/list", clusterName))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/masters/list", clusterName))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -747,7 +763,7 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 }
 
 // FindAvailableMaster determines the first master available master (ie the one that responds on ssh request)
-func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.Reference) (_ *protocol.Host, err error) {
+func (s *ClusterListener) FindAvailableMaster(inctx context.Context, in *protocol.Reference) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot find available master")
 
@@ -757,8 +773,8 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName, _ := srvutils.GetReference(in)
@@ -766,13 +782,14 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/master/available", clusterName))
+	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/master/available", clusterName))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -782,7 +799,7 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 		return nil, xerr
 	}
 
-	out, xerr := master.ToProtocol(job.Context())
+	out, xerr := master.ToProtocol(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -791,7 +808,7 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 }
 
 // InspectMaster returns the information about a master of the cluster
-func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
+func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect cluster master")
 
@@ -801,8 +818,8 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName := in.GetName()
@@ -815,14 +832,15 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	}
 
 	job, err := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/master/%s/inspect", clusterName, masterRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/master/%s/inspect", clusterName, masterRef),
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -837,7 +855,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 		}
 	}
 
-	out, xerr := master.ToProtocol(job.Context())
+	out, xerr := master.ToProtocol(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -846,7 +864,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 }
 
 // StopMaster stops a master of the Cluster
-func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop Cluster master")
 
@@ -854,8 +872,8 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
@@ -870,13 +888,14 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id of node is provided")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/master/%s/stop", clusterName, masterRef))
+	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/master/%s/stop", clusterName, masterRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -895,7 +914,7 @@ func (s *ClusterListener) StopMaster(ctx context.Context, in *protocol.ClusterNo
 }
 
 // StartMaster starts a stopped master of the Cluster
-func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot start Cluster master")
 
@@ -906,8 +925,8 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName := in.GetName()
@@ -920,14 +939,15 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 	}
 
 	job, xerr := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/master/%s/start", clusterName, masterRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/master/%s/start", clusterName, masterRef),
 	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -946,7 +966,7 @@ func (s *ClusterListener) StartMaster(ctx context.Context, in *protocol.ClusterN
 }
 
 // StateMaster returns the state of a master of the Cluster
-func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
+func (s *ClusterListener) StateMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get Cluster master state")
 
@@ -956,8 +976,8 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	clusterName := in.GetName()
@@ -970,14 +990,15 @@ func (s *ClusterListener) StateMaster(ctx context.Context, in *protocol.ClusterN
 	}
 
 	job, err := PrepareJob(
-		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, masterRef),
+		inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, masterRef),
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
