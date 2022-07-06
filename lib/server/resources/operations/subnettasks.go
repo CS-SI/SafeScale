@@ -219,8 +219,8 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, gerr fail.Error) {
+	defer fail.OnPanic(&gerr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -238,25 +238,27 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() {
+	go func() (ferr fail.Error) {
 		defer close(chRes)
 
 		castedParams, ok := params.(taskFinalizeGatewayConfigurationParameters)
 		if !ok {
-			chRes <- result{nil, fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")}
-			return
+			xerr := fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")
+			chRes <- result{nil, xerr}
+			return xerr
 		}
 
 		timings, xerr := instance.Service().Timings()
 		if xerr != nil {
 			chRes <- result{nil, xerr}
-			return
+			return xerr
 		}
 
 		objgw := castedParams.host
 		if valid.IsNil(objgw) {
-			chRes <- result{nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")}
-			return
+			xerr := fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
+			chRes <- result{nil, xerr}
+			return xerr
 		}
 
 		userData := castedParams.userdata
@@ -278,7 +280,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
-				return
+				return xerr
 			}
 		} else {
 			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY)
@@ -292,7 +294,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 				theCause := fail.ConvertError(fail.Cause(xerr))
 				if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
 					chRes <- result{nil, xerr}
-					return
+					return xerr
 				}
 
 				debug.IgnoreError(xerr)
@@ -304,7 +306,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
-				return
+				return xerr
 			}
 
 			time.Sleep(timings.RebootTimeout())
@@ -313,7 +315,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
-				return
+				return xerr
 			}
 		} else {
 			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
@@ -324,7 +326,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
-			return
+			return xerr
 		}
 
 		// By design, phase 5 doesn't  touch network cfg, so no reboot needed
@@ -332,12 +334,12 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
-			return
+			return xerr
 		}
 
 		chRes <- result{nil, nil}
-		return // nolint
-	}()
+		return nil // nolint
+	}() // nolint
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr

@@ -23,11 +23,13 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
 
@@ -396,5 +398,138 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingWF(t *testing.T) {
 			t.Errorf("It should have finished near 200 ms but it didn't!!")
 			t.FailNow()
 		}
+	}
+}
+
+// This tests the same thing as TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting, it just
+// runs .Abort first, then Wait
+// It fails, however it's unclear if it should work..: by design, what should happen if we abort 1st before running the wait ?
+func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater(t *testing.T) {
+	enough := false
+	iter := 0
+	streak := 0
+	chansize := 10
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		for {
+			iter++
+			if iter > 1 {
+				break
+			}
+			if enough {
+				break
+			}
+
+			t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
+			overlord, xerr := NewTaskGroup()
+			require.NotNil(t, overlord)
+			require.Nil(t, xerr)
+			xerr = overlord.SetID(fmt.Sprintf("parent-%d", iter))
+			require.Nil(t, xerr)
+
+			bailout := make(chan string, chansize) // a buffered channel
+			for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
+				_, xerr = overlord.Start(
+					func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+						weWereAborted := false
+						for { // do some work, then look for aborted, again and again
+							// some work
+							time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
+							if t.Aborted() {
+								// Cleaning up first before leaving... ;)
+								time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
+								weWereAborted = true
+								break
+							}
+						}
+						// We are using the classic 'send on closed channel' trick to see if Wait actually waits until everyone is DONE.
+						// If it does we will never see a panic, but if, Abort doesn't mean TellYourChildrenToAbort but
+						// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
+						acha := parameters.(chan string)
+						acha <- "Bailing out"
+
+						if weWereAborted {
+							return "", fail.AbortedError(nil, "we were killed")
+						}
+
+						return "who cares", nil
+					}, bailout,
+					InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
+				)
+				require.Nil(t, xerr)
+			}
+
+			// after this, some tasks will already be looking for ABORT signals
+			time.Sleep(time.Duration(65) * time.Millisecond)
+
+			xerr = overlord.Abort()
+			require.Nil(t, xerr)
+
+			// did we abort ?
+			aborted := overlord.Aborted()
+			if !aborted {
+				t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+			}
+
+			_, res, xerr := overlord.WaitFor(5 * time.Second)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrAborted:
+					consequences := xerr.Consequences()
+					if strings.Contains(spew.Sdump(consequences), "panic happened") {
+						t.Logf("unexpected panic occurred!")
+					}
+				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
+				case *fail.ErrRuntimePanic:
+					t.Errorf("That shouldn't happen")
+					t.Fail()
+					return
+				case *fail.ErrorList:
+					if strings.Contains(spew.Sdump(xerr), "panic happened") {
+						t.Logf("unexpected panic occurred!")
+					}
+				default:
+					t.Errorf("Unexpected error: %v", xerr)
+				}
+			} else {
+				require.NotNil(t, res)
+				if len(bailout) == chansize {
+					streak++
+					if streak > 5 {
+						break
+					}
+					continue
+				}
+			}
+
+			close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
+			// If not..., well...
+
+			reminder := false
+			if len(bailout) != chansize { // this means panic
+				reminder = true
+				t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
+				// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
+				// size should be chansize each time), but if we dont...
+				// we will see runtime panics on our LOGS !!, but NOT in the code
+				// with a t.FailNow() we also fail, but the test output is less frightening
+				enough = true
+			}
+
+			time.Sleep(2000 * time.Millisecond)
+			if reminder {
+				t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
+			}
+			// Well, we have a problem Waiting, now it's clear, and as a bonus we uncovered a problem communicating panics to function callers
+		}
+	}()
+
+	failed := waitTimeout(&wg, 120*time.Second)
+	if failed { // It ended with a deadlock
+		t.Errorf("We have a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater")
+		t.Fail()
 	}
 }
