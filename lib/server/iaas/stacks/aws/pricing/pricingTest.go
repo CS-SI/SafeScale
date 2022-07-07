@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
-func TryConnection(bucketName, key string) fail.Error {
+func TryConnection(bucketName, key string) fail.Error { // nolint
 	s := session.Must(session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials("", "", ""),
 		S3ForcePathStyle: aws.Bool(true),
@@ -67,7 +67,8 @@ func TryConnection(bucketName, key string) fail.Error {
 	hostTemplates := make(map[string]abstract.HostTemplate)
 
 	for _, v := range prods.PriceList {
-		price, xerr := ouraws.NewPriceFromJSONValue(v)
+		_ = v
+		price, xerr := ouraws.NewPriceFromJSONValue(nil)
 		if xerr != nil {
 			continue
 		}
@@ -87,11 +88,4 @@ func TryConnection(bucketName, key string) fail.Error {
 	fmt.Print(spew.Sdump(hostTemplates))
 	fmt.Print(len(hostTemplates))
 	return nil
-}
-
-func main() {
-	err := TryConnection("", "")
-	if err != nil {
-		fmt.Println(err.Error())
-	}
 }
