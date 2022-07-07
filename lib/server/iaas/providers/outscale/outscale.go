@@ -75,7 +75,7 @@ func get(m map[string]interface{}, key string, def ...string) string {
 func getNotEmpty(m map[string]interface{}, key string, def ...string) string {
 	v, ok := m[key]
 	if ok {
-		val, _ := v.(string)
+		val, _ := v.(string) // nolint
 		if val != "" {
 			return val
 		}
