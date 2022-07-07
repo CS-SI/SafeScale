@@ -1394,8 +1394,7 @@ func (s stack) rpcModifyInstanceSecurityGroups(ctx context.Context, id *string, 
 	)
 }
 
-func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONValue, fail.Error) {
-	var emptySlice []aws.JSONValue
+func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]*string, fail.Error) {
 	filters := make([]*pricing.Filter, 0, 2+len(ids))
 	filters = append(
 		filters, []*pricing.Filter{
@@ -1431,30 +1430,30 @@ func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONVal
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	if len(resp.PriceList) == 0 {
 		if len(ids) > 0 {
-			return emptySlice, fail.NotFoundError("failed to find products")
+			return nil, fail.NotFoundError("failed to find products")
 		}
-		return emptySlice, nil
+		return nil, nil
 	}
+
 	return resp.PriceList, nil
 }
 
-func (s stack) rpcGetProductByID(ctx context.Context, id *string) (aws.JSONValue, fail.Error) {
-	nullValue := aws.JSONValue{}
+func (s stack) rpcGetProductByID(ctx context.Context, id *string) (*string, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
-		return nullValue, xerr
+		return nil, xerr
 	}
 
 	resp, xerr := s.rpcGetProducts(ctx, []*string{id})
 	if xerr != nil {
-		return nullValue, xerr
+		return nil, xerr
 	}
 	if len(resp) > 1 {
-		return nullValue, fail.InconsistentError("found more than one product with ID %s", aws.StringValue(id))
+		return nil, fail.InconsistentError("found more than one product with ID %s", aws.StringValue(id))
 	}
 	return resp[0], nil
 }
