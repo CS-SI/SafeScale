@@ -191,9 +191,9 @@ func executeScript(
 		)
 
 		if !hidesOutput {
-			cmd = fmt.Sprintf("sync; chmod u+rwx %s; bash -x -c %s; exit ${PIPESTATUS}", filename, filename)
+			cmd = fmt.Sprintf("sync; chmod u+rwx %s; sudo bash -x -c %s; exit ${PIPESTATUS}", filename, filename)
 		} else {
-			cmd = fmt.Sprintf("sync; chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; bash -x -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
+			cmd = fmt.Sprintf("sync; chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; sudo bash -x -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
 		}
 
 		xerr = retry.Action(

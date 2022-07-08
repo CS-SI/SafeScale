@@ -780,7 +780,12 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 						)
 					}
 
-					networkV3.NetworkID, _ = networkInstance.GetID()
+					var err error
+					networkV3.NetworkID, err = networkInstance.GetID()
+					if err != nil {
+						return fail.ConvertError(err)
+					}
+
 					networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
 					networkV3.CIDR = req.CIDR
 					return nil
@@ -907,8 +912,15 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 						return innerXErr
 					}
 				}
-				networkV3.SubnetID, _ = subnetInstance.GetID()
-				networkV3.GatewayID, _ = primaryGateway.GetID()
+				var err error
+				networkV3.SubnetID, err = subnetInstance.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
+				networkV3.GatewayID, err = primaryGateway.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
 				if networkV3.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(ctx); innerXErr != nil {
 					return innerXErr
 				}
@@ -922,7 +934,10 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 					return innerXErr
 				}
 				if !gwFailoverDisabled {
-					networkV3.SecondaryGatewayID, _ = secondaryGateway.GetID()
+					networkV3.SecondaryGatewayID, err = secondaryGateway.GetID()
+					if err != nil {
+						return fail.ConvertError(err)
+					}
 					if networkV3.SecondaryGatewayIP, innerXErr = secondaryGateway.GetPrivateIP(ctx); innerXErr != nil {
 						return innerXErr
 					}
@@ -2148,7 +2163,11 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 					}
 
 					node := nodesV3.ByNumericalID[nodeIdx]
-					node.ID, _ = hostInstance.GetID()
+					var err error
+					node.ID, err = hostInstance.GetID()
+					if err != nil {
+						return fail.ConvertError(err)
+					}
 
 					// Recover public IP of the master if it exists
 					var inErr fail.Error
@@ -2810,7 +2829,12 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 					}
 
 					node = nodesV3.ByNumericalID[nodeIdx]
-					node.ID, _ = hostInstance.GetID()
+					var err error
+					node.ID, err = hostInstance.GetID()
+					if err != nil {
+						return fail.ConvertError(err)
+					}
+
 					var inErr fail.Error
 					node.PublicIP, inErr = hostInstance.GetPublicIP(ctx)
 					if inErr != nil {

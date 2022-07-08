@@ -565,7 +565,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 }
 
 // InspectLabel inspects a Label of a Host
-func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.Label, value string, ferr fail.Error) {
+func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.Label, _ string, ferr fail.Error) {
 	if handler == nil {
 		return nil, "", fail.InvalidInstanceError()
 	}
