@@ -177,14 +177,18 @@ func onHostCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Id
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
-	theID := instance.GetID()
-	_, err := instance.Service().InspectHost(ctx, theID)
+	theID, err := instance.GetID()
 	if err != nil {
-		switch err.(type) {
+		return false, fail.ConvertError(err)
+	}
+
+	_, xerr := instance.Service().InspectHost(ctx, theID)
+	if xerr != nil {
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			return false, nil
 		default:
-			return false, err
+			return false, xerr
 		}
 	}
 
@@ -520,8 +524,13 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
+	hid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	// Request Host inspection from provider
-	ahf, xerr := instance.Service().InspectHost(ctx, instance.GetID())
+	ahf, xerr := instance.Service().InspectHost(ctx, hid)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -931,7 +940,10 @@ func (instance *Host) implCreate(
 		}()
 
 		// instruct Cloud Provider to create host
-		defaultSubnetID := defaultSubnet.GetID()
+		defaultSubnetID, err := defaultSubnet.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
 		ahf, userdataContent, xerr = svc.CreateHost(ctx, hostReq)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1184,7 +1196,12 @@ func (instance *Host) implCreate(
 			return xerr
 		}
 
-		xerr = instance.unbindDefaultSecurityGroupIfNeeded(ctx, networkInstance.GetID())
+		nid, err := networkInstance.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+
+		xerr = instance.unbindDefaultSecurityGroupIfNeeded(ctx, nid)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -1308,7 +1325,10 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet) fail.Error {
 	svc := instance.Service()
 	if req.Single {
-		hostID := instance.GetID()
+		hostID, err := instance.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
 				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
@@ -1372,8 +1392,13 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}
 				}()
 
+				gwid, err := gwsg.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
+
 				item := &propertiesv1.SecurityGroupBond{
-					ID:         gwsg.GetID(),
+					ID:         gwid,
 					Name:       gwsg.GetName(),
 					Disabled:   false,
 					FromSubnet: true,
@@ -1403,8 +1428,13 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}
 				}()
 
+				pubId, err := pubipsg.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
+
 				item := &propertiesv1.SecurityGroupBond{
-					ID:         pubipsg.GetID(),
+					ID:         pubId,
 					Name:       pubipsg.GetName(),
 					Disabled:   false,
 					FromSubnet: true,
@@ -1504,9 +1534,14 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
 					}
 
+					langId, err := lansg.GetID()
+					if err != nil {
+						return fail.ConvertError(err)
+					}
+
 					// register security group in properties
 					item := &propertiesv1.SecurityGroupBond{
-						ID:         lansg.GetID(),
+						ID:         langId,
 						Name:       lansg.GetName(),
 						Disabled:   false,
 						FromSubnet: true,
@@ -1581,9 +1616,15 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
 func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, networkID string) fail.Error {
 	svc := instance.Service()
+
+	hostId, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	sgName, err := svc.GetDefaultSecurityGroupName(ctx)
 	if err != nil {
-		return err
+		return fail.ConvertError(err)
 	}
 	if sgName != "" {
 		adsg, innerXErr := svc.InspectSecurityGroupByName(ctx, networkID, sgName)
@@ -1595,7 +1636,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ne
 			default:
 				return innerXErr
 			}
-		} else if innerXErr = svc.UnbindSecurityGroupFromHost(ctx, adsg, instance.GetID()); innerXErr != nil {
+		} else if innerXErr = svc.UnbindSecurityGroupFromHost(ctx, adsg, hostId); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// Consider a security group not found as a successful unbind
@@ -1908,7 +1949,10 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				hostID := instance.GetID()
+				hostID, err := instance.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
 				hostName := instance.GetName()
 				svc := instance.Service()
 				for _, as := range req.Subnets {
@@ -1962,7 +2006,10 @@ func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.Host
 						)
 					}
 
-					hostID := instance.GetID()
+					hostID, err := instance.GetID()
+					if err != nil {
+						return fail.ConvertError(err)
+					}
 					hostName := instance.GetName()
 					svc := instance.Service()
 					for _, as := range req.Subnets {
@@ -2023,7 +2070,13 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
-	xerr := svc.ClearHostStartupScript(ctx, instance.GetID())
+
+	hostId, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	xerr := svc.ClearHostStartupScript(ctx, hostId)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2243,12 +2296,17 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 		}
 	}
 
+	nid, err := networkInstance.GetID()
+	if err != nil {
+		return nil, nil, fail.ConvertError(err)
+	}
+
 	// Check if Subnet exists
 	var (
 		subnetRequest abstract.SubnetRequest
 		cidrIndex     uint
 	)
-	subnetInstance, xerr := LoadSubnet(ctx, svc, networkInstance.GetID(), singleHostRequest.ResourceName)
+	subnetInstance, xerr := LoadSubnet(ctx, svc, nid, singleHostRequest.ResourceName)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -2281,7 +2339,10 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			}
 
 			subnetRequest.Name = singleHostRequest.ResourceName
-			subnetRequest.NetworkID = networkInstance.GetID()
+			subnetRequest.NetworkID, err = networkInstance.GetID()
+			if err != nil {
+				return nil, nil, fail.ConvertError(err)
+			}
 			subnetRequest.IPVersion = ipversion.IPv4
 			subnetRequest.CIDR = subnetCIDR
 			subnetRequest.DNSServers = dnsServers
@@ -2486,6 +2547,11 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
+	hid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	var (
 		single         bool
 		singleSubnetID string
@@ -2572,8 +2638,10 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			hostID := instance.GetID()
-			// hostName := instance.GetName()
+			hostID, err := instance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
 
 			single = hostNetworkV2.Single
 			if single {
@@ -2705,7 +2773,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				default:
 				}
 
-				if rerr := svc.DeleteHost(ctx, instance.GetID()); rerr != nil {
+				if rerr := svc.DeleteHost(ctx, hid); rerr != nil {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
@@ -2742,7 +2810,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					default:
 					}
 
-					state, stateErr := svc.GetHostState(ctx, instance.GetID())
+					state, stateErr := svc.GetHostState(ctx, hid)
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
@@ -3107,7 +3175,10 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	defer tracer.Exiting()
 
 	hostName := instance.GetName()
-	hostID := instance.GetID()
+	hostID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 
 	svc := instance.Service()
 	timings, xerr := svc.Timings()
@@ -3173,11 +3244,12 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// instance.Lock()
-	// defer instance.Unlock()
-
 	hostName := instance.GetName()
-	hostID := instance.GetID()
+	hostID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	svc := instance.Service()
 
 	timings, xerr := instance.Service().Timings()
@@ -3798,7 +3870,11 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sgInstance.GetID()
+			sgID, err := sgInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			// If the Security Group is already bound to the Host with the exact same state, considered as a success
 			item, ok := hsgV1.ByID[sgID]
 			if ok && item.Disabled == !bool(enable) {
@@ -3864,7 +3940,11 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sgInstance.GetID()
+			sgID, err := sgInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			// Check if the security group is listed for the Host
 			found := false
 			for k, v := range hsgV1.ByID {
@@ -3905,7 +3985,12 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			delete(sghV1.ByID, instance.GetID())
+			hid, err := instance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			delete(sghV1.ByID, hid)
 			delete(sghV1.ByName, instance.GetName())
 			return nil
 		})
@@ -3957,6 +4042,11 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
+	hid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	sgName := sg.GetName()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -3995,7 +4085,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, hid)
 			}
 
 			caps, xerr := svc.GetCapabilities(ctx)
@@ -4010,7 +4100,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				}
 			} else {
 				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-				xerr = svc.BindSecurityGroupToHost(ctx, asg, instance.GetID())
+				xerr = svc.BindSecurityGroupToHost(ctx, asg, hid)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -4044,11 +4134,18 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	}
 
 	sgName := sgInstance.GetName()
+	sgId, err := sgInstance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	hid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	// instance.Lock()
-	// defer instance.Unlock()
 
 	svc := instance.Service()
 	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -4081,7 +4178,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgInstance.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgId)
 			}
 
 			caps, xerr := svc.GetCapabilities(ctx)
@@ -4096,7 +4193,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				}
 			} else {
 				// Bind the security group on provider side; if security group not binded, considered as a success
-				xerr = svc.UnbindSecurityGroupFromHost(ctx, asg, instance.GetID())
+				xerr = svc.UnbindSecurityGroupFromHost(ctx, asg, hid)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -4255,7 +4352,10 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	}
 
 	labelName := labelInstance.GetName()
-	labelID := labelInstance.GetID()
+	labelID, err := labelInstance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -4333,7 +4433,11 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			labelID := labelInstance.GetID()
+			labelID, err := labelInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			// If the host is not bound to this Label, consider it a success
 			if _, ok = hostLabelsV1.ByID[labelID]; ok {
 				delete(hostLabelsV1.ByID, labelID)
@@ -4397,7 +4501,11 @@ func (instance *Host) UpdateLabel(ctx context.Context, labelInstance resources.L
 	defer tracer.Exiting()
 
 	var alabel *abstract.Label
-	hostID := instance.GetID()
+	hostID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	hostName := instance.GetName()
 	xerr := labelInstance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool

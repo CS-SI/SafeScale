@@ -110,8 +110,11 @@ func (t *Label) GetName() string {
 
 // GetID returns the ID of the tag
 // Satisfies interface data.Identifiable
-func (t *Label) GetID() string {
-	return t.ID
+func (t *Label) GetID() (string, error) {
+	if t == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return t.ID, nil
 }
 
 // IsTag tells of the Label represents a Tag (ie a Label without value)

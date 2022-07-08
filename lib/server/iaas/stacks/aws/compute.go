@@ -444,6 +444,11 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 		return nil, xerr
 	}
 
+	ahfi, err := ahf.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
@@ -484,7 +489,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 			return nil, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return nil, fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout,
+				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", ahfi, timeout,
 			)
 		default:
 			return nil, retryErr
@@ -1046,10 +1051,17 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 		return xerr
 	}
 
+	ahfi, err := ahf.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	ahfn := ahf.GetName()
+
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&ferr)
 
-	vm, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahf.GetID()))
+	vm, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1091,12 +1103,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 				debug.IgnoreError(cause)
 			default:
-				return fail.Wrap(cause, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
+				return fail.Wrap(cause, "failed to stop Host '%s' with id '%s'", ahfn, ahfi)
 			}
 		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 			debug.IgnoreError(xerr)
 		default:
-			return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
+			return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahfn, ahfi)
 		}
 	}
 
@@ -1359,7 +1371,12 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 		}
 	}
 
-	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahf.GetID()))
+	ahfi, err := ahf.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
 		return xerr
 	}
@@ -1379,7 +1396,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 	if len(sgs) == len(resp.SecurityGroups) {
 		return nil
 	}
-	if xerr = s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahf.GetID()), sgs); xerr != nil {
+	if xerr = s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs); xerr != nil {
 		return xerr
 	}
 
@@ -1416,8 +1433,13 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 		}
 	}
 
+	ahfi, err := ahf.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	// query the instance to get its current Security Groups
-	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahf.GetID()))
+	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
 		return xerr
 	}
@@ -1454,5 +1476,5 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 		return nil
 	}
 
-	return s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahf.GetID()), sgs)
+	return s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs)
 }

@@ -120,8 +120,11 @@ func (v *Volume) GetName() string {
 
 // GetID returns the ID of the volume
 // Satisfies interface data.Identifiable
-func (v *Volume) GetID() string {
-	return v.ID
+func (v *Volume) GetID() (string, error) {
+	if v == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return v.ID, nil
 }
 
 // VolumeAttachmentRequest represents a volume attachment request

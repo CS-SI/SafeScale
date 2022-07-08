@@ -156,7 +156,7 @@ func TestVolume_GetID(t *testing.T) {
 
 	v := NewVolume()
 	v.ID = "Volume ID"
-	id := v.GetID()
+	id, _ := v.GetID()
 	if id != v.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

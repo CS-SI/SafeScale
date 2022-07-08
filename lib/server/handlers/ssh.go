@@ -567,8 +567,13 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return invalid, "", "", xerr
 	}
 
+	hid, err := host.GetID()
+	if err != nil {
+		return invalid, "", "", fail.ConvertError(err)
+	}
+
 	// retrieve ssh config to perform some commands
-	sshCfg, xerr := handler.GetConfig(host.GetID())
+	sshCfg, xerr := handler.GetConfig(hid)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

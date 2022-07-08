@@ -18,6 +18,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -130,8 +131,11 @@ func (ff *FeatureFile) GetName() string {
 }
 
 // GetID ...
-func (ff *FeatureFile) GetID() string {
-	return ff.GetName()
+func (ff *FeatureFile) GetID() (string, error) {
+	if ff == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return ff.GetName(), nil
 }
 
 // Filename returns the filename of the Feature definition, with error handling

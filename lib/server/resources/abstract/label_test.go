@@ -184,7 +184,7 @@ func TestLabel_GetName(t *testing.T) {
 func TestLabel_GetID(t *testing.T) {
 	s := NewLabel()
 	s.ID = "Label ID"
-	id := s.GetID()
+	id, _ := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

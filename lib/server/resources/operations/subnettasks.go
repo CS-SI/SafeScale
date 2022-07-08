@@ -109,7 +109,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 
 			// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
 			if rgw.IsTaken() {
-				if id := rgw.GetID(); id != "" {
+				if id, _ := rgw.GetID(); id != "" {
 					as.GatewayIDs = append(as.GatewayIDs, id)
 				}
 			}
@@ -177,8 +177,13 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
+			hid, err := rgw.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			if as != nil && as.VIP != nil {
-				xerr = svc.BindHostToVIP(ctx, as.VIP, rgw.GetID())
+				xerr = svc.BindHostToVIP(ctx, as.VIP, hid)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr

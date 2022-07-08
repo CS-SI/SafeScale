@@ -199,6 +199,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		)
 	}
 
+	ahfid, err := ahf.GetID()
+	if err != nil {
+		return nil, nil, fail.ConvertError(err)
+	}
+
 	// If no key pair is supplied create one
 	var xerr fail.Error
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
@@ -336,7 +341,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 			}()
 
 			// Wait that Host is ready, not just that the build is started
-			if _, innerXErr = s.WaitHostReady(ctx, ahf.GetID(), timings.HostLongOperationTimeout()); innerXErr != nil {
+			if _, innerXErr = s.WaitHostReady(ctx, ahfid, timings.HostLongOperationTimeout()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrInvalidRequest:
 					return retry.StopRetryError(innerXErr)
@@ -469,11 +474,16 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 		)
 	}
 
+	ahfid, err := ahf.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
 	defer fail.OnPanic(&ferr)
 
-	return s.rpcResetStartupScriptOfInstance(ctx, ahf.GetID())
+	return s.rpcResetStartupScriptOfInstance(ctx, ahfid)
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
@@ -864,9 +874,19 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 		}
 	}
 
+	ahfid, err := ahf.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	asgid, err := asg.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
-	return s.rpcAddTagsToInstance(ctx, ahf.GetID(), []string{asg.GetID()})
+	return s.rpcAddTagsToInstance(ctx, ahfid, []string{asgid})
 }
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
@@ -886,7 +906,17 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 		return xerr
 	}
 
+	ahfid, err := ahf.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	asgid, err := asg.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
-	return s.rpcRemoveTagsFromInstance(ctx, ahf.GetID(), []string{asg.GetID()})
+	return s.rpcRemoveTagsFromInstance(ctx, ahfid, []string{asgid})
 }

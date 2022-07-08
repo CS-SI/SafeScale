@@ -123,7 +123,10 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 			return nil, xerr
 		}
 
-		subnetReq.NetworkID = networkInstance.GetID()
+		subnetReq.NetworkID, err = networkInstance.GetID()
+		if err != nil {
+			return nil, fail.ConvertError(err)
+		}
 		subnetReq.Name = networkReq.Name
 		subnetReq.CIDR = subnetNet.String()
 		subnetReq.KeepOnFailure = networkReq.KeepOnFailure

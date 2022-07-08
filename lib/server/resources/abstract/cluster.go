@@ -109,8 +109,8 @@ func (instance ClusterIdentity) GetName() string {
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
-func (instance ClusterIdentity) GetID() string {
-	return instance.GetName()
+func (instance ClusterIdentity) GetID() (string, error) {
+	return instance.GetName(), nil
 }
 
 // OK ...

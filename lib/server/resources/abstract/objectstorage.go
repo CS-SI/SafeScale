@@ -128,8 +128,8 @@ func (instance ObjectStorageBucket) GetName() string {
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (instance ObjectStorageBucket) GetID() string {
-	return instance.ID
+func (instance ObjectStorageBucket) GetID() (string, error) {
+	return instance.ID, nil
 }
 
 // ObjectStorageItemMetadata ...
@@ -160,6 +160,6 @@ func (osi ObjectStorageItem) GetName() string {
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (osi ObjectStorageItem) GetID() string {
-	return osi.ItemID
+func (osi ObjectStorageItem) GetID() (string, error) {
+	return osi.ItemID, nil
 }

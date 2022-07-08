@@ -1692,7 +1692,12 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			_, found = nodesV3.PrivateNodeByID[hostInstance.GetID()]
+			hid, err := hostInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			_, found = nodesV3.PrivateNodeByID[hid]
 			return nil
 		})
 	})
@@ -1800,7 +1805,12 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			numericalID, found := nodesV3.MasterByID[host.GetID()]
+			hid, err := host.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			numericalID, found := nodesV3.MasterByID[hid]
 			if !found {
 				return abstract.ResourceNotFoundError("master", host.GetName())
 			}
@@ -1808,7 +1818,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 			master = nodesV3.ByNumericalID[numericalID]
 			delete(nodesV3.ByNumericalID, numericalID)
 			delete(nodesV3.MasterByName, host.GetName())
-			delete(nodesV3.MasterByID, host.GetID())
+			delete(nodesV3.MasterByID, hid)
 			if found, indexInSlice := containsClusterNode(nodesV3.Masters, numericalID); found {
 				length := len(nodesV3.Masters)
 				if indexInSlice < length-1 {

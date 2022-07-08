@@ -780,7 +780,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 						)
 					}
 
-					networkV3.NetworkID = networkInstance.GetID()
+					networkV3.NetworkID, _ = networkInstance.GetID()
 					networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
 					networkV3.CIDR = req.CIDR
 					return nil
@@ -793,11 +793,18 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			return xerr
 		}
 
+		nid, err := networkInstance.GetID()
+		if err != nil {
+			xerr := fail.ConvertError(err)
+			chRes <- result{nil, nil, xerr}
+			return xerr
+		}
+
 		// Creates Subnet
 		logrus.Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 		subnetReq := abstract.SubnetRequest{
 			Name:           req.Name,
-			NetworkID:      networkInstance.GetID(),
+			NetworkID:      nid,
 			CIDR:           req.CIDR,
 			HA:             !gwFailoverDisabled,
 			ImageRef:       gatewaysDef.Image,
@@ -900,8 +907,8 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 						return innerXErr
 					}
 				}
-				networkV3.SubnetID = subnetInstance.GetID()
-				networkV3.GatewayID = primaryGateway.GetID()
+				networkV3.SubnetID, _ = subnetInstance.GetID()
+				networkV3.GatewayID, _ = primaryGateway.GetID()
 				if networkV3.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(ctx); innerXErr != nil {
 					return innerXErr
 				}
@@ -915,7 +922,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 					return innerXErr
 				}
 				if !gwFailoverDisabled {
-					networkV3.SecondaryGatewayID = secondaryGateway.GetID()
+					networkV3.SecondaryGatewayID, _ = secondaryGateway.GetID()
 					if networkV3.SecondaryGatewayIP, innerXErr = secondaryGateway.GetPrivateIP(ctx); innerXErr != nil {
 						return innerXErr
 					}
@@ -1050,10 +1057,26 @@ func (instance *Cluster) createHostResources(
 		}
 
 		// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
-		if haveSecondaryGateway && primaryGateway.GetID() == secondaryGateway.GetID() {
-			ar := result{fail.InconsistentError("primary and secondary gateways have the same id %s", primaryGateway.GetID())}
-			chRes <- ar
-			return ar.rErr
+		if haveSecondaryGateway {
+			pgi, err := primaryGateway.GetID()
+			if err != nil {
+				xerr := fail.ConvertError(err)
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			sgi, err := secondaryGateway.GetID()
+			if err != nil {
+				xerr := fail.ConvertError(err)
+				chRes <- result{xerr}
+				return xerr
+			}
+
+			if pgi == sgi {
+				ar := result{fail.InconsistentError("primary and secondary gateways have the same id %s", pgi)}
+				chRes <- ar
+				return ar.rErr
+			}
 		}
 
 		_, xerr = primaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
@@ -1132,17 +1155,19 @@ func (instance *Cluster) createHostResources(
 				}
 
 				hosts, merr := instance.Service().ListHosts(context.Background(), false)
-				for _, invol := range hosts {
-					theName := invol.GetName()
-					if strings.Contains(theName, "master") {
-						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: invol.GetID(), Name: invol.GetName()})
-						}
-					}
-				}
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
+				}
+
+				for _, invol := range hosts {
+					theName := invol.GetName()
+					theId, _ := invol.GetID()
+					if strings.Contains(theName, "master") {
+						if strings.Contains(theName, instance.GetName()) {
+							list = append(list, machineID{ID: theId, Name: invol.GetName()})
+						}
+					}
 				}
 
 				if len(list) > 0 {
@@ -1229,17 +1254,19 @@ func (instance *Cluster) createHostResources(
 				}
 
 				hosts, merr := instance.Service().ListHosts(context.Background(), false)
-				for _, invol := range hosts {
-					theName := invol.GetName()
-					if strings.Contains(theName, "node") {
-						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: invol.GetID(), Name: invol.GetName()})
-						}
-					}
-				}
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
+				}
+
+				for _, invol := range hosts {
+					theName := invol.GetName()
+					theId, _ := invol.GetID()
+					if strings.Contains(theName, "node") {
+						if strings.Contains(theName, instance.GetName()) {
+							list = append(list, machineID{ID: theId, Name: invol.GetName()})
+						}
+					}
 				}
 
 				if len(list) > 0 {
@@ -2121,7 +2148,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 					}
 
 					node := nodesV3.ByNumericalID[nodeIdx]
-					node.ID = hostInstance.GetID()
+					node.ID, _ = hostInstance.GetID()
 
 					// Recover public IP of the master if it exists
 					var inErr fail.Error
@@ -2783,7 +2810,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 					}
 
 					node = nodesV3.ByNumericalID[nodeIdx]
-					node.ID = hostInstance.GetID()
+					node.ID, _ = hostInstance.GetID()
 					var inErr fail.Error
 					node.PublicIP, inErr = hostInstance.GetPublicIP(ctx)
 					if inErr != nil {
@@ -2840,8 +2867,13 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 								}
 							}
 
+							hid, err := hostInstance.GetID()
+							if err != nil {
+								return fail.ConvertError(err)
+							}
+
 							delete(nodesV3.PrivateNodeByName, hostInstance.GetName())
-							delete(nodesV3.PrivateNodeByID, hostInstance.GetID())
+							delete(nodesV3.PrivateNodeByID, hid)
 
 							return nil
 						},

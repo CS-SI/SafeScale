@@ -909,6 +909,11 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 		return fail.InvalidParameterError("hostInstance", "cannot be nil")
 	}
 
+	sgid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
@@ -917,8 +922,11 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 			}
 
 			// Unbind security group on provider side; if not found, considered as a success
-			hostID := hostInstance.GetID()
-			if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID); innerXErr != nil {
+			hostID, err := hostInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+			if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					debug.IgnoreError(innerXErr)
@@ -950,6 +958,11 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
+	sgid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
@@ -969,7 +982,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 			}
 			if hostID != "" {
 				// Unbind security group on provider side; if not found, considered as a success
-				if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID); innerXErr != nil {
+				if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						debug.IgnoreError(innerXErr)
@@ -1042,7 +1055,11 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 				return fail.InvalidRequestError("security group is already marked as default for subnet %s", asg.DefaultForSubnet)
 			}
 
-			asg.DefaultForSubnet = subnetInstance.GetID()
+			var err error
+			asg.DefaultForSubnet, err = subnetInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
 		}
 
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -1052,7 +1069,11 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 			}
 
 			// First check if subnet is present with the state requested; if present with same state, consider situation as a success
-			subnetID := subnetInstance.GetID()
+			subnetID, err := subnetInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			subnetName := subnetInstance.GetName()
 			disable := !bool(enable)
 			if item, ok := sgsV1.ByID[subnetID]; !ok || item.Disabled == disable {
@@ -1162,6 +1183,11 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 		return fail.InvalidParameterCannotBeNilError("subnetInstance")
 	}
 
+	sgid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	var subnetHosts *propertiesv1.SubnetHosts
 	xerr := subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
@@ -1177,7 +1203,8 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 		return xerr
 	}
 
-	return instance.unsafeUnbindFromSubnet(ctx, taskUnbindFromHostsAttachedToSubnetParams{subnetID: subnetInstance.GetID(), subnetName: subnetInstance.GetName(), subnetHosts: subnetHosts})
+	xerr = instance.unsafeUnbindFromSubnet(ctx, taskUnbindFromHostsAttachedToSubnetParams{subnetID: sgid, subnetName: subnetInstance.GetName(), subnetHosts: subnetHosts})
+	return xerr
 }
 
 // unbindFromSubnetHosts unbinds the security group from Hosts attached to a Subnet
@@ -1198,6 +1225,11 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 	_, xerr = instance.taskUnbindFromHostsAttachedToSubnet(task, params)
 	if xerr != nil {
 		return xerr
+	}
+
+	sgid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
 	}
 
 	// -- Remove Hosts attached to Subnet referenced in Security Group
@@ -1228,7 +1260,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), params.subnetID)
+			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, sgid, params.subnetID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1261,6 +1293,11 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 		return fail.InvalidParameterError("rs", "cannot be empty string")
 	}
 
+	sgid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
@@ -1279,7 +1316,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 				subnetName = subnetRef
 			}
 			if subnetID != "" {
-				if innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), subnetID); innerXErr != nil {
+				if innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, sgid, subnetID); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// consider a Security Group not found as a successful unbind, and continue to update metadata

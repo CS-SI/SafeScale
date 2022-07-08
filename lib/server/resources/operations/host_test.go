@@ -134,7 +134,7 @@ func Test_LoadHost(t *testing.T) {
 
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 	})
 	require.Nil(t, xerr)
@@ -222,7 +222,7 @@ func TestHost_Browse(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		xerr = host.Browse(nil, func(host *abstract.HostCore) fail.Error { // nolint
 			return nil
@@ -288,7 +288,7 @@ func TestHost_ForceGetState(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		_, xerr = host.ForceGetState(nil) // nolint
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
@@ -321,7 +321,7 @@ func TestHost_ForceGetState(t *testing.T) {
 		host, err = LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		svc._setLogLevel(2)
 
@@ -389,7 +389,7 @@ func TestHost_Unsafereload(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		ohost, ok := host.(*Host)
 		if !ok {
@@ -460,7 +460,7 @@ func TestHost_Reload(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		xerr = host.Reload(ctx)
 		require.Nil(t, xerr)
@@ -502,7 +502,7 @@ func TestHost_GetState(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		ohost, ok := host.(*Host)
 		if !ok {
@@ -1303,7 +1303,7 @@ func TestHost_GetPrivateIPOnSubnet(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		ip, xerr := host.GetPrivateIPOnSubnet(ctx, "localhost")
 		require.Nil(t, xerr)
@@ -1769,7 +1769,7 @@ func TestHost_ToProtocol(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		protocol, xerr := host.ToProtocol(ctx)
 		require.Nil(t, xerr)
@@ -1835,7 +1835,7 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 		host, err := LoadHost(ctx, svc, "localhost")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-		require.EqualValues(t, host.GetID(), "localhost")
+		require.EqualValues(t, skip(host.GetID()), "localhost")
 
 		_, xerr = svc.CreateSecurityGroup(
 			ctx,

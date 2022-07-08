@@ -213,7 +213,7 @@ func TestSubnet_GetID(t *testing.T) {
 
 	s := NewSubnet()
 	s.ID = "Subnet ID"
-	id := s.GetID()
+	id, _ := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

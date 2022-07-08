@@ -108,7 +108,7 @@ func Test_LoadNetwork(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 	})
 	require.Nil(t, xerr)
@@ -195,7 +195,7 @@ func TestNetwork_Carry(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		onetwork := network.(*Network)
 		xerr = onetwork.carry(ctx, anetwork)
@@ -291,7 +291,7 @@ func TestNetwork_Browse(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		xerr = network.Browse(nil, func(network *abstract.Network) fail.Error { // nolint
 			return nil
@@ -315,7 +315,7 @@ func TestNetwork_Browse(t *testing.T) {
 
 		xerr = network.Browse(ctx, func(network *abstract.Network) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(network).String(), "*abstract.Network")
-			require.EqualValues(t, network.GetID(), "mynetwork")
+			require.EqualValues(t, skip(network.GetID()), "mynetwork")
 			require.EqualValues(t, network.GetName(), "mynetwork")
 			return nil
 		})
@@ -343,7 +343,7 @@ func TestNetwork_Delete(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		xerr = network.Delete(nil) // nolint
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
@@ -388,7 +388,7 @@ func TestNetwork_Delete(t *testing.T) {
 		network, err = LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		xerr = network.Delete(ctx)
 		require.Nil(t, xerr)
@@ -419,7 +419,7 @@ func TestNetwork_GetCIDR(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		onetwork := network.(*Network)
 		cidr, xerr := onetwork.GetCIDR(ctx)
@@ -450,7 +450,7 @@ func TestNetwork_ToProtocol(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		onetwork := network.(*Network)
 		proto, xerr := onetwork.ToProtocol(ctx)
@@ -485,7 +485,7 @@ func TestNetwork_InspectSubnet(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		onetwork := network.(*Network)
 		_, xerr = onetwork.InspectSubnet(ctx, "mynetwork")
@@ -504,7 +504,7 @@ func TestNetwork_InspectSubnet(t *testing.T) {
 		osubnet, err := LoadSubnet(ctx, svc, "", "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(osubnet).String(), "*operations.Subnet")
-		require.EqualValues(t, osubnet.GetID(), "mynetwork")
+		require.EqualValues(t, skip(osubnet.GetID()), "mynetwork")
 
 		xerr = onetwork.AdoptSubnet(ctx, osubnet)
 		require.Nil(t, xerr)
@@ -547,7 +547,7 @@ func Test_FreeCIDRForSingleHost(t *testing.T) {
 		network, err := LoadNetwork(ctx, svc, "mynetwork")
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(network).String(), "*operations.Network")
-		require.EqualValues(t, network.GetID(), "mynetwork")
+		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		xerr = FreeCIDRForSingleHost(ctx, network, 21)
 		require.Nil(t, xerr)

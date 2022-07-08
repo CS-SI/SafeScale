@@ -500,7 +500,8 @@ func TestCluster_GetIdentity(t *testing.T) {
 
 		aci, err := ocluster.GetIdentity(ctx)
 		require.Nil(t, err)
-		require.EqualValues(t, aci.GetID(), "ClusterName")
+		acid, _ := aci.GetID()
+		require.EqualValues(t, acid, "ClusterName")
 		require.EqualValues(t, aci.GetName(), "ClusterName")
 
 	})
