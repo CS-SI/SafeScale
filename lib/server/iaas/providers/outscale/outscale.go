@@ -64,12 +64,29 @@ func remap(s interface{}) map[string]interface{} {
 func get(m map[string]interface{}, key string, def ...string) string {
 	v, ok := m[key]
 	if !ok {
-		if def != nil {
+		if len(def) > 0 {
 			return def[0]
 		}
 		return ""
 	}
 	return v.(string)
+}
+
+func getNotEmpty(m map[string]interface{}, key string, def ...string) string {
+	v, ok := m[key]
+	if ok {
+		val, _ := v.(string) // nolint
+		if val != "" {
+			return val
+		}
+		return def[0]
+	}
+
+	if len(def) > 0 {
+		return def[0]
+	}
+
+	panic("this kind of getters is bad for struct population")
 }
 
 func volumeSpeed(s string) volumespeed.Enum {
@@ -154,7 +171,7 @@ next:
 			Subregion:          get(compute, "Subregion"),
 			DNSList:            dnsServers,
 			DefaultTenancy:     get(compute, "DefaultTenancy", "default"),
-			DefaultImage:       get(compute, "DefaultImage", outscaleDefaultImage),
+			DefaultImage:       getNotEmpty(compute, "DefaultImage", outscaleDefaultImage),
 			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),
 			OperatorUsername:   get(compute, "OperatorUsername", "safescale"),
 		},
@@ -215,6 +232,7 @@ func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Confi
 	if err != nil {
 		return nil, err
 	}
+
 	cfg := providers.ConfigMap{}
 	cfg.Set("AccessKey", opts.AccessKeyID)
 	cfg.Set("SecretKey", opts.SecretAccessKey)

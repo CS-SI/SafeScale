@@ -237,7 +237,7 @@ func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingReq
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-	if count <= 1 {
+	if count < 1 {
 		return nil, fail.InvalidParameterError("count", "must be at least 1")
 	}
 
