@@ -180,7 +180,7 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 }
 
 // CreateHost creates a host meeting the requirements specified by request
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
@@ -197,11 +197,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		return nil, nil, fail.InvalidRequestError(
 			"the host %s must be on at least one network (even if public)", resourceName,
 		)
-	}
-
-	ahfid, err := ahf.GetID()
-	if err != nil {
-		return nil, nil, fail.ConvertError(err)
 	}
 
 	// If no key pair is supplied create one
@@ -237,7 +232,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}
 
 	// Constructs userdata content
-	userData = userdata.NewContent()
+	userData := userdata.NewContent()
 	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
@@ -310,6 +305,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
 
+	var ahf *abstract.HostFull
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -339,6 +335,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 					}
 				}
 			}()
+
+			ahfid, err := ahf.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
 
 			// Wait that Host is ready, not just that the build is started
 			if _, innerXErr = s.WaitHostReady(ctx, ahfid, timings.HostLongOperationTimeout()); innerXErr != nil {

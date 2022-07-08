@@ -223,15 +223,14 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 
 // InspectVolumeAttachment returns the volume attachment identified by id
 func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
-	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
-		return nilA, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if hostRef == "" {
-		return nilA, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 	if vaID == "" {
-		return nilA, fail.InvalidParameterCannotBeEmptyStringError("vaID")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
@@ -240,12 +239,12 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string
 	serverID, diskID := extractFromAttachmentID(vaID)
 	instance, xerr := s.rpcGetInstance(ctx, serverID)
 	if xerr != nil {
-		return nilA, xerr
+		return nil, xerr
 	}
 
 	disk, xerr := s.rpcGetDisk(ctx, diskID)
 	if xerr != nil {
-		return nilA, xerr
+		return nil, xerr
 	}
 
 	for _, v := range instance.Disks {
@@ -261,7 +260,7 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string
 }
 
 func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr) // too many unchecked casts
+	defer fail.OnPanic(&ferr)
 
 	if operation == "tags" {
 		// delete current nat route (is it really necessary ?)

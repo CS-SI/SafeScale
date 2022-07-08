@@ -623,6 +623,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
+			ahc.ID = server.ID
+			ahc.Name = server.Name
+
+			if ahc.ID == "" {
+				return fail.InconsistentError("machine created with empty id")
+			}
+
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
 			if zoneErr != nil {
 				logrus.Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
@@ -640,18 +647,17 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			defer func() {
 				if innerXErr != nil {
-					derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-					if derr != nil {
-						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+					if server != nil && server.ID != "" {
+						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+						if derr != nil {
+							logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+						}
 					}
 				}
 			}()
 
-			ahc.ID = server.ID
-			ahc.Name = server.Name
-
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timings.HostOperationTimeout())
+			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -686,19 +692,21 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.DeleteHost(context.Background(), ahc.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf(
-						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
-					)
-				case *fail.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
+			if ahc != nil && ahc.ID != "" {
+				derr := s.DeleteHost(context.Background(), ahc.ID)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						logrus.Errorf(
+							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
+						)
+					case *fail.ErrTimeout:
+						logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
+					default:
+						logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
+					}
+					_ = ferr.AddConsequence(derr)
 				}
-				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
