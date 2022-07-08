@@ -377,7 +377,7 @@ func TestHostCore_GetID(t *testing.T) {
 	hc := &HostCore{
 		ID: "HostCore ID",
 	}
-	id := hc.GetID()
+	id, _ := hc.GetID()
 	if id != hc.ID {
 		t.Error("Wrong GetID value restitution")
 		t.Fail()
@@ -462,7 +462,7 @@ func TestHostFull_GetID_ThatPanics(t *testing.T) {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
 		var hf *HostFull
-		id := hf.GetID() // this HAS to panic
+		id, _ := hf.GetID() // this HAS to panic
 		_ = id
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
@@ -473,13 +473,13 @@ func TestHostFull_GetID_ThatPanics(t *testing.T) {
 
 func TestHostFull_GetID(t *testing.T) {
 	hf := NewHostFull()
-	id := hf.GetID()
+	id, _ := hf.GetID()
 	if id != "" {
 		t.Error("(empty) *Hostfull has no id")
 		t.Fail()
 	}
 	hf.Core.ID = "HostFullId"
-	id = hf.GetID()
+	id, _ = hf.GetID()
 	if id != hf.Core.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

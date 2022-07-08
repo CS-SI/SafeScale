@@ -140,14 +140,17 @@ func (instance *volume) IsNull() bool {
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *volume) Exists(ctx context.Context) (bool, fail.Error) {
-	theID := instance.GetID()
-	_, err := instance.Service().InspectVolume(ctx, theID)
+	theID, err := instance.GetID()
 	if err != nil {
-		switch err.(type) {
+		return false, fail.ConvertError(err)
+	}
+	_, xerr := instance.Service().InspectVolume(ctx, theID)
+	if xerr != nil {
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			return false, nil
 		default:
-			return false, err
+			return false, xerr
 		}
 	}
 
@@ -308,8 +311,13 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
+	volid, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	// delete volume
-	xerr = instance.Service().DeleteVolume(ctx, instance.GetID())
+	xerr = instance.Service().DeleteVolume(ctx, volid)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -445,7 +453,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	)
 
 	svc := instance.Service()
-	targetID := host.GetID()
+	targetID, err := host.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 	targetName := host.GetName()
 
 	// -- proceed some checks on volume --
@@ -848,7 +859,10 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	targetID := host.GetID()
+	targetID, err := host.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
 	defer tracer.Exiting()
 
@@ -1053,7 +1067,10 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	volumeID := instance.GetID()
+	volumeID, err := instance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
 	volumeName := instance.GetName()
 	out := &protocol.VolumeInspectResponse{
 		Id:          volumeID,

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
+	"github.com/gofrs/uuid"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
@@ -350,8 +350,11 @@ func (hc *HostCore) GetName() string {
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (hc *HostCore) GetID() string {
-	return hc.ID
+func (hc *HostCore) GetID() (string, error) {
+	if hc == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return hc.ID, nil
 }
 
 // HostNetworking contains subnets information related to Host
@@ -427,8 +430,11 @@ func (hf *HostFull) OK() bool {
 
 // GetID returns the ID of the host
 // satisfies interface data.Identifiable
-func (hf *HostFull) GetID() string {
-	return hf.Core.ID
+func (hf *HostFull) GetID() (string, error) {
+	if hf == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return hf.Core.ID, nil
 }
 
 // GetName returns the name of the host

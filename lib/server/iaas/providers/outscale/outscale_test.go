@@ -218,6 +218,7 @@ func Test_VMWithGPU(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, h)
-	err = tt.Service.DeleteHost(context.Background(), h.GetID())
+	hid, _ := h.GetID()
+	err = tt.Service.DeleteHost(context.Background(), hid)
 	assert.NoError(t, err)
 }

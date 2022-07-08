@@ -561,6 +561,9 @@ func (instance *SecurityGroup) GetName() string {
 
 // GetID returns the ID of the securitygroup
 // Satisfies interface data.Identifiable
-func (instance *SecurityGroup) GetID() string {
-	return instance.ID
+func (instance *SecurityGroup) GetID() (string, error) {
+	if instance == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return instance.ID, nil
 }

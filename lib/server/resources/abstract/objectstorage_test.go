@@ -181,7 +181,7 @@ func TestObjectStorageBucket_GetName(t *testing.T) {
 func TestObjectStorageBucket_GetID(t *testing.T) {
 
 	n := ObjectStorageBucket{}
-	id := n.GetID()
+	id, _ := n.GetID()
 	if id != "" {
 		t.Error("Can't read id when no name given")
 		t.Fail()
@@ -190,7 +190,7 @@ func TestObjectStorageBucket_GetID(t *testing.T) {
 		ID:   "ObjectStorageBucket ID",
 		Name: "ObjectStorageBucket Name",
 	}
-	id = n.GetID()
+	id, _ = n.GetID()
 	if id != n.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -265,7 +265,8 @@ func TestObjectStorageItem_GetID(t *testing.T) {
 		},
 	}
 
-	if osi.GetID() != osi.ItemID {
+	osid, _ := osi.GetID()
+	if osid != osi.ItemID {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}

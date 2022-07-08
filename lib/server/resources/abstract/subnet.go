@@ -155,8 +155,11 @@ func (s *Subnet) GetName() string {
 
 // GetID ...
 // satisfies interface data.Identifiable
-func (s *Subnet) GetID() string {
-	return s.ID
+func (s *Subnet) GetID() (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return s.ID, nil
 }
 
 func (s *Subnet) GetCIDR() string {

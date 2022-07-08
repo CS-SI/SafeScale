@@ -146,6 +146,9 @@ func (n *Network) GetName() string {
 
 // GetID ...
 // satisfies interface data.Identifiable
-func (n *Network) GetID() string {
-	return n.ID
+func (n *Network) GetID() (string, error) {
+	if n == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return n.ID, nil
 }

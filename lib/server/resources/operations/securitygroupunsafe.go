@@ -221,6 +221,12 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 	go func() {
 		defer close(chRes)
 
+		sgid, err := instance.GetID()
+		if err != nil {
+			chRes <- result{fail.ConvertError(err)}
+			return
+		}
+
 		// -- update Security Groups in Network metadata
 		networkInstance, xerr := LoadNetwork(ctx, instance.Service(), networkID)
 		if xerr != nil {
@@ -235,7 +241,7 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 					return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				delete(nsgV1.ByID, instance.GetID())
+				delete(nsgV1.ByID, sgid)
 				delete(nsgV1.ByName, instance.GetName())
 				return nil
 			})
@@ -376,6 +382,12 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 			return
 		}
 
+		sgid, err := instance.GetID()
+		if err != nil {
+			chRes <- result{fail.ConvertError(err)}
+			return
+		}
+
 		// Unbind Security Group from Hosts attached to Subnet
 		_, xerr = instance.taskUnbindFromHostsAttachedToSubnet(task, params)
 		if xerr != nil {
@@ -391,7 +403,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 					return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), params.subnetID)
+				innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, sgid, params.subnetID)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
@@ -530,6 +542,12 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 	go func() {
 		defer close(chRes)
 
+		sgid, err := instance.GetID()
+		if err != nil {
+			chRes <- result{fail.ConvertError(err)}
+			return
+		}
+
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
 				asg, ok := clonable.(*abstract.SecurityGroup)
@@ -541,7 +559,11 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 					return fail.InvalidRequestError("security group is already marked as default for host %s", asg.DefaultForHost)
 				}
 
-				asg.DefaultForHost = hostInstance.GetID()
+				var err error
+				asg.DefaultForHost, err = hostInstance.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
 			}
 
 			return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
@@ -551,7 +573,11 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 				}
 
 				// First check if host is present; if not present or state is different, replace the entry
-				hostID := hostInstance.GetID()
+				hostID, err := hostInstance.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
+
 				hostName := hostInstance.GetName()
 				disable := !bool(enable)
 				if item, ok := sghV1.ByID[hostID]; !ok || item.Disabled == disable {
@@ -569,7 +595,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 				switch enable {
 				case resources.SecurityGroupEnable:
 					// In case the security group is already bound, we must consider a "duplicate" error has a success
-					xerr := instance.Service().BindSecurityGroupToHost(ctx, instance.GetID(), hostID)
+					xerr := instance.Service().BindSecurityGroupToHost(ctx, sgid, hostID)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -582,7 +608,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 					}
 				case resources.SecurityGroupDisable:
 					// In case the security group has to be disabled, we must consider a "not found" error has a success
-					xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID)
+					xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {

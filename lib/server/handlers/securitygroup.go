@@ -95,7 +95,12 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 		return nil, xerr
 	}
 
-	xerr = sgInstance.Create(handler.job.Context(), networkInstance.GetID(), sgName, description, rules)
+	nid, err := networkInstance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	xerr = sgInstance.Create(handler.job.Context(), nid, sgName, description, rules)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -152,8 +152,11 @@ func (instance *Feature) GetName() string {
 }
 
 // GetID ...
-func (instance *Feature) GetID() string {
-	return instance.GetName()
+func (instance *Feature) GetID() (string, error) {
+	if instance == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
+	return instance.GetName(), nil
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling

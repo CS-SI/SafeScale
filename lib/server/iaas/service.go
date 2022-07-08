@@ -270,9 +270,9 @@ func (instance service) WaitHostState(ctx context.Context, hostID string, state 
 	}
 }
 
-// WaitVolumeState waits a host achieve state
+// WaitVolumeState waits until a volume achieves state
 // If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitVolumeState(ctx context.Context, volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
+func (instance service) WaitVolumeState(inctx context.Context, volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -280,90 +280,137 @@ func (instance service) WaitVolumeState(ctx context.Context, volumeID string, st
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("volumeID")
 	}
 
-	cout := make(chan int)
-	next := make(chan bool)
-	vc := make(chan *abstract.Volume)
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	go pollVolume(ctx, instance, volumeID, state, cout, next, vc)
-	for {
-		select {
-		case res := <-cout:
-			if res == 0 {
-				return nil, fail.NewError("error getting host state")
-			}
-			if res == 1 {
-				return <-vc, nil
-			}
-			if res == 2 {
-				next <- true
-			}
-		case <-time.After(timeout):
-			next <- false
-			return nil, fail.TimeoutError(nil, timeout, "Wait host state timeout")
-		}
+	type result struct {
+		rTr  *abstract.Volume
+		rErr fail.Error
 	}
-}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-func pollVolume(
-	ctx context.Context, svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
-) {
-	var crash error
-	defer fail.SilentOnPanic(&crash)
+		for {
+			v, err := instance.InspectVolume(ctx, volumeID)
+			if err != nil {
+				chRes <- result{nil, err}
+				return
+			}
+			if v.State == state {
+				chRes <- result{v, nil}
+				return
+			}
 
-	for {
-		v, err := svc.InspectVolume(ctx, volumeID)
-		if err != nil {
-			cout <- 0
-			return
+			// if all implementations of InspectVolume handle ctx correctly (they check if ctx is Done) this is not necessary...
+			// but not all InspecVolume implementation does, so...
+			breakIt := false
+			select {
+			case <-ctx.Done():
+				breakIt = true
+			default:
+			}
+
+			if breakIt {
+				break
+			}
 		}
-		if v.State == state {
-			cout <- 1
-			hostc <- v
-			return
-		}
-		cout <- 2
-		if !<-next {
-			return
-		}
+
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	case <-time.After(timeout):
+		return nil, fail.TimeoutError(nil, timeout, "Wait host state timeout")
 	}
 }
 
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (instance service) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
+func (instance service) ListTemplates(inctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := instance.Provider.ListTemplates(ctx, all)
-	if err != nil {
-		return nil, err
-	}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	if all {
-		return allTemplates, nil
+	type result struct {
+		rTr  []*abstract.HostTemplate
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	return instance.reduceTemplates(allTemplates, instance.whitelistTemplateREs, instance.blacklistTemplateREs), nil
+		allTemplates, err := instance.Provider.ListTemplates(ctx, all)
+		if err != nil {
+			chRes <- result{nil, err}
+			return
+		}
+
+		if all {
+			chRes <- result{allTemplates, nil}
+			return
+		}
+
+		chRes <- result{instance.reduceTemplates(allTemplates, instance.whitelistTemplateREs, instance.blacklistTemplateREs), nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // FindTemplateByName returns the template by its name
-func (instance service) FindTemplateByName(ctx context.Context, name string) (*abstract.HostTemplate, fail.Error) {
+func (instance service) FindTemplateByName(inctx context.Context, name string) (*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := instance.Provider.ListTemplates(ctx, true)
-	if err != nil {
-		return nil, err
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  *abstract.HostTemplate
+		rErr fail.Error
 	}
-	for _, i := range allTemplates {
-		i := i
-		if i.Name == name {
-			return i, nil
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		allTemplates, err := instance.Provider.ListTemplates(ctx, true)
+		if err != nil {
+			chRes <- result{nil, err}
+			return
 		}
+		for _, i := range allTemplates {
+			i := i
+			if i.Name == name {
+				chRes <- result{i, nil}
+				return
+			}
+		}
+		chRes <- result{nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-	return nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
 }
 
 // FindTemplateByID returns the template by its ID
@@ -386,54 +433,79 @@ func (instance service) FindTemplateByID(ctx context.Context, id string) (*abstr
 }
 
 // FindTemplateBySizing returns an abstracted template corresponding to the Host Sizing Requirements
-func (instance service) FindTemplateBySizing(ctx context.Context, sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
-	useScannerDB := sizing.MinGPU > 0 || sizing.MinCPUFreq > 0
+func (instance service) FindTemplateBySizing(inctx context.Context, sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	// if we want a specific template and there is a match, we take it
-	if sizing.Template != "" {
-		// if match by name, we take it
-		if ft, xerr := instance.FindTemplateByName(ctx, sizing.Template); xerr == nil {
-			return ft, nil
-		}
-
-		// match by ID is also valid
-		if ft, xerr := instance.FindTemplateByID(ctx, sizing.Template); xerr == nil {
-			return ft, nil
-		}
-
-		// if we reached this point with a template in mind, it means that was not available, so we issue a warning about it
-		logrus.Warnf("template %s not found", sizing.Template)
+	type result struct {
+		rTr  *abstract.HostTemplate
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	templates, xerr := instance.ListTemplatesBySizing(ctx, sizing, useScannerDB)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
-	}
+		useScannerDB := sizing.MinGPU > 0 || sizing.MinCPUFreq > 0
 
-	var template *abstract.HostTemplate
-	if len(templates) > 0 {
-		template = templates[0]
-		msg := fmt.Sprintf(
-			"Selected host template: '%s' (%d core%s", template.Name, template.Cores,
-			strprocess.Plural(uint(template.Cores)),
-		)
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
+		// if we want a specific template and there is a match, we take it
+		if sizing.Template != "" {
+			// if match by name, we take it
+			if ft, xerr := instance.FindTemplateByName(ctx, sizing.Template); xerr == nil {
+				chRes <- result{ft, nil}
+				return
 			}
+
+			// match by ID is also valid
+			if ft, xerr := instance.FindTemplateByID(ctx, sizing.Template); xerr == nil {
+				chRes <- result{ft, nil}
+				return
+			}
+
+			// if we reached this point with a template in mind, it means that was not available, so we issue a warning about it
+			logrus.Warnf("template %s not found", sizing.Template)
 		}
-		msg += ")"
-		logrus.Infof(msg)
-	} else {
-		logrus.Errorf("failed to find template corresponding to requested resources")
-		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+
+		templates, xerr := instance.ListTemplatesBySizing(ctx, sizing, useScannerDB)
+		if xerr != nil {
+			chRes <- result{nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")}
+			return
+		}
+
+		var template *abstract.HostTemplate
+		if len(templates) > 0 {
+			template = templates[0]
+			msg := fmt.Sprintf(
+				"Selected host template: '%s' (%d core%s", template.Name, template.Cores,
+				strprocess.Plural(uint(template.Cores)),
+			)
+			if template.CPUFreq > 0 {
+				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+			}
+			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+			if template.GPUNumber > 0 {
+				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+				if template.GPUType != "" {
+					msg += fmt.Sprintf(" %s", template.GPUType)
+				}
+			}
+			msg += ")"
+			logrus.Infof(msg)
+		} else {
+			logrus.Errorf("failed to find template corresponding to requested resources")
+			chRes <- result{nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")}
+			return
+		}
+		chRes <- result{template, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-	return template, nil
 }
 
 // reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
@@ -474,207 +546,237 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 // ListTemplatesBySizing select templates satisfying sizing requirements
 // returned list is ordered by size fitting
 func (instance service) ListTemplatesBySizing(
-	ctx context.Context, sizing abstract.HostSizingRequirements, force bool,
+	inctx context.Context, sizing abstract.HostSizingRequirements, force bool,
 ) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(context.Background(), true, "").Entering()
+	tracer := debug.NewTracer(inctx, true, "").Entering()
 	defer tracer.Exiting()
 
-	allTpls, rerr := instance.ListTemplates(ctx, false)
-	if rerr != nil {
-		return nil, rerr
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  []*abstract.HostTemplate
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	scannerTpls := map[string]bool{}
-	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
-	if askedForSpecificScannerInfo {
-		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
-		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
-		if err != nil {
-			if force {
-				logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
-			} else {
-				var noHostError string
-				if sizing.MinCPUFreq <= 0 {
-					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
-				} else {
-					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
-				}
-				return nil, fail.NewError(noHostError)
-			}
-		} else {
-			authOpts, rerr := instance.GetAuthenticationOptions(ctx)
-			if rerr != nil {
-				return nil, rerr
-			}
+		allTpls, rerr := instance.ListTemplates(ctx, false)
+		if rerr != nil {
+			chRes <- result{nil, rerr}
+			return
+		}
 
-			region, ok := authOpts.Get("Region")
-			if !ok {
-				return nil, fail.SyntaxError("region value unset")
-			}
-
-			svcName, xerr := instance.GetName()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			folder := fmt.Sprintf("images/%s/%s", svcName, region)
-
-			imageList, err := db.ReadAll(folder)
+		scannerTpls := map[string]bool{}
+		askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
+		if askedForSpecificScannerInfo {
+			_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+			db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 			if err != nil {
 				if force {
 					logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 				} else {
 					var noHostError string
 					if sizing.MinCPUFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+						noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
+						noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 					}
-					logrus.Error(noHostError)
-					return nil, fail.NewError(noHostError)
+					chRes <- result{nil, fail.NewError(noHostError)}
+					return
 				}
 			} else {
-				var images []abstract.StoredCPUInfo
-				for _, f := range imageList {
-					imageFound := abstract.StoredCPUInfo{}
-					if err := json.Unmarshal(f, &imageFound); err != nil {
-						return nil, fail.Wrap(err, "error unmarshalling image '%s'")
-					}
-
-					// if the user asked explicitly no gpu
-					if sizing.MinGPU == 0 && imageFound.GPU != 0 {
-						continue
-					}
-
-					if imageFound.GPU < sizing.MinGPU {
-						continue
-					}
-
-					if imageFound.CPUFrequency < float64(sizing.MinCPUFreq) {
-						continue
-					}
-
-					images = append(images, imageFound)
+				authOpts, rerr := instance.GetAuthenticationOptions(ctx)
+				if rerr != nil {
+					chRes <- result{nil, rerr}
+					return
 				}
 
-				if !force && (len(images) == 0) {
-					var noHostError string
-					if sizing.MinCPUFreq <= 0 {
-						noHostError = fmt.Sprintf(
-							"Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU,
-						)
+				region, ok := authOpts.Get("Region")
+				if !ok {
+					chRes <- result{nil, fail.SyntaxError("region value unset")}
+					return
+				}
+
+				svcName, xerr := instance.GetName()
+				if xerr != nil {
+					chRes <- result{nil, xerr}
+					return
+				}
+
+				folder := fmt.Sprintf("images/%s/%s", svcName, region)
+
+				imageList, err := db.ReadAll(folder)
+				if err != nil {
+					if force {
+						logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 					} else {
-						noHostError = fmt.Sprintf(
-							"Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements",
-							sizing.MinGPU, sizing.MinCPUFreq,
-						)
+						var noHostError string
+						if sizing.MinCPUFreq <= 0 {
+							noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+						} else {
+							noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
+						}
+						logrus.Error(noHostError)
+						chRes <- result{nil, fail.NewError(noHostError)}
+						return
 					}
-					logrus.Error(noHostError)
-					return nil, fail.NewError(noHostError)
+				} else {
+					var images []abstract.StoredCPUInfo
+					for _, f := range imageList {
+						imageFound := abstract.StoredCPUInfo{}
+						if err := json.Unmarshal(f, &imageFound); err != nil {
+							chRes <- result{nil, fail.Wrap(err, "error unmarshalling image '%s'")}
+							return
+						}
+
+						// if the user asked explicitly no gpu
+						if sizing.MinGPU == 0 && imageFound.GPU != 0 {
+							continue
+						}
+
+						if imageFound.GPU < sizing.MinGPU {
+							continue
+						}
+
+						if imageFound.CPUFrequency < float64(sizing.MinCPUFreq) {
+							continue
+						}
+
+						images = append(images, imageFound)
+					}
+
+					if !force && (len(images) == 0) {
+						var noHostError string
+						if sizing.MinCPUFreq <= 0 {
+							noHostError = fmt.Sprintf(
+								"Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU,
+							)
+						} else {
+							noHostError = fmt.Sprintf(
+								"Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements",
+								sizing.MinGPU, sizing.MinCPUFreq,
+							)
+						}
+						logrus.Error(noHostError)
+						chRes <- result{nil, fail.NewError(noHostError)}
+						return
+					}
+
+					for _, image := range images {
+						scannerTpls[image.TemplateID] = true
+					}
 				}
+			}
+		}
 
-				for _, image := range images {
-					scannerTpls[image.TemplateID] = true
+		reducedTmpls := instance.reduceTemplates(allTpls, instance.whitelistTemplateREs, instance.blacklistTemplateREs)
+		if sizing.MinGPU < 1 {
+			// Force filtering of known templates with GPU from template list when sizing explicitly asks for no GPU
+			gpus, xerr := instance.GetRegexpsOfTemplatesWithGPU()
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return
+			}
+			reducedTmpls = instance.reduceTemplates(reducedTmpls, nil, gpus)
+		}
+
+		if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
+			logrus.Debugf("Looking for a host template as small as possible")
+		} else {
+			coreMsg := ""
+			if sizing.MinCores > 0 {
+				if sizing.MaxCores > 0 {
+					coreMsg = fmt.Sprintf("between %d and %d", sizing.MinCores, sizing.MaxCores)
+				} else {
+					coreMsg = fmt.Sprintf("at least %d", sizing.MinCores)
 				}
-			}
-		}
-	}
-
-	reducedTmpls := instance.reduceTemplates(allTpls, instance.whitelistTemplateREs, instance.blacklistTemplateREs)
-	if sizing.MinGPU < 1 {
-		// Force filtering of known templates with GPU from template list when sizing explicitly asks for no GPU
-		gpus, xerr := instance.GetRegexpsOfTemplatesWithGPU()
-		if xerr != nil {
-			return nil, xerr
-		}
-		reducedTmpls = instance.reduceTemplates(reducedTmpls, nil, gpus)
-	}
-
-	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
-		logrus.Debugf("Looking for a host template as small as possible")
-	} else {
-		coreMsg := ""
-		if sizing.MinCores > 0 {
-			if sizing.MaxCores > 0 {
-				coreMsg = fmt.Sprintf("between %d and %d", sizing.MinCores, sizing.MaxCores)
 			} else {
-				coreMsg = fmt.Sprintf("at least %d", sizing.MinCores)
+				coreMsg = fmt.Sprintf("at most %d", sizing.MaxCores)
 			}
-		} else {
-			coreMsg = fmt.Sprintf("at most %d", sizing.MaxCores)
-		}
-		ramMsg := ""
-		if sizing.MinRAMSize > 0 {
-			if sizing.MaxRAMSize > 0 {
-				ramMsg = fmt.Sprintf("between %.01f and %.01f", sizing.MinRAMSize, sizing.MaxRAMSize)
+			ramMsg := ""
+			if sizing.MinRAMSize > 0 {
+				if sizing.MaxRAMSize > 0 {
+					ramMsg = fmt.Sprintf("between %.01f and %.01f", sizing.MinRAMSize, sizing.MaxRAMSize)
+				} else {
+					ramMsg = fmt.Sprintf("at least %.01f", sizing.MinRAMSize)
+				}
 			} else {
-				ramMsg = fmt.Sprintf("at least %.01f", sizing.MinRAMSize)
+				coreMsg = fmt.Sprintf("at most %.01f", sizing.MaxRAMSize)
 			}
-		} else {
-			coreMsg = fmt.Sprintf("at most %.01f", sizing.MaxRAMSize)
+			diskMsg := ""
+			if sizing.MinDiskSize > 0 {
+				diskMsg = fmt.Sprintf(" and at least %d GB of disk", sizing.MinDiskSize)
+			}
+			gpuMsg := ""
+			if sizing.MinGPU >= 0 {
+				gpuMsg = fmt.Sprintf("%d GPU%s", sizing.MinGPU, strprocess.Plural(uint(sizing.MinGPU)))
+			}
+			logrus.Debugf(
+				fmt.Sprintf(
+					"Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg,
+				),
+			)
 		}
-		diskMsg := ""
-		if sizing.MinDiskSize > 0 {
-			diskMsg = fmt.Sprintf(" and at least %d GB of disk", sizing.MinDiskSize)
+
+		for _, t := range reducedTmpls {
+			msg := fmt.Sprintf(
+				"Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores,
+				t.RAMSize, t.GPUNumber, t.DiskSize,
+			)
+			msg += " %s"
+			if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
+				logrus.Tracef(msg, "not enough cores")
+				continue
+			}
+			if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
+				logrus.Tracef(msg, "too many cores")
+				continue
+			}
+			if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
+				logrus.Tracef(msg, "not enough RAM")
+				continue
+			}
+			if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
+				logrus.Tracef(msg, "too many RAM")
+				continue
+			}
+			if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
+				logrus.Tracef(msg, "not enough disk")
+				continue
+			}
+			if t.DiskSize > 0 && sizing.MaxDiskSize > 0 && t.DiskSize > sizing.MaxDiskSize {
+				logrus.Tracef(msg, "too many disk")
+				continue
+			}
+			if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
+				logrus.Tracef(msg, "too many GPU")
+				continue
+			}
+
+			if _, ok := scannerTpls[t.ID]; (ok || !askedForSpecificScannerInfo) && t.ID != "" {
+				newT := t
+				selectedTpls = append(selectedTpls, newT)
+			}
 		}
-		gpuMsg := ""
-		if sizing.MinGPU >= 0 {
-			gpuMsg = fmt.Sprintf("%d GPU%s", sizing.MinGPU, strprocess.Plural(uint(sizing.MinGPU)))
-		}
-		logrus.Debugf(
-			fmt.Sprintf(
-				"Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg,
-			),
-		)
+
+		sort.Sort(ByRankDRF(selectedTpls))
+		chRes <- result{selectedTpls, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	for _, t := range reducedTmpls {
-		msg := fmt.Sprintf(
-			"Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores,
-			t.RAMSize, t.GPUNumber, t.DiskSize,
-		)
-		msg += " %s"
-		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
-			logrus.Tracef(msg, "not enough cores")
-			continue
-		}
-		if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
-			logrus.Tracef(msg, "too many cores")
-			continue
-		}
-		if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
-			logrus.Tracef(msg, "not enough RAM")
-			continue
-		}
-		if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
-			logrus.Tracef(msg, "too many RAM")
-			continue
-		}
-		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
-			logrus.Tracef(msg, "not enough disk")
-			continue
-		}
-		if t.DiskSize > 0 && sizing.MaxDiskSize > 0 && t.DiskSize > sizing.MaxDiskSize {
-			logrus.Tracef(msg, "too many disk")
-			continue
-		}
-		if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
-			logrus.Tracef(msg, "too many GPU")
-			continue
-		}
-
-		if _, ok := scannerTpls[t.ID]; (ok || !askedForSpecificScannerInfo) && t.ID != "" {
-			newT := t
-			selectedTpls = append(selectedTpls, newT)
-		}
-	}
-
-	sort.Sort(ByRankDRF(selectedTpls))
-	return selectedTpls, nil
 }
 
 type scoredImage struct {
@@ -689,45 +791,68 @@ func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
-func (instance service) FilterImages(ctx context.Context, filter string) ([]*abstract.Image, fail.Error) {
+func (instance service) FilterImages(inctx context.Context, filter string) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := instance.ListImages(ctx, false)
-	if err != nil {
-		return nil, err
-	}
-	imgs = instance.reduceImages(imgs)
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	if len(filter) == 0 {
-		return imgs, nil
+	type result struct {
+		rTr  []*abstract.Image
+		rErr fail.Error
 	}
-	var simgs []scoredImage
-	// fields := strings.Split(strings.ToUpper(osname), " ")
-	for _, img := range imgs {
-		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(filter), 0.7, 5)
-		// score := matchScore(fields, strings.ToUpper(img.Name))
-		// score := SimilarityScore(filter, img.Name)
-		if score > 0.5 {
-			simgs = append(
-				simgs, scoredImage{
-					Image: *img,
-					score: score,
-				},
-			)
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		imgs, err := instance.ListImages(ctx, false)
+		if err != nil {
+			chRes <- result{nil, err}
+			return
+		}
+		imgs = instance.reduceImages(imgs)
+
+		if len(filter) == 0 {
+			chRes <- result{imgs, nil}
+			return
+		}
+		var simgs []scoredImage
+		// fields := strings.Split(strings.ToUpper(osname), " ")
+		for _, img := range imgs {
+			// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
+			score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(filter), 0.7, 5)
+			// score := matchScore(fields, strings.ToUpper(img.Name))
+			// score := SimilarityScore(filter, img.Name)
+			if score > 0.5 {
+				simgs = append(
+					simgs, scoredImage{
+						Image: *img,
+						score: score,
+					},
+				)
+			}
+
+		}
+		var fimgs []*abstract.Image
+		sort.Sort(scoredImages(simgs))
+		for _, simg := range simgs {
+			simg := simg
+			fimgs = append(fimgs, &simg.Image)
 		}
 
+		chRes <- result{fimgs, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-	var fimgs []*abstract.Image
-	sort.Sort(scoredImages(simgs))
-	for _, simg := range simgs {
-		simg := simg
-		fimgs = append(fimgs, &simg.Image)
-	}
-
-	return fimgs, nil
 }
 
 func (instance service) reduceImages(imgs []*abstract.Image) []*abstract.Image {
@@ -763,20 +888,43 @@ func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 }
 
 // ListImages reduces the list of needed, if all bool is true, all images are returned, if not, images are filtered using blacklists and whitelists
-func (instance service) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
+func (instance service) ListImages(inctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := instance.Provider.ListImages(ctx, all)
-	if err != nil {
-		return nil, err
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  []*abstract.Image
+		rErr fail.Error
 	}
-	return instance.reduceImages(imgs), nil
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		imgs, err := instance.Provider.ListImages(ctx, all)
+		if err != nil {
+			chRes <- result{nil, err}
+			return
+		}
+
+		chRes <- result{instance.reduceImages(imgs), nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // SearchImage search an image corresponding to OS Name
-func (instance service) SearchImage(ctx context.Context, osname string) (*abstract.Image, fail.Error) {
+func (instance service) SearchImage(inctx context.Context, osname string) (*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -784,49 +932,73 @@ func (instance service) SearchImage(ctx context.Context, osname string) (*abstra
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
 	}
 
-	imgs, xerr := instance.ListImages(ctx, false)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(imgs) == 0 {
-		return nil, fail.NotFoundError("unable to find an image matching '%s', 0 results returned by the service listing images", osname)
-	}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	reg := regexp.MustCompile("[^A-Z0-9]")
+	type result struct {
+		rTr  *abstract.Image
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
 
-	var maxLength int
-	for _, img := range imgs {
-		length := len(img.Name)
-		if maxLength < length {
-			maxLength = length
+		imgs, xerr := instance.ListImages(ctx, false)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
 		}
-	}
+		if len(imgs) == 0 {
+			chRes <- result{nil, fail.NotFoundError("unable to find an image matching '%s', 0 results returned by the service listing images", osname)}
+			return
+		}
 
-	normalizedOSName := normalizeString(osname, reg)
-	paddedNormalizedOSName := addPadding(normalizedOSName, maxLength)
+		reg := regexp.MustCompile("[^A-Z0-9]")
 
-	minWFScore := -1
-	wfSelect := -1
-	for i, entry := range imgs {
-		normalizedImageName := normalizeString(entry.Name, reg)
-		normalizedImageName = addPadding(normalizedImageName, maxLength)
-		if strings.Contains(normalizedImageName, normalizedOSName) {
-			wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
-			logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
-
-			if minWFScore == -1 || wfScore < minWFScore {
-				minWFScore = wfScore
-				wfSelect = i
+		var maxLength int
+		for _, img := range imgs {
+			length := len(img.Name)
+			if maxLength < length {
+				maxLength = length
 			}
 		}
-	}
 
-	if wfSelect < 0 {
-		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
-	}
+		normalizedOSName := normalizeString(osname, reg)
+		paddedNormalizedOSName := addPadding(normalizedOSName, maxLength)
 
-	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
-	return imgs[wfSelect], nil
+		minWFScore := -1
+		wfSelect := -1
+		for i, entry := range imgs {
+			normalizedImageName := normalizeString(entry.Name, reg)
+			normalizedImageName = addPadding(normalizedImageName, maxLength)
+			if strings.Contains(normalizedImageName, normalizedOSName) {
+				wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
+				logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+
+				if minWFScore == -1 || wfScore < minWFScore {
+					minWFScore = wfScore
+					wfSelect = i
+				}
+			}
+		}
+
+		if wfSelect < 0 {
+			chRes <- result{nil, fail.NotFoundError("unable to find an image matching '%s'", osname)}
+			return
+		}
+
+		logrus.Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
+		chRes <- result{imgs[wfSelect], nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 func normalizeString(in string, reg *regexp.Regexp) string {
@@ -849,76 +1021,128 @@ func addPadding(in string, maxLength int) string {
 }
 
 // CreateHostWithKeyPair creates a host
-func (instance service) CreateHostWithKeyPair(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
+func (instance service) CreateHostWithKeyPair(inctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
-	found := true
-	ah := abstract.NewHostCore()
-	ah.Name = request.ResourceName
-	_, rerr := instance.InspectHost(ctx, ah)
-	var nilErrNotFound *fail.ErrNotFound = nil // nolint
-	if rerr != nil && rerr != nilErrNotFound {
-		if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
-			return nil, nil, nil, fail.ConvertError(rerr)
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		hf   *abstract.HostFull
+		uc   *userdata.Content
+		ak   *abstract.KeyPair
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		found := true
+		ah := abstract.NewHostCore()
+		ah.Name = request.ResourceName
+		_, rerr := instance.InspectHost(ctx, ah)
+		var nilErrNotFound *fail.ErrNotFound = nil // nolint
+		if rerr != nil && rerr != nilErrNotFound {
+			if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
+				chRes <- result{nil, nil, nil, fail.ConvertError(rerr)}
+				return
+			}
+			found = false
+			debug.IgnoreError(rerr)
 		}
-		found = false
-		debug.IgnoreError(rerr)
+
+		if found {
+			chRes <- result{nil, nil, nil, abstract.ResourceDuplicateError("host", request.ResourceName)}
+			return
+		}
+
+		// Create temporary key pair
+		kpNameuuid, err := uuid.NewV4()
+		if err != nil {
+			chRes <- result{nil, nil, nil, fail.ConvertError(err)}
+			return
+		}
+
+		kpName := kpNameuuid.String()
+		kp, rerr := instance.CreateKeyPair(ctx, kpName)
+		if rerr != nil {
+			chRes <- result{nil, nil, nil, rerr}
+			return
+		}
+
+		// Create host
+		hostReq := abstract.HostRequest{
+			ResourceName:   request.ResourceName,
+			HostName:       request.HostName,
+			ImageID:        request.ImageID,
+			ImageRef:       request.ImageID,
+			KeyPair:        kp,
+			PublicIP:       request.PublicIP,
+			Subnets:        request.Subnets,
+			DefaultRouteIP: request.DefaultRouteIP,
+			DiskSize:       request.DiskSize,
+			// DefaultGateway: request.DefaultGateway,
+			TemplateID: request.TemplateID,
+		}
+		host, userData, rerr := instance.CreateHost(ctx, hostReq)
+		if rerr != nil {
+			chRes <- result{nil, nil, nil, rerr}
+			return
+		}
+		chRes <- result{host, userData, kp, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.hf, res.uc, res.ak, res.rErr
+	case <-ctx.Done():
+		return nil, nil, nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, nil, nil, fail.ConvertError(inctx.Err())
 	}
 
-	if found {
-		return nil, nil, nil, abstract.ResourceDuplicateError("host", request.ResourceName)
-	}
-
-	// Create temporary key pair
-	kpNameuuid, err := uuid.NewV4()
-	if err != nil {
-		return nil, nil, nil, fail.ConvertError(err)
-	}
-
-	kpName := kpNameuuid.String()
-	kp, rerr := instance.CreateKeyPair(ctx, kpName)
-	if rerr != nil {
-		return nil, nil, nil, rerr
-	}
-
-	// Create host
-	hostReq := abstract.HostRequest{
-		ResourceName:   request.ResourceName,
-		HostName:       request.HostName,
-		ImageID:        request.ImageID,
-		ImageRef:       request.ImageID,
-		KeyPair:        kp,
-		PublicIP:       request.PublicIP,
-		Subnets:        request.Subnets,
-		DefaultRouteIP: request.DefaultRouteIP,
-		DiskSize:       request.DiskSize,
-		// DefaultGateway: request.DefaultGateway,
-		TemplateID: request.TemplateID,
-	}
-	host, userData, rerr := instance.CreateHost(ctx, hostReq)
-	if rerr != nil {
-		return nil, nil, nil, rerr
-	}
-	return host, userData, kp, nil
 }
 
 // ListHostsByName list hosts by name
-func (instance service) ListHostsByName(ctx context.Context, details bool) (map[string]*abstract.HostFull, fail.Error) {
+func (instance service) ListHostsByName(inctx context.Context, details bool) (map[string]*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	hosts, err := instance.ListHosts(ctx, details)
-	if err != nil {
-		return nil, err
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  map[string]*abstract.HostFull
+		rErr fail.Error
 	}
-	hostMap := make(map[string]*abstract.HostFull)
-	for _, host := range hosts {
-		hostMap[host.Core.Name] = host
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		hosts, err := instance.ListHosts(ctx, details)
+		if err != nil {
+			chRes <- result{nil, err}
+			return
+		}
+		hostMap := make(map[string]*abstract.HostFull)
+		for _, host := range hosts {
+			hostMap[host.Core.Name] = host
+		}
+		chRes <- result{hostMap, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-	return hostMap, nil
+
 }
 
 // TenantCleanup removes everything related to SafeScale from tenant (mainly metadata)
@@ -934,44 +1158,136 @@ func (instance service) TenantCleanup(ctx context.Context, force bool) fail.Erro
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (instance service) LookupRuleInSecurityGroup(
-	ctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
+	inctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
 ) (bool, fail.Error) {
 	if valid.IsNil(asg) {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 
-	_, xerr := asg.Rules.IndexOfEquivalentRule(rule)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			return false, nil
-		default:
-			return false, xerr
-		}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  bool
+		rErr fail.Error
 	}
-	return true, nil
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		_, xerr := asg.Rules.IndexOfEquivalentRule(rule)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				chRes <- result{false, nil}
+				return
+			default:
+				chRes <- result{false, xerr}
+				return
+			}
+		}
+		chRes <- result{true, nil}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return false, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return false, fail.ConvertError(inctx.Err())
+	}
 }
 
 // InspectHostByName hides the "complexity" of the way to get Host by name
-func (instance service) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
+func (instance service) InspectHostByName(inctx context.Context, name string) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return instance.InspectHost(ctx, abstract.NewHostCore().SetName(name))
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  *abstract.HostFull
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		ah, xerr := instance.InspectHost(ctx, abstract.NewHostCore().SetName(name))
+		chRes <- result{ah, xerr}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
-func (instance service) InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error) {
+func (instance service) InspectSecurityGroupByName(inctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return instance.InspectSecurityGroup(ctx, abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  *abstract.SecurityGroup
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		as, xerr := instance.InspectSecurityGroup(ctx, abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+		chRes <- result{as, xerr}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
-func (instance service) ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error) {
+func (instance service) ObjectStorageConfiguration(inctx context.Context) (objectstorage.Config, fail.Error) {
 	if valid.IsNil(instance) {
 		return objectstorage.Config{}, fail.InvalidInstanceError()
 	}
-	return instance.Location.Configuration()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  objectstorage.Config
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		oc, xerr := instance.Location.Configuration()
+		chRes <- result{oc, xerr}
+		return // nolint
+	}()
+	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
+	case <-ctx.Done():
+		return objectstorage.Config{}, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return objectstorage.Config{}, fail.ConvertError(inctx.Err())
+	}
 }

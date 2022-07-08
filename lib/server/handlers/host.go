@@ -598,7 +598,12 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			outValue, ok = lhV1.ByID[hostInstance.GetID()]
+			hin, err := hostInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			outValue, ok = lhV1.ByID[hin]
 			if !ok {
 				return fail.NotFoundError()
 			}

@@ -124,16 +124,16 @@ func (myself *MetadataCore) Service() iaas.Service {
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (myself *MetadataCore) GetID() string {
-	id, err := myself.getID()
-	if err != nil {
-		panic(err)
-	}
-	return id
+func (myself *MetadataCore) GetID() (string, error) {
+	return myself.getID()
 }
 
 func (myself *MetadataCore) getID() (string, fail.Error) {
-	id, ok := myself.id.Load().(string) // nolint, better panic than error-hiding
+	if myself == nil {
+		return "", fail.InvalidInstanceError()
+	}
+
+	id, ok := myself.id.Load().(string) // nolint
 	if !ok {
 		return "", fail.InvalidInstanceError()
 	}
@@ -431,8 +431,13 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
+			idd, err := ident.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			if myself.kindSplittedStore {
-				myself.id.Store(ident.GetID())
+				myself.id.Store(idd)
 			} else {
 				myself.id.Store(ident.GetName())
 			}

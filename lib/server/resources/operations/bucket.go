@@ -133,14 +133,18 @@ func (instance *bucket) IsNull() bool {
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *bucket) Exists(ctx context.Context) (bool, fail.Error) {
-	theID := instance.GetID()
-	_, err := instance.Service().InspectBucket(ctx, theID)
+	theID, err := instance.GetID()
 	if err != nil {
-		switch err.(type) {
+		return false, fail.ConvertError(err)
+	}
+
+	_, xerr := instance.Service().InspectBucket(ctx, theID)
+	if xerr != nil {
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			return false, nil
 		default:
-			return false, err
+			return false, xerr
 		}
 	}
 
@@ -354,6 +358,8 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	bun := instance.GetName()
+
 	// -- check Bucket is not still mounted
 	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
@@ -374,10 +380,10 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// -- delete Bucket
-	xerr = instance.Service().DeleteBucket(ctx, instance.GetName())
+	xerr = instance.Service().DeleteBucket(ctx, bun)
 	if xerr != nil {
 		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
-			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
+			return fail.NotFoundError("failed to find Bucket '%s'", bun)
 		}
 		return xerr
 	}
@@ -415,11 +421,18 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	bun := instance.GetName()
+
 	svc := instance.Service()
 	hostInstance, xerr := LoadHost(ctx, svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
+		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", bun, hostName)
+	}
+
+	hostID, err := hostInstance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
 	}
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
@@ -431,8 +444,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 			}
 
 			// First check if mounted on Host...
-			if mountPath, ok := mountsV1.ByHostName[hostInstance.GetName()]; ok {
-				return fail.DuplicateError("there is already a mount of Bucket '%s' on Host '%s' in folder '%s'", instance.GetName(), hostInstance.GetName(), mountPath)
+			if mountPath, ok := mountsV1.ByHostName[hostName]; ok {
+				return fail.DuplicateError("there is already a mount of Bucket '%s' on Host '%s' in folder '%s'", bun, hostName, mountPath)
 			}
 
 			// Second check if already mounted on another Host...
@@ -467,16 +480,16 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 
 	mountPoint := path
 	if path == abstract.DefaultBucketMountPoint {
-		mountPoint = abstract.DefaultBucketMountPoint + instance.GetName()
+		mountPoint = abstract.DefaultBucketMountPoint + bun
 	}
 
 	fsProtocol, err := svc.Protocol()
 	if err != nil {
-		return err
+		return fail.ConvertError(err)
 	}
 
 	desc := bucketfs.Description{
-		BucketName: instance.GetName(),
+		BucketName: bun,
 		Protocol:   fsProtocol,
 		MountPoint: mountPoint,
 	}
@@ -523,8 +536,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			mountsV1.ByHostID[hostInstance.GetID()] = mountPoint
-			mountsV1.ByHostName[hostInstance.GetName()] = mountPoint
+			mountsV1.ByHostID[hostID] = mountPoint
+			mountsV1.ByHostName[hostName] = mountPoint
 			return nil
 		})
 	})
@@ -540,7 +553,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			mountsV1.BucketMounts[instance.GetName()] = mountPoint
+			mountsV1.BucketMounts[hostName] = mountPoint
 			return nil
 		})
 	})
@@ -572,6 +585,11 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	hostID, err := hostInstance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
 	}
 
 	var mountPoint string
@@ -620,7 +638,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			delete(mountsV1.BucketMounts, instance.GetName())
+			delete(mountsV1.BucketMounts, bucketName)
 			return nil
 		})
 	})
@@ -635,8 +653,8 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			delete(mountsV1.ByHostID, hostInstance.GetID())
-			delete(mountsV1.ByHostName, hostInstance.GetName())
+			delete(mountsV1.ByHostID, hostID)
+			delete(mountsV1.ByHostName, hostName)
 			return nil
 		})
 	})
@@ -644,8 +662,10 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 
 // ToProtocol returns the protocol message corresponding to Bucket fields
 func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketResponse, fail.Error) {
+	bun := instance.GetName()
+
 	out := &protocol.BucketResponse{
-		Name: instance.GetName(),
+		Name: bun,
 	}
 
 	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -663,10 +683,12 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 					return xerr
 				}
 
+				hostName := hostInstance.GetName()
+
 				out.Mounts = append(out.Mounts, &protocol.BucketMount{
 					Host: &protocol.Reference{
 						Id:   k,
-						Name: hostInstance.GetName(),
+						Name: hostName,
 					},
 					Path: v,
 				})

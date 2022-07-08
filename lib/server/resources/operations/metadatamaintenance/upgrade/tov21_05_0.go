@@ -176,7 +176,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(svc iaas.Service, owningInst
 
 		// Make sure the ID of the Network is valid (at least with FlexibleEngine, Network ID corresponds to Subnet ID in previous versions of SafeScale)
 		if owningInstance != nil && !valid.IsNil(owningInstance) {
-			abstractNetwork.ID = owningInstance.GetID()
+			abstractNetwork.ID, _ = owningInstance.GetID()
 		}
 
 		if !currentNetworkProps.Lookup(networkproperty.SubnetsV1) {
@@ -256,7 +256,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(svc iaas.Service, owningInst
 
 			subnetID = abstractSubnet.ID
 			abstractSubnet.Name = subnetName
-			abstractSubnet.Network = owningInstance.GetID()
+			abstractSubnet.Network, _ = owningInstance.GetID()
 			abstractSubnet.IPVersion = ipversion.IPv4
 			abstractSubnet.DNSServers = abstractNetwork.DNSServers
 			abstractSubnet.Domain = abstractNetwork.Domain
@@ -314,9 +314,9 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(svc iaas.Service, owningInst
 					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				abstractSubnet.GWSecurityGroupID = gwSG.GetID()
-				abstractSubnet.InternalSecurityGroupID = internalSG.GetID()
-				abstractSubnet.PublicIPSecurityGroupID = publicSG.GetID()
+				abstractSubnet.GWSecurityGroupID, _ = gwSG.GetID()
+				abstractSubnet.InternalSecurityGroupID, _ = internalSG.GetID()
+				abstractSubnet.PublicIPSecurityGroupID, _ = publicSG.GetID()
 				return nil
 			})
 			innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -548,7 +548,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(ctx context.Context, instance *
 				}
 
 				var previousID string
-				subnetID := subnetInstance.GetID()
+				subnetID, _ := subnetInstance.GetID()
 				_, ok = hnV1.IPv4Addresses[subnetID]
 				if ok {
 					previousID = subnetID
@@ -1153,10 +1153,13 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					return nErr
 				}
 
+				nid, _ := networkInstance.GetID()
+				snid, _ := subnetInstance.GetID()
+
 				config = &propertiesv3.ClusterNetwork{
-					NetworkID:          networkInstance.GetID(),
+					NetworkID:          nid,
 					CreatedNetwork:     clusterCreatedNetwork,
-					SubnetID:           subnetInstance.GetID(),
+					SubnetID:           snid,
 					CIDR:               networkV2.CIDR,
 					GatewayID:          networkV2.GatewayID,
 					GatewayIP:          networkV2.GatewayIP,
@@ -1185,10 +1188,13 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					return nErr
 				}
 
+				nid, _ := networkInstance.GetID()
+				snid, _ := subnetInstance.GetID()
+
 				config = &propertiesv3.ClusterNetwork{
-					NetworkID:      networkInstance.GetID(),
+					NetworkID:      nid,
 					CreatedNetwork: clusterCreatedNetwork,
-					SubnetID:       subnetInstance.GetID(),
+					SubnetID:       snid,
 					CIDR:           networkV1.CIDR,
 					GatewayID:      networkV1.GatewayID,
 					GatewayIP:      networkV1.GatewayIP,

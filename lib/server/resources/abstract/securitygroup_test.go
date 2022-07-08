@@ -629,7 +629,7 @@ func TestSecurityGroup_SetID(t *testing.T) {
 
 	sg := NewSecurityGroup()
 	sg.SetID("toto")
-	id := sg.GetID()
+	id, _ := sg.GetID()
 	if id != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()

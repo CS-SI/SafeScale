@@ -236,6 +236,7 @@ func TestClusterIdentity_Replace(t *testing.T) {
 	require.EqualValues(t, result, cluster2)
 	require.EqualValues(t, result.(*ClusterIdentity).Keypair, kp2)
 	require.EqualValues(t, result.(*ClusterIdentity).GetName(), cluster2.Name)
-	require.EqualValues(t, result.(*ClusterIdentity).GetID(), cluster2.Name)
+	clid, _ := result.(*ClusterIdentity).GetID()
+	require.EqualValues(t, clid, cluster2.Name)
 
 }

@@ -201,7 +201,7 @@ func TestNetwork_GetID(t *testing.T) {
 
 	n := NewNetwork()
 	n.ID = "Network Name"
-	id := n.GetID()
+	id, _ := n.GetID()
 	if id != n.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

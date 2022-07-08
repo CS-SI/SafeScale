@@ -131,14 +131,17 @@ func (instance *Network) IsNull() bool {
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
-	theID := instance.GetID()
-	_, err := instance.Service().InspectNetwork(ctx, theID)
+	theID, err := instance.GetID()
 	if err != nil {
-		switch err.(type) {
+		return false, fail.ConvertError(err)
+	}
+	_, xerr := instance.Service().InspectNetwork(ctx, theID)
+	if xerr != nil {
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			return false, nil
 		default:
-			return false, err
+			return false, xerr
 		}
 	}
 
@@ -523,13 +526,18 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							}
 						}
 
+						sgid, err := sgInstance.GetID()
+						if err != nil {
+							return fail.ConvertError(err)
+						}
+
 						propsXErr = sgInstance.unsafeDelete(ctx, true)
 						if propsXErr != nil {
 							return propsXErr
 						}
 
 						// -- delete reference to Security Group in Network
-						delete(nsgV1.ByID, sgInstance.GetID())
+						delete(nsgV1.ByID, sgid)
 						delete(nsgV1.ByName, sgInstance.GetName())
 					}
 					return nil
@@ -702,7 +710,13 @@ func (instance *Network) InspectSubnet(ctx context.Context, ref string) (_ resou
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return LoadSubnet(ctx, instance.Service(), instance.GetID(), ref)
+	nid, err := instance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	sn, xerr := LoadSubnet(ctx, instance.Service(), nid, ref)
+	return sn, xerr
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata
@@ -737,7 +751,10 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 			}
 
 			name := subnet.GetName()
-			id := subnet.GetID()
+			id, err := subnet.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
 			nsV1.ByID[id] = name
 			nsV1.ByName[name] = id
 			return nil

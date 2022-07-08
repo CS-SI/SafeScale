@@ -89,7 +89,10 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, xerr
 	}
 
-	req.NetworkID = networkInstance.GetID()
+	req.NetworkID, err = networkInstance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
 
 	subnetInstance, xerr := subnetfactory.New(handler.job.Service())
 	if xerr != nil {
@@ -143,7 +146,10 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 			return nil, xerr
 		}
 
-		networkID = networkInstance.GetID()
+		_, err := networkInstance.GetID()
+		if err != nil {
+			return nil, fail.ConvertError(err)
+		}
 	}
 
 	return subnetfactory.List(handler.job.Context(), handler.job.Service(), networkID, all)
@@ -193,7 +199,6 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 	var (
 		networkInstance resources.Network
 		subnetInstance  resources.Subnet
-		subnetID        string
 	)
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
@@ -208,7 +213,11 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 	}
 
 	clean := true
-	subnetID = subnetInstance.GetID()
+	subnetID, err := subnetInstance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	networkInstance, xerr = subnetInstance.InspectNetwork(handler.job.Context())
 	if xerr != nil {
 		switch xerr.(type) {

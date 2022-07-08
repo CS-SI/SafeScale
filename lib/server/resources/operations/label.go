@@ -306,7 +306,11 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		out.Id = alabel.GetID()
+		var err error
+		out.Id, err = alabel.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
 		out.Name = alabel.GetName()
 		out.HasDefault = alabel.HasDefault
 		out.DefaultValue = alabel.DefaultValue
@@ -413,7 +417,10 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 			}
 
 			// If the tag has this host, consider it a success
-			hostID := hostInstance.GetID()
+			hostID, err := hostInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
 			hostName := hostInstance.GetName()
 			_, ok = labelHostsV1.ByID[hostID]
 			if !ok {
@@ -457,7 +464,10 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 				return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hID := hostInstance.GetID()
+			hID, err := hostInstance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
 			hName := hostInstance.GetName()
 
 			// If the Label does not reference this Host, consider it a success

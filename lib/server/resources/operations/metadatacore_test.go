@@ -49,8 +49,8 @@ func (e *SomeClonable) GetValue() string {
 func (e *SomeClonable) GetName() string {
 	return e.value
 }
-func (e *SomeClonable) GetID() string {
-	return e.value
+func (e *SomeClonable) GetID() (string, error) {
+	return e.value, nil
 }
 
 func Test_NewCore(t *testing.T) {
@@ -138,6 +138,10 @@ func TestMetadataCore_Service(t *testing.T) {
 
 }
 
+func skip(a string, _ error) string {
+	return a
+}
+
 func TestMetadataCore_GetID(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -151,7 +155,7 @@ func TestMetadataCore_GetID(t *testing.T) {
 	var amc *MetadataCore = nil
 	ctx := context.Background()
 
-	require.EqualValues(t, amc.GetID(), "")
+	require.EqualValues(t, skip(amc.GetID()), "")
 
 	network := abstract.NewNetwork()
 	network.ID = "Network ID"
@@ -161,11 +165,11 @@ func TestMetadataCore_GetID(t *testing.T) {
 
 		mc, xerr := NewCore(svc, "network", "networks", network)
 		require.Nil(t, xerr)
-		require.EqualValues(t, mc.GetID(), "")
+		require.EqualValues(t, skip(mc.GetID()), "")
 
 		xerr = mc.Carry(ctx, network)
 		require.Nil(t, xerr)
-		require.EqualValues(t, mc.GetID(), "Network ID")
+		require.EqualValues(t, skip(mc.GetID()), "Network ID")
 
 	})
 	require.EqualValues(t, serr, nil)
@@ -260,7 +264,7 @@ func TestMetadataCore_Inspect(t *testing.T) {
 
 			an, ok := clonable.(*abstract.Network)
 			require.True(t, ok)
-			require.EqualValues(t, an.GetID(), "Network_ID")
+			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
 
 			return nil
@@ -309,7 +313,7 @@ func TestMetadataCore_Review(t *testing.T) {
 
 			an, ok := clonable.(*abstract.Network)
 			require.EqualValues(t, ok, true)
-			require.EqualValues(t, an.GetID(), "Network_ID")
+			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
 
 			return nil
@@ -741,11 +745,11 @@ type SomeObserver struct {
 	States map[string]string
 }
 
-func (e *SomeObserver) GetID() string {
+func (e *SomeObserver) GetID() (string, error) {
 	if e == nil {
-		return ""
+		return "", nil
 	}
-	return e.ID
+	return e.ID, nil
 }
 func (e *SomeObserver) GetName() string {
 	if e == nil {

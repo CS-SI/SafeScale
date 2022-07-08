@@ -69,10 +69,20 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 			return
 		}
 
-		sgID := instance.GetID()
+		sgID, err := instance.GetID()
+		if err != nil {
+			chRes <- result{nil, fail.ConvertError(err)}
+			return
+		}
+
+		hid, err := hostInstance.GetID()
+		if err != nil {
+			chRes <- result{nil, fail.ConvertError(err)}
+			return
+		}
 
 		// Unbind Security Group from Host on provider side
-		xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgID, hostInstance.GetID())
+		xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgID, hid)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

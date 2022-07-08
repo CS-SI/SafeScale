@@ -381,22 +381,33 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.Wrap(xerr, "could not get/create the scan network")
 	}
 
+	nid, aerr := network.GetID()
+	if aerr != nil {
+		return nil, fail.ConvertError(aerr)
+	}
+
 	defer func() {
 		derr := network.Delete(context.Background())
 		if derr != nil {
-			logrus.Warnf("Error deleting network '%s'", network.GetID())
+			logrus.Warnf("Error deleting network '%s'", nid)
 			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
 	logrus.Infof("Creating scan subnet: %q", scanSubnetName)
-	subnet, xerr := handler.getScanSubnet(network.GetID())
+	subnet, xerr := handler.getScanSubnet(nid)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not get/create the scan subnet")
 	}
+
+	snid, aerr := subnet.GetID()
+	if aerr != nil {
+		return nil, fail.ConvertError(aerr)
+	}
+
 	defer func() {
 		if derr := subnet.Delete(context.Background()); derr != nil {
-			logrus.Warnf("Error deleting subnet '%s'", subnet.GetID())
+			logrus.Warnf("Error deleting subnet '%s'", snid)
 			_ = ferr.AddConsequence(derr)
 		}
 	}()
@@ -505,8 +516,13 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
+	hid, err := host.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	defer func() {
-		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, host.GetID())
+		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, hid)
 		if derr := host.Delete(context.Background()); derr != nil {
 			switch derr.(type) {
 			case *fail.ErrNotFound:

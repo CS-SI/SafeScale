@@ -295,19 +295,29 @@ func (s stack) Migrate(ctx context.Context, operation string, params map[string]
 			return fail.InvalidParameterError("instance", "should be *operations.Host")
 		}
 
+		hid, err := instance.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+
 		networkInstance, xerr := subnetInstance.InspectNetwork(context.Background())
 		if xerr != nil {
 			return xerr
 		}
 
+		nid, err := networkInstance.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+
 		// remove old nat route tag
-		xerr = s.rpcRemoveTagsFromInstance(ctx, instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
+		xerr = s.rpcRemoveTagsFromInstance(ctx, hid, []string{"no-ip-" + subnetInstance.GetName()})
 		if xerr != nil {
 			return xerr
 		}
 
 		// add new nat route tag
-		xerr = s.rpcAddTagsToInstance(ctx, instance.GetID(), []string{fmt.Sprintf(NATRouteTagFormat, networkInstance.GetID())})
+		xerr = s.rpcAddTagsToInstance(ctx, hid, []string{fmt.Sprintf(NATRouteTagFormat, nid)})
 		if xerr != nil {
 			return xerr
 		}

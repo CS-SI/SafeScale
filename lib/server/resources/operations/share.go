@@ -57,8 +57,8 @@ type ShareIdentity struct {
 
 // GetID returns the ID of the Share
 // satisfies interface data.Identifiable
-func (si ShareIdentity) GetID() string {
-	return si.ShareID
+func (si ShareIdentity) GetID() (string, error) {
+	return si.ShareID, nil
 }
 
 // GetName returns the name of the Share
@@ -483,13 +483,20 @@ func (instance *Share) Create(
 		}
 	}()
 
+	sid, err := server.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	si := ShareIdentity{
-		HostID:    server.GetID(),
+		HostID:    sid,
 		HostName:  server.GetName(),
 		ShareID:   hostShare.ID,
 		ShareName: hostShare.Name,
 	}
-	return instance.carry(ctx, &si)
+
+	xerr = instance.carry(ctx, &si)
+	return xerr
 }
 
 // unsafeGetServer returns the Host acting as Share server, with error handling
@@ -592,10 +599,10 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}
 
 	var (
-		export               string
-		targetName, targetID string
-		hostShare            *propertiesv1.HostShare
-		shareName, shareID   string
+		export             string
+		targetName         string
+		hostShare          *propertiesv1.HostShare
+		shareName, shareID string
 	)
 
 	targetName = target.GetName()
@@ -668,7 +675,11 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}
 
 	// Lock for read, won't change data other than properties, which are protected by their own way
-	targetID = target.GetID()
+	targetID, err := target.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
 	xerr = target.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if Share is already mounted
 		// Check if there is already volume mounted in the path (or in subpath)
@@ -931,7 +942,10 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 
 	var mountPath string
 	remotePath := serverPrivateIP + ":" + hostShare.Path
-	targetID := target.GetID()
+	targetID, err := target.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 	xerr = target.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -1123,10 +1137,10 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	shareID := instance.GetID()
+	shareID, err := instance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
 	shareName := instance.GetName()
 	server, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)

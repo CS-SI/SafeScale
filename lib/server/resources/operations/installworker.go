@@ -1759,12 +1759,18 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 					return
 				}
 
+				gwId, err := gwSG.GetID()
+				if err != nil {
+					chRes <- result{fail.ConvertError(err)}
+					return
+				}
+
 				sgRule := abstract.NewSecurityGroupRule()
 				sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
 				sgRule.EtherType = ipversion.IPv4
 				sgRule.Protocol, _ = r["protocol"].(string) // nolint
 				sgRule.Sources = []string{"0.0.0.0/0"}
-				sgRule.Targets = []string{gwSG.GetID()}
+				sgRule.Targets = []string{gwId}
 
 				var commaSplitted []string
 				if ports, ok := r["ports"].(int); ok {
