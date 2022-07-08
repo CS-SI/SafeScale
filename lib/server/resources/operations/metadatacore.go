@@ -256,7 +256,6 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -303,7 +302,6 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 			})
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -412,7 +410,6 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -490,7 +487,6 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -627,7 +623,6 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 			return myself.updateIdentity()
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -739,7 +734,6 @@ func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.E
 			return myself.updateIdentity()
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -823,7 +817,6 @@ func (myself *MetadataCore) readByID(inctx context.Context, id string) fail.Erro
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -897,7 +890,6 @@ func (myself *MetadataCore) readByName(inctx context.Context, name string) fail.
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -966,7 +958,6 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1002,7 +993,6 @@ func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
 			return myself.unsafeReload(ctx)
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1129,7 +1119,6 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1176,7 +1165,6 @@ func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(bu
 			})
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1312,7 +1300,6 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1352,7 +1339,6 @@ func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
 			return dumped, nil
 		}()
 		chRes <- result{dump, gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1425,7 +1411,6 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 			return r, nil
 		}()
 		chRes <- result{gtr, gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1461,7 +1446,6 @@ func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.
 			return myself.unsafeDeserialize(ctx, buf)
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -1545,7 +1529,6 @@ func (myself *MetadataCore) unsafeDeserialize(inctx context.Context, buf []byte)
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
