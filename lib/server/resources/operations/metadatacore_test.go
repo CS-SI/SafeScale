@@ -277,7 +277,6 @@ func TestMetadataCore_Inspect(t *testing.T) {
 }
 
 func TestMetadataCore_Review(t *testing.T) {
-
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	require.Nil(t, xerr)
@@ -326,7 +325,6 @@ func TestMetadataCore_Review(t *testing.T) {
 }
 
 func TestMetadataCore_Alter(t *testing.T) {
-
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	require.Nil(t, xerr)
@@ -394,6 +392,14 @@ func TestMetadataCore_Alter(t *testing.T) {
 }
 
 func TestMetadataCore_Carry(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Panic is expected")
+		} else {
+			t.Error("It should have panicked", r)
+			t.Fail()
+		}
+	}()
 
 	ctx := context.Background()
 
@@ -424,6 +430,14 @@ func TestMetadataCore_Carry(t *testing.T) {
 }
 
 func TestMetadataCore_Read(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Panic is expected")
+		} else {
+			t.Error("It should have panicked", r)
+			t.Fail()
+		}
+	}()
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -459,6 +473,14 @@ func TestMetadataCore_Read(t *testing.T) {
 }
 
 func TestMetadataCore_ReadByID(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log("Panic is expected")
+		} else {
+			t.Error("It should have panicked", r)
+			t.Fail()
+		}
+	}()
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -509,7 +531,6 @@ func TestMetadataCore_ReadByID(t *testing.T) {
 }
 
 func TestMetadataCore_Reload(t *testing.T) {
-
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	require.Nil(t, xerr)
@@ -658,7 +679,7 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	_, xerr = amc.unsafeSerialize()
+	_, xerr = amc.unsafeSerialize(ctx)
 	// require.Contains(t, xerr.Error(), "calling method from a nil pointer"), true)
 	require.Contains(t, xerr.Error(), "runtime error: invalid memory address or nil pointer dereference") // FIXME: aw, runtime error -__-
 
@@ -679,7 +700,7 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 		err = mc.Carry(ctx, network)
 		require.Nil(t, err)
 
-		data, xerr := mc.unsafeSerialize()
+		data, xerr := mc.unsafeSerialize(ctx)
 		require.Nil(t, xerr)
 		str := string(data)
 
@@ -715,7 +736,7 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 		err = mc.Carry(ctx, network)
 		require.Nil(t, err)
 
-		data, xerr := mc.unsafeSerialize()
+		data, xerr := mc.unsafeSerialize(ctx)
 		require.Nil(t, xerr)
 		str := string(data)
 		require.Contains(t, str, "\"id\":\"Network_ID\"")
@@ -729,7 +750,7 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 		require.Nil(t, err)
 		xerr = amc.Deserialize(ctx, []byte(str))
 		require.Nil(t, xerr)
-		data, xerr = mc.unsafeSerialize()
+		data, xerr = mc.unsafeSerialize(ctx)
 		require.Nil(t, xerr)
 		require.EqualValues(t, str, string(data))
 
