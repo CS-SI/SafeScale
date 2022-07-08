@@ -199,6 +199,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 		)
 	}
 
+	ahfid, err := ahf.GetID()
+	if err != nil {
+		return nil, nil, fail.ConvertError(err)
+	}
+
 	// If no key pair is supplied create one
 	var xerr fail.Error
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
