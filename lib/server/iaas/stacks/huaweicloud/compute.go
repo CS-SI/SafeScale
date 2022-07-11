@@ -597,11 +597,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(
-									fail.Wrap(
-										derr, "cleaning up on failure, failed to delete host",
-									),
-								)
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 							}
 						}
 					}
@@ -632,42 +628,41 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
 			if zoneErr != nil {
-				logrus.Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
+				logrus.Tracef("Host '%s' successfully created but cannot confirm Availability Zone: %s", server.Name, zoneErr)
 			} else {
-				logrus.Tracef("Host successfully created in requested Availability Zone '%s'", creationZone)
-				if creationZone != srvOpts.AvailabilityZone {
-					if srvOpts.AvailabilityZone != "" {
-						logrus.Warnf(
-							"Host created in the WRONG availability zone: requested '%s' and got instead '%s'",
-							srvOpts.AvailabilityZone, creationZone,
-						)
-					}
+				logrus.Tracef("Host '%s' successfully created in requested Availability Zone '%s'", server.Name, creationZone)
+				if creationZone != srvOpts.AvailabilityZone && srvOpts.AvailabilityZone != "" {
+					logrus.Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", server.Name, srvOpts.AvailabilityZone, creationZone)
 				}
 			}
 
 			defer func() {
-				if innerXErr != nil {
-					if server != nil && server.ID != "" {
-						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-						if derr != nil {
-							logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
-						}
+				if innerXErr != nil && ahc.ID != "" {
+					derr := servers.Delete(s.ComputeClient, ahc.ID).ExtractErr()
+					if derr != nil {
+						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+					} else {
+						ahc.ID = ""
+						ahc.Name = ""
 					}
 				}
 			}()
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
+			//FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
+			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
+			//       We should think of a way to increase this timing based on number of hosts are created
+			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
 					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
+						// ahc.ID = server.ID
+						// ahc.Name = server.Name
 						ahc.LastState = hoststate.Error
 					}
-
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
+
 				default:
 					return innerXErr
 				}
@@ -677,16 +672,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		timings.NormalDelay(),
 		timings.HostLongOperationTimeout(),
 	)
-	if retryErr != nil {
-		switch retryErr.(type) {
-		case *retry.ErrStopRetry: // here it should never happen
-			return nil, userData, fail.Wrap(fail.Cause(retryErr), "stopping retries")
-		case *retry.ErrTimeout:
-			return nil, userData, fail.Wrap(fail.Cause(retryErr), "timeout")
-		default:
-			return nil, userData, retryErr
-		}
-	}
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
@@ -710,6 +695,17 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}
 		}
 	}()
+
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return nil, userData, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return nil, userData, fail.Wrap(fail.Cause(retryErr), "timeout")
+		default:
+			return nil, userData, retryErr
+		}
+	}
 
 	host, xerr = s.complementHost(ctx, ahc, server)
 	if xerr != nil {
