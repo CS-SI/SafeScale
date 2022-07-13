@@ -40,5 +40,11 @@ sdk_python: has_python sdk
 
 force_sdk_python: prepare_python sdk_python
 
+sdk_js: sdk
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Creating javascript protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
+	@mkdir -p ./javascript
+	@protoc -I. -I$(GOMODPATH)/pkg/mod --js_out=library=safescale.pb,binary:./javascript safescale.proto
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Finished creating javascript protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
+
 clean:
-	@($(RM) safescale.pb.go safescale_pb2.py ./python3/safescale_pb2.py ./python3/safescale_pb2_grpc.py || true)
+	@($(RM) safescale.pb.go safescale_pb2.py ./python3/safescale_pb2.py ./python3/safescale_pb2_grpc.py ./javascript/safescale.pb.js || true)
