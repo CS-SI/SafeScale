@@ -490,8 +490,8 @@ validtest: vettest
 	@mv ./integrationtests/integration_results.log .
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
-	@if [ -s ./integration_results.log ] && grep -e '--- FAIL' -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
-	@if [ -s ./integration_results.log ] && grep -e '--- FAIL' -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
+	@if [ -s ./integration_results.log ] && grep -e '--- FAIL' -e '--- PASS' -e 'panic: test timed out' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e '--- FAIL' -e '--- PASS' -e 'panic: test timed out' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
 
 checkforpr: testclean validtest
 
@@ -503,8 +503,8 @@ mintest: begin
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
-	@if [ -s ./test_results.log ] && grep '--- FAIL' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
-	@if [ -s ./test_results.log ] && grep '--- FAIL' ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -514,8 +514,8 @@ precommittest: begin
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
-	@if [ -s ./test_results.log ] && grep '--- FAIL' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
-	@if [ -s ./test_results.log ] && grep '--- FAIL' ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -527,7 +527,7 @@ test: begin coverdeps # Run unit tests
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
-	@if [ -s ./test_results.log ] && grep '--- FAIL' ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
 gofmt: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running gofmt checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
