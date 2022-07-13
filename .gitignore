@@ -30,6 +30,7 @@ debug
 
 #ignore generated files
 *.pb.go
+*.pb.js
 *_pb2*.py
 rice-box.go
 *_string.go
