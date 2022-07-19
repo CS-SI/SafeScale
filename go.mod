@@ -36,7 +36,7 @@ require (
 	github.com/sanity-io/litter v1.5.5
 	github.com/schollz/progressbar/v3 v3.8.6
 	github.com/sethvargo/go-password v0.2.0
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli v1.22.9
@@ -45,7 +45,7 @@ require (
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2
-	golang.org/x/sys v0.0.0-20220624220833-87e55d714810
+	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.86.0
