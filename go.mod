@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.52
+	github.com/aws/aws-sdk-go v1.44.54
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -48,8 +48,8 @@ require (
 	golang.org/x/sys v0.0.0-20220624220833-87e55d714810
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.86.0
-	google.golang.org/grpc v1.47.0
+	google.golang.org/api v0.87.0
+	google.golang.org/grpc v1.48.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/fsnotify.v1 v1.4.7
 )

@@ -379,14 +379,14 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
 					if innerErr := instance.service.ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
 						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
-						logrus.Warningf(innerErr.Error())
+						logrus.WithContext(ctx).Warningf(innerErr.Error())
 						return innerErr
 					}
 
 					if !bytes.Equal(data, target.Bytes()) {
 						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
 						innerErr := fail.NewError("remote content is different from local reference")
-						logrus.Warningf(innerErr.Error())
+						logrus.WithContext(ctx).Warningf(innerErr.Error())
 						return innerErr
 					}
 
@@ -399,7 +399,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 				func(t retry.Try, v verdict.Enum) {
 					switch v { // nolint
 					case verdict.Retry:
-						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
+						logrus.WithContext(ctx).Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
 					}
 				},
 			)
@@ -422,7 +422,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 		func(t retry.Try, v verdict.Enum) {
 			switch v { // nolint
 			case verdict.Retry:
-				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(time.Since(readAfterWrite)))
+				logrus.WithContext(ctx).Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(time.Since(readAfterWrite)))
 			}
 		},
 	)
@@ -439,9 +439,9 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 	}
 
 	if iterations > 1 {
-		logrus.Warningf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+		logrus.WithContext(ctx).Warningf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	} else {
-		logrus.Debugf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+		logrus.WithContext(ctx).Debugf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	}
 
 	return nil

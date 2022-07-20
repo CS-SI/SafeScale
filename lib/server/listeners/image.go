@@ -35,8 +35,8 @@ type ImageListener struct {
 
 // List available images
 func (s *ImageListener) List(inctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list image")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list image")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -57,7 +57,7 @@ func (s *ImageListener) List(inctx context.Context, in *protocol.ImageListReques
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewImageHandler(job)
 	images, xerr := handler.List(in.GetAll())

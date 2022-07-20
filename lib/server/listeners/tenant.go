@@ -39,18 +39,18 @@ type TenantListener struct {
 // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // List lists registered tenants
-func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list tenants")
+func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list tenants")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
+	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	defer fail.OnExitLogError(&err)
+	defer fail.OnExitLogError(inctx, &err)
 
 	tenants, xerr := iaas.GetTenantNames()
 	if xerr != nil {
@@ -69,19 +69,19 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
+func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
+	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	defer fail.OnExitLogError(&err)
+	defer fail.OnExitLogError(inctx, &err)
 
-	currentTenant := operations.CurrentTenant(ctx)
+	currentTenant := operations.CurrentTenant(inctx)
 	if currentTenant == nil {
 		return nil, fail.NotFoundError("no tenant set")
 	}
@@ -99,25 +99,25 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 }
 
 // Set sets the tenant to use for each command
-func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot set tenant")
+func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot set tenant")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
+	if inctx == nil {
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	defer fail.OnExitLogError(&err)
+	defer fail.OnExitLogError(inctx, &err)
 
-	xerr := operations.SetCurrentTenant(ctx, in.GetName())
+	xerr := operations.SetCurrentTenant(inctx, in.GetName())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -127,8 +127,8 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 
 // Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
 func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot cleanup tenant")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot cleanup tenant")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -151,7 +151,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	currentTenant := operations.CurrentTenant(ctx)
 	if currentTenant != nil && currentTenant.Name == in.GetName() {
@@ -170,8 +170,8 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
 func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot scan tenant")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot scan tenant")
 
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
@@ -190,7 +190,7 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewTenantHandler(job)
 	var resultList *protocol.ScanResultList
@@ -201,8 +201,8 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 
 // Inspect returns information about a tenant
 func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -224,7 +224,7 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewTenantHandler(job)
 	tenantInfo, err := handler.Inspect(name)
@@ -237,8 +237,8 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 
 // Upgrade upgrades metadata of a tenant if needed
 func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot upgrade tenant")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot upgrade tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -261,7 +261,7 @@ func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgra
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	// Not setting metadataVersion prevents to overwrite current version file if it exists...
 	svc, xerr := iaas.UseService(name, "")

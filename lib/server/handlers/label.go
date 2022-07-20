@@ -48,6 +48,11 @@ func NewTagHandler(job server.Job) LabelHandler {
 
 // List returns the network list
 func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -60,7 +65,7 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	browseInstance, xerr := labelfactory.New(handler.job.Service())
 	if xerr != nil {
@@ -92,6 +97,11 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 
 // Delete deletes Label referenced by ref
 func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -107,7 +117,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -115,7 +125,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		case *fail.ErrNotFound:
 			return abstract.ResourceNotFoundError("tag", ref)
 		default:
-			logrus.Debugf("failed to delete tag: %+v", xerr)
+			logrus.WithContext(task.Context()).Debugf("failed to delete tag: %+v", xerr)
 			return xerr
 		}
 	}
@@ -125,6 +135,11 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 
 // Inspect returns the tag identified by ref and its attachment (if any)
 func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -140,7 +155,7 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -157,6 +172,11 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 
 // Create a tag
 func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue string) (instance resources.Label, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -171,7 +191,7 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "('%s', %d, %s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
 	instance, xerr = labelfactory.New(handler.job.Service())

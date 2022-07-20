@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -60,7 +61,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature specification file '%s'", name)
 	}
 
-	logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(tmplString)))
+	logrus.WithContext(context.Background()).Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(tmplString)))
 
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -323,9 +324,9 @@ func init() {
 			if err != nil {
 				displayFilename := item.DisplayFilename()
 				if displayFilename == "" {
-					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
+					logrus.WithContext(context.Background()).Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
 				} else {
-					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s), install method '%s' is unknown", itemName, displayFilename, k))
+					logrus.WithContext(context.Background()).Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s), install method '%s' is unknown", itemName, displayFilename, k))
 				}
 				continue
 			}

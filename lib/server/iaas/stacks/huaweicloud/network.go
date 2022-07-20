@@ -698,10 +698,10 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					logrus.Debugf("Subnet still owns host(s), retrying in %s...", timings.NormalDelay())
+					logrus.WithContext(ctx).Debugf("Subnet still owns host(s), retrying in %s...", timings.NormalDelay())
 				default:
-					logrus.Warnf("unexpected error: %s", spew.Sdump(t.Err))
-					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), timings.NormalDelay())
+					logrus.WithContext(ctx).Warnf("unexpected error: %s", spew.Sdump(t.Err))
+					logrus.WithContext(ctx).Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), timings.NormalDelay())
 				}
 			}
 		},
@@ -850,7 +850,7 @@ func (s stack) createSubnet(ctx context.Context, req abstract.SubnetRequest) (*s
 		timings.ContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
-				logrus.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", req.Name)
+				logrus.WithContext(ctx).Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", req.Name)
 			}
 		},
 	)

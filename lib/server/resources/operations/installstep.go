@@ -260,7 +260,7 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, true, "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	outcomes := &unitResults{}
 
@@ -324,7 +324,7 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(inctx, true, "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(inctx, &ferr, tracer.TraceMessage())
 
 	var (
 		clonedV data.Map
@@ -351,12 +351,14 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		var taskErr fail.Error
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
+			subiteration := time.Now()
 			clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v)
+			logrus.Warningf("The 1st part of thing takes %s", time.Since(subiteration)) // FIXME: OPP Remove this
 			taskErr = debug.InjectPlannedFail(taskErr)
 			if taskErr != nil {
 				abErr := tg.AbortWithCause(taskErr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -366,20 +368,21 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 			if taskErr != nil {
 				abErr := tg.AbortWithCause(taskErr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
 			subtasks[h.GetName()] = subtask
+			logrus.Warningf("This thing takes %s", time.Since(subiteration)) // FIXME: OPP Remove this
 		}
 
 		tgr, xerr := tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if len(subtasks) != len(hosts) {
-				logrus.Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
+				logrus.WithContext(ctx).Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
 			}
-			logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
+			logrus.WithContext(ctx).Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
 			if taskErr != nil {
 				_ = taskErr.AddConsequence(xerr)
 			} else {
@@ -406,7 +409,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		}
 
 		chRes <- result{outcomes, taskErr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -457,7 +460,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	clonedV["HostIP"], xerr = host.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf("aborting because of %s", xerr.Error())
+		logrus.WithContext(ctx).Errorf("aborting because of %s", xerr.Error())
 		return nil, xerr
 	}
 
@@ -479,7 +482,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf("aborting because of %s", xerr.Error())
+		logrus.WithContext(ctx).Errorf("aborting because of %s", xerr.Error())
 		return nil, xerr
 	}
 
@@ -525,23 +528,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	defer fail.OnPanic(&ferr)
 	var res concurrency.TaskResult
 
-	defer func() {
-		if res != nil {
-			if sres, ok := res.(stepResult); ok {
-				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
-					dur := spew.Sdump(res)
-					if !strings.Contains(dur, "check_") {
-						logrus.Debugf("task result: %s", spew.Sdump(res))
-					}
-				}
-			}
-		}
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			logrus.Debugf("task error: %v", ferr)
-		}
-	}()
-
 	var ok bool
 	if params == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("params")
@@ -557,6 +543,23 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
+
+	defer func() {
+		if res != nil {
+			if sres, ok := res.(stepResult); ok {
+				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
+					dur := spew.Sdump(res)
+					if !strings.Contains(dur, "check_") {
+						logrus.WithContext(ctx).Debugf("task result: %s", spew.Sdump(res))
+					}
+				}
+			}
+		}
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			logrus.WithContext(ctx).Debugf("task error: %v", ferr)
+		}
+	}()
 
 	type result struct {
 		rTr  concurrency.TaskResult
@@ -626,13 +629,13 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 			retcode, outrun, outerr, xerr = p.Host.Run(ctx, command, outputs.COLLECT, connTimeout, is.WallTime)
 			if retcode == 126 {
-				logrus.Debugf("Text busy happened")
+				logrus.WithContext(ctx).Debugf("Text busy happened")
 			}
 
 			// Executes the script on the remote host
 			if retcode != 126 || rounds == 0 {
 				if retcode == 126 {
-					logrus.Warnf("Text busy killed the script")
+					logrus.WithContext(ctx).Warnf("Text busy killed the script")
 				}
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -668,7 +671,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		chRes <- result{stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

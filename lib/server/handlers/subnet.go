@@ -59,6 +59,11 @@ func NewSubnetHandler(job server.Job) SubnetHandler {
 
 // Create a new subnet
 func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetRequest, gwName string, sizing abstract.HostSizingRequirements) (_ resources.Subnet, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -73,7 +78,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	thisCidr := netretry.CIDRString(req.CIDR)
 	conflict, err := thisCidr.IntersectsWith("172.17.0.0/16")
@@ -115,6 +120,11 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 
 // List existing networks
 func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -123,7 +133,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "(%v, %v)", networkRef, all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var networkID string
 	if networkRef == "" {
@@ -157,6 +167,11 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 
 // Inspect returns infos on a subnet
 func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources.Subnet, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -171,13 +186,18 @@ func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "'%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 }
 
 // Delete a/many subnet/s
 func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -192,7 +212,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 
 	tracer := debug.NewTracer(handler.job.Context(), true, "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	newCtx := context.WithValue(handler.job.Context(), "force", force)
 
@@ -254,6 +274,11 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 
 // BindSecurityGroup attaches a Security Group to a Subnet
 func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable resources.SecurityGroupActivation) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -274,7 +299,7 @@ func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef str
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
@@ -291,6 +316,11 @@ func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef str
 
 // UnbindSecurityGroup detaches a Security Group from a subnet
 func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -305,7 +335,7 @@ func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef s
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -331,6 +361,11 @@ func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef s
 
 // EnableSecurityGroup applies the rules of a bound security group on a network
 func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -345,7 +380,7 @@ func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef s
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
@@ -367,6 +402,11 @@ func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef s
 
 // DisableSecurityGroup detaches a Security Group from a subnet
 func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -381,7 +421,7 @@ func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef 
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
@@ -403,6 +443,11 @@ func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef 
 
 // ListSecurityGroups lists the Security Group bound to subnet
 func (handler *subnetHandler) ListSecurityGroups(networkRef, subnetRef string, state securitygroupstate.Enum) (_ []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -417,7 +462,7 @@ func (handler *subnetHandler) ListSecurityGroups(networkRef, subnetRef string, s
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {

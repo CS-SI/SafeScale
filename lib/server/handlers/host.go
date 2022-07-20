@@ -78,6 +78,11 @@ func NewHostHandler(job server.Job) HostHandler {
 
 // Start ...
 func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -89,7 +94,7 @@ func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -106,6 +111,11 @@ func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
 
 // Stop shutdowns a host.
 func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -117,7 +127,7 @@ func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -133,6 +143,11 @@ func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
 
 // Reboot reboots a host.
 func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -144,7 +159,7 @@ func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -161,6 +176,11 @@ func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
 
 // List lists hosts managed by SafeScale only, or all hosts.
 func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -169,7 +189,7 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return hostfactory.List(handler.job.Context(), handler.job.Service(), all)
 }
@@ -177,6 +197,11 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 // Create creates a new host
 // Note: returned resources.Host has to be .Released() by caller
 func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -185,7 +210,7 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", req.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.New(handler.job.Service())
 	if xerr != nil {
@@ -202,6 +227,11 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 
 // Resize a Host
 func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -210,7 +240,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -251,6 +281,11 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 
 // Status returns the status of a host (running or stopped mainly)
 func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -262,7 +297,7 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -281,6 +316,11 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 
 // Inspect a host
 func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -305,6 +345,11 @@ func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Err
 
 // Delete a host
 func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -316,7 +361,7 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -333,6 +378,11 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 
 // BindSecurityGroup attaches a Security Group to a host
 func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable resources.SecurityGroupActivation) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -347,7 +397,7 @@ func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable reso
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -369,6 +419,11 @@ func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable reso
 
 // UnbindSecurityGroup detaches a Security Group from a host
 func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -383,7 +438,7 @@ func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fai
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -400,6 +455,11 @@ func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fai
 
 // EnableSecurityGroup applies a Security Group already attached (if not already applied)
 func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -414,7 +474,7 @@ func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fai
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -436,6 +496,11 @@ func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fai
 
 // DisableSecurityGroup applies a Security Group already attached (if not already applied)
 func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -450,7 +515,7 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -494,6 +559,11 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 
 // ListSecurityGroups applies a Security Group already attached (if not already applied)
 func (handler *hostHandler) ListSecurityGroups(hostRef string) (_ []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -505,7 +575,7 @@ func (handler *hostHandler) ListSecurityGroups(hostRef string) (_ []*propertiesv
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -526,7 +596,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, kind=%s)", hostRef, kind).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -578,7 +648,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -637,7 +707,7 @@ func (handler *hostHandler) BindLabel(hostRef, labelRef, value string) (ferr fai
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -677,7 +747,7 @@ func (handler *hostHandler) UnbindLabel(hostRef, labelRef string) (ferr fail.Err
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -711,7 +781,7 @@ func (handler *hostHandler) UpdateLabel(hostRef, labelRef, value string) (ferr f
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -745,7 +815,7 @@ func (handler *hostHandler) ResetLabel(hostRef, labelRef string) (ferr fail.Erro
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {

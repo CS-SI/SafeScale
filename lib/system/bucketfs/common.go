@@ -120,7 +120,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 	if xerr != nil {
 		switch cErr := xerr.(type) {
 		case *fail.ErrTimeout:
-			logrus.Errorf("ErrTimeout running remote script '%s'", name)
+			logrus.WithContext(ctx).Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
 			return xerr
 		case *fail.ErrExecution:
@@ -171,7 +171,7 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 
 	defer func() {
 		if derr := utils.LazyRemove(f.Name()); derr != nil {
-			logrus.Warnf("Error deleting file: %v", derr)
+			logrus.WithContext(ctx).Warnf("Error deleting file: %v", derr)
 		}
 	}()
 

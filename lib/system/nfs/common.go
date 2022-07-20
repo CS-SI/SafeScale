@@ -123,15 +123,14 @@ func executeScript(
 
 		defer func() {
 			if derr := utils.LazyRemove(f.Name()); derr != nil {
-				logrus.Debugf("Error deleting file: %v", derr)
+				logrus.WithContext(ctx).Debugf("Error deleting file: %v", derr)
 			}
 		}()
 
-		transferTime := 30 * time.Second
+		transferTime := 30 * time.Second // FIXME: OPP Hardcoded time
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				// TODO: Remove this later
 				select {
 				case <-ctx.Done():
 					return retry.StopRetryError(ctx.Err())

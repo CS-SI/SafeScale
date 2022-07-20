@@ -328,7 +328,7 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 
 	// FIXME: 'allWithEmbedded' should be passed as parameter...
 	// walk through the folders that may contain Feature files
-	list, xerr := walkInsideFeatureFileFolders(allWithEmbedded)
+	list, xerr := walkInsideFeatureFileFolders(ctx, allWithEmbedded)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -577,12 +577,12 @@ func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, v
 		for {
 			rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, connectionTimeout, executionTimeout)
 			if rc == 126 {
-				logrus.Debugf("Text busy happened")
+				logrus.WithContext(ctx).Debugf("Text busy happened")
 			}
 
 			if rc != 126 || rounds == 0 {
 				if rc == 126 {
-					logrus.Warnf("Text busy killed the script")
+					logrus.WithContext(ctx).Warnf("Text busy killed the script")
 				}
 				chRes <- result{rc, stdout, stderr, err}
 				return
@@ -794,9 +794,9 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType
 			return
 		}
 
-		logrus.Debugf("[%s] system dependencies installation successful.", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] system dependencies installation successful.", hostLabel)
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -872,7 +872,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 		}
 
 		if !disabled {
-			logrus.Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
 			feat, xerr := NewFeature(ctx, instance.Service(), "edgeproxy4subnet")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -895,14 +895,14 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 				chRes <- result{fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)}
 				return
 			}
-			logrus.Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
+			logrus.WithContext(ctx).Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
 			chRes <- result{nil}
 			return
 		}
 
-		logrus.Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
+		logrus.WithContext(ctx).Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -976,7 +976,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		}
 
 		if !disabled {
-			logrus.Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
 
 			feat, xerr := NewFeature(ctx, instance.Service(), "remotedesktop")
 			xerr = debug.InjectPlannedFail(xerr)
@@ -1011,10 +1011,10 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 				return
 			}
 
-			logrus.Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1066,7 +1066,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 		}
 
 		if !disabled {
-			logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
 
 			// 1st, Feature 'ansible'
 			feat, xerr := NewFeature(ctx, instance.Service(), "ansible")
@@ -1094,7 +1094,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible': %s", identity.Name, msg)}
 				return
 			}
-			logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
 
 			// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
 			feat, xerr = NewFeature(ctx, instance.Service(), "ansible-for-cluster")
@@ -1116,10 +1116,10 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)}
 				return
 			}
-			logrus.Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1190,10 +1190,10 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 				rk := r.ResultsOfKey(k)
 				if !rk.Successful() {
 					if len(rk.ErrorMessages()) == 0 {
-						logrus.Warnf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
+						logrus.WithContext(ctx).Warnf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
 					} else {
 						reason = true
-						logrus.Warnf("This failed: %s with %s", k, spew.Sdump(rk))
+						logrus.WithContext(ctx).Warnf("This failed: %s with %s", k, spew.Sdump(rk))
 					}
 				}
 			}
@@ -1203,9 +1203,9 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 				return
 			}
 		}
-		logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

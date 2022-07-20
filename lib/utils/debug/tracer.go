@@ -58,6 +58,7 @@ type tracer struct {
 	inDone       bool
 	outDone      bool
 	sw           temporal.Stopwatch
+	context      context.Context
 }
 
 const (
@@ -86,6 +87,7 @@ func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
 func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
+		context: ctx,
 	}
 
 	if aID := ctx.Value(concurrency.KeyForID); aID != nil { // nolint
@@ -126,6 +128,7 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
+		context: task.Context(),
 	}
 	if task != nil {
 		t.taskSig = task.Signature()
@@ -185,7 +188,7 @@ func (instance *tracer) Entering() Tracer {
 			instance.inDone = true
 			msg := goingInPrefix + instance.buildMessage(0)
 			if msg != "" {
-				logrus.Tracef(msg)
+				logrus.WithContext(instance.context).Tracef(msg)
 			}
 		}
 	}
@@ -214,7 +217,7 @@ func (instance *tracer) Exiting() Tracer {
 				msg += " (duration: " + instance.sw.String() + ")"
 			}
 			if msg != "" {
-				logrus.Tracef(msg)
+				logrus.WithContext(instance.context).Tracef(msg)
 			}
 		}
 	}
@@ -248,7 +251,7 @@ func (instance *tracer) Trace(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
 		if message != "" {
-			logrus.Tracef(message)
+			logrus.WithContext(instance.context).Tracef(message)
 		}
 	}
 	return instance
@@ -259,7 +262,7 @@ func (instance *tracer) TraceAsError(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
 		if message != "" {
-			logrus.Errorf(message)
+			logrus.WithContext(instance.context).Errorf(message)
 		}
 	}
 	return instance

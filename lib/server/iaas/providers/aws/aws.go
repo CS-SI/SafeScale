@@ -120,7 +120,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if _, ok = computeCfg["Owners"]; ok {
 		ownerList, ok := computeCfg["Owners"].(string)
 		if !ok {
-			logrus.Debugf("error reading owners: %v", computeCfg["Owners"])
+			logrus.WithContext(context.Background()).Debugf("error reading owners: %v", computeCfg["Owners"])
 		} else {
 			frag := strings.Split(ownerList, ",")
 			for _, item := range frag {

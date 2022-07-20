@@ -90,7 +90,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
 						}
 					}
-					logrus.Debugf("Deleted rule: %s", r)
+					logrus.WithContext(ctx).Debugf("Deleted rule: %s", r)
 				}
 			}
 		}
@@ -204,7 +204,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
-				logrus.Debugf("Deleted rule: %s", r)
+				logrus.WithContext(ctx).Debugf("Deleted rule: %s", r)
 			}
 		}
 	}
@@ -255,7 +255,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
-				logrus.Debugf("Deleted rule: %s", r)
+				logrus.WithContext(ctx).Debugf("Deleted rule: %s", r)
 			}
 			v.IDs = []string{}
 		}
@@ -298,7 +298,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return asg, xerr
 	}
 
-	logrus.Debugf("Created rule: %d with name %s", resp.Id, resp.Name)
+	logrus.WithContext(ctx).Debugf("Created rule: %d with name %s", resp.Id, resp.Name)
 	rule.IDs = append(rule.IDs, fmt.Sprintf("%d", resp.Id))
 	asg.Rules = append(asg.Rules, rule)
 	return asg, nil

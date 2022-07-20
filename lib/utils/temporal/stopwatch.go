@@ -17,6 +17,7 @@
 package temporal
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -40,9 +41,9 @@ type Stopwatch interface {
 	// String returns a printable representation of the current elapsed time
 	String() string
 	// OnExitLogWithLevel returns a function that will log start and end of Stopwatch, intended tto be used with defer
-	OnExitLogWithLevel(in, out string, level logrus.Level) func()
+	OnExitLogWithLevel(ctx context.Context, in, out string, level logrus.Level) func()
 
-	OnExitLogInfo(in, out string) func()
+	OnExitLogInfo(ctx context.Context, in, out string) func()
 }
 
 // stopwatch is the implementation satisfying interface Stopwatch
@@ -108,15 +109,12 @@ func (sw *stopwatch) String() string {
 
 // OnExitLogWithLevel logs 'in' with log level 'level', then returns a function (to be used with defer for example)
 // that will log 'out' + elapsed time
-func (sw *stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func() {
+func (sw *stopwatch) OnExitLogWithLevel(ctx context.Context, in, out string, level logrus.Level) func() {
 	if in == "" && out == "" {
 		return func() {}
 	}
 
-	logLevelFn, ok := commonlog.LogLevelFnMap[level]
-	if !ok {
-		logLevelFn = logrus.Info
-	}
+	logLevelFn := commonlog.LogLevelFnMap(ctx, level)
 	logLevelFn(in)
 
 	sw.Start()
@@ -127,8 +125,8 @@ func (sw *stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func
 }
 
 // OnExitLogInfo logs 'in' in Info level then returns a function that will log 'out' with elapsed time
-func (sw *stopwatch) OnExitLogInfo(in, out string) func() {
-	return sw.OnExitLogWithLevel(in, out, logrus.InfoLevel)
+func (sw *stopwatch) OnExitLogInfo(ctx context.Context, in, out string) func() {
+	return sw.OnExitLogWithLevel(ctx, in, out, logrus.InfoLevel)
 }
 
 // FormatDuration ...

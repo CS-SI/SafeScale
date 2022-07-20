@@ -262,7 +262,7 @@ func (hc *HostCore) IsNull() bool {
 
 // IsConsistent tells if host struct is consistent
 func (hc *HostCore) IsConsistent() bool {
-	return hc.ID != "" || hc.Name != ""
+	return hc.ID != ""
 }
 
 // SetID is used to set ID field

@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
+	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -76,9 +78,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Volume, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Volume, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -86,28 +86,98 @@ func LoadVolume(ctx context.Context, svc iaas.Service, ref string, options ...da
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  resources.Volume
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		ga, gerr := func() (_ resources.Volume, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			// trick to avoid collisions
+			var kt *volume
+			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Volume)
+					if ok {
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			var ok bool
+			volumeInstance, ok := anon.(resources.Volume)
+			if !ok {
+				return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
+			}
+			if volumeInstance == nil {
+				return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
+			}
+
+			// if cache failed we are here, so we better retrieve updated information...
+			xerr = volumeInstance.Reload(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := volumeInstance.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Volume)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.Volume")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return volumeInstance, nil
+		}()
+		chRes <- result{ga, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var ok bool
-	volumeInstance, ok := anon.(resources.Volume)
-	if !ok {
-		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
-	}
-	if volumeInstance == nil {
-		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
-	}
-
-	return volumeInstance, nil
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
@@ -325,12 +395,12 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 			xerr = fail.ConvertError(fail.Cause(xerr))
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
+				logrus.WithContext(ctx).Debugf("Unable to find the volume on provider side, cleaning up metadata")
 			default:
 				return xerr
 			}
 		case *fail.ErrNotFound:
-			logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
+			logrus.WithContext(ctx).Debugf("Unable to find the volume on provider side, cleaning up metadata")
 		default:
 			return xerr
 		}
@@ -368,7 +438,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.Service()
-	_, xerr := LoadVolume(ctx, svc, req.Name)
+	mdv, xerr := LoadVolume(ctx, svc, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -378,6 +448,13 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
 	} else {
+		exists, xerr := mdv.Exists(ctx)
+		if xerr != nil {
+			return xerr
+		}
+		if !exists {
+			return fail.DuplicateError("there is already a Volume named '%s', but no longer exists, is a metadata mistake", req.Name)
+		}
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
@@ -779,7 +856,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		return xerr
 	}
 
-	logrus.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volumeName, targetName, volumeUUID)
+	logrus.WithContext(ctx).Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volumeName, targetName, volumeUUID)
 	return nil
 }
 

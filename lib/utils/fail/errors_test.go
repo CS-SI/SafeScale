@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -43,6 +44,8 @@ type BrokenError struct {
 func (e *BrokenError) Annotate(key string, value data.Annotation) data.Annotatable { return nil }
 func (e *BrokenError) Annotations() data.Annotations                               { return nil }
 func (e *BrokenError) Annotation(key string) (data.Annotation, bool)               { return nil, false }
+
+func (e *BrokenError) WithContext(ctx context.Context) { return }
 
 // causer
 func (e *BrokenError) Cause() error     { return nil }

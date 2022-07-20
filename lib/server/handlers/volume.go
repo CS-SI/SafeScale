@@ -67,6 +67,11 @@ func NewVolumeHandler(job server.Job) VolumeHandler {
 
 // List returns the list of Volumes
 func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -79,7 +84,7 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	browseInstance, xerr := volumefactory.New(handler.job.Service())
 	if xerr != nil {
@@ -104,6 +109,11 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 
 // Delete deletes volume referenced by ref
 func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -119,7 +129,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -127,7 +137,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		case *fail.ErrNotFound:
 			return abstract.ResourceNotFoundError("volume", ref)
 		default:
-			logrus.Debugf("failed to delete volume: %+v", xerr)
+			logrus.WithContext(handler.job.Context()).Debugf("failed to delete volume: %+v", xerr)
 			return xerr
 		}
 	}
@@ -159,6 +169,11 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 
 // Inspect returns the volume identified by ref and its attachment (if any)
 func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -174,7 +189,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -188,6 +203,11 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 
 // Create a volume
 func (handler *volumeHandler) Create(name string, size int, speed volumespeed.Enum) (objv resources.Volume, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -202,7 +222,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
 	objv, xerr = volumefactory.New(handler.job.Service())
@@ -222,6 +242,11 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 
 // Attach a volume to a host
 func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path string, format string, doNotFormat bool, doNotMount bool) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -245,7 +270,7 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
@@ -264,6 +289,11 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -281,7 +311,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()

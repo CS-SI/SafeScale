@@ -38,8 +38,8 @@ type SSHListener struct {
 
 // Run executes an ssh command on a host
 func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot run by ssh")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot run by ssh")
 	defer fail.OnPanic(&ferr)
 
 	if s == nil {
@@ -72,7 +72,7 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *p
 	tracer := debug.NewTracer(ctx, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewSSHHandler(job)
 	retcode, stdout, stderr, xerr := handler.Run(hostRef, command)
@@ -90,8 +90,8 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *p
 
 // Copy copies file from/to a host
 func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot copy by ssh")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -117,7 +117,7 @@ func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommand) (
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSSHHandler(job)
 	retcode, stdout, stderr, xerr := handler.Copy(in.GetSource(), in.GetDestination())

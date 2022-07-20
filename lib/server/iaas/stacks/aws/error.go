@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -87,7 +88,7 @@ func normalizeError(err error) fail.Error {
 						return fail.NotAvailableError(err.Error())
 					}
 				default:
-					logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+					logrus.WithContext(context.Background()).Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
 					return fail.NewError("unhandled error received from provider: %s", err.Error())
 				}
 			}

@@ -111,6 +111,8 @@ type worker struct {
 	host    *Host
 	cluster *Cluster
 
+	machines map[string]resources.Host
+
 	availableMaster  resources.Host
 	availableNode    resources.Host
 	availableGateway resources.Host
@@ -138,6 +140,7 @@ func newWorker(ctx context.Context, f resources.Feature, target resources.Target
 		method:    method,
 		action:    action,
 		commandCB: cb,
+		machines:  make(map[string]resources.Host),
 	}
 	switch target.TargetType() {
 	case featuretargettype.Cluster:
@@ -206,7 +209,7 @@ func (w *worker) CanProceed(inctx context.Context, s resources.FeatureSettings) 
 			return
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -590,7 +593,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 
 		w.allGateways = list
 		chRes <- result{list, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -798,7 +801,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map, settings resour
 		}
 
 		chRes <- result{outcomes, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -842,12 +845,8 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterError("params", "should be taskLaunchStepParameters")
 	}
 
-	defer fail.OnExitLogError(&ferr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
-	defer temporal.NewStopwatch().OnExitLogWithLevel(
-		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName),
-		fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, ferr),
-		logrus.DebugLevel,
-	)
+	defer fail.OnExitLogError(ctx, &ferr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
+	defer temporal.NewStopwatch().OnExitLogWithLevel(ctx, fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName), fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, ferr), logrus.DebugLevel)
 
 	chRes := make(chan result)
 	go func() {
@@ -927,7 +926,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			} else {
 				wallTimeConv, inner := strconv.Atoi(anon.(string))
 				if inner != nil {
-					logrus.Warnf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+					logrus.WithContext(ctx).Warnf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
 				} else {
 					wallTime = time.Duration(wallTimeConv) * time.Minute
 				}
@@ -989,7 +988,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 							} else {
 								msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v", w.action.String(), p.stepName, cuk.Error())
 							}
-							logrus.Warnf(msg.Error())
+							logrus.WithContext(ctx).Warnf(msg.Error())
 							errpack = append(errpack, msg)
 						}
 					}
@@ -1031,7 +1030,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 
 		chRes <- result{&r, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1173,7 +1172,7 @@ func (w *worker) validateClusterSizing(inctx context.Context) (ferr fail.Error) 
 		}
 
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1298,6 +1297,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			}
 
 			for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
+				sorrow := time.Now()
 				primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1415,10 +1415,11 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 					chRes <- result{xerr}
 					return
 				}
+				logrus.Warningf("Bottleneck is %s", time.Since(sorrow)) // FIXME: OPP Remove this
 			}
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1475,13 +1476,13 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 				msg += " '" + ruleName + "'"
 			}
 			msg += " for host '" + hostName
-			logrus.Error(msg + "': " + xerr.Error())
+			logrus.WithContext(ctx).Error(msg + "': " + xerr.Error())
 			chRes <- result{nil, fail.Wrap(xerr, msg)}
 			return
 		}
-		logrus.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
+		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1596,7 +1597,7 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]re
 		}
 
 		chRes <- result{hostsList, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1946,7 +1947,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 	}
 		// }
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

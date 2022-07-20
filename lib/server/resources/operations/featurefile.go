@@ -26,7 +26,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -171,35 +173,90 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 //    - nil: everything worked as expected
 //    - fail.ErrNotFound: no FeatureFile is found with the name
 //    - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(ctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (_ *FeatureFile, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
+func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
+	type result struct {
+		rTr  *FeatureFile
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		ga, gerr := func() (_ *FeatureFile, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			if svc == nil {
+				return nil, fail.InvalidParameterCannotBeNilError("svc")
+			}
+			if name == "" {
+				return nil, fail.InvalidParameterError("name", "cannot be empty string")
+			}
+
+			// trick to avoid collisions
+			var kt *FeatureFile
+			cachename := fmt.Sprintf("%T/%s", kt, name)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
+					casted, ok := val.(*FeatureFile)
+					if ok {
+						incrementExpVar("newhost.cache.hit")
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			featureFileInstance, ok := anon.(*FeatureFile)
+			if !ok {
+				return nil, fail.InconsistentError("cache content for key '%s' is not a resources.Feature", name)
+			}
+			if featureFileInstance == nil {
+				return nil, fail.InconsistentError("nil value found in Feature cache for key '%s'", name)
+			}
+
+			// FIXME: Bad
+			if cache != nil {
+				_ = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, featureFileInstance.GetName()), featureFileInstance, &store.Options{Expiration: 1 * time.Minute})
+				hid, _ := featureFileInstance.GetID()
+				_ = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), featureFileInstance, &store.Options{Expiration: 1 * time.Minute})
+
+				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
+					casted, ok := val.(*FeatureFile)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.FeatureFile")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return featureFileInstance, nil
+		}()
+		chRes <- result{ga, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	featureFileInstance, ok := anon.(*FeatureFile)
-	if !ok {
-		return nil, fail.InconsistentError("cache content for key '%s' is not a resources.Feature", name)
-	}
-	if featureFileInstance == nil {
-		return nil, fail.InconsistentError("nil value found in Feature cache for key '%s'", name)
-	}
-
-	return featureFileInstance, nil
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache
@@ -215,7 +272,7 @@ func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (dat
 			return nil, xerr
 		}
 
-		logrus.Tracef("Loaded Feature '%s' (%s)", newInstance.DisplayFilename(), newInstance.Filename())
+		logrus.WithContext(context.Background()).Tracef("Loaded Feature '%s' (%s)", newInstance.DisplayFilename(), newInstance.Filename())
 	} else {
 		v := viper.New()
 		setViperConfigPathes(v)
@@ -241,7 +298,7 @@ func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (dat
 			newInstance = newFeatureFile(v.ConfigFileUsed(), name, false, v)
 		}
 
-		logrus.Tracef("Loaded Feature '%s' (%s)", newInstance.DisplayFilename(), newInstance.Filename())
+		logrus.WithContext(context.Background()).Tracef("Loaded Feature '%s' (%s)", newInstance.DisplayFilename(), newInstance.Filename())
 
 		// if we can log the sha256 of the feature, do it
 		filename := v.ConfigFileUsed()
@@ -251,7 +308,7 @@ func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (dat
 				return nil, fail.ConvertError(err)
 			}
 
-			logrus.Tracef("Loaded Feature '%s' SHA256:%s", name, getSHA256Hash(string(content)))
+			logrus.WithContext(context.Background()).Tracef("Loaded Feature '%s' SHA256:%s", name, getSHA256Hash(string(content)))
 		}
 	}
 
@@ -602,7 +659,7 @@ func getFeatureFileFolders(useCWD bool) []string {
 }
 
 // walkInsideFeatureFileFolders walks inside folders where Feature Files may be found and returns a list of Feature names
-func walkInsideFeatureFileFolders(filter featureFilter) ([]string, fail.Error) {
+func walkInsideFeatureFileFolders(ctx context.Context, filter featureFilter) ([]string, fail.Error) {
 	var out []string
 	switch filter {
 	case allWithEmbedded, embeddedOnly:
@@ -627,7 +684,7 @@ func walkInsideFeatureFileFolders(filter featureFilter) ([]string, fail.Error) {
 						}
 					default:
 					}
-					logrus.Error(err)
+					logrus.WithContext(ctx).Error(err)
 					return err
 				}
 
@@ -681,13 +738,13 @@ func watchFeatureFileFolders(ctx context.Context) error {
 				if !ok {
 					return
 				}
-				logrus.Error("Feature File watcher returned an error: ", err)
+				logrus.WithContext(ctx).Error("Feature File watcher returned an error: ", err)
 			}
 		}
 	}()
 
 	for _, v := range getFeatureFileFolders(false) {
-		err = addPathToWatch(watcher, v)
+		err = addPathToWatch(ctx, watcher, v)
 		if err != nil {
 			return err
 		}
@@ -697,7 +754,7 @@ func watchFeatureFileFolders(ctx context.Context) error {
 	return nil
 }
 
-func addPathToWatch(w *rfsnotify.RWatcher, path string) error {
+func addPathToWatch(ctx context.Context, w *rfsnotify.RWatcher, path string) error {
 	err := w.AddRecursive(path)
 	if err != nil {
 		switch casted := err.(type) {
@@ -708,16 +765,16 @@ func addPathToWatch(w *rfsnotify.RWatcher, path string) error {
 				debug.IgnoreError(err)
 				return nil
 			default:
-				logrus.Error(err)
+				logrus.WithContext(ctx).Error(err)
 				return err
 			}
 		default:
-			logrus.Error(err)
+			logrus.WithContext(ctx).Error(err)
 			return err
 		}
 	}
 
-	logrus.Debugf("adding monitoring of folder '%s' for Feature file changes", path)
+	logrus.WithContext(ctx).Debugf("adding monitoring of folder '%s' for Feature file changes", path)
 	return nil
 }
 
@@ -792,7 +849,7 @@ func StartFeatureFileWatcher() {
 	go func() {
 		err := watchFeatureFileFolders(context.Background())
 		if err != nil {
-			logrus.Error(err)
+			logrus.WithContext(context.Background()).Error(err)
 		}
 	}()
 }

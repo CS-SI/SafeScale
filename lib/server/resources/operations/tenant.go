@@ -51,7 +51,7 @@ func CurrentTenant(ctx context.Context) *Tenant {
 		for _, tenant := range tenants {
 			name, ok := tenant["name"].(string)
 			if !ok {
-				logrus.Warnf("tenant names should be strings: %v is not", tenant["name"])
+				logrus.WithContext(ctx).Warnf("tenant names should be strings: %v is not", tenant["name"])
 				continue
 			}
 

@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -36,12 +37,9 @@ const (
 )
 
 // OnExitLogErrorWithLevel logs error with the log level wanted
-func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interface{}) {
+func OnExitLogErrorWithLevel(ctx context.Context, err interface{}, level logrus.Level, msg ...interface{}) {
 	if err != nil {
-		logLevelFn, ok := commonlog.LogLevelFnMap[level]
-		if !ok {
-			logLevelFn = logrus.Error
-		}
+		logLevelFn := commonlog.LogLevelFnMap(ctx, level)
 
 		switch v := err.(type) {
 		case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
@@ -59,7 +57,7 @@ func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interfa
 				}
 			}
 		default:
-			logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
+			logrus.WithContext(ctx).Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 		}
 	}
 }
@@ -97,12 +95,12 @@ func extractCallerName() string {
 
 // OnExitLogError logs error with level logrus.ErrorLevel.
 // func OnExitLogError(in string, err *error) {
-func OnExitLogError(err interface{}, msg ...interface{}) {
-	OnExitLogErrorWithLevel(err, logrus.ErrorLevel, msg...)
+func OnExitLogError(ctx context.Context, err interface{}, msg ...interface{}) {
+	OnExitLogErrorWithLevel(ctx, err, logrus.ErrorLevel, msg...)
 }
 
 // OnExitWrapError wraps the error with the message
-func OnExitWrapError(err interface{}, msg ...interface{}) {
+func OnExitWrapError(ctx context.Context, err interface{}, msg ...interface{}) {
 	if err != nil {
 		var newErr error
 		switch v := err.(type) {
@@ -115,7 +113,7 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 				newErr = Wrap(*v, msg...)
 			}
 		default:
-			logrus.Errorf(callstack.DecorateWith("fail.OnExitWrapError()", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 0))
+			logrus.WithContext(ctx).Errorf(callstack.DecorateWith("fail.OnExitWrapError()", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 0))
 			return
 		}
 		if newErr != nil {
@@ -123,7 +121,7 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 			if ok {
 				*targetErr = newErr
 			} else {
-				logrus.Errorf("This is a coding mistake, OnExitWrapError only works when 'err' is a '*error'")
+				logrus.WithContext(ctx).Errorf("This is a coding mistake, OnExitWrapError only works when 'err' is a '*error'")
 				return
 			}
 		}
@@ -131,7 +129,7 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 }
 
 // OnExitConvertToGRPCStatus converts err to GRPC Status.
-func OnExitConvertToGRPCStatus(err *error) {
+func OnExitConvertToGRPCStatus(ctx context.Context, err *error) {
 	if err != nil && *err != nil {
 		var newErr error
 		switch v := (*err).(type) {
@@ -140,7 +138,7 @@ func OnExitConvertToGRPCStatus(err *error) {
 		case error:
 			newErr = ToGRPCStatus(v)
 		default:
-			logrus.Errorf("fail.OnExitConvertToGRPCStatus(): invalid parameter 'err': unexpected type '%s'", reflect.TypeOf(err).String())
+			logrus.WithContext(ctx).Errorf("fail.OnExitConvertToGRPCStatus(): invalid parameter 'err': unexpected type '%s'", reflect.TypeOf(err).String())
 			return
 		}
 		if newErr != nil {
@@ -151,8 +149,8 @@ func OnExitConvertToGRPCStatus(err *error) {
 
 // OnExitTraceError logs error with level logrus.TraceLevel.
 // func OnExitTraceError(in string, err *error) {
-func OnExitTraceError(err interface{}, msg ...interface{}) {
-	OnExitLogErrorWithLevel(err, logrus.TraceLevel, msg...)
+func OnExitTraceError(ctx context.Context, err interface{}, msg ...interface{}) {
+	OnExitLogErrorWithLevel(ctx, err, logrus.TraceLevel, msg...)
 }
 
 // OnPanic captures panic error and fill the error pointer with a ErrRuntimePanic.

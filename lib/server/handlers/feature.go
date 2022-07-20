@@ -55,6 +55,11 @@ func NewFeatureHandler(job server.Job) FeatureHandler {
 // List ...
 // Note: returned []resources.Feature must be .Released by caller
 func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef string, installedOnly bool) (_ []resources.Feature, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -66,7 +71,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s)", targetType, targetRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	switch targetType {
 	case featuretargettype.Host:
@@ -113,6 +118,11 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 // Inspect ...
 // Note: returned resources.Feature must be .Released() by the caller
 func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, targetRef, featureName string) (_ resources.Feature, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -127,7 +137,7 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
@@ -161,6 +171,11 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 
 // Export exports the content of the feature file
 func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetRef, featureName string, embedded bool) (_ *protocol.FeatureExportResponse, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -175,7 +190,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var (
 		feat resources.Feature
@@ -217,6 +232,11 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 
 // Check checks if a feature installed on target
 func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map, settings resources.FeatureSettings) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -231,7 +251,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
@@ -300,6 +320,11 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 
 // Add ...
 func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map, settings resources.FeatureSettings) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -314,7 +339,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
@@ -359,6 +384,11 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 
 // Remove uninstalls a Feature
 func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map, settings resources.FeatureSettings) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -373,7 +403,7 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {

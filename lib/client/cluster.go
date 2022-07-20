@@ -186,7 +186,11 @@ func (c clusterConsumer) Create(def *protocol.ClusterCreateRequest, timeout time
 
 	def.TenantId = c.session.tenant
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Create(newCtx, def)
+	cr, zerr := service.Create(newCtx, def)
+	if zerr != nil {
+		return nil, zerr
+	}
+	return cr, nil
 }
 
 // Delete deletes a cluster

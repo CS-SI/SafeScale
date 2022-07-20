@@ -753,7 +753,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, r
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	logrus.Debugf("Trying to resize a Host...")
+	logrus.WithContext(ctx).Debugf("Trying to resize a Host...")
 	// servers.Resize()
 
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt

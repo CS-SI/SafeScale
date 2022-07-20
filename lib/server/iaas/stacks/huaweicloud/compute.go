@@ -202,7 +202,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 		} else {
 			userData = string(opts.UserData)
 		}
-		// logrus.Debugf("Base64 encoded userdata size = %d bytes", len(userData))
+		// logrus.WithContext(ctx).Debugf("Base64 encoded userdata size = %d bytes", len(userData))
 		b["user_data"] = &userData
 	}
 
@@ -309,7 +309,7 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -337,7 +337,7 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 
 	// VPL: what's the point if there ios
 	if len(azList) == 0 {
-		logrus.Warnf("no Availability Zones detected !")
+		logrus.WithContext(ctx).Warnf("no Availability Zones detected !")
 	}
 
 	return azList, nil
@@ -366,7 +366,7 @@ func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error
 			}
 			s.selectedAvailabilityZone = azone
 		}
-		logrus.Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
+		logrus.WithContext(ctx).Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
 	}
 	return s.selectedAvailabilityZone, nil
 }
@@ -597,7 +597,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
+								_ = xerr.AddConsequence(
+									fail.Wrap(
+										derr, "cleaning up on failure, failed to delete host",
+									),
+								)
 							}
 						}
 					}
@@ -628,41 +632,45 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
 			if zoneErr != nil {
-				logrus.Tracef("Host '%s' successfully created but cannot confirm Availability Zone: %s", server.Name, zoneErr)
+				logrus.WithContext(ctx).Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
-				logrus.Tracef("Host '%s' successfully created in requested Availability Zone '%s'", server.Name, creationZone)
-				if creationZone != srvOpts.AvailabilityZone && srvOpts.AvailabilityZone != "" {
-					logrus.Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", server.Name, srvOpts.AvailabilityZone, creationZone)
+				logrus.WithContext(ctx).Tracef("Host successfully created in requested Availability Zone '%s'", creationZone)
+				if creationZone != srvOpts.AvailabilityZone {
+					if srvOpts.AvailabilityZone != "" {
+						logrus.WithContext(ctx).Warnf(
+							"Host created in the WRONG availability zone: requested '%s' and got instead '%s'",
+							srvOpts.AvailabilityZone, creationZone,
+						)
+					}
 				}
 			}
 
 			defer func() {
-				if innerXErr != nil && ahc.ID != "" {
-					derr := servers.Delete(s.ComputeClient, ahc.ID).ExtractErr()
-					if derr != nil {
-						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
-					} else {
-						ahc.ID = ""
-						ahc.Name = ""
+				if innerXErr != nil {
+					if server != nil && server.ID != "" {
+						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+						if derr != nil {
+							logrus.WithContext(ctx).Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+						}
 					}
 				}
 			}()
 
 			// Wait that host is ready, not just that the build is started
-			//FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
+			// FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
 			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
 			//       We should think of a way to increase this timing based on number of hosts are created
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timings.HostOperationTimeout())
+			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
 					if server != nil {
-						// ahc.ID = server.ID
-						// ahc.Name = server.Name
+						ahc.ID = server.ID
+						ahc.Name = server.Name
 						ahc.LastState = hoststate.Error
 					}
-					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 
+					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
 					return innerXErr
 				}
@@ -672,30 +680,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		timings.NormalDelay(),
 		timings.HostLongOperationTimeout(),
 	)
-
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if ahc != nil && ahc.ID != "" {
-				derr := s.DeleteHost(context.Background(), ahc.ID)
-				if derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						logrus.Errorf(
-							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
-						)
-					case *fail.ErrTimeout:
-						logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-					default:
-						logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
-					}
-					_ = ferr.AddConsequence(derr)
-				}
-			}
-		}
-	}()
-
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
@@ -706,6 +690,29 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			return nil, userData, retryErr
 		}
 	}
+
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			if ahc.IsConsistent() {
+				derr := s.DeleteHost(context.Background(), ahc.ID)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						logrus.WithContext(ctx).Errorf(
+							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
+						)
+					case *fail.ErrTimeout:
+						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
+					default:
+						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
+					}
+					_ = ferr.AddConsequence(derr)
+				}
+			}
+		}
+	}()
 
 	host, xerr = s.complementHost(ctx, ahc, server)
 	if xerr != nil {
@@ -734,7 +741,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			if ferr != nil {
 				derr := s.DeleteFloatingIP(context.Background(), fip.ID)
 				if derr != nil {
-					logrus.Errorf("Error deleting Floating IP: %v", derr)
+					logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
 					_ = ferr.AddConsequence(derr)
 				}
 			}
@@ -891,7 +898,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 	out, err := extractImage(img)
 	if err != nil {
 		// probably image internals has changed, dump image description
-		logrus.Warnf("this image description is invalid: %s", spew.Sdump(img))
+		logrus.WithContext(ctx).Warnf("this image description is invalid: %s", spew.Sdump(img))
 		return nil, fail.Wrap(err, "huawei has changed the way it populates *images.Image")
 	}
 
@@ -944,7 +951,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 	}
 
 	if !host.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 	return host, xerr
 }
@@ -959,7 +966,7 @@ func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Imag
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	opts := images.ListOpts{
 		Status: images.ImageStatusActive,
@@ -1040,7 +1047,7 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTempl
 		}
 	}
 	if len(flvList) == 0 {
-		logrus.Debugf("Template list empty")
+		logrus.WithContext(ctx).Debugf("Template list empty")
 	}
 	return flvList, nil
 }
@@ -1136,7 +1143,7 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, serv
 		if subnetName == "" {
 			subnet, xerr := s.InspectSubnet(ctx, subnetID)
 			if xerr != nil {
-				logrus.Errorf("failed to get network '%s'", subnetID)
+				logrus.WithContext(ctx).Errorf("failed to get network '%s'", subnetID)
 				errors = append(errors, xerr)
 				continue
 			}
@@ -1455,7 +1462,7 @@ func (s stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 	if xerr != nil {
 		rerr := s.DeleteFloatingIP(ctx, fip.ID)
 		if rerr != nil {
-			logrus.Warnf("Error deleting floating ip: %v", rerr)
+			logrus.WithContext(ctx).Warnf("Error deleting floating ip: %v", rerr)
 			_ = xerr.AddConsequence(rerr)
 		}
 		return nil, xerr

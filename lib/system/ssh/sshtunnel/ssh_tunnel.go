@@ -17,6 +17,7 @@
 package sshtunnel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -61,9 +62,9 @@ func OnPanic(err *error) {
 func SilentOnPanic(err *error) {
 	if x := recover(); x != nil {
 		if anError, ok := x.(error); ok {
-			logrus.Errorf("runtime panic occurred: %v", anError)
+			logrus.WithContext(context.Background()).Errorf("runtime panic occurred: %v", anError)
 		} else {
-			logrus.Errorf("runtime panic occurred: %v", x)
+			logrus.WithContext(context.Background()).Errorf("runtime panic occurred: %v", x)
 		}
 	}
 }
@@ -218,7 +219,7 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 			resLis: theCli,
 			resErr: theErr,
 		}
-		return // nolint
+
 	}()
 
 	if timeout != 0 {
@@ -457,7 +458,7 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 			resCli: theCli,
 			resErr: theErr,
 		}
-		return // nolint
+
 	}()
 
 	if timeout != 0 {
@@ -510,7 +511,7 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 			resConn: theConn,
 			resErr:  theErr,
 		}
-		return // nolint
+
 	}()
 
 	if timeout != 0 {

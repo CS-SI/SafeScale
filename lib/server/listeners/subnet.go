@@ -49,9 +49,9 @@ type SubnetListener struct {
 
 // Create a new subnet
 func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot create Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create Subnet")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -77,7 +77,7 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var sizing *abstract.HostSizingRequirements
 	if in.GetGateway() != nil {
@@ -116,9 +116,9 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 
 // List existing networks
 func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitLogError(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot list Subnets")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitLogError(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot list Subnets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -143,7 +143,7 @@ func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequ
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %v)", networkRefLabel, in.All).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	list, xerr := handler.List(networkRef, in.GetAll())
@@ -162,9 +162,9 @@ func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequ
 
 // Inspect returns infos on a subnet
 func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspectRequest) (_ *protocol.Subnet, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect Subnet")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -192,7 +192,7 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnetInstance"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	subnetInstance, xerr := handler.Inspect(networkRef, subnetRef)
@@ -205,9 +205,9 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 
 // Delete a/many subnet/s
 func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDeleteRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -235,7 +235,7 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	xerr = handler.Delete(networkRef, subnetRef, in.GetForce())
@@ -249,9 +249,9 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 
 // BindSecurityGroup attaches a Security Group to a hostnetwork
 func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot bind Security Group to Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -284,7 +284,7 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -300,9 +300,9 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 
 // UnbindSecurityGroup detaches a Security Group from a subnet
 func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Security Group from Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -335,7 +335,7 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	return empty, handler.UnbindSecurityGroup(networkRef, subnetRef, sgRef)
@@ -343,9 +343,9 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 
 // EnableSecurityGroup applies the rules of a bound security group on a network
 func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot enable Security Group of Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot enable Security Group of Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -378,7 +378,7 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	return empty, handler.EnableSecurityGroup(networkRef, subnetRef, sgRef)
@@ -386,9 +386,9 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 
 // DisableSecurityGroup detaches a Security Group from a subnet
 func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot disable Security Group of Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot disable Security Group of Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -421,7 +421,7 @@ func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protoco
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	return empty, handler.DisableSecurityGroup(networkRef, subnetRef, sgRef)
@@ -429,9 +429,9 @@ func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protoco
 
 // ListSecurityGroups lists the Security Group bound to subnet
 func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot list Security Groups bound to Subnet")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitLogError(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list Security Groups bound to Subnet")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -458,7 +458,7 @@ func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	state := securitygroupstate.Enum(in.GetState())
 

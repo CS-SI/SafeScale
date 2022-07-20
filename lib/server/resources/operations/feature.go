@@ -45,9 +45,12 @@ import (
 
 // Feature contains the information about a FeatureFile to be installed
 type Feature struct {
-	file                  *FeatureFile
-	installers            map[installmethod.Enum]Installer // defines the installers available for the Feature
-	svc                   iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+	file       *FeatureFile
+	installers map[installmethod.Enum]Installer // defines the installers available for the Feature
+	svc        iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+
+	machines map[string]resources.Host
+
 	conditionedParameters ConditionedFeatureParameters
 }
 
@@ -77,8 +80,9 @@ func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources
 	}
 
 	featureInstance := &Feature{
-		file: featureFileInstance,
-		svc:  svc,
+		file:     featureFileInstance,
+		machines: make(map[string]resources.Host),
+		svc:      svc,
 	}
 	return featureInstance, nil
 }
@@ -276,7 +280,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	targetType := strings.ToLower(target.TargetType().String())
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	// -- passive check if feature is installed on target
 	switch target.(type) { // nolint
@@ -344,7 +348,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		return nil, xerr
 	}
 
-	logrus.Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
+	logrus.WithContext(ctx).Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
 
 	// Inits and checks target parameters
 	myV, xerr := instance.prepareParameters(ctx, v, target)
@@ -420,7 +424,7 @@ func (instance *Feature) conditionParameters(ctx context.Context, externals data
 			if _, ok := instance.file.versionControl[k]; ok {
 				value, xerr := instance.controlledParameter(ctx, k, target)
 				if xerr != nil {
-					logrus.Error(xerr.Error())
+					logrus.WithContext(ctx).Error(xerr.Error())
 				} else {
 					item.controlled = true
 					item.currentValue = value
@@ -479,10 +483,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	defer temporal.NewStopwatch().OnExitLogInfo(
-		fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName),
-		fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName),
-	)()
+	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName))()
 
 	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
@@ -504,7 +505,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		}
 
 		if results.Successful() {
-			logrus.Infof("Feature '%s' is already installed.", featureName)
+			logrus.WithContext(ctx).Infof("Feature '%s' is already installed.", featureName)
 			return results, nil
 		}
 	}
@@ -554,7 +555,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	targetType := target.TargetType().String()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	var (
 		results resources.Results
@@ -567,10 +568,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return nil, xerr
 	}
 
-	defer temporal.NewStopwatch().OnExitLogInfo(
-		fmt.Sprintf("Starting removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
-		fmt.Sprintf("Ending removal of Feature '%s' from %s '%s'", featureName, targetType, targetName),
-	)()
+	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting removal of Feature '%s' from %s '%s'", featureName, targetType, targetName), fmt.Sprintf("Ending removal of Feature '%s' from %s '%s'", featureName, targetType, targetName))()
 
 	// Inits and checks target parameters
 	myV, xerr := instance.prepareParameters(ctx, v, target)
@@ -650,7 +648,7 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 			case featuretargettype.Cluster:
 				msgTail = fmt.Sprintf("on cluster '%s'", t.(data.Identifiable).GetName())
 			}
-			logrus.Debugf("%s %s...", msgHead, msgTail)
+			logrus.WithContext(ctx).Debugf("%s %s...", msgHead, msgTail)
 		}
 
 		targetIsCluster := t.TargetType() == featuretargettype.Cluster
@@ -863,7 +861,7 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 	}
 
 	// walk through the folders that may contain Feature files
-	list, xerr := walkInsideFeatureFileFolders(filter)
+	list, xerr := walkInsideFeatureFileFolders(ctx, filter)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -876,8 +874,8 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 			case *fail.ErrNotFound:
 				// ignore a feature file not found; weird, but fs may have changed (will be handled properly later with fswatcher)
 			case *fail.ErrSyntax:
-				// When a synta error occurs, log but do not fail
-				logrus.Error(fail.Wrap(xerr, "failed to load Feature '%s'", v))
+				// When a syntax error occurs, log but do not fail
+				logrus.WithContext(ctx).Error(fail.Wrap(xerr, "failed to load Feature '%s'", v))
 				continue
 			default:
 				return nil, xerr

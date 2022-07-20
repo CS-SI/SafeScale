@@ -62,6 +62,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/eko/gocache/v2/cache"
 
 	// "github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -867,9 +868,8 @@ func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum,
 	return nil, nil
 }
 
-// func (e *ServiceTest) GetCache(ctx context.Context, name string) (cache.Cache, fail.Error) {
-func (e *ServiceTest) GetCache(ctx context.Context, name string) (interface{}, fail.Error) {
-	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", name, e.options.enablecache)
+func (e *ServiceTest) GetCache(ctx context.Context) (*cache.Cache, fail.Error) {
+	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", "none", e.options.enablecache)
 	/*
 		if name == "" {
 			return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
@@ -879,7 +879,8 @@ func (e *ServiceTest) GetCache(ctx context.Context, name string) (interface{}, f
 		}
 		var c cache.Cache = NewCacheTest("name", e)
 	*/
-	return nil, fail.NotAvailableError("No cache available !")
+	// return nil, fail.NotAvailableError("No cache available !")
+	return nil, nil
 }
 
 /*
@@ -2416,6 +2417,33 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		if xerr != nil {
 			return aci, xerr
 		}
+		gw, xerr := LoadHost(ctx, e, fmt.Sprintf("gw-%s", name))
+		if xerr != nil {
+			return aci, xerr
+		}
+		xerr = gw.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			_, ok := clonable.(*abstract.HostCore)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			innerXErr := props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				hnV2.PublicIPv4 = "192.168.11.11"
+				hnV2.PublicIPv6 = ""
+
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			return nil
+		})
 	}
 	if !e._hasInternalData(fmt.Sprintf("hosts/ByID/gw2-%s", name)) {
 		_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
@@ -2445,6 +2473,33 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		if xerr != nil {
 			return aci, xerr
 		}
+		gw, xerr := LoadHost(ctx, e, fmt.Sprintf("gw2-%s", name))
+		if xerr != nil {
+			return aci, xerr
+		}
+		xerr = gw.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			_, ok := clonable.(*abstract.HostCore)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			innerXErr := props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				hnV2.PublicIPv4 = "192.168.11.12"
+				hnV2.PublicIPv6 = ""
+
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			return nil
+		})
 	}
 
 	if shorten { // To make cluster.Create result without have to folow procedure
@@ -3177,7 +3232,7 @@ func (e *SSHConnectorTest) CreatePersistentTunnel() fail.Error {
 	e.svc._survey("SSHConnectorTest::CreatePersistentTunnel (not implemented)")
 	return nil
 }
-func (e *SSHConnectorTest) Enter(username string, shell string) (ferr fail.Error) {
+func (e *SSHConnectorTest) Enter(ctx2 context.Context, username string, shell string) (ferr fail.Error) {
 	e.svc._surveyf("SSHConnectorTest::Enter { user: \"%s\", shell: \"%s\" }", username, shell)
 
 	defer fail.OnPanic(&ferr)

@@ -146,7 +146,7 @@ func NormalizeError(err error) fail.Error {
 				tracer.Trace("received 'EOF', normalized to '*fail.ErrNotFound'")
 				return fail.NotFoundError("EOF")
 			default:
-				logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+				logrus.WithContext(context.Background()).Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
 				return fail.NewError("unhandled error received from provider: %s", err.Error())
 			}
 		}

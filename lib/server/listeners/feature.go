@@ -40,8 +40,8 @@ type FeatureListener struct {
 
 // List ...
 func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRequest) (_ *protocol.FeatureListResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot list Features")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot list Features")
 	defer fail.OnPanic(&ferr)
 
 	empty := &protocol.FeatureListResponse{}
@@ -74,7 +74,7 @@ func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%s, %s)", in.GetTargetType(), targetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	list, xerr := handler.List(targetType, targetRef, in.GetInstalledOnly())
@@ -100,8 +100,8 @@ func convertTargetType(in protocol.FeatureTargetType) (featuretargettype.Enum, f
 
 // Inspect ...
 func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureDetailResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot inspect Feature")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot inspect Feature")
 	defer fail.OnPanic(&ferr)
 
 	if s == nil {
@@ -135,7 +135,7 @@ func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDet
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	feat, xerr := handler.Inspect(targetType, targetRef, featureName)
@@ -150,8 +150,8 @@ func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDet
 
 // Export exports the content of the feature file
 func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureExportResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot export Feature")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot export Feature")
 	defer fail.OnPanic(&ferr)
 
 	if s == nil {
@@ -181,7 +181,7 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	return handler.Export(targetType, targetRef, featureName, in.GetEmbedded())
@@ -189,7 +189,7 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 
 // Check checks if a feature installed on target
 func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
 	defer func() {
 		ferr = debug.InjectPlannedError(ferr)
 		if ferr != nil {
@@ -197,10 +197,10 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 			case *fail.ErrNotFound:
 				// Do not wrap *fail.ErrNotFound if it means "Feature not installed"
 				if val, found := cerr.Annotation("not_installed"); !found || !val.(bool) {
-					fail.OnExitWrapError(&ferr, "cannot check Feature")
+					fail.OnExitWrapError(inctx, &ferr, "cannot check Feature")
 				}
 			default:
-				fail.OnExitWrapError(&ferr, "cannot check Feature")
+				fail.OnExitWrapError(inctx, &ferr, "cannot check Feature")
 			}
 		}
 	}()
@@ -247,7 +247,7 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 			switch ferr.(type) {
 			case *fail.ErrNotFound:
 			default:
-				fail.OnExitLogError(ferr, tracer.TraceMessage())
+				fail.OnExitLogError(ctx, ferr, tracer.TraceMessage())
 			}
 		}
 	}()
@@ -282,8 +282,8 @@ func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
 
 // Add ...
 func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot add Feature")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot add Feature")
 	defer fail.OnPanic(&ferr)
 
 	empty = &googleprotobuf.Empty{}
@@ -320,7 +320,7 @@ func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionR
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	xerr = handler.Add(targetType, targetRef, featureName, featureVariables, featureSettings)
@@ -333,8 +333,8 @@ func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionR
 
 // Remove uninstalls a Feature
 func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot remove Feature")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot remove Feature")
 	defer fail.OnPanic(&ferr)
 
 	empty = &googleprotobuf.Empty{}
@@ -370,7 +370,7 @@ func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActi
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	xerr = handler.Remove(targetType, targetRef, featureName, featureVariables, featureSettings)

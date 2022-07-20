@@ -389,7 +389,7 @@ func (s stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.E
 	return request.Password, nil
 }
 
-func (s stack) prepareUserData(request abstract.HostRequest, ud *userdata.Content) fail.Error {
+func (s stack) prepareUserData(ctx context.Context, request abstract.HostRequest, ud *userdata.Content) fail.Error {
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return xerr
@@ -403,7 +403,7 @@ func (s stack) prepareUserData(request abstract.HostRequest, ud *userdata.Conten
 	}()
 	if xerr := ud.Prepare(*s.configurationOptions, request, cidr, "", timings); xerr != nil {
 		msg := "failed to prepare user data content"
-		logrus.Debugf(strprocess.Capitalize(msg + ": " + xerr.Error()))
+		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(msg + ": " + xerr.Error()))
 		return fail.Wrap(xerr, msg)
 	}
 	return nil
@@ -430,7 +430,7 @@ func (s stack) createNICs(ctx context.Context, request *abstract.HostRequest) (n
 		for _, v := range nics {
 			xerr := s.rpcDeleteNic(ctx, v.NicId)
 			if xerr != nil {
-				logrus.Errorf("impossible to delete NIC '%s': %v", v.NicId, xerr)
+				logrus.WithContext(ctx).Errorf("impossible to delete NIC '%s': %v", v.NicId, xerr)
 			}
 		}
 	}
@@ -590,7 +590,7 @@ func (s stack) addNICs(ctx context.Context, request *abstract.HostRequest, vmID 
 		for i, nic := range nics {
 			xerr = s.rpcLinkNic(ctx, vmID, nic.NicId, int32(i+1))
 			if xerr != nil {
-				logrus.Errorf("failed to attach NIC %s to Host %s: %v", nic.NicId, vmID, xerr)
+				logrus.WithContext(ctx).Errorf("failed to attach NIC %s to Host %s: %v", nic.NicId, vmID, xerr)
 				return nil, xerr
 			}
 		}
@@ -849,7 +849,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 	// Configure userdata content
 	udc = userdata.NewContent()
-	if xerr = s.prepareUserData(request, udc); xerr != nil {
+	if xerr = s.prepareUserData(ctx, request, udc); xerr != nil {
 		return nil, nil, xerr
 	}
 
@@ -865,7 +865,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if derr := s.DeleteKeyPair(context.Background(), creationKeyPair.Name); derr != nil {
-			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
+			logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
 			if ferr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
@@ -983,14 +983,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 			defer func() {
 				ferr = debug.InjectPlannedError(ferr)
 				if ferr != nil {
-					logrus.Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
+					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
 					if derr := s.DeleteHost(context.Background(), vm.VmId); derr != nil {
 						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
-						logrus.Errorf(strprocess.Capitalize(msg))
+						logrus.WithContext(ctx).Errorf(strprocess.Capitalize(msg))
 						ferr = fail.AddConsequence(ferr, fail.Wrap(derr, msg))
 						return
 					}
-					logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
+					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
 				}
 			}()
 
@@ -1143,7 +1143,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	for _, ip := range publicIPs {
 		if xerr = s.rpcDeletePublicIPByID(ctx, ip.PublicIpId); xerr != nil { // continue to delete even if error
 			lastErr = xerr
-			logrus.Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
+			logrus.WithContext(ctx).Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
 		}
 	}
 
@@ -1155,7 +1155,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 		}
 		if _, ok := tags["DeleteWithVM"]; ok {
 			if xerr = s.DeleteVolume(ctx, v.VolumeID); xerr != nil { // continue to delete even if error
-				logrus.Errorf("Unable to delete Volume %s of Host %s", v.VolumeID, ahf.Core.ID)
+				logrus.WithContext(ctx).Errorf("Unable to delete Volume %s of Host %s", v.VolumeID, ahf.Core.ID)
 			}
 		}
 	}

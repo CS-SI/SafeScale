@@ -243,7 +243,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
-		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, jsonContent)
+		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, jsonContent)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
@@ -278,7 +278,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
 
-		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "upstream":
@@ -322,7 +322,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
 
-		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, nil
 
 	default:
@@ -425,7 +425,7 @@ func (k *KongController) addSourceControl(ctx context.Context,
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to apply setting 'source-control' of proxy rule '%s'", ruleName)
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
 	return nil
@@ -471,7 +471,7 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.WithContext(ctx).Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
@@ -506,7 +506,7 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.WithContext(ctx).Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
@@ -541,7 +541,7 @@ func (k *KongController) patch(ctx context.Context, name, url, data string, v *d
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.Debugf("update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.WithContext(ctx).Debugf("update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("update of rule '%s' failed: retcode=%d", name, retcode)
 	}
 

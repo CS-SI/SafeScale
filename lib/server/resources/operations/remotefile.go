@@ -96,7 +96,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 			}
 
 			if retcode != 0 && (iout != "" || ierr != "") {
-				logrus.Debugf("Ignoring '%s' and '%s'", iout, ierr)
+				logrus.WithContext(ctx).Debugf("Ignoring '%s' and '%s'", iout, ierr)
 			}
 			if retcode == 1 && (strings.Contains(ierr, "lost connection") || strings.Contains(iout, "lost connection")) {
 				problem := fail.NewError(ierr)
@@ -146,7 +146,7 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 
 	defer func() {
 		if derr := utils.LazyRemove(f.Name()); derr != nil {
-			logrus.Debugf("Error deleting file: %v", derr)
+			logrus.WithContext(ctx).Debugf("Error deleting file: %v", derr)
 		}
 	}()
 
@@ -216,7 +216,7 @@ func (rfh *RemoteFilesHandler) Cleanup(ctx context.Context, host resources.Host)
 		xerr := v.RemoveRemote(ctx, host)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Warnf(xerr.Error())
+			logrus.WithContext(ctx).Warnf(xerr.Error())
 		}
 	}
 

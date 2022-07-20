@@ -26,7 +26,8 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/gofrs/uuid"
+	"github.com/eko/gocache/v2/cache"
+	"github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
@@ -59,6 +60,7 @@ type Service interface {
 	GetProviderName() (string, fail.Error)
 	GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
+	GetCache(context.Context) (cache.CacheInterface, fail.Error) // FIXME: OPP Check performance diff tuning this thing // FIXME: OPP Remove this
 	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)
 	ListHostsByName(context.Context, bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
@@ -83,6 +85,8 @@ type service struct {
 	objectstorage.Location
 
 	tenantName string
+
+	cacheManager *wrappedCache
 
 	//	metadataBucket objectstorage.GetBucket
 	metadataBucket abstract.ObjectStorageBucket
@@ -359,7 +363,7 @@ func (instance service) ListTemplates(inctx context.Context, all bool) ([]*abstr
 		}
 
 		chRes <- result{instance.reduceTemplates(allTemplates, instance.whitelistTemplateREs, instance.blacklistTemplateREs), nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -401,7 +405,7 @@ func (instance service) FindTemplateByName(inctx context.Context, name string) (
 			}
 		}
 		chRes <- result{nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -462,7 +466,7 @@ func (instance service) FindTemplateBySizing(inctx context.Context, sizing abstr
 			}
 
 			// if we reached this point with a template in mind, it means that was not available, so we issue a warning about it
-			logrus.Warnf("template %s not found", sizing.Template)
+			logrus.WithContext(ctx).Warnf("template %s not found", sizing.Template)
 		}
 
 		templates, xerr := instance.ListTemplatesBySizing(ctx, sizing, useScannerDB)
@@ -489,14 +493,14 @@ func (instance service) FindTemplateBySizing(inctx context.Context, sizing abstr
 				}
 			}
 			msg += ")"
-			logrus.Infof(msg)
+			logrus.WithContext(ctx).Infof(msg)
 		} else {
-			logrus.Errorf("failed to find template corresponding to requested resources")
+			logrus.WithContext(ctx).Errorf("failed to find template corresponding to requested resources")
 			chRes <- result{nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")}
 			return
 		}
 		chRes <- result{template, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -579,7 +583,7 @@ func (instance service) ListTemplatesBySizing(
 			db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 			if err != nil {
 				if force {
-					logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+					logrus.WithContext(ctx).Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 				} else {
 					var noHostError string
 					if sizing.MinCPUFreq <= 0 {
@@ -614,7 +618,7 @@ func (instance service) ListTemplatesBySizing(
 				imageList, err := db.ReadAll(folder)
 				if err != nil {
 					if force {
-						logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+						logrus.WithContext(ctx).Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 					} else {
 						var noHostError string
 						if sizing.MinCPUFreq <= 0 {
@@ -622,7 +626,7 @@ func (instance service) ListTemplatesBySizing(
 						} else {
 							noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 						}
-						logrus.Error(noHostError)
+						logrus.WithContext(ctx).Error(noHostError)
 						chRes <- result{nil, fail.NewError(noHostError)}
 						return
 					}
@@ -663,7 +667,7 @@ func (instance service) ListTemplatesBySizing(
 								sizing.MinGPU, sizing.MinCPUFreq,
 							)
 						}
-						logrus.Error(noHostError)
+						logrus.WithContext(ctx).Error(noHostError)
 						chRes <- result{nil, fail.NewError(noHostError)}
 						return
 					}
@@ -687,7 +691,7 @@ func (instance service) ListTemplatesBySizing(
 		}
 
 		if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
-			logrus.Debugf("Looking for a host template as small as possible")
+			logrus.WithContext(ctx).WithContext(ctx).Debugf("Looking for a host template as small as possible")
 		} else {
 			coreMsg := ""
 			if sizing.MinCores > 0 {
@@ -717,7 +721,7 @@ func (instance service) ListTemplatesBySizing(
 			if sizing.MinGPU >= 0 {
 				gpuMsg = fmt.Sprintf("%d GPU%s", sizing.MinGPU, strprocess.Plural(uint(sizing.MinGPU)))
 			}
-			logrus.Debugf(
+			logrus.WithContext(ctx).WithContext(ctx).Debugf(
 				fmt.Sprintf(
 					"Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg,
 				),
@@ -731,31 +735,31 @@ func (instance service) ListTemplatesBySizing(
 			)
 			msg += " %s"
 			if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
-				logrus.Tracef(msg, "not enough cores")
+				logrus.WithContext(ctx).Tracef(msg, "not enough cores")
 				continue
 			}
 			if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
-				logrus.Tracef(msg, "too many cores")
+				logrus.WithContext(ctx).Tracef(msg, "too many cores")
 				continue
 			}
 			if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
-				logrus.Tracef(msg, "not enough RAM")
+				logrus.WithContext(ctx).Tracef(msg, "not enough RAM")
 				continue
 			}
 			if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
-				logrus.Tracef(msg, "too many RAM")
+				logrus.WithContext(ctx).Tracef(msg, "too many RAM")
 				continue
 			}
 			if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
-				logrus.Tracef(msg, "not enough disk")
+				logrus.WithContext(ctx).Tracef(msg, "not enough disk")
 				continue
 			}
 			if t.DiskSize > 0 && sizing.MaxDiskSize > 0 && t.DiskSize > sizing.MaxDiskSize {
-				logrus.Tracef(msg, "too many disk")
+				logrus.WithContext(ctx).Tracef(msg, "too many disk")
 				continue
 			}
 			if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
-				logrus.Tracef(msg, "too many GPU")
+				logrus.WithContext(ctx).Tracef(msg, "too many GPU")
 				continue
 			}
 
@@ -767,7 +771,7 @@ func (instance service) ListTemplatesBySizing(
 
 		sort.Sort(ByRankDRF(selectedTpls))
 		chRes <- result{selectedTpls, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -843,7 +847,7 @@ func (instance service) FilterImages(inctx context.Context, filter string) ([]*a
 		}
 
 		chRes <- result{fimgs, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -911,7 +915,7 @@ func (instance service) ListImages(inctx context.Context, all bool) ([]*abstract
 		}
 
 		chRes <- result{instance.reduceImages(imgs), nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -973,7 +977,7 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 			normalizedImageName = addPadding(normalizedImageName, maxLength)
 			if strings.Contains(normalizedImageName, normalizedOSName) {
 				wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
-				logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+				logrus.WithContext(ctx).Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
 
 				if minWFScore == -1 || wfScore < minWFScore {
 					minWFScore = wfScore
@@ -987,9 +991,9 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 			return
 		}
 
-		logrus.Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
+		logrus.WithContext(ctx).Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
 		chRes <- result{imgs[wfSelect], nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1092,7 +1096,7 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 			return
 		}
 		chRes <- result{host, userData, kp, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1132,7 +1136,7 @@ func (instance service) ListHostsByName(inctx context.Context, details bool) (ma
 			hostMap[host.Core.Name] = host
 		}
 		chRes <- result{hostMap, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1187,7 +1191,7 @@ func (instance service) LookupRuleInSecurityGroup(
 			}
 		}
 		chRes <- result{true, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1218,7 +1222,7 @@ func (instance service) InspectHostByName(inctx context.Context, name string) (*
 
 		ah, xerr := instance.InspectHost(ctx, abstract.NewHostCore().SetName(name))
 		chRes <- result{ah, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1228,6 +1232,18 @@ func (instance service) InspectHostByName(inctx context.Context, name string) (*
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
+}
+
+func (instance service) GetCache(inctx context.Context) (cache.CacheInterface, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		return instance.cacheManager, nil
+	}
+
+	return nil, nil
 }
 
 // InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
@@ -1249,7 +1265,7 @@ func (instance service) InspectSecurityGroupByName(inctx context.Context, networ
 
 		as, xerr := instance.InspectSecurityGroup(ctx, abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 		chRes <- result{as, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1280,7 +1296,7 @@ func (instance service) ObjectStorageConfiguration(inctx context.Context) (objec
 
 		oc, xerr := instance.Location.Configuration()
 		chRes <- result{oc, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

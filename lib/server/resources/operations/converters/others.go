@@ -24,8 +24,6 @@ import (
 	"strings"
 	"text/scanner"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -41,42 +39,6 @@ func BucketListToProtocol(in []string) *protocol.BucketListResponse {
 	return &protocol.BucketListResponse{
 		Buckets: buckets,
 	}
-}
-
-// NFSExportOptionsFromStringToProtocol converts a string containing NFS export options as string to the (now deprecated) protocol message
-func NFSExportOptionsFromStringToProtocol(in string) *protocol.NFSExportOptions {
-	parts := strings.Split(in, ",")
-	out := &protocol.NFSExportOptions{}
-	for _, v := range parts {
-		v = strings.ToLower(v)
-		switch v {
-		case "read_only":
-			out.ReadOnly = true
-		case "root_squash":
-			out.RootSquash = true
-		case "no_root_squash":
-			out.RootSquash = false
-		case "secure":
-			out.Secure = true
-		case "insecure":
-			out.Secure = false
-		case "async":
-			out.Async = true
-		case "sync":
-			out.Async = false
-		case "nohide":
-			out.NoHide = true
-		case "crossmnt":
-			out.CrossMount = true
-		case "subtree_check":
-			out.SubtreeCheck = true
-		case "no_subtree_check":
-			out.SubtreeCheck = false
-		default:
-			logrus.Warnf("unhandled NFS option '%s', ignoring.", v)
-		}
-	}
-	return out
 }
 
 // HostSizingRequirementsFromStringToAbstract HostSizingFromStringToAbstract converts host sizing requirements from string to *abstract.HostSizingRequirements

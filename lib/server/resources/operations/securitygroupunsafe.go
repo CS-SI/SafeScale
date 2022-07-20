@@ -139,7 +139,6 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			}
 
 			// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
-			// defer task.DisarmAbortSignal()()
 
 			// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
 			innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -189,7 +188,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			return
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -251,7 +250,7 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 			return
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -293,7 +292,7 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 			return innerXErr
 		})
 		chRes <- result{xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -344,7 +343,7 @@ func (instance *SecurityGroup) unsafeAddRule(inctx context.Context, rule *abstra
 			return nil
 		})
 		chRes <- result{xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -421,7 +420,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 			})
 		})
 		chRes <- result{xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -510,7 +509,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(inctx context.Context, abstrac
 			})
 		})
 		chRes <- result{xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -624,7 +623,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 			})
 		})
 		chRes <- result{xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

@@ -996,7 +996,7 @@ func (s stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec
 		for _, i := range v.Instances {
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf(
+				logrus.WithContext(ctx).Errorf(
 					"found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
 					aws.Int64Value(i.State.Code)&0xff,
 				)
@@ -1070,7 +1070,7 @@ func (s stack) rpcDescribeInstances(ctx context.Context, ids []*string) ([]*ec2.
 			_ = ec2.InstanceState{}
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
+				logrus.WithContext(ctx).Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
 					aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}

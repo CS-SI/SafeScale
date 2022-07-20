@@ -227,7 +227,7 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 			innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumesv2.ExtractVolumes(page)
 				if err != nil {
-					logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
+					logrus.WithContext(ctx).Errorf("Error listing volumes: volume extraction: %+v", err)
 					return false, err
 				}
 				for _, vol := range list {

@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	serializer "github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -53,11 +52,11 @@ type MetadataCore struct {
 
 	shielded   *shielded.Shielded
 	properties *serializer.JSONProperties
-	observers  map[string]observer.Observer
 	sync.RWMutex
 
-	kind              string
-	folder            MetadataFolder
+	kind   string
+	folder MetadataFolder
+
 	loaded            bool
 	committed         bool
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
@@ -99,7 +98,6 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		folder:     fld,
 		properties: props,
 		shielded:   protected,
-		observers:  map[string]observer.Observer{},
 	}
 	switch kind {
 	case clusterKind:
@@ -512,6 +510,12 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 				return fail.ConvertError(err)
 			}
 
+			if loaded, ok := myself.id.Load().(string); ok {
+				if idd == loaded {
+					return nil
+				}
+			}
+
 			if myself.kindSplittedStore {
 				myself.id.Store(idd)
 			} else {
@@ -537,8 +541,8 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -640,8 +644,8 @@ func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.E
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	myself.RLock()
+	defer myself.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1216,7 +1220,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If entry not found, consider operation not an error
-						logrus.Tracef("MetadataFolder not found by id, maybe not an error")
+						logrus.WithContext(ctx).Tracef("MetadataFolder not found by id, maybe not an error")
 					default:
 						errors = append(errors, xerr)
 					}
@@ -1238,7 +1242,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If entry not found, consider operation not an error
-						logrus.Tracef("MetadataFolder not found by name, maybe not an error")
+						logrus.WithContext(ctx).Tracef("MetadataFolder not found by name, maybe not an error")
 					default:
 						errors = append(errors, xerr)
 					}
@@ -1274,7 +1278,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If entry not found, consider operation not an error
-						logrus.Tracef("MetadataFolder not found by name, maybe not an error")
+						logrus.WithContext(ctx).Tracef("MetadataFolder not found by name, maybe not an error")
 					default:
 						errors = append(errors, xerr)
 					}
@@ -1290,12 +1294,12 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 				}
 			}
 
-			myself.loaded = false
-			myself.committed = false
-
 			if len(errors) > 0 {
 				return fail.NewErrorList(errors)
 			}
+
+			myself.loaded = false
+			myself.committed = false
 
 			return nil
 		}()
@@ -1336,7 +1340,13 @@ func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
 			if err != nil {
 				return "", fail.ConvertError(err)
 			}
-			return dumped, nil
+
+			props, err := myself.properties.Sdump()
+			if err != nil {
+				return "", fail.ConvertError(err)
+			}
+
+			return dumped + props, nil
 		}()
 		chRes <- result{dump, gerr}
 	}()
@@ -1394,7 +1404,6 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 
 				if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 					if jserr := json.Unmarshal(propsJSONed, &propsMapped); jserr != nil {
-						// logrus.Tracef("*MetadataCore.Serialize(): Unmarshalling JSONed properties into map failed!")
 						return nil, fail.ConvertError(jserr)
 					}
 				}

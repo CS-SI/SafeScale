@@ -17,6 +17,7 @@
 package temporal
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -163,7 +164,7 @@ func TestStartStopDurationWithPauseDefaultFormatting(t *testing.T) {
 
 func printSomething(sw *Stopwatch) {
 	logrus.SetOutput(os.Stdout)
-	defer (*sw).OnExitLogInfo("Foo", "Bar")
+	defer (*sw).OnExitLogInfo(context.Background(), "Foo", "Bar")
 }
 
 func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
@@ -206,21 +207,21 @@ func TestOnExitLogWithLevel(t *testing.T) {
 
 	stowa := NewStopwatch()
 	// wrong in
-	f := stowa.OnExitLogWithLevel("", "out", logrus.TraceLevel)
+	f := stowa.OnExitLogWithLevel(context.Background(), "", "out", logrus.TraceLevel)
 	log := tests.LogrusCapture(func() {
 		f()
 	})
 	require.EqualValues(t, log, "")
 
 	// wrong logruslevel
-	f = stowa.OnExitLogWithLevel("in", "out", 8)
+	f = stowa.OnExitLogWithLevel(context.Background(), "in", "out", 8)
 	log = tests.LogrusCapture(func() {
 		f()
 	})
 	require.Contains(t, log, "level=info msg")
 
 	// valid call
-	f = stowa.OnExitLogWithLevel("in", "out", logrus.PanicLevel)
+	f = stowa.OnExitLogWithLevel(context.Background(), "in", "out", logrus.PanicLevel)
 	log = tests.LogrusCapture(func() {
 		f()
 	})

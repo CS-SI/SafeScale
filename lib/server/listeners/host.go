@@ -71,8 +71,8 @@ type StoredCPUInfo struct {
 
 // Start ...
 func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot start host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot start host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -96,7 +96,7 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Start(ref)
@@ -104,8 +104,8 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 
 // Stop shutdowns a host.
 func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot stop host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot stop host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -131,7 +131,7 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Stop(ref)
@@ -139,8 +139,8 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 
 // Reboot reboots a host.
 func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot reboot host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot reboot host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -164,7 +164,7 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Reboot(ref)
@@ -172,8 +172,8 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list hosts")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list hosts")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -194,7 +194,7 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	hosts, xerr := handler.List(all)
@@ -213,8 +213,8 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 
 // Create creates a new host
 func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create host")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -237,7 +237,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var sizing *abstract.HostSizingRequirements
 	if in.SizingAsString != "" {
@@ -338,8 +338,8 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 
 // Resize a host
 func (s *HostListener) Resize(inctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot resize host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot resize host")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -362,7 +362,7 @@ func (s *HostListener) Resize(inctx context.Context, in *protocol.HostDefinition
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	sizing := abstract.HostSizingRequirements{
 		MinCores:    int(in.GetCpuCount()),
@@ -383,8 +383,8 @@ func (s *HostListener) Resize(inctx context.Context, in *protocol.HostDefinition
 
 // Status returns the status of a host (running or stopped mainly)
 func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht *protocol.HostStatus, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host status")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot get host status")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -411,7 +411,7 @@ func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	state, xerr := handler.Status(ref)
@@ -421,8 +421,8 @@ func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht
 
 // Inspect a host
 func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h *protocol.Host, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot inspect host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot inspect host")
 	defer fail.OnPanic(&ferr)
 
 	if s == nil {
@@ -449,7 +449,7 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	hostInstance, xerr := handler.Inspect(ref)
@@ -468,8 +468,8 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 
 // Delete a host
 func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -498,7 +498,7 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Delete(ref)
@@ -506,8 +506,8 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 
 // SSH returns ssh parameters to access a host
 func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *protocol.SshConfig, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot get host SSH information")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -534,7 +534,7 @@ func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *pr
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	sshHandler := handlers.NewSSHHandler(job)
 	sshConfig, xerr := sshHandler.GetConfig(ref)
@@ -552,8 +552,8 @@ func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *pr
 
 // BindSecurityGroup attaches a Security Group to a host
 func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot bind Security Group to Host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -588,7 +588,7 @@ func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.Sec
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -604,8 +604,8 @@ func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.Sec
 
 // UnbindSecurityGroup detaches a Security Group from a host
 func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Security Group from Host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -640,7 +640,7 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.UnbindSecurityGroup(hostRef, sgRef)
@@ -648,8 +648,8 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 
 // EnableSecurityGroup applies a Security Group already attached (if not already applied)
 func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot enable Security Group on Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot enable Security Group on Host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -682,7 +682,7 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.EnableSecurityGroup(hostRef, sgRef)
@@ -690,8 +690,8 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 
 // DisableSecurityGroup applies a Security Group already attached (if not already applied)
 func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot disable security group on host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot disable security group on host")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -724,7 +724,7 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.EnableSecurityGroup(hostRef, sgRef)
@@ -732,8 +732,8 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 
 // ListSecurityGroups applies a Security Group already attached (if not already applied)
 func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot disable security group on host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot disable security group on host")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -760,7 +760,7 @@ func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.Se
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	bonds, xerr := handler.ListSecurityGroups(hostRef)
@@ -774,8 +774,8 @@ func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.Se
 
 // ListLabels lists Label/Tag bound to a Host
 func (s *HostListener) ListLabels(inctx context.Context, in *protocol.LabelBoundsRequest) (_ *protocol.LabelListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot bind Label to Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot bind Label to Host")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -802,7 +802,7 @@ func (s *HostListener) ListLabels(inctx context.Context, in *protocol.LabelBound
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, kind=%s)", hostRefLabel, kind).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	list, xerr := hostHandler.ListLabels(hostRef, kind)
@@ -826,8 +826,8 @@ func kindToString(state bool) string {
 
 // InspectLabel inspects a Label of a Host
 func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabelRequest) (_ *protocol.HostLabelResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect Label of Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect Label of Host")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -858,7 +858,7 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	labelInstance, hostValue, xerr := hostHandler.InspectLabel(hostRef, labelRef)
@@ -883,8 +883,8 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 
 // BindLabel binds a Label to a Host
 func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot bind Label to Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot bind Label to Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -916,7 +916,7 @@ func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.BindLabel(hostRef, labelRef, in.GetValue())
@@ -930,8 +930,8 @@ func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRe
 
 // UnbindLabel unbinds a Label from a Host
 func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot unbind Label from Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Label from Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -963,7 +963,7 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.UnbindLabel(hostRef, labelRef)
@@ -977,8 +977,8 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 
 // UpdateLabel updates Label value for the Host
 func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot bind Label to Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot bind Label to Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -1010,7 +1010,7 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.UpdateLabel(hostRef, labelRef, in.GetValue())
@@ -1024,8 +1024,8 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 
 // ResetLabel restores default value of Label to the Host
 func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot unbind Label from Host")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Label from Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -1057,7 +1057,7 @@ func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindR
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.ResetLabel(hostRef, labelRef)

@@ -1,4 +1,4 @@
-VERSION=22.07.07-0
+VERSION=22.07.12-2
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)

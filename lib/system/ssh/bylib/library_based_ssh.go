@@ -25,7 +25,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"reflect"
 	"strings"
 	"time"
 
@@ -201,8 +200,6 @@ type LibCommand struct {
 }
 
 func (sc *LibCommand) closeTunneling() error {
-	logrus.Tracef("Closing tunnels")
-
 	if sc.tunnels != nil {
 		sc.tunnels.Close()
 	}
@@ -221,7 +218,6 @@ func (sc *LibCommand) Output() (_ []byte, ferr error) {
 	defer func() {
 		nerr := sc.cleanup()
 		if nerr != nil {
-			logrus.Warnf("Error waiting for command cleanup: %v", nerr)
 			ferr = nerr
 		}
 	}()
@@ -326,11 +322,11 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			Timeout:         10 * time.Second,
 		}
 
-		logrus.Tracef("Dialing to %s:%d using %s:%d", sc.cfg.LocalHost, sc.cfg.LocalPort, "localhost", sc.tunnels.GetLocalEndpoint().Port())
+		logrus.WithContext(ctx).Tracef("Dialing to %s:%d using %s:%d", sc.cfg.LocalHost, sc.cfg.LocalPort, "localhost", sc.tunnels.GetLocalEndpoint().Port())
 		client, err := sshtunnel.DialSSHWithTimeout("tcp", fmt.Sprintf("%s:%d", sc.cfg.LocalHost, sc.tunnels.GetLocalEndpoint().Port()), directConfig, 45*time.Second)
 		if err != nil {
 			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-				logrus.Tracef(spew.Sdump(err))
+				logrus.WithContext(ctx).Tracef(spew.Sdump(err))
 			}
 			if ne, ok := err.(net.Error); ok {
 				if ne.Timeout() || ne.Temporary() {
@@ -380,7 +376,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			newsession, internalErr = client.NewSession()
 			if internalErr != nil {
 				retries = retries + 1 // nolint
-				logrus.Tracef("problem creating session: %s", internalErr.Error())
+				logrus.WithContext(ctx).Tracef("problem creating session: %s", internalErr.Error())
 				if strings.Contains(internalErr.Error(), "EOF") {
 					eofCount++
 					if eofCount >= 14 {
@@ -396,7 +392,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			if session != nil { // race condition mitigation
 				return fmt.Errorf("too late")
 			}
-			logrus.Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
+			logrus.WithContext(ctx).Tracef("creating the session took %s and %d retries", time.Since(beginDial), retries)
 			session = newsession
 			return nil
 		}, 2*time.Second, 150*time.Second)
@@ -463,12 +459,12 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 			beginIter := time.Now()
 			if err := sshtunnel.RunCommandInSSHSessionWithTimeout(session, sc.cmd.String(), opTimeout); err != nil {
-				logrus.Debugf("Error running command after %s: %s", time.Since(beginIter), err.Error())
+				logrus.WithContext(ctx).Debugf("Error running command after %s: %s", time.Since(beginIter), err.Error())
 				errorCode = -1
 
 				if ee, ok := err.(*ssh.ExitError); ok {
 					errorCode = ee.ExitStatus()
-					logrus.Debugf("Found an exit error of command '%s': %d", sc.cmd.String(), errorCode)
+					logrus.WithContext(ctx).Debugf("Found an exit error of command '%s': %d", sc.cmd.String(), errorCode)
 				}
 
 				if _, ok := err.(*ssh.ExitMissingError); ok {
@@ -477,7 +473,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				}
 
 				if _, ok := err.(net.Error); ok {
-					logrus.Debugf("Found network error running command '%s'", sc.cmd.String())
+					logrus.WithContext(ctx).Debugf("Found network error running command '%s'", sc.cmd.String())
 					errorCode = 255
 				}
 
@@ -532,7 +528,6 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 func (sc *LibCommand) cleanup() error {
 	err1 := sc.closeTunneling()
 	if err1 != nil {
-		logrus.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
 		return fmt.Errorf("unable to close SSH tunnels: %s", err1.Error())
 	}
 
@@ -639,9 +634,9 @@ func (sconf *Profile) CreateTunneling(ctx context.Context) (*sshtunnel.SSHTunnel
 	go func() {
 		tsErr := tu.Start()
 		if tsErr != nil {
-			logrus.Tracef("tunnel Start goroutine failed: %s", tsErr.Error())
+			logrus.WithContext(ctx).Tracef("tunnel Start goroutine failed: %s", tsErr.Error())
 		}
-		logrus.Tracef("quitting tunnel Start goroutine")
+		logrus.WithContext(ctx).Tracef("quitting tunnel Start goroutine")
 		tu.Close()
 	}()
 
@@ -752,7 +747,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		timeout+time.Minute,
 	)
 	if retryErr != nil {
-		logrus.Debugf("WaitServerReady: the wait finished with: %v", retryErr)
+		logrus.WithContext(ctx).Debugf("WaitServerReady: the wait finished with: %v", retryErr)
 		return stdout, retryErr
 	}
 
@@ -761,7 +756,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			temporal.FormatDuration(time.Since(begins)), stdout)
 	}
 
-	logrus.Debugf(
+	logrus.WithContext(ctx).Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.IPAddress, originalPhase,
 		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
@@ -830,7 +825,7 @@ func closeAndLog(in io.Closer) {
 	if in != nil {
 		err := in.Close()
 		if err != nil {
-			logrus.Tracef(err.Error())
+			logrus.WithContext(context.Background()).Tracef(err.Error())
 		}
 	}
 }
@@ -922,7 +917,7 @@ func (sconf *Profile) copy(ctx context.Context, remotePath string, localPath str
 			}
 		}
 
-		logrus.Debugf("%d bytes copied to %s\n", written, remotePath)
+		logrus.WithContext(ctx).Debugf("%d bytes copied to %s\n", written, remotePath)
 	} else {
 		// connect
 		conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", sshConfig.LocalHost, tu.GetLocalEndpoint().Port()), config)
@@ -957,7 +952,7 @@ func (sconf *Profile) copy(ctx context.Context, remotePath string, localPath str
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
-		logrus.Debugf("%d bytes copied from %s\n", written, remotePath)
+		logrus.WithContext(ctx).Debugf("%d bytes copied from %s\n", written, remotePath)
 
 		if fi, err := srcFile.Stat(); err != nil {
 			if fi != nil {
@@ -978,7 +973,7 @@ func (sconf *Profile) copy(ctx context.Context, remotePath string, localPath str
 }
 
 // Enter runs interactive shell
-func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
+func (sconf *Profile) Enter(ctx context.Context, username string, shell string) (ferr fail.Error) {
 	userPass := ""
 	if username != "" && username != sconf.User {
 		fmt.Printf("Password: ")
@@ -1071,11 +1066,11 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	if sshUsername != "safescale" {
 		err = session.Setenv("SAFESCALESSHUSER", sshUsername)
 		if err != nil {
-			logrus.Debugf("failure setting user terminal: %v", err)
+			logrus.WithContext(ctx).Debugf("failure setting user terminal: %v", err)
 		}
 		err = session.Setenv("SAFESCALESSHPASS", userPass)
 		if err != nil {
-			logrus.Debugf("failure setting user password: %v", err)
+			logrus.WithContext(ctx).Debugf("failure setting user password: %v", err)
 		}
 	}
 

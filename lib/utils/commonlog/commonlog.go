@@ -17,6 +17,8 @@
 package commonlog
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -33,12 +35,15 @@ var (
 	// emptyFieldMap logrus.FieldMap
 
 	// LogLevelFnMap is a map between loglevel and log functions from logrus
-	LogLevelFnMap = map[logrus.Level]func(args ...interface{}){
-		logrus.TraceLevel: logrus.Trace,
-		logrus.DebugLevel: logrus.Debug,
-		logrus.InfoLevel:  logrus.Info,
-		logrus.WarnLevel:  logrus.Warn,
-		logrus.ErrorLevel: logrus.Error,
+	LogLevelFnMap = func(ctx context.Context, lev logrus.Level) func(args ...interface{}) {
+		lm := map[logrus.Level]func(args ...interface{}){
+			logrus.TraceLevel: logrus.WithContext(ctx).Trace,
+			logrus.DebugLevel: logrus.WithContext(ctx).Debug,
+			logrus.InfoLevel:  logrus.WithContext(ctx).Info,
+			logrus.WarnLevel:  logrus.WithContext(ctx).Warn,
+			logrus.ErrorLevel: logrus.WithContext(ctx).Error,
+		}
+		return lm[lev]
 	}
 )
 
@@ -61,6 +66,10 @@ func GetDefaultFormatter() *MyFormatter {
 
 // Format ...
 func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	if f == nil {
+		return nil, fmt.Errorf("invalid instance")
+	}
+
 	if f.TextFormatter.DisableLevelTruncation && f.TextFormatter.ForceColors {
 		if f.pid == "" {
 			f.pid = strconv.Itoa(os.Getpid())
@@ -70,12 +79,24 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			}
 		}
 		bc, err := f.TextFormatter.Format(entry)
-		ticket := string(bc)
-		// replaced := strings.Replace(ticket, "[20", ""+strings.Repeat(" ", 8-len(entry.Level.String())+"[" + f.pid + "][20", 1)
-		replaced := strings.Replace(ticket, "[20", ""+strings.Repeat(" ", 8-len(entry.Level.String()))+"[20", 1)
-		replaced = strings.Replace(replaced, "] ", "]["+entry.Level.String()+"]["+f.pid+"] ", 1)
+		if err != nil {
+			return nil, err
+		}
 
-		return []byte(replaced), err
+		ticket := string(bc)
+		if entry != nil {
+			replaced := strings.Replace(ticket, "[20", ""+strings.Repeat(" ", 8-len(entry.Level.String()))+"[20", 1)
+			replaced = strings.Replace(replaced, "] ", "]["+entry.Level.String()+"]["+f.pid+"] ", 1)
+			if entry.Context != nil {
+				theID, ok := entry.Context.Value("ID").(string)
+				if ok {
+					replaced = strings.Replace(replaced, "] ", "]["+theID+"] ", 1)
+				}
+			}
+			return []byte(replaced), nil
+		}
+
+		return []byte(ticket), nil
 	}
 
 	return f.TextFormatter.Format(entry)

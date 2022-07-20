@@ -62,7 +62,7 @@ func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resour
 	xerr = w.CanProceed(ctx, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Error(xerr.Error())
+		logrus.WithContext(ctx).Error(xerr.Error())
 		return nil, xerr
 	}
 

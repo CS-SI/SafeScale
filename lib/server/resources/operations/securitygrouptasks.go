@@ -108,7 +108,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 			})
 		})
 		chRes <- result{nil, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -183,7 +183,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 				if xerr != nil {
 					abErr := tg.AbortWithCause(xerr)
 					if abErr != nil {
-						logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+						logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 					}
 					break
 				}
@@ -201,7 +201,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 		}
 
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -275,7 +275,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 			}
 		}
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -345,7 +345,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(
 			}
 		}
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

@@ -42,8 +42,8 @@ type ClusterListener struct {
 
 // List lists clusters
 func (s *ClusterListener) List(inctx context.Context, in *protocol.Reference) (hl *protocol.ClusterListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list clusters")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list clusters")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -61,7 +61,7 @@ func (s *ClusterListener) List(inctx context.Context, in *protocol.Reference) (h
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	list, xerr := handler.List()
@@ -74,8 +74,8 @@ func (s *ClusterListener) List(inctx context.Context, in *protocol.Reference) (h
 
 // Create creates a new cluster
 func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCreateRequest) (_ *protocol.ClusterResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -97,7 +97,7 @@ func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCrea
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	req, xerr := converters.ClusterRequestFromProtocolToAbstract(in)
 	if xerr != nil {
@@ -119,8 +119,8 @@ func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCrea
 
 // State returns the status of a cluster
 func (s *ClusterListener) State(inctx context.Context, in *protocol.Reference) (ht *protocol.ClusterStateResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get cluster status")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot get cluster status")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -145,7 +145,7 @@ func (s *ClusterListener) State(inctx context.Context, in *protocol.Reference) (
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	st, xerr := handler.State(ref)
@@ -158,8 +158,8 @@ func (s *ClusterListener) State(inctx context.Context, in *protocol.Reference) (
 
 // Inspect a cluster
 func (s *ClusterListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.ClusterResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -185,7 +185,7 @@ func (s *ClusterListener) Inspect(inctx context.Context, in *protocol.Reference)
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	instance, xerr := handler.Inspect(ref)
@@ -198,8 +198,8 @@ func (s *ClusterListener) Inspect(inctx context.Context, in *protocol.Reference)
 
 // Start ...
 func (s *ClusterListener) Start(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot start cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot start cluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -222,7 +222,7 @@ func (s *ClusterListener) Start(inctx context.Context, in *protocol.Reference) (
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	return empty, handler.Start(ref)
@@ -230,8 +230,8 @@ func (s *ClusterListener) Start(inctx context.Context, in *protocol.Reference) (
 
 // Stop shutdowns an entire cluster (including the gateways)
 func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot stop cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot stop cluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -257,7 +257,7 @@ func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (e
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	return empty, handler.Start(ref)
@@ -265,8 +265,8 @@ func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (e
 
 // Delete a cluster
 func (s *ClusterListener) Delete(inctx context.Context, in *protocol.ClusterDeleteRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete Cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete Cluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -293,7 +293,7 @@ func (s *ClusterListener) Delete(inctx context.Context, in *protocol.ClusterDele
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	return empty, handler.Delete(ref, in.GetForce())
@@ -301,8 +301,8 @@ func (s *ClusterListener) Delete(inctx context.Context, in *protocol.ClusterDele
 
 // Expand adds node(s) to a cluster
 func (s *ClusterListener) Expand(inctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot expand cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot expand cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -328,7 +328,7 @@ func (s *ClusterListener) Expand(inctx context.Context, in *protocol.ClusterResi
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	sizing, _, err := converters.HostSizingRequirementsFromStringToAbstract(in.GetNodeSizing())
 	if err != nil {
@@ -360,8 +360,8 @@ func (s *ClusterListener) Expand(inctx context.Context, in *protocol.ClusterResi
 
 // Shrink removes node(s) from a cluster
 func (s *ClusterListener) Shrink(inctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot shrink cluster")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot shrink cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -387,7 +387,7 @@ func (s *ClusterListener) Shrink(inctx context.Context, in *protocol.ClusterResi
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	count := uint(in.GetCount())
 	if count == 0 {
@@ -415,8 +415,8 @@ func fromClusterNodes(in []*propertiesv3.ClusterNode) []*protocol.Host {
 
 // ListNodes lists node(s) of a cluster
 func (s *ClusterListener) ListNodes(inctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list cluster nodes")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list cluster nodes")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -442,7 +442,7 @@ func (s *ClusterListener) ListNodes(inctx context.Context, in *protocol.Referenc
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 
@@ -464,8 +464,8 @@ func (s *ClusterListener) ListNodes(inctx context.Context, in *protocol.Referenc
 
 // InspectNode inspects a node of the cluster
 func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect cluster node")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect cluster node")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -496,7 +496,7 @@ func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.Cluste
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	hostInstance, xerr := handler.InspectNode(clusterName, nodeRef)
@@ -514,8 +514,8 @@ func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.Cluste
 
 // DeleteNode removes node(s) from a cluster
 func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete Cluster Node")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete Cluster Node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -545,7 +545,7 @@ func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.Cluster
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	xerr := handler.DeleteNode(clusterName, nodeRef)
@@ -563,8 +563,8 @@ func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.Cluster
 
 // StopNode stops a node of the cluster
 func (s *ClusterListener) StopNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot stop cluster node")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot stop cluster node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -597,7 +597,7 @@ func (s *ClusterListener) StopNode(inctx context.Context, in *protocol.ClusterNo
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	xerr = handler.StopNode(clusterName, nodeRef)
@@ -615,8 +615,8 @@ func (s *ClusterListener) StopNode(inctx context.Context, in *protocol.ClusterNo
 
 // StartNode starts a stopped node of the cluster
 func (s *ClusterListener) StartNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot start cluster node")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot start cluster node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -649,7 +649,7 @@ func (s *ClusterListener) StartNode(inctx context.Context, in *protocol.ClusterN
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	xerr = handler.StartNode(clusterName, nodeRef)
@@ -667,8 +667,8 @@ func (s *ClusterListener) StartNode(inctx context.Context, in *protocol.ClusterN
 
 // StateNode returns the state of a node of the cluster
 func (s *ClusterListener) StateNode(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get cluster node state")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot get cluster node state")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -700,7 +700,7 @@ func (s *ClusterListener) StateNode(inctx context.Context, in *protocol.ClusterN
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	state, xerr := handler.StateNode(clusterName, nodeRef)
@@ -719,8 +719,8 @@ func (s *ClusterListener) StateNode(inctx context.Context, in *protocol.ClusterN
 
 // ListMasters returns the list of masters of the cluster
 func (s *ClusterListener) ListMasters(inctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list masters")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list masters")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -746,7 +746,7 @@ func (s *ClusterListener) ListMasters(inctx context.Context, in *protocol.Refere
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	list, xerr := handler.ListMasters(clusterName)
@@ -764,8 +764,8 @@ func (s *ClusterListener) ListMasters(inctx context.Context, in *protocol.Refere
 
 // FindAvailableMaster determines the first master available master (ie the one that responds on ssh request)
 func (s *ClusterListener) FindAvailableMaster(inctx context.Context, in *protocol.Reference) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot find available master")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot find available master")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -791,7 +791,7 @@ func (s *ClusterListener) FindAvailableMaster(inctx context.Context, in *protoco
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	master, xerr := handler.FindAvailableMaster(clusterName)
@@ -809,8 +809,8 @@ func (s *ClusterListener) FindAvailableMaster(inctx context.Context, in *protoco
 
 // InspectMaster returns the information about a master of the cluster
 func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect cluster master")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect cluster master")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -842,7 +842,7 @@ func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.Clus
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	master, xerr := handler.InspectMaster(clusterName, masterRef)
@@ -865,8 +865,8 @@ func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.Clus
 
 // StopMaster stops a master of the Cluster
 func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot stop Cluster master")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot stop Cluster master")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -897,7 +897,7 @@ func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.Cluster
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	xerr = handler.StopMaster(clusterName, masterRef)
@@ -915,8 +915,8 @@ func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.Cluster
 
 // StartMaster starts a stopped master of the Cluster
 func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot start Cluster master")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot start Cluster master")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -949,7 +949,7 @@ func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.Cluste
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	xerr = handler.StartMaster(clusterName, masterRef)
@@ -967,8 +967,8 @@ func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.Cluste
 
 // StateMaster returns the state of a master of the Cluster
 func (s *ClusterListener) StateMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get Cluster master state")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot get Cluster master state")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -1000,7 +1000,7 @@ func (s *ClusterListener) StateMaster(inctx context.Context, in *protocol.Cluste
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
 	state, xerr := handler.StateMaster(clusterName, masterRef)

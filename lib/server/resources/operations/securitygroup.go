@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -77,39 +79,106 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ *SecurityGroup, ferr fail.Error) {
-	// Note: do not log error from here; caller has the responsibility to log if needed
-	defer fail.OnPanic(&ferr)
+func LoadSecurityGroup(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (*SecurityGroup, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+	type result struct {
+		rTr  *SecurityGroup
+		rErr fail.Error
 	}
-	if ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		ga, gerr := func() (_ *SecurityGroup, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
+			if svc == nil {
+				return nil, fail.InvalidParameterError("svc", "cannot be nil")
+			}
+			if ref == "" {
+				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+			}
+
+			// trick to avoid collisions
+			var kt *SecurityGroup
+			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(*SecurityGroup)
+					if ok {
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, svc, ref) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			var ok bool
+			sgInstance, ok := anon.(*SecurityGroup)
+			if !ok {
+				return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
+			}
+			if sgInstance == nil {
+				return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
+			}
+
+			// if cache failed we are here, so we better retrieve updated information...
+			xerr = sgInstance.Reload(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, sgInstance.GetName()), sgInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := sgInstance.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), sgInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(*SecurityGroup)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.SecurityGroup")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return sgInstance, nil
+		}()
+		chRes <- result{ga, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, svc, ref) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var ok bool
-	sgInstance, ok := anon.(*SecurityGroup)
-	if !ok {
-		return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
-	}
-	if sgInstance == nil {
-		return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
-	}
-
-	return sgInstance, nil
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
@@ -370,7 +439,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 				return xerr
 			}
 
-			logrus.Infof("Security Group '%s' created successfully", name)
+			logrus.WithContext(ctx).Infof("Security Group '%s' created successfully", name)
 			chRes <- result{nil}
 			return nil
 		}
@@ -382,7 +451,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 			return xerr
 		}
 
-		logrus.Infof("Security Group '%s' created successfully", name)
+		logrus.WithContext(ctx).Infof("Security Group '%s' created successfully", name)
 		chRes <- result{nil}
 		return nil
 	}() // nolint
@@ -497,7 +566,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -604,7 +673,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -1105,7 +1174,7 @@ func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(ctx context.Context
 			if _, innerXErr := tg.Start(instance.taskBindEnabledOnHost, v); innerXErr != nil {
 				abErr := tg.AbortWithCause(innerXErr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -1131,7 +1200,7 @@ func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(ctx context.Contex
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -1157,7 +1226,7 @@ func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(ctx context.Conte
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}

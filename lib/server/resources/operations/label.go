@@ -18,9 +18,12 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
+	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
@@ -70,37 +73,105 @@ func NewLabel(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
 }
 
 // LoadLabel loads the metadata of a Label
-func LoadLabel(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Label, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+func LoadLabel(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Label, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	type result struct {
+		rTr  resources.Label
+		rErr fail.Error
 	}
-	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		ga, gerr := func() (_ resources.Label, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
+			if svc == nil {
+				return nil, fail.InvalidParameterCannotBeNilError("svc")
+			}
+			if ref = strings.TrimSpace(ref); ref == "" {
+				return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+			}
+
+			// trick to avoid collisions
+			var kt *label
+			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Label)
+					if ok {
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, svc, ref) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			labelInstance, ok := anon.(resources.Label)
+			if !ok {
+				return nil, fail.InconsistentError("value in cache for Label with key '%s' is not a resources.Label", ref)
+			}
+			if labelInstance == nil {
+				return nil, fail.InconsistentError("nil value in cache for Label with key '%s'", ref)
+			}
+
+			// if cache failed we are here, so we better retrieve updated information...
+			xerr = labelInstance.Reload(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, labelInstance.GetName()), labelInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := labelInstance.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), labelInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Label)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.Label")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return labelInstance, nil
+		}()
+		chRes <- result{ga, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, svc, ref) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	labelInstance, ok := anon.(resources.Label)
-	if !ok {
-		return nil, fail.InconsistentError("value in cache for Label with key '%s' is not a resources.Label", ref)
-	}
-	if labelInstance == nil {
-		return nil, fail.InconsistentError("nil value in cache for Label with key '%s'", ref)
-	}
-
-	return labelInstance, nil
 }
 
 // onLabelCacheMiss is called when there is no instance in cache of Label 'ref'
@@ -187,50 +258,71 @@ func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label
 }
 
 // Delete deletes Label and its metadata
-func (instance *label) Delete(ctx context.Context) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func (instance *label) Delete(inctx context.Context) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return fail.InvalidParameterError("ctx", "cannot be nil")
+	if inctx == nil {
+		return fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label")).Entering()
+	tracer := debug.NewTracer(inctx, tracing.ShouldTrace("resources.label")).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			lhV1, ok := clonable.(*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+					lhV1, ok := clonable.(*propertiesv1.LabelHosts)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					if len(lhV1.ByID) > 0 {
+						return fail.NotAvailableError("'%s' still bound to Hosts", instance.GetName())
+					}
+
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
 			}
 
-			if len(lhV1.ByID) > 0 {
-				return fail.NotAvailableError("'%s' still bound to Hosts", instance.GetName())
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					logrus.WithContext(ctx).Debugf("Unable to find the tag on provider side, cleaning up metadata")
+				default:
+					return xerr
+				}
 			}
 
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+			// remove metadata
+			return instance.MetadataCore.Delete(ctx)
+		}()
+		chRes <- result{gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			logrus.Debugf("Unable to find the tag on provider side, cleaning up metadata")
-		default:
-			return xerr
-		}
-	}
-
-	// remove metadata
-	return instance.MetadataCore.Delete(ctx)
 }
 
 // Create a tag
@@ -349,7 +441,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 	return out, nil
 }
 
-// IsTag tells of the Label represents a Tag (ie a Label that does not carry a defaut value)
+// IsTag tells of the Label represents a Tag (ie a Label that does not carry a default value)
 func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 	var out bool
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {

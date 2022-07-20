@@ -39,6 +39,9 @@ func (s ProviderProxy) GetAuthenticationOptions(ctx context.Context) (_ Config, 
 	defer fail.OnPanic(&ferr)
 
 	config, xerr := s.Provider.GetAuthenticationOptions(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return config, xerr
 }
 
@@ -46,6 +49,9 @@ func (s ProviderProxy) GetConfigurationOptions(ctx context.Context) (_ Config, f
 	defer fail.OnPanic(&ferr)
 
 	config, xerr := s.Provider.GetConfigurationOptions(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return config, xerr
 }
 
@@ -54,6 +60,7 @@ func (s ProviderProxy) GetRawConfigurationOptions(ctx context.Context) (_ stacks
 
 	asta, xerr := s.Provider.GetStack()
 	if xerr != nil {
+		xerr.WithContext(ctx)
 		return stacks.ConfigurationOptions{}, xerr
 	}
 	return asta.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
@@ -64,6 +71,7 @@ func (s ProviderProxy) GetRawAuthenticationOptions(ctx context.Context) (_ stack
 
 	asta, xerr := s.Provider.GetStack()
 	if xerr != nil {
+		xerr.WithContext(ctx)
 		return stacks.AuthenticationOptions{}, xerr
 	}
 	return asta.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
@@ -104,6 +112,9 @@ func (s ProviderProxy) GetCapabilities(ctx context.Context) (_ Capabilities, fer
 	defer fail.OnPanic(&ferr)
 
 	capabilities, xerr := s.Provider.GetCapabilities(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return capabilities, xerr
 }
 
@@ -118,6 +129,9 @@ func (s ProviderProxy) ListImages(ctx context.Context, all bool) (_ []*abstract.
 	defer fail.OnPanic(&ferr)
 
 	images, xerr := s.Provider.ListImages(ctx, all)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return images, xerr
 }
 
@@ -125,6 +139,9 @@ func (s ProviderProxy) ListTemplates(ctx context.Context, all bool) (_ []*abstra
 	defer fail.OnPanic(&ferr)
 
 	templates, xerr := s.Provider.ListTemplates(ctx, all)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return templates, xerr
 }
 
@@ -139,6 +156,9 @@ func (s ProviderProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]
 	defer fail.OnPanic(&ferr)
 
 	zones, xerr := s.Provider.ListAvailabilityZones(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return zones, xerr
 }
 
@@ -146,6 +166,9 @@ func (s ProviderProxy) ListRegions(ctx context.Context) (_ []string, ferr fail.E
 	defer fail.OnPanic(&ferr)
 
 	regions, xerr := s.Provider.ListRegions(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return regions, xerr
 }
 
@@ -153,6 +176,9 @@ func (s ProviderProxy) InspectImage(ctx context.Context, id string) (_ *abstract
 	defer fail.OnPanic(&ferr)
 
 	image, xerr := s.Provider.InspectImage(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return image, xerr
 }
 
@@ -160,6 +186,9 @@ func (s ProviderProxy) InspectTemplate(ctx context.Context, id string) (_ *abstr
 	defer fail.OnPanic(&ferr)
 
 	template, xerr := s.Provider.InspectTemplate(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return template, xerr
 }
 
@@ -167,6 +196,9 @@ func (s ProviderProxy) CreateKeyPair(ctx context.Context, name string) (_ *abstr
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.Provider.CreateKeyPair(ctx, name)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return pair, xerr
 }
 
@@ -174,6 +206,9 @@ func (s ProviderProxy) InspectKeyPair(ctx context.Context, id string) (_ *abstra
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.Provider.InspectKeyPair(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return pair, xerr
 }
 
@@ -181,6 +216,9 @@ func (s ProviderProxy) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair,
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.Provider.ListKeyPairs(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return pair, xerr
 }
 
@@ -188,6 +226,9 @@ func (s ProviderProxy) DeleteKeyPair(ctx context.Context, id string) (ferr fail.
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteKeyPair(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -195,6 +236,9 @@ func (s ProviderProxy) ListSecurityGroups(ctx context.Context, networkRef string
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Provider.ListSecurityGroups(ctx, networkRef)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return groups, xerr
 }
 
@@ -202,6 +246,9 @@ func (s ProviderProxy) CreateSecurityGroup(ctx context.Context, networkRef, name
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Provider.CreateSecurityGroup(ctx, networkRef, name, description, rules)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return groups, xerr
 }
 
@@ -209,6 +256,9 @@ func (s ProviderProxy) InspectSecurityGroup(ctx context.Context, sgParam stacks.
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Provider.InspectSecurityGroup(ctx, sgParam)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return groups, xerr
 }
 
@@ -216,6 +266,9 @@ func (s ProviderProxy) ClearSecurityGroup(ctx context.Context, sgParam stacks.Se
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Provider.ClearSecurityGroup(ctx, sgParam)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return groups, xerr
 }
 
@@ -223,6 +276,9 @@ func (s ProviderProxy) DeleteSecurityGroup(ctx context.Context, group *abstract.
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteSecurityGroup(ctx, group)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -230,6 +286,9 @@ func (s ProviderProxy) AddRuleToSecurityGroup(ctx context.Context, sgParam stack
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.Provider.AddRuleToSecurityGroup(ctx, sgParam, rule)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return group, xerr
 }
 
@@ -237,6 +296,9 @@ func (s ProviderProxy) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam 
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.Provider.DeleteRuleFromSecurityGroup(ctx, sgParam, rule)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return group, xerr
 }
 
@@ -244,6 +306,9 @@ func (s ProviderProxy) GetDefaultSecurityGroupName(ctx context.Context) (_ strin
 	defer fail.OnPanic(&ferr)
 
 	cfg, xerr := s.Provider.GetDefaultSecurityGroupName(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return cfg, xerr
 }
 
@@ -251,6 +316,9 @@ func (s ProviderProxy) EnableSecurityGroup(ctx context.Context, group *abstract.
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.EnableSecurityGroup(ctx, group)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -258,6 +326,9 @@ func (s ProviderProxy) DisableSecurityGroup(ctx context.Context, group *abstract
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DisableSecurityGroup(ctx, group)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -265,6 +336,9 @@ func (s ProviderProxy) CreateNetwork(ctx context.Context, req abstract.NetworkRe
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.CreateNetwork(ctx, req)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -272,6 +346,9 @@ func (s ProviderProxy) InspectNetwork(ctx context.Context, id string) (_ *abstra
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.InspectNetwork(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -279,6 +356,9 @@ func (s ProviderProxy) InspectNetworkByName(ctx context.Context, name string) (_
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.InspectNetworkByName(ctx, name)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -286,6 +366,9 @@ func (s ProviderProxy) ListNetworks(ctx context.Context) (_ []*abstract.Network,
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.ListNetworks(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -293,6 +376,9 @@ func (s ProviderProxy) DeleteNetwork(ctx context.Context, id string) (ferr fail.
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteNetwork(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -300,6 +386,9 @@ func (s ProviderProxy) HasDefaultNetwork(ctx context.Context) (_ bool, ferr fail
 	defer fail.OnPanic(&ferr)
 
 	cfg, xerr := s.Provider.HasDefaultNetwork(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return cfg, xerr
 }
 
@@ -307,6 +396,9 @@ func (s ProviderProxy) GetDefaultNetwork(ctx context.Context) (_ *abstract.Netwo
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.GetDefaultNetwork(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -314,6 +406,9 @@ func (s ProviderProxy) CreateSubnet(ctx context.Context, req abstract.SubnetRequ
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.CreateSubnet(ctx, req)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -321,6 +416,9 @@ func (s ProviderProxy) InspectSubnet(ctx context.Context, id string) (_ *abstrac
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.InspectSubnet(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -328,6 +426,9 @@ func (s ProviderProxy) InspectSubnetByName(ctx context.Context, networkID, name 
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.InspectSubnetByName(ctx, networkID, name)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -335,6 +436,9 @@ func (s ProviderProxy) ListSubnets(ctx context.Context, networkID string) (_ []*
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.ListSubnets(ctx, networkID)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -342,6 +446,9 @@ func (s ProviderProxy) DeleteSubnet(ctx context.Context, id string) (ferr fail.E
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteSubnet(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -349,6 +456,9 @@ func (s ProviderProxy) BindSecurityGroupToSubnet(ctx context.Context, sgParam st
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.BindSecurityGroupToSubnet(ctx, sgParam, subnetID)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -356,6 +466,9 @@ func (s ProviderProxy) UnbindSecurityGroupFromSubnet(ctx context.Context, sgPara
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.UnbindSecurityGroupFromSubnet(ctx, sgParam, subnetID)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -363,6 +476,9 @@ func (s ProviderProxy) CreateVIP(ctx context.Context, networkID, subnetID, name 
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.Provider.CreateVIP(ctx, networkID, subnetID, name, securityGroups)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return network, xerr
 }
 
@@ -370,6 +486,9 @@ func (s ProviderProxy) AddPublicIPToVIP(ctx context.Context, ip *abstract.Virtua
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.AddPublicIPToVIP(ctx, ip)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -377,6 +496,9 @@ func (s ProviderProxy) BindHostToVIP(ctx context.Context, ip *abstract.VirtualIP
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.BindHostToVIP(ctx, ip, s2)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -384,6 +506,9 @@ func (s ProviderProxy) UnbindHostFromVIP(ctx context.Context, ip *abstract.Virtu
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.UnbindHostFromVIP(ctx, ip, s2)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -391,6 +516,9 @@ func (s ProviderProxy) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (f
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteVIP(ctx, ip)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -398,6 +526,9 @@ func (s ProviderProxy) CreateHost(ctx context.Context, request abstract.HostRequ
 	defer fail.OnPanic(&ferr)
 
 	host, content, xerr := s.Provider.CreateHost(ctx, request)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return host, content, xerr
 }
 
@@ -405,6 +536,9 @@ func (s ProviderProxy) ClearHostStartupScript(ctx context.Context, parameter sta
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.ClearHostStartupScript(ctx, parameter)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -412,6 +546,9 @@ func (s ProviderProxy) InspectHost(ctx context.Context, parameter stacks.HostPar
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.InspectHost(ctx, parameter)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return host, xerr
 }
 
@@ -419,6 +556,9 @@ func (s ProviderProxy) GetHostState(ctx context.Context, parameter stacks.HostPa
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.GetHostState(ctx, parameter)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return host, xerr
 }
 
@@ -426,6 +566,9 @@ func (s ProviderProxy) ListHosts(ctx context.Context, b bool) (_ abstract.HostLi
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.ListHosts(ctx, b)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return host, xerr
 }
 
@@ -433,6 +576,9 @@ func (s ProviderProxy) DeleteHost(ctx context.Context, parameter stacks.HostPara
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteHost(ctx, parameter)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -440,6 +586,9 @@ func (s ProviderProxy) StopHost(ctx context.Context, host stacks.HostParameter, 
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.StopHost(ctx, host, gracefully)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -447,6 +596,9 @@ func (s ProviderProxy) StartHost(ctx context.Context, parameter stacks.HostParam
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.StartHost(ctx, parameter)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -454,6 +606,9 @@ func (s ProviderProxy) RebootHost(ctx context.Context, parameter stacks.HostPara
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.RebootHost(ctx, parameter)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -461,6 +616,9 @@ func (s ProviderProxy) ResizeHost(ctx context.Context, parameter stacks.HostPara
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.ResizeHost(ctx, parameter, requirements)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return host, xerr
 }
 
@@ -468,6 +626,9 @@ func (s ProviderProxy) WaitHostReady(ctx context.Context, hostParam stacks.HostP
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.WaitHostReady(ctx, hostParam, timeout)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return host, xerr
 }
 
@@ -475,6 +636,9 @@ func (s ProviderProxy) BindSecurityGroupToHost(ctx context.Context, sgParam stac
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.BindSecurityGroupToHost(ctx, sgParam, hostParam)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -482,6 +646,9 @@ func (s ProviderProxy) UnbindSecurityGroupFromHost(ctx context.Context, sgParam 
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.UnbindSecurityGroupFromHost(ctx, sgParam, hostParam)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -489,6 +656,9 @@ func (s ProviderProxy) CreateVolume(ctx context.Context, request abstract.Volume
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.CreateVolume(ctx, request)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return volume, xerr
 }
 
@@ -496,6 +666,9 @@ func (s ProviderProxy) InspectVolume(ctx context.Context, id string) (_ *abstrac
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.InspectVolume(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return volume, xerr
 }
 
@@ -503,6 +676,9 @@ func (s ProviderProxy) ListVolumes(ctx context.Context) (_ []*abstract.Volume, f
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.ListVolumes(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return volume, xerr
 }
 
@@ -510,6 +686,9 @@ func (s ProviderProxy) DeleteVolume(ctx context.Context, id string) (ferr fail.E
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteVolume(ctx, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -517,6 +696,9 @@ func (s ProviderProxy) CreateVolumeAttachment(ctx context.Context, request abstr
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.CreateVolumeAttachment(ctx, request)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return volume, xerr
 }
 
@@ -524,6 +706,9 @@ func (s ProviderProxy) InspectVolumeAttachment(ctx context.Context, serverID, id
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.InspectVolumeAttachment(ctx, serverID, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return volume, xerr
 }
 
@@ -531,6 +716,9 @@ func (s ProviderProxy) ListVolumeAttachments(ctx context.Context, serverID strin
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.Provider.ListVolumeAttachments(ctx, serverID)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return volume, xerr
 }
 
@@ -538,6 +726,9 @@ func (s ProviderProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id 
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteVolumeAttachment(ctx, serverID, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }
 
@@ -545,5 +736,8 @@ func (s ProviderProxy) Migrate(ctx context.Context, operation string, params map
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.Migrate(ctx, operation, params)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
 	return xerr
 }

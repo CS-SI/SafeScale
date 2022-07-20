@@ -18,9 +18,11 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
@@ -37,6 +39,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/eko/gocache/v2/store"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -71,7 +75,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources.Bucket, ferr fail.Error) {
+func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -79,29 +83,98 @@ func LoadBucket(ctx context.Context, svc iaas.Service, name string) (b resources
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rTr  resources.Bucket
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gb, gerr := func() (_ resources.Bucket, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			// trick to avoid collisions
+			var kt *bucket
+			cachename := fmt.Sprintf("%T/%s", kt, name)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
+					casted, ok := val.(resources.Bucket)
+					if ok {
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			b, ok := anon.(resources.Bucket)
+			if !ok {
+				return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
+			}
+
+			if b == nil {
+				return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
+			}
+
+			// if cache failed we are here, so we better retrieve updated information...
+			xerr = b.Reload(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := b.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
+					casted, ok := val.(resources.Bucket)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.Bucket")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return b, nil
+		}()
+		chRes <- result{gb, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var ok bool
-	b, ok = anon.(resources.Bucket)
-	if !ok {
-		return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
-	}
-
-	if b == nil {
-		return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
-	}
-
-	return b, nil
 }
 
 func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
@@ -198,7 +271,7 @@ func (instance *bucket) Browse(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+	xerr := instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
 		ab := abstract.NewObjectStorageBucket()
 		var inErr fail.Error
 		if inErr = ab.Deserialize(buf); inErr != nil {
@@ -207,6 +280,12 @@ func (instance *bucket) Browse(
 
 		return callback(ab)
 	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // GetHost ...
@@ -289,7 +368,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 
 	tracer := debug.NewTracer(ctx, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -338,7 +417,13 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- write metadata
-	return instance.carry(ctx, &ab)
+	xerr = instance.carry(ctx, &ab)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Delete a bucket
@@ -353,7 +438,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -389,7 +474,13 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// -- delete metadata
-	return instance.MetadataCore.Delete(ctx)
+	xerr = instance.MetadataCore.Delete(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Mount a bucket on a host on the given mount point
@@ -416,7 +507,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 
 	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -575,7 +666,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 
 	tracer := debug.NewTracer(ctx, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -646,7 +737,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return xerr
 	}
 
-	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -658,6 +749,12 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 			return nil
 		})
 	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // ToProtocol returns the protocol message corresponding to Bucket fields

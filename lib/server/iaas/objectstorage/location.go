@@ -24,12 +24,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
 	// necessary for connect()
@@ -205,14 +203,14 @@ func (instance *location) connect() fail.Error {
 	// Check config stowLocation
 	err := stow.Validate(kind, config)
 	if err != nil {
-		logrus.Debugf("invalid config: %v", err)
 		return fail.ConvertError(err)
 	}
 	instance.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
-		logrus.Debugf("failed dialing stowLocation (error type=%s): %v", reflect.TypeOf(err).String(), err)
+		return fail.ConvertError(err)
 	}
-	return fail.ConvertError(err)
+
+	return nil
 }
 
 // Protocol returns the type of ObjectStorage
@@ -321,7 +319,6 @@ func (instance location) FindBucket(ctx context.Context, bucketName string) (_ b
 	err = stow.WalkContainers(instance.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
-				logrus.Debugf("%v", err)
 				return err
 			}
 			if c.Name() == bucketName {

@@ -228,7 +228,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 		defer func() {
 			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetGWSG)
 			if derr != nil {
-				logrus.Warnf(derr.Error())
+				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
 		}()
 
@@ -241,7 +241,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 		defer func() {
 			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetPublicIPSG)
 			if derr != nil {
-				logrus.Warnf(derr.Error())
+				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
 		}()
 
@@ -254,7 +254,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 		defer func() {
 			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetInternalSG)
 			if derr != nil {
-				logrus.Warnf(derr.Error())
+				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
 		}()
 
@@ -683,7 +683,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 			if caps.PrivateVirtualIP {
 				logrus.Info("Driver support private Virtual IP, honoring the failover setup for gateways.")
 			} else {
-				logrus.Warnf("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
+				logrus.WithContext(ctx).Warnf("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
 				failover = false
 			}
 		}
@@ -869,7 +869,7 @@ func (instance *Subnet) unsafeUpdateSubnetStatus(inctx context.Context, target s
 		}
 
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -915,7 +915,7 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail
 		}
 
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -986,7 +986,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 					img = nil
 					for _, aimg := range imgs {
 						if strings.Compare(aimg.ID, imageQuery) == 0 {
-							logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+							logrus.WithContext(ctx).Tracef("exact match by ID, ignoring jarowinkler results")
 							img = aimg
 							break
 						}
@@ -1090,7 +1090,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 		if xerr != nil {
 			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			chRes <- result{xerr}
 			return xerr
@@ -1112,7 +1112,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 			}
 		}
@@ -1181,18 +1181,18 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 					defer func() {
 						ferr = debug.InjectPlannedFail(ferr)
 						if ferr != nil && !req.KeepOnFailure {
-							logrus.Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
+							logrus.WithContext(ctx).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
 							derr := primaryGateway.RelaxedDeleteHost(context.Background())
 							derr = debug.InjectPlannedFail(derr)
 							if derr != nil {
 								switch derr.(type) {
 								case *fail.ErrTimeout:
-									logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+									logrus.WithContext(ctx).Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
 								default:
 								}
 								_ = ferr.AddConsequence(derr)
 							} else {
-								logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+								logrus.WithContext(ctx).Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 							}
 							if req.HA {
 								if derr := instance.unbindHostFromVIP(context.Background(), as.VIP, primaryGateway); derr != nil {
@@ -1205,7 +1205,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 					defer func() {
 						derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
 						if derr != nil {
-							logrus.Warnf(derr.Error())
+							logrus.WithContext(ctx).Warnf(derr.Error())
 						}
 					}()
 
@@ -1274,7 +1274,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 						if derr != nil {
 							switch derr.(type) {
 							case *fail.ErrTimeout:
-								logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
+								logrus.WithContext(ctx).Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
 							default:
 							}
 							_ = ferr.AddConsequence(derr)
@@ -1396,7 +1396,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 		if xerr != nil {
 			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 		}
 
@@ -1409,7 +1409,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 			}
 		}

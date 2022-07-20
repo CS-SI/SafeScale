@@ -53,7 +53,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	defer func() {
 		rerr := utils.LazyRemove(f.Name())
 		if rerr != nil {
-			logrus.Debugf(rerr.Error())
+			logrus.WithContext(ctx).Debugf(rerr.Error())
 		}
 	}()
 

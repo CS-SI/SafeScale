@@ -212,7 +212,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(svc iaas.Service, owningInst
 					case *fail.ErrNotFound:
 						somethingMissing = true
 						innerXErr = fail.Wrap(innerXErr, "ignoring migration of Network %s: cannot inspect Network of Subnet '%s'", abstractSubnet.Network, subnetName)
-						logrus.Error(innerXErr.Error())
+						logrus.WithContext(ctx).Error(innerXErr.Error())
 						return innerXErr
 					default:
 						return fail.Wrap(innerXErr, "cannot inspect Network %s of Subnet '%s'", abstractSubnet.Network, subnetName)
@@ -925,13 +925,13 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 	for name := range requires {
 		f, xerr := operations.NewFeature(context.Background(), svc, name)
 		if xerr != nil {
-			logrus.Error(xerr.Error())
+			logrus.WithContext(ctx).Error(xerr.Error())
 			continue
 		}
 
 		req, xerr := f.Dependencies(ctx)
 		if xerr != nil {
-			logrus.Error(xerr.Error())
+			logrus.WithContext(ctx).Error(xerr.Error())
 			continue
 		}
 

@@ -17,6 +17,7 @@
 package debug
 
 import (
+	"context"
 	"net/http"
 	_ "net/http/pprof" // nolint
 	"os"
@@ -39,6 +40,8 @@ const (
 // Profile starts profiling based on the content of 'what'
 // Must be called with defer: defer debug.Profile("cpu")
 func Profile(what string) func() {
+	ctx := context.Background()
+
 	if what == "" {
 		what = "cpu,mem"
 	}
@@ -55,43 +58,43 @@ func Profile(what string) func() {
 		case "cpu":
 			var filename string
 			if len(content) > 1 {
-				filename = constructProfileFilename(content[1], defaultCPUProfileFilenameSuffix)
+				filename = constructProfileFilename(ctx, content[1], defaultCPUProfileFilenameSuffix)
 			} else {
-				filename = constructProfileFilename("", defaultCPUProfileFilenameSuffix)
+				filename = constructProfileFilename(ctx, "", defaultCPUProfileFilenameSuffix)
 			}
 			cpufile, err = os.Create(filename)
 			if err != nil {
-				logrus.Fatalf("Failed to create profile file '%s'", filename)
+				logrus.WithContext(ctx).Fatalf("Failed to create profile file '%s'", filename)
 			}
 			_ = pprof.StartCPUProfile(cpufile)
-			logrus.Infof("CPU profiling enabled")
+			logrus.WithContext(ctx).Infof("CPU profiling enabled")
 			profileCPU = true
 		case "mem", "memory", "ram":
 			var filename string
 			if len(content) > 1 {
-				filename = constructProfileFilename(content[1], defaultMemProfileFilenameSuffix)
+				filename = constructProfileFilename(ctx, content[1], defaultMemProfileFilenameSuffix)
 			} else {
-				filename = constructProfileFilename("", defaultMemProfileFilenameSuffix)
+				filename = constructProfileFilename(ctx, "", defaultMemProfileFilenameSuffix)
 			}
 			memfile, err = os.Create(filename)
 			if err != nil {
-				logrus.Fatalf("could not create memory profile: %v", err)
+				logrus.WithContext(ctx).Fatalf("could not create memory profile: %v", err)
 			}
-			logrus.Infof("RAM profiling enabled")
+			logrus.WithContext(ctx).Infof("RAM profiling enabled")
 			profileMemory = true
 		case "trace":
 			var filename string
 			if len(content) > 1 {
-				filename = constructProfileFilename(content[1], defaultTraceProfileFilenameSuffix)
+				filename = constructProfileFilename(ctx, content[1], defaultTraceProfileFilenameSuffix)
 			} else {
-				filename = constructProfileFilename("", defaultTraceProfileFilenameSuffix)
+				filename = constructProfileFilename(ctx, "", defaultTraceProfileFilenameSuffix)
 			}
 			tracefile, err = os.Create(filename)
 			if err != nil {
-				logrus.Fatalf("Failed to create profile file '%s'", filename)
+				logrus.WithContext(ctx).Fatalf("Failed to create profile file '%s'", filename)
 			}
 			_ = trace.Start(tracefile)
-			logrus.Infof("Trace profiling enabled")
+			logrus.WithContext(ctx).Infof("Trace profiling enabled")
 			profileTrace = true
 		case "web", "www":
 			listen := "localhost"
@@ -103,7 +106,7 @@ func Profile(what string) func() {
 					port = content[2]
 					_, err = strconv.Atoi(port)
 					if err != nil {
-						logrus.Fatalf("invalid port '%s' for web profiler", port)
+						logrus.WithContext(ctx).Fatalf("invalid port '%s' for web profiler", port)
 					}
 				}
 			}
@@ -116,18 +119,18 @@ func Profile(what string) func() {
 
 				err := http.ListenAndServe(server, nil)
 				if err != nil {
-					logrus.Errorf("ailed to start profiling web ui: %s", err.Error())
+					logrus.WithContext(ctx).Errorf("ailed to start profiling web ui: %s", err.Error())
 				} else {
-					logrus.Infof("WEBUI profiling started on %s", server)
+					logrus.WithContext(ctx).Infof("WEBUI profiling started on %s", server)
 				}
 			}()
 		default:
-			logrus.Infof("Unsupported profiling option '%s'", v)
+			logrus.WithContext(ctx).Infof("Unsupported profiling option '%s'", v)
 		}
 	}
 
 	return func() {
-		logrus.Debug("calling debug.Profile() closing func...")
+		logrus.WithContext(ctx).Debug("calling debug.Profile() closing func...")
 		if profileMemory {
 			defer func() {
 				_ = memfile.Close()
@@ -135,7 +138,7 @@ func Profile(what string) func() {
 
 			runtime.GC() // get up-to-date statistics
 			if err := pprof.WriteHeapProfile(memfile); err != nil {
-				logrus.Errorf("could not write memory profile: %v", err)
+				logrus.WithContext(ctx).Errorf("could not write memory profile: %v", err)
 			}
 		}
 		if profileCPU {
@@ -147,7 +150,7 @@ func Profile(what string) func() {
 	}
 }
 
-func constructProfileFilename(path, complement string) string {
+func constructProfileFilename(ctx context.Context, path, complement string) string {
 	if path == "" {
 		if strings.HasPrefix(os.Args[0], "/") {
 			path = os.Args[0] + complement
@@ -159,7 +162,7 @@ func constructProfileFilename(path, complement string) string {
 	st, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			logrus.Fatalf("failed to check if profile file '%s' exists: %s", path, err.Error())
+			logrus.WithContext(ctx).Fatalf("failed to check if profile file '%s' exists: %s", path, err.Error())
 		}
 	} else if st.IsDir() {
 		path += "/" + os.Args[0] + complement

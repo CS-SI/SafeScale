@@ -45,6 +45,11 @@ func NewTemplateHandler(job server.Job) TemplateHandler {
 
 // List available templates
 func (handler *templateHandler) List(all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -53,13 +58,18 @@ func (handler *templateHandler) List(all bool) (_ []*abstract.HostTemplate, ferr
 
 	tracer := debug.NewTracer(handler.job.Context(), true, "(all=%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return handler.job.Service().ListTemplates(handler.job.Context(), all)
 }
 
 // Match lists templates that match the sizing
 func (handler *templateHandler) Match(sizing abstract.HostSizingRequirements) (_ []*abstract.HostTemplate, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -68,13 +78,18 @@ func (handler *templateHandler) Match(sizing abstract.HostSizingRequirements) (_
 
 	tracer := debug.NewTracer(handler.job.Context(), true, "%s", sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return handler.job.Service().ListTemplatesBySizing(handler.job.Context(), sizing, false)
 }
 
 // Inspect returns information about a tenant
 func (handler *templateHandler) Inspect(ref string) (_ *abstract.HostTemplate, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -83,7 +98,7 @@ func (handler *templateHandler) Inspect(ref string) (_ *abstract.HostTemplate, f
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return handler.job.Service().FindTemplateByName(handler.job.Context(), ref)
 }

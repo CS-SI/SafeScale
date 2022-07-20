@@ -22,10 +22,12 @@ import (
 	"path"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
+	"github.com/eko/gocache/v2/store"
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -139,38 +141,106 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Share, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Share, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	type result struct {
+		rTr  resources.Share
+		rErr fail.Error
 	}
-	if ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		ga, gerr := func() (_ resources.Share, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
+			if svc == nil {
+				return nil, fail.InvalidParameterCannotBeNilError("svc")
+			}
+			if ref == "" {
+				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+			}
+
+			// trick to avoid collisions
+			var kt *Share
+			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Share)
+					if ok {
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, svc, ref) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			var ok bool
+			var shareInstance resources.Share
+			if shareInstance, ok = anon.(resources.Share); !ok {
+				return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
+			}
+			if shareInstance == nil {
+				return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
+			}
+
+			// if cache failed we are here, so we better retrieve updated information...
+			xerr = shareInstance.Reload(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := shareInstance.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Share)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.Share")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return shareInstance, nil
+		}()
+		chRes <- result{ga, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, svc, ref) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var ok bool
-	var shareInstance resources.Share
-	if shareInstance, ok = anon.(resources.Share); !ok {
-		return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
-	}
-	if shareInstance == nil {
-		return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
-	}
-
-	return shareInstance, nil
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
@@ -477,7 +547,7 @@ func (instance *Share) Create(
 				})
 			})
 			if derr != nil {
-				logrus.Errorf("After failure, cleanup failed to update metadata of host '%s'", server.GetName())
+				logrus.WithContext(context.Background()).Errorf("After failure, cleanup failed to update metadata of host '%s'", server.GetName())
 				_ = ferr.AddConsequence(derr)
 			}
 		}
@@ -1170,24 +1240,24 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 		h, xerr := LoadHost(ctx, svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Errorf(xerr.Error())
+			logrus.WithContext(ctx).Errorf(xerr.Error())
 			continue
 		}
 
 		mounts, xerr := h.GetMounts(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Errorf(xerr.Error())
+			logrus.WithContext(ctx).Errorf(xerr.Error())
 			continue
 		}
 		sharePath, ok := mounts.RemoteMountsByShareID[shareID]
 		if !ok {
-			logrus.Error(fail.InconsistentError("failed to find the sharePath on host '%s' where Share '%s' is mounted", h.GetName(), shareName).Error())
+			logrus.WithContext(ctx).Error(fail.InconsistentError("failed to find the sharePath on host '%s' where Share '%s' is mounted", h.GetName(), shareName).Error())
 			continue
 		}
 		mount, ok := mounts.RemoteMountsByPath[sharePath]
 		if !ok {
-			logrus.Error(fail.InconsistentError("failed to find a mount associated to Share path '%s' for host '%s'", sharePath, h.GetName()).Error())
+			logrus.WithContext(ctx).Error(fail.InconsistentError("failed to find a mount associated to Share path '%s' for host '%s'", sharePath, h.GetName()).Error())
 			continue
 		}
 		psmd := &protocol.ShareMountDefinition{
