@@ -1394,7 +1394,7 @@ func (s stack) rpcModifyInstanceSecurityGroups(ctx context.Context, id *string, 
 	)
 }
 
-func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]*string, fail.Error) {
+func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONValue, fail.Error) {
 	filters := make([]*pricing.Filter, 0, 2+len(ids))
 	filters = append(
 		filters, []*pricing.Filter{
@@ -1443,7 +1443,7 @@ func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]*string, fa
 	return resp.PriceList, nil
 }
 
-func (s stack) rpcGetProductByID(ctx context.Context, id *string) (*string, fail.Error) {
+func (s stack) rpcGetProductByID(ctx context.Context, id *string) (aws.JSONValue, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return nil, xerr
 	}
