@@ -67,12 +67,6 @@ func Test_OnExitLogErrorWithLevel(t *testing.T) {
 	require.Contains(t, log, "Any message")
 
 	log = tests.LogrusCapture(func() {
-		nerr := fmt.Errorf("Any message")
-		OnExitLogErrorWithLevel(context.Background(), &nerr, 42)
-	})
-	require.Contains(t, log, "level=error")
-
-	log = tests.LogrusCapture(func() {
 		nerr := grpcstatus.Error(codes.FailedPrecondition, "GRPC Error: id was not found")
 		OnExitLogErrorWithLevel(context.Background(), &nerr, logrus.WarnLevel)
 

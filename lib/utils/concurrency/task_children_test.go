@@ -161,10 +161,10 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 
 	count := make(chan int, 4)
 
-	_, xerr = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(400) * time.Millisecond)
+	_, xerr = overlord.Start(func(ta Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(1400) * time.Millisecond)
 		fmt.Println("Evaluating...")
-		if t.Aborted() {
+		if ta.Aborted() {
 			return "A", fail.AbortedError(nil)
 		}
 		count <- 1
@@ -172,10 +172,10 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 	}, nil, InheritParentIDOption, AmendID("/child"))
 	require.Nil(t, xerr)
 
-	_, xerr = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(500) * time.Millisecond)
+	_, xerr = overlord.Start(func(ta Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(1500) * time.Millisecond)
 		fmt.Println("Evaluating...")
-		if t.Aborted() {
+		if ta.Aborted() {
 			return "A", fail.AbortedError(nil)
 		}
 		count <- 1
@@ -187,7 +187,15 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 		time.Sleep(time.Duration(200) * time.Millisecond) // definitively weird: with 40ms of sleep, everything is working as expected...
 		// something occurs after 40ms that delay channel read with select...
 		fmt.Println("Aborting...")
-		_ = overlord.Abort()
+		xerr := overlord.Abort()
+		if xerr != nil {
+			t.Errorf("%s", xerr.Error())
+		}
+
+		is := overlord.Aborted()
+		if !is {
+			t.Errorf("It is NOT aborted")
+		}
 	}()
 
 	_, xerr = overlord.WaitGroup()

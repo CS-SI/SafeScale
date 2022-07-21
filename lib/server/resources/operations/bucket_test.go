@@ -94,10 +94,8 @@ func Test_LoadBucket(t *testing.T) {
 		_ = svc._setInternalData("buckets/byID/notabucket", network)
 		_ = svc._setInternalData("buckets/byName/notabucket", network)
 
-		// FIXME: Seriously ? Network in bucket correctly casted to bucket, no error ?
 		bucket, err = LoadBucket(ctx, svc, "notabucket")
-		require.Nil(t, err)
-		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
+		require.NotNil(t, err)
 
 		svc._reset()
 

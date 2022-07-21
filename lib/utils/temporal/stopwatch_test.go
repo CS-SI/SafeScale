@@ -218,13 +218,13 @@ func TestOnExitLogWithLevel(t *testing.T) {
 	log = tests.LogrusCapture(func() {
 		f()
 	})
-	require.Contains(t, log, "level=info msg")
+	require.EqualValues(t, log, "")
 
 	// valid call
 	f = stowa.OnExitLogWithLevel(context.Background(), "in", "out", logrus.PanicLevel)
 	log = tests.LogrusCapture(func() {
 		f()
 	})
-	require.Contains(t, log, "level=info msg")
+	require.EqualValues(t, log, "")
 
 }

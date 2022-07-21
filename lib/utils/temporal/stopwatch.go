@@ -115,13 +115,17 @@ func (sw *stopwatch) OnExitLogWithLevel(ctx context.Context, in, out string, lev
 	}
 
 	logLevelFn := commonlog.LogLevelFnMap(ctx, level)
-	logLevelFn(in)
+	if logLevelFn != nil {
+		logLevelFn(in)
 
-	sw.Start()
-	return func() {
-		sw.Stop()
-		logLevelFn(fmt.Sprintf("%s (elapsed: %s)", out, FormatDuration(sw.GetDuration()))) // nolint
+		sw.Start()
+		return func() {
+			sw.Stop()
+			logLevelFn(fmt.Sprintf("%s (elapsed: %s)", out, FormatDuration(sw.GetDuration()))) // nolint
+		}
 	}
+
+	return func() {}
 }
 
 // OnExitLogInfo logs 'in' in Info level then returns a function that will log 'out' with elapsed time

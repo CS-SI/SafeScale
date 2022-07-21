@@ -133,9 +133,11 @@ func Successful() Arbiter {
 
 // Timeout returns Abort after a duration of time passes since the first try, while the try returns an error; returns Done if no error occurred during the last try
 func Timeout(limit time.Duration) Arbiter {
-	if limit < 1*time.Second {
-		panic("wrong defaults")
-	}
+	/*
+		if limit < 1*time.Second {
+			panic("wrong defaults")
+		}
+	*/
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
 			switch cerr := t.Err.(type) {

@@ -868,7 +868,7 @@ func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum,
 	return nil, nil
 }
 
-func (e *ServiceTest) GetCache(ctx context.Context) (*cache.Cache, fail.Error) {
+func (e *ServiceTest) GetCache(ctx context.Context) (cache.CacheInterface, fail.Error) {
 	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", "none", e.options.enablecache)
 	/*
 		if name == "" {

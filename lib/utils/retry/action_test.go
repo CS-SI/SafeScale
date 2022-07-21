@@ -1458,7 +1458,7 @@ func TestDontComplainWhenWeHaveATimeoutButItsOK(t *testing.T) {
 	}
 }
 
-func TestEbony(at *testing.T) {
+func TestRepeat(at *testing.T) {
 	chErr := make(chan error)
 	go func() {
 		for { // the end of test kills this
@@ -1529,11 +1529,11 @@ func TestEbony(at *testing.T) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *ErrTimeout:
-			at.Error(xerr)
+			at.Log(xerr)
 		case *ErrStopRetry:
-			at.Error(xerr)
+			at.Log(xerr)
 		default:
-			at.Error(xerr)
+			at.Log(xerr)
 		}
 	}
 }

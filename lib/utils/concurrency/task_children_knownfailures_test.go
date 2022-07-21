@@ -18,7 +18,6 @@ package concurrency
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -74,73 +73,6 @@ func TestAbortNotStartedTask(t *testing.T) {
 	res, xerr = child.Wait()
 	require.NotNil(t, xerr)
 	require.NotNil(t, res)
-}
-
-func TestAbortStartedTaskWithChildren(t *testing.T) {
-	iter := 2
-	for i := 0; i < iter; i++ {
-		fmt.Println("--- NEXT ---")
-
-		parent, xerr := NewTask()
-		require.NotNil(t, parent)
-		require.Nil(t, xerr)
-
-		xerr = parent.SetID("/parent")
-		require.Nil(t, xerr)
-
-		_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(700) * time.Millisecond)
-			return "B", nil
-		}, nil)
-		require.Nil(t, xerr)
-
-		child, xerr := NewTaskWithContext(parent.Context())
-		require.Nil(t, xerr)
-		_, xerr = child.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(400) * time.Millisecond)
-			if t.Aborted() {
-				return "A", fail.AbortedError(nil)
-			}
-			return "B", nil
-		}, nil, InheritParentIDOption, AmendID("/child"))
-		require.Nil(t, xerr)
-
-		sibling, xerr := NewTaskWithContext(parent.Context())
-		require.Nil(t, xerr)
-		_, xerr = sibling.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(500) * time.Millisecond)
-			if t.Aborted() {
-				return "A", fail.AbortedError(nil)
-			}
-			return "B", nil
-		}, nil, InheritParentIDOption, AmendID("/sibling"))
-		require.Nil(t, xerr)
-
-		time.Sleep(time.Duration(50) * time.Millisecond)
-
-		xerr = parent.Abort() // Abort the stated parent, should succeed
-		require.Nil(t, xerr)
-
-		time.Sleep(10 * time.Millisecond) // let abort propagation occurs
-		require.True(t, parent.Aborted()) // parent should be aborted
-		require.True(t, child.Aborted())
-		require.True(t, sibling.Aborted())
-
-		res, xerr := parent.Wait()
-		require.NotNil(t, xerr) // parent aborted, should return *fail.ErrAborted
-		if res == nil {
-			t.Errorf("result is nil, it shouldn't (xerr = %v (%s))", xerr, reflect.TypeOf(xerr).String())
-		}
-		require.NotNil(t, res) // result produced, must not be nil
-
-		res, xerr = child.Wait() // parent.Wait() should have told child to terminate on abort
-		require.NotNil(t, xerr)  // should return *fail.ErrAborted
-		require.NotNil(t, res)   // result produced, must bot be nil
-
-		res, xerr = sibling.Wait() // idem for sibling
-		require.NotNil(t, xerr)
-		require.NotNil(t, res)
-	}
 }
 
 // Taskgroups work well instead
