@@ -271,10 +271,10 @@ func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
 	if len(in) > 0 {
 		jsoned, err := json.Marshal(in)
 		if err != nil {
-			return data.Map{}, fail.Wrap(err, "failed to check feature: failed to convert variables to json")
+			return data.NewMap(), fail.Wrap(err, "failed to check feature: failed to convert variables to json")
 		}
 		if err = json.Unmarshal(jsoned, &out); err != nil {
-			return data.Map{}, fail.Wrap(err, "failed to check feature: failed to convert variables")
+			return data.NewMap(), fail.Wrap(err, "failed to check feature: failed to convert variables")
 		}
 	}
 	return out, nil

@@ -641,7 +641,7 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType
 			return
 		}
 
-		params := data.Map{}
+		params := data.NewMap()
 		if nodeType == clusternodetype.Master {
 			tp, xerr := instance.Service().GetTenantParameters()
 			if xerr != nil {
@@ -880,9 +880,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 				return
 			}
 
-			if params == nil {
-				params = data.Map{}
-			}
+			params, _ := data.FromMap(params)
 			results, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -986,9 +984,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 			}
 
 			// Adds remotedesktop feature on Cluster (ie masters)
-			if params == nil {
-				params = data.Map{}
-			}
+			params, _ := data.FromMap(params)
 			params["Username"] = "cladm"
 			params["Password"] = identity.AdminPassword
 
@@ -1077,9 +1073,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 			}
 
 			// Adds ansible feature on Cluster (ie masters)
-			if params == nil {
-				params = data.Map{}
-			}
+			params, _ := data.FromMap(params)
 			params["Username"] = "cladm"
 			params["Password"] = identity.AdminPassword
 			r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
@@ -1174,9 +1168,7 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 			return
 		}
 
-		if params == nil {
-			params = data.Map{}
-		}
+		params, _ := data.FromMap(params)
 		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

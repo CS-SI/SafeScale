@@ -1029,6 +1029,10 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 			}
 
 			if myself.loaded && !myself.committed {
+				name, ok := myself.name.Load().(string)
+				if ok {
+					return fail.InconsistentError("cannot unsafeReload a not committed data with name %s", name)
+				}
 				return fail.InconsistentError("cannot unsafeReload a not committed data")
 			}
 

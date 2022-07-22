@@ -45,6 +45,9 @@ func NewMap() Map {
 }
 
 func FromMap(m Map) (Map, error) {
+	if m == nil {
+		return NewMap(), nil
+	}
 	cm := NewMap()
 	return (&cm).Replace(&m)
 }

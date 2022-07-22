@@ -1160,8 +1160,10 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	if count == 0 {
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
 	}
-	if parameters == nil {
-		parameters = data.Map{}
+
+	parameters, err := data.FromMap(parameters)
+	if err != nil {
+		return nil, fail.ConvertError(err)
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d)", count)

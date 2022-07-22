@@ -833,7 +833,7 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 
 // ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
 func ExtractFeatureParameters(params []string) data.Map {
-	out := data.Map{}
+	out := data.NewMap()
 	for _, v := range params {
 		splitted := strings.Split(v, "=")
 		if len(splitted) > 1 {

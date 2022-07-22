@@ -1704,10 +1704,8 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Host")}
 			return
 		}
-		variables := p.variables
-		if variables == nil {
-			variables = data.Map{}
-		}
+
+		variables, _ := data.FromMap(p.variables)
 		hostLabel := p.host.GetName()
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
@@ -2297,10 +2295,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 			chRes <- result{nil, fail.InconsistentError("failed to cast 'params' to 'taskConfiguraMastersParameters'")}
 			return
 		}
-		variables := p.variables
-		if variables != nil {
-			variables = data.Map{}
-		}
+		variables, _ := data.FromMap(p.variables)
 		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
@@ -2461,10 +2456,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 			return
 		}
 
-		variables := p.variables
-		if variables == nil {
-			variables = data.Map{}
-		}
+		variables, _ := data.FromMap(p.variables)
 
 		started := time.Now()
 
@@ -2961,11 +2953,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	if !ok {
 		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfigureNodesParameters'")
 	}
-	variables := p.variables
-	if variables == nil {
-		variables = data.Map{}
-	}
-
+	variables, _ := data.FromMap(p.variables)
 	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -3128,10 +3116,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Node")}
 			return
 		}
-		variables := p.variables
-		if variables == nil {
-			variables = data.Map{}
-		}
+		variables, _ := data.FromMap(p.variables)
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.index, p.node.Name).WithStopwatch().Entering()
 		defer tracer.Exiting()

@@ -95,7 +95,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 			return nil, xerr
 		}
 
-		results, xerr := featureInstance.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
+		results, xerr := featureInstance.Check(ctx, addressedGateway, data.NewMap(), resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
@@ -283,14 +283,14 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 
 	case "upstream":
 		// Separate upstream options from target settings
-		unjsoned := data.Map{}
+		unjsoned := data.NewMap()
 		err := json.Unmarshal([]byte(content), &unjsoned)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
-		options := data.Map{}
-		target := data.Map{}
+		options := data.NewMap()
+		target := data.NewMap()
 		for k, v := range unjsoned {
 			if k == "target" || k == "weight" {
 				target[k] = v
