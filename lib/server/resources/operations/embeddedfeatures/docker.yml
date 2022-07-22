@@ -330,7 +330,7 @@ feature:
                             if [[ "{{.DockerHubUsername}}" != "" ]]; then
                                 docker login --username="{{.DockerHubUsername}}" --password-stdin <<< "{{.DockerHubPassword}}" > /tmp/docker-fail.txt
                                 if [[ "$(cat /tmp/docker-fail.txt)" != "Login Succeeded" ]]; then
-                                    sfFail 216 "$(/tmp/cat docker-fail.txt)"
+                                    sfFail 216 "$(cat /tmp/docker-fail.txt)"
                                 fi
                             fi
                             rm -f /tmp/docker-fail.txt || true
@@ -362,7 +362,7 @@ feature:
                             sfFirewallReload || sfFail 192 "Firewall problem"
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg --purge --force-remove-reinstreq docker-ce*
+                                    dpkg --purge --force-remove-reinstreq docker-ce docker-ce-cli docker-ce-rootless-extras
                                     ;;
                                 centos|redhat|rhel)
                                     yum remove -y docker-ce*
