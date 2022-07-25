@@ -18,12 +18,12 @@
  * limitations under the License.
  */
 
-package viableos
+package ostests
 
 import (
 	"testing"
 )
 
 func Test_Nop(t *testing.T) {
-	t.Skip("viableos tests disabled")
+	t.Skip("ostests tests disabled")
 }

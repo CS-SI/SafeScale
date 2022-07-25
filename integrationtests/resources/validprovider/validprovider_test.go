@@ -1,5 +1,5 @@
-//go:build (integration && ostests) || allintegration
-// +build integration,ostests allintegration
+//go:build (integration && validprovider) || allintegration
+// +build integration,validprovider allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package viableos
+package validprovider
 
 import (
 	"testing"
@@ -26,9 +26,7 @@ import (
 )
 
 func Test_ViableosCreate(t *testing.T) {
-	helpers.InSection("viableos").Clear().
-		AddScenario(CreateCentosNetwork).
-		AddScenario(CreateDebianNetwork).
+	helpers.InSection("validprovider").Clear().
 		AddScenario(CreateUbuntuNetwork)
 	helpers.RunScenarios(t)
 }
