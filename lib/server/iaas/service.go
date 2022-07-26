@@ -1239,7 +1239,7 @@ func (instance service) GetCache(inctx context.Context) (cache.CacheInterface, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+	if beta := os.Getenv("SAFESCALE_CACHE"); beta != "" {
 		return instance.cacheManager, nil
 	}
 

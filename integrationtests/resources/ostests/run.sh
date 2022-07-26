@@ -1,3 +1,3 @@
 #!/bin/bash
 
-go test -v -timeout 3600s -tags=allintegration ./...
+go test -v -timeout 14400s -tags=allintegration ./... | tee test_results.log
