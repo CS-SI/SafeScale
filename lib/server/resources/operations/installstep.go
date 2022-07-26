@@ -264,12 +264,6 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 
 	outcomes := &unitResults{}
 
-	var (
-		subtask concurrency.Task
-		outcome concurrency.TaskResult
-		clonedV data.Map
-	)
-
 	for _, h := range hosts {
 		select {
 		case <-ctx.Done():
@@ -277,21 +271,20 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 		default:
 		}
 
-		var xerr fail.Error
 		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
-		clonedV, xerr = is.initLoopTurnForHost(ctx, h, v)
+		clonedV, xerr := is.initLoopTurnForHost(ctx, h, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		subtask, xerr = concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
+		subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		outcome, xerr = is.taskRunOnHost(subtask, runOnHostParameters{Host: h, Variables: clonedV})
+		outcome, xerr := is.taskRunOnHost(subtask, runOnHostParameters{Host: h, Variables: clonedV})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -326,10 +319,6 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(inctx, &ferr, tracer.TraceMessage())
 
-	var (
-		subtask concurrency.Task
-	)
-
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -350,7 +339,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		var taskErr fail.Error
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			subtask, taskErr = tg.Start(is.taskRunOnHostWithLoop, runOnHostParameters{Host: h, Variables: v})
+			subtask, taskErr := tg.Start(is.taskRunOnHostWithLoop, runOnHostParameters{Host: h, Variables: v})
 			taskErr = debug.InjectPlannedFail(taskErr)
 			if taskErr != nil {
 				abErr := tg.AbortWithCause(taskErr)
