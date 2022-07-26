@@ -57,6 +57,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["name"].(string) == names.Labels[0])
 
 	fmt.Println("Creating same Label " + names.Labels[0] + " with other value (none)")
@@ -68,6 +69,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, len(result.([]interface{})) > 0)
 
 	fmt.Println("Inspecting Label " + names.Labels[0])
@@ -75,6 +77,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["default_value"] == "labelvalue")
 
 	time.Sleep(temporal.DefaultDelay())
@@ -92,12 +95,14 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, len(result.([]interface{})) == 1)
 
 	out, err = helpers.GetOutput("safescale host label inspect " + "gw-" + names.Networks[0] + " " + names.Labels[0])
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
 
 	fmt.Println("Checking host inspect display Labels...")
@@ -105,6 +110,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, len(result.(map[string]interface{})["labels"].([]interface{})) > 0)
 	// FIXME: check content of Label from safescale host inspect
 	// require.True(t, result.(map[string]interface{})["labels"].([]map[string]interface{})[0][""] > 0))
@@ -118,6 +124,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "newvalue")
 
 	fmt.Println("Resetting value of Label for Host")
@@ -129,6 +136,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
 
 	fmt.Println("deleting still bound Label")
@@ -154,6 +162,7 @@ func LabelBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "differentvalue")
 
 	fmt.Println("unbinding Label from Host")
@@ -180,7 +189,7 @@ func TagBase(t *testing.T) {
 	out, err := helpers.GetOutput("safescale tag list")
 	require.Nil(t, err)
 	result, err := helpers.ExtractResult(out)
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.Nil(t, result)
 
 	fmt.Println("Creating Tag " + names.Tags[0])
@@ -188,6 +197,7 @@ func TagBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.True(t, result.(map[string]interface{})["name"] == names.Tags[0])
 
 	out, err = helpers.GetOutput("safescale tag create " + names.Tags[0])
@@ -213,6 +223,7 @@ func TagBase(t *testing.T) {
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
+	require.NotNil(t, result)
 	require.NotNil(t, len(result.([]interface{})) > 0)
 
 	fmt.Printf("Deleting tag %s (should fail because stil bound)\n", names.Tags[0])
@@ -228,7 +239,7 @@ func TagBase(t *testing.T) {
 	out, err = helpers.GetOutput("safescale host tag list " + "gw-" + names.Networks[0])
 	require.Nil(t, err)
 	result, err = helpers.ExtractResult(out)
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.Nil(t, result)
 
 	out, err = helpers.GetOutput("safescale tag delete " + names.Tags[0])

@@ -120,7 +120,7 @@ func ExtractResult(in string) (interface{}, error) {
 
 	result, ok := jsoned["result"]
 	if !ok || result == nil {
-		return nil, nil
+		return nil, fmt.Errorf("failed to retrieve 'result' from json")
 	}
 
 	return result, nil
