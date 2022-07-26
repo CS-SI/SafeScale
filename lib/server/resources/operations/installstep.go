@@ -327,7 +327,6 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 	defer fail.OnExitLogError(inctx, &ferr, tracer.TraceMessage())
 
 	var (
-		clonedV data.Map
 		subtask concurrency.Task
 	)
 
@@ -351,19 +350,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		var taskErr fail.Error
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			subiteration := time.Now()
-			clonedV, taskErr = is.initLoopTurnForHost(ctx, h, v)
-			logrus.Warningf("The 1st part of thing takes %s", time.Since(subiteration)) // FIXME: OPP Remove this
-			taskErr = debug.InjectPlannedFail(taskErr)
-			if taskErr != nil {
-				abErr := tg.AbortWithCause(taskErr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-				}
-				break
-			}
-
-			subtask, taskErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+			subtask, taskErr = tg.Start(is.taskRunOnHostWithLoop, runOnHostParameters{Host: h, Variables: v})
 			taskErr = debug.InjectPlannedFail(taskErr)
 			if taskErr != nil {
 				abErr := tg.AbortWithCause(taskErr)
@@ -373,7 +360,6 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 				break
 			}
 			subtasks[h.GetName()] = subtask
-			logrus.Warningf("This thing takes %s", time.Since(subiteration)) // FIXME: OPP Remove this
 		}
 
 		tgr, xerr := tg.WaitGroup()
@@ -519,6 +505,38 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 type runOnHostParameters struct {
 	Host      resources.Host
 	Variables data.Map
+}
+
+func (is *step) taskRunOnHostWithLoop(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var res concurrency.TaskResult
+
+	var ok bool
+	if params == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params")
+	}
+	p, ok := params.(runOnHostParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
+	}
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+
+	inctx := task.Context()
+	cv, xerr := is.initLoopTurnForHost(inctx, p.Host, p.Variables)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	res, xerr = is.taskRunOnHost(task, runOnHostParameters{
+		Host:      p.Host,
+		Variables: cv,
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+	return res, nil
 }
 
 // taskRunOnHost ...
