@@ -45,7 +45,7 @@ func LabelBase(t *testing.T) {
 	out, err = helpers.GetOutput("safescale label list")
 	require.Nil(t, err)
 	result, err := helpers.ExtractResult(out)
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.Nil(t, result)
 
 	fmt.Println("Inspecting non-existent Label")
