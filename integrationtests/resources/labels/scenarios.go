@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
@@ -103,11 +104,14 @@ func LabelBase(t *testing.T) {
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
 	require.NotNil(t, result)
-	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
+	t.Logf("Received: %s, and result was %s", out, spew.Sdump(result))
+	rmap := result.(map[string]interface{})
+	require.True(t, rmap["value"].(string) == "labelvalue")
 
 	fmt.Println("Checking host inspect display Labels...")
 	out, err = helpers.GetOutput("safescale host inspect " + "gw-" + names.Networks[0])
 	require.Nil(t, err)
+	t.Logf("Received: %s", out)
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
 	require.NotNil(t, result)
@@ -125,7 +129,8 @@ func LabelBase(t *testing.T) {
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
 	require.NotNil(t, result)
-	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "newvalue")
+	rmap = result.(map[string]interface{})
+	require.True(t, rmap["value"].(string) == "newvalue")
 
 	fmt.Println("Resetting value of Label for Host")
 	out, err = helpers.GetOutput("safescale host label reset " + "gw-" + names.Networks[0] + " " + names.Labels[0])
@@ -137,7 +142,8 @@ func LabelBase(t *testing.T) {
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
 	require.NotNil(t, result)
-	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "labelvalue")
+	rmap = result.(map[string]interface{})
+	require.True(t, rmap["value"].(string) == "labelvalue")
 
 	fmt.Println("deleting still bound Label")
 	out, err = helpers.GetOutput("safescale label delete " + names.Labels[0])
@@ -163,7 +169,8 @@ func LabelBase(t *testing.T) {
 	result, err = helpers.ExtractResult(out)
 	require.Nil(t, err)
 	require.NotNil(t, result)
-	require.True(t, result.(map[string]interface{})["host"].(map[string]interface{})["value"].(string) == "differentvalue")
+	rmap = result.(map[string]interface{})
+	require.True(t, rmap["value"].(string) == "differentvalue")
 
 	fmt.Println("unbinding Label from Host")
 	out, err = helpers.GetOutput("safescale host label unbind " + "gw-" + names.Networks[0] + " " + names.Labels[0])
@@ -288,8 +295,4 @@ func TagIsNotLabel(t *testing.T) {
 }
 
 func init() {
-	helpers.InSection("labels").
-		AddScenario(LabelBase).
-		AddScenario(TagBase).
-		AddScenario(TagIsNotLabel)
 }
