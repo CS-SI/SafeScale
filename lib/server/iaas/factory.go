@@ -165,7 +165,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
 		}
 
-		logrus.Warningf("Created a cache in: %p", newS.cacheManager)
+		logrus.WithContext(ctx).Infof("Created a cache in: %p", newS.cacheManager)
 
 		// allRegions, xerr := newS.ListRegions()
 		// if xerr != nil {
