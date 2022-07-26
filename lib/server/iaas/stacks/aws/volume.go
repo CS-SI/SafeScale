@@ -43,11 +43,11 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	volumeType, minSize := fromAbstractVolumeSpeed(request.Speed)
 	if request.Size < minSize {
-		logrus.Infof("AWS minimum size for requested volume type is %d (%d requested); using minimum size", minSize, request.Size)
+		logrus.WithContext(ctx).Infof("AWS minimum size for requested volume type is %d (%d requested); using minimum size", minSize, request.Size)
 		request.Size = 125
 	}
 
@@ -193,7 +193,7 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -243,7 +243,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	query := ec2.DeleteVolumeInput{
 		VolumeId: aws.String(id),
@@ -264,7 +264,7 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	availableDevices := initAvailableDevices()
 	var resp *ec2.VolumeAttachment

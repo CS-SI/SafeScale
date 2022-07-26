@@ -44,7 +44,7 @@ type Connector interface {
 	CreatePersistentTunneling() fail.Error
 	Config() (Config, fail.Error)
 	CopyWithTimeout(context.Context, string, string, bool, time.Duration) (int, string, string, fail.Error)
-	Enter(string, string) fail.Error
+	Enter(context.Context, string, string) fail.Error
 	NewCommand(context.Context, string) (Command, fail.Error)
 	NewSudoCommand(context.Context, string) (Command, fail.Error)
 	WaitServerReady(context.Context, string, time.Duration) (string, fail.Error)

@@ -47,8 +47,8 @@ type VolumeListener struct {
 
 // List the available volumes
 func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list volume")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list volume")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -70,7 +70,7 @@ func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequ
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
 	volumes, xerr := handler.List(in.GetAll())
@@ -94,8 +94,8 @@ func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequ
 
 // Create a new volume
 func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreateRequest) (_ *protocol.VolumeInspectResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create volume")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create volume")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -119,7 +119,7 @@ func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreate
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewVolumeHandler(job)
 	volumeInstance, xerr := handler.Create(name, int(size), volumespeed.Enum(speed))
@@ -132,8 +132,8 @@ func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreate
 
 // Attach a volume to a host and create a mount point
 func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot attach volume")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot attach volume")
 
 	empty := &googleprotobuf.Empty{}
 	if s == nil {
@@ -176,7 +176,7 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
 	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat, doNotMount); xerr != nil {
@@ -188,8 +188,8 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 
 // Detach a volume from a host. It umount associated mountpoint
 func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot detach volume")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot detach volume")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -220,7 +220,7 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s, %s)", volumeRefLabel, hostRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
 	if xerr = handler.Detach(volumeRef, hostRef); xerr != nil {
@@ -233,8 +233,8 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 
 // Delete a volume
 func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete volume")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete volume")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -260,7 +260,7 @@ func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
 	if xerr = handler.Delete(ref); xerr != nil {
@@ -273,8 +273,8 @@ func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (
 
 // Inspect a volume
 func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInspectResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect volume")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect volume")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -299,7 +299,7 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewVolumeHandler(job)
 	volumeInstance, xerr := handler.Inspect(ref)

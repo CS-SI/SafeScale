@@ -83,7 +83,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 
 		hostSizing := castedParams.sizing
 
-		logrus.Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
+		logrus.WithContext(ctx).Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.TemplateRef, hostReq.ImageID)
 		svc := instance.Service()
 		hostReq.PublicIP = true
 		hostReq.IsGateway = true
@@ -134,7 +134,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				if !hostReq.KeepOnFailure {
-					logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
+					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
 					derr := rgw.Delete(context.Background())
 					if derr != nil {
 						msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
@@ -143,13 +143,13 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 							// missing Host is considered as a successful deletion, continue
 							debug.IgnoreError(derr)
 						case *fail.ErrTimeout:
-							logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
+							logrus.WithContext(context.Background()).Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 						default:
-							logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+							logrus.WithContext(context.Background()).Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
 						}
 						_ = ferr.AddConsequence(derr)
 					} else {
-						logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
+						logrus.WithContext(ctx).Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
@@ -164,7 +164,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					})
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						logrus.Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+						logrus.WithContext(ctx).Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
 					}
 				}
 			}
@@ -272,11 +272,8 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		// Executes userdata phase2 script to finalize host installation
 		tracer := debug.NewTracer(ctx, true, "(%s)", gwname).WithStopwatch().Entering()
 		defer tracer.Exiting()
-		defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
-		defer temporal.NewStopwatch().OnExitLogInfo(
-			fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
-			fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
-		)()
+		defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
+		defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname), fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname))()
 
 		waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 
@@ -288,7 +285,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 				return xerr
 			}
 		} else {
-			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY)
+			logrus.WithContext(ctx).Debugf("Nothing to do for the phase '%s'", userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY)
 		}
 
 		if objgw.thePhaseDoesSomething(ctx, userdata.PHASE4_SYSTEM_FIXES, userData) {
@@ -306,7 +303,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 			}
 
 			// intermediate gateway reboot
-			logrus.Infof("Rebooting gateway '%s'", gwname)
+			logrus.WithContext(ctx).Infof("Rebooting gateway '%s'", gwname)
 			xerr = objgw.Reboot(ctx, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -323,7 +320,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 				return xerr
 			}
 		} else {
-			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
+			logrus.WithContext(ctx).Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
 		}
 
 		// final phase...

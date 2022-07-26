@@ -1,3 +1,0 @@
-#!/bin/bash
-
-go test -v -timeout 3600s -tags=allintegration ./...

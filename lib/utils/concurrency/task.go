@@ -88,7 +88,7 @@ type TaskCore interface {
 	AbortWithCause(fail.Error) fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	DisarmAbortSignal() func()
+	DisarmAbortSignal() (func(), fail.Error)
 	ID() (string, fail.Error)
 	Signature() string
 	Status() (TaskStatus, fail.Error)
@@ -334,6 +334,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	}
 
 	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance) // nolint
+	instance.ctx = context.WithValue(ctx, KeyForID, instance.id)                  // nolint
 
 	return instance, nil
 }
@@ -1483,10 +1484,9 @@ func (instance *task) Abortable() (bool, fail.Error) {
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
 // Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitly a subtask.
-func (instance *task) DisarmAbortSignal() func() {
+func (instance *task) DisarmAbortSignal() (func(), fail.Error) {
 	if valid.IsNil(instance) {
-		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.") // FIXME: return error
-		return func() {}
+		return func() {}, fail.InvalidInstanceError()
 	}
 
 	instance.lock.Lock()
@@ -1506,9 +1506,9 @@ func (instance *task) DisarmAbortSignal() func() {
 			defer instance.lock.Unlock()
 
 			instance.abortDisengaged = false
-		}
+		}, nil
 	}
 
 	// If abort signal is already disengaged, does nothing and returns a func that does nothing also
-	return func() {}
+	return func() {}, nil
 }

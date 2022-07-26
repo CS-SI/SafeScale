@@ -22,7 +22,11 @@ import (
 	"expvar"
 	"fmt"
 	"regexp"
+	"time"
 
+	"github.com/dgraph-io/ristretto"
+	"github.com/eko/gocache/v2/cache"
+	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -70,10 +74,10 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func UseService(tenantName, metadataVersion string) (newService Service, ferr fail.Error) {
-	defer fail.OnExitLogError(&ferr)
-	defer fail.OnPanic(&ferr)
-
 	ctx := context.Background() // FIXME: Check context
+
+	defer fail.OnExitLogError(ctx, &ferr)
+	defer fail.OnPanic(&ferr)
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
@@ -93,7 +97,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		if !found {
 			name, found = tenant["Name"].(string)
 			if !found {
-				logrus.Error("tenant found without 'name'")
+				logrus.WithContext(ctx).Error("tenant found without 'name'")
 				continue
 			}
 		}
@@ -110,7 +114,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 				if !found {
 					provider, found = tenant["Client"].(string)
 					if !found {
-						logrus.Error("Missing field 'provider' or 'client' in tenant")
+						logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
 						continue
 					}
 				}
@@ -120,21 +124,21 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		svcProvider = provider
 		svc, found = allProviders[provider]
 		if !found {
-			logrus.Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
+			logrus.WithContext(ctx).Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
 			continue
 		}
 
 		_, found = tenant["identity"].(map[string]interface{})
 		if !found {
-			logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		}
 		_, found = tenant["compute"].(map[string]interface{})
 		if !found {
-			logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		}
 		_, found = tenant["network"].(map[string]interface{})
 		if !found {
-			logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
 
 		_, tenantObjectStorageFound := tenant["objectstorage"]
@@ -146,10 +150,22 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
 		}
 
-		newS := &service{
-			Provider:   providerInstance,
-			tenantName: tenantName,
+		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+			NumCounters: 1000,
+			MaxCost:     100,
+			BufferItems: 1024,
+		})
+		if err != nil {
+			return nil, fail.ConvertError(err)
 		}
+
+		newS := &service{
+			Provider:     providerInstance,
+			tenantName:   tenantName,
+			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
+		}
+
+		logrus.Warningf("Created a cache in: %p", newS.cacheManager)
 
 		// allRegions, xerr := newS.ListRegions()
 		// if xerr != nil {
@@ -193,7 +209,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
 			}
 		} else {
-			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
+			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
 		// Initializes Metadata Object Storage (maybe different from the Object Storage)
@@ -270,7 +286,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 					metadataCryptKey = ek
 				}
 			}
-			logrus.Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
+			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
 		} else {
 			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
@@ -749,9 +765,11 @@ func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
 }
 
 func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Viper, fail.Error) {
+	ctx := context.Background()
+
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
-		logrus.Errorf(msg)
+		logrus.WithContext(ctx).Errorf(msg)
 		return nil, v, fail.SyntaxError(msg)
 	}
 

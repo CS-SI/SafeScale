@@ -57,6 +57,11 @@ func NewSecurityGroupHandler(job server.Job) SecurityGroupHandler {
 
 // List lists hosts managed by SafeScale only, or all hosts.
 func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -65,13 +70,18 @@ func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return securitygroupfactory.List(handler.job.Context(), handler.job.Service(), all)
 }
 
 // Create creates a new Security Group
 func (handler *securityGroupHandler) Create(networkRef, sgName, description string, rules abstract.SecurityGroupRules) (_ resources.SecurityGroup, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -83,7 +93,7 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', '%s')", networkRef, sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
 	if xerr != nil {
@@ -110,6 +120,11 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 
 // Clear calls the clear method to remove all rules from a security group
 func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -121,7 +136,7 @@ func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -133,6 +148,11 @@ func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
 
 // Reset clears the rules of a security group and reads the ones stored in metadata
 func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -141,7 +161,7 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -153,6 +173,11 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 
 // Inspect a host
 func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.SecurityGroup, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -161,13 +186,18 @@ func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.Security
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "(%s)", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 }
 
 // Delete a host
 func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -179,7 +209,7 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -191,6 +221,11 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 
 // AddRule creates a new rule and add it to an eisting security group
 func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.SecurityGroupRule) (_ resources.SecurityGroup, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -205,7 +240,7 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -222,6 +257,11 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 
 // DeleteRule deletes a rule identified by id from a security group
 func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.SecurityGroupRule) (_ resources.SecurityGroup, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -236,7 +276,7 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', %v)", sgRef, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -253,6 +293,11 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata
 func (handler *securityGroupHandler) Sanitize(sgRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -264,13 +309,18 @@ func (handler *securityGroupHandler) Sanitize(sgRef string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // Bonds lists the resources bound to the Security Group
 func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*propertiesv1.SecurityGroupBond, _ []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -292,7 +342,7 @@ func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*prop
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', %s)", sgRef, kind).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {

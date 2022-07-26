@@ -183,7 +183,7 @@ func (s stack) deleteInternetService(ctx context.Context, netID string) fail.Err
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// internet service not found
-			logrus.Warnf("no internet service linked to network '%s': %v", netID, xerr)
+			logrus.WithContext(ctx).Warnf("no internet service linked to network '%s': %v", netID, xerr)
 			return nil
 		default:
 			return xerr
@@ -601,7 +601,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		}
 
 		// Remove should fail only if something goes wrong when deleting VMs
-		logrus.Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
+		logrus.WithContext(ctx).Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
 		if xerr = s.deleteNICs(ctx, resp); xerr != nil {
 			return xerr
 		}

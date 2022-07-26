@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
 	// necessary for connect
@@ -211,7 +210,6 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 			if ferr != nil {
 				_ = ferr.AddConsequence(clerr)
 			}
-			logrus.Warnf("error closing item")
 		}
 	}()
 
@@ -312,7 +310,6 @@ func writeChunk(container stow.Container, objectName string, source io.Reader, n
 	nBytesRead, err := source.Read(buf)
 	if err == io.EOF {
 		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
-		logrus.Errorf(msg)
 		return fail.NewError(msg)
 	}
 	r := bytes.NewReader(buf)
@@ -322,8 +319,7 @@ func writeChunk(container stow.Container, objectName string, source io.Reader, n
 	if err != nil {
 		return fail.Wrap(err, "failed to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 	}
-	logrus.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
-	return fail.ConvertError(err)
+	return nil
 }
 
 // Delete deletes the object from Object Storage

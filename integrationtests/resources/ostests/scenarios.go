@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package viableos
+package ostests
 
 import (
 	"fmt"

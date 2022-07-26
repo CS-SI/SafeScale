@@ -24,7 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
@@ -53,57 +52,6 @@ func Test_BucketListToProtocol(t *testing.T) {
 	if !match {
 		t.Error("Converter mismatch")
 		t.Fail()
-	}
-
-}
-
-func Test_NFSExportOptionsFromStringToProtocol(t *testing.T) {
-
-	tests := map[string]int{
-		"":                               0,
-		"read_only":                      1,
-		"root_squash":                    2,
-		"read_only,root_squash":          3,
-		"root_squash,no_root_squash":     0,
-		"secure":                         4,
-		"secure,insecure":                0,
-		"async":                          8,
-		"async,sync":                     0,
-		"nohide":                         16,
-		"crossmnt":                       32,
-		"subtree_check":                  64,
-		"subtree_check,no_subtree_check": 0,
-	}
-	nfsOpt := &protocol.NFSExportOptions{} // nolint
-	packed := 0
-	for name, value := range tests {
-		nfsOpt = NFSExportOptionsFromStringToProtocol(name)
-		packed = 0
-		if nfsOpt.ReadOnly {
-			packed++
-		}
-		if nfsOpt.RootSquash {
-			packed += 2
-		}
-		if nfsOpt.Secure {
-			packed += 4
-		}
-		if nfsOpt.Async {
-			packed += 8
-		}
-		if nfsOpt.NoHide {
-			packed += 16
-		}
-		if nfsOpt.CrossMount {
-			packed += 32
-		}
-		if nfsOpt.SubtreeCheck {
-			packed += 64
-		}
-		if packed != value {
-			t.Error("Converter mismatch")
-			t.Fail()
-		}
 	}
 
 }

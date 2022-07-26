@@ -44,8 +44,8 @@ type NetworkListener struct {
 
 // Create a new network
 func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitLogError(&ferr, "cannot create network")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitLogError(inctx, &ferr, "cannot create network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -71,7 +71,7 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	cidr := in.GetCidr()
 	if cidr == "" {
@@ -130,8 +130,8 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 
 // List existing networks
 func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRequest) (_ *protocol.NetworkList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list networks")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list networks")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -152,7 +152,7 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.network")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	list, xerr := handler.List(in.GetAll())
@@ -171,8 +171,8 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect network")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -198,7 +198,7 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	networkInstance, xerr := handler.Inspect(networkRef)
@@ -211,8 +211,8 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 
 // Delete a network
 func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDeleteRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete network")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete network")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -244,7 +244,7 @@ func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDele
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	return empty, handler.Delete(networkRef, in.GetForce())

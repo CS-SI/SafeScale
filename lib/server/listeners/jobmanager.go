@@ -94,8 +94,8 @@ type JobManagerListener struct {
 
 // Stop specified process
 func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot stop job")
+	defer fail.OnExitConvertToGRPCStatus(ctx, &ferr)
+	defer fail.OnExitWrapError(ctx, &ferr, "cannot stop job")
 	defer fail.OnPanic(&ferr)
 
 	empty = &googleprotobuf.Empty{}
@@ -122,7 +122,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer := debug.NewTracer(task, true, "('%s')", uuid).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
@@ -140,26 +140,26 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 }
 
 // List running process
-func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list jobs")
+func (s *JobManagerListener) List(inctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list jobs")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	task, xerr := concurrency.NewTaskWithContext(ctx)
+	task, xerr := concurrency.NewTaskWithContext(inctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(inctx, &err, tracer.TraceMessage())
 
 	// handler := JobManagerHandler(tenant.Service)
 	jobMap := server.ListJobs()

@@ -480,7 +480,7 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 				return xerr
 			}
 
-			return sshConn.Enter(username, shell)
+			return sshConn.Enter(context.Background(), username, shell)
 		},
 		temporal.DefaultDelay(),
 		temporal.SSHConnectionTimeout(),

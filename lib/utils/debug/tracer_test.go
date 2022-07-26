@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -12,8 +13,8 @@ import (
 func trackSomething(ref string) (err error) {
 	tracer := NewTracer(nil, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-	defer fail.OnExitWrapError(&err, "something bad happened")
+	defer fail.OnExitLogError(context.Background(), &err, tracer.TraceMessage())
+	defer fail.OnExitWrapError(context.Background(), &err, "something bad happened")
 	defer fail.OnPanic(&err)
 
 	tracer.TraceAsError("you fade away")

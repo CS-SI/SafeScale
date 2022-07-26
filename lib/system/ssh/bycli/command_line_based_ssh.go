@@ -216,7 +216,7 @@ func (stun *Tunnel) Close() fail.Error {
 
 	defer func() {
 		if lazyErr := utils.LazyRemove(stun.keyFile.Name()); lazyErr != nil {
-			logrus.Error(lazyErr)
+			logrus.WithContext(context.Background()).Error(lazyErr)
 		}
 	}()
 
@@ -267,7 +267,6 @@ func killProcess(proc *os.Process) fail.Error {
 				// process not found, continue
 				debug.IgnoreError(err)
 			default:
-				logrus.Errorf("proc.Kill() failed: %s", cerr.Error())
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		default:
@@ -275,7 +274,6 @@ func killProcess(proc *os.Process) fail.Error {
 			case "os: process already finished":
 				debug.IgnoreError(err)
 			default:
-				logrus.Errorf("proc.Kill() failed: %s", err.Error())
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		}
@@ -293,7 +291,6 @@ func killProcess(proc *os.Process) fail.Error {
 			// process not found or has no child, continue
 			debug.IgnoreError(err)
 		default:
-			logrus.Error(err.Error())
 			return fail.Wrap(err, "unable to wait on SSH tunnel process")
 		}
 	}
@@ -322,7 +319,7 @@ func getFreePort() (uint, fail.Error) {
 	defer func() {
 		clErr := listener.Close()
 		if clErr != nil {
-			logrus.Error(clErr)
+			logrus.WithContext(context.Background()).Error(clErr)
 		}
 	}()
 	if err != nil {
@@ -347,7 +344,7 @@ func isTunnelReady(port int) bool {
 	}
 	err = server.Close()
 	if err != nil {
-		logrus.Warnf("Error closing server: %v", err)
+		logrus.WithContext(context.Background()).Warnf("Error closing server: %v", err)
 	}
 	return false
 }
@@ -359,16 +356,27 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("scfg")
 	}
 
-	gwCfg, _ := scfg.GetPrimaryGatewayConfig()
+	gwCfg, xerr := scfg.GetPrimaryGatewayConfig()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// Creates temporary file with private key
-	scpk, _ := gwCfg.GetPrivateKey()
+	scpk, xerr := gwCfg.GetPrivateKey()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	f, err := utils.CreateTempFileFromString(scpk, 0400)
 	if err != nil {
 		return nil, err
 	}
 
-	localPort, _ := scfg.GetLocalPort()
+	localPort, xerr := scfg.GetLocalPort()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if localPort == 0 {
 		localPort, err = getFreePort()
 		if err != nil {
@@ -376,8 +384,15 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		}
 	}
 
-	targetPort, _ := scfg.GetPort()
-	gwPort, _ := gwCfg.GetPort()
+	targetPort, xerr := scfg.GetPort()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	gwPort, xerr := gwCfg.GetPort()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if targetPort == 0 {
 		targetPort = ssh.SSHPort
@@ -391,11 +406,25 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	// 	scfg.SecondaryGatewayConfig.Port = 22
 	// }
 
-	targetHost, _ := scfg.GetHostname()
-	targetIPAddr, _ := scfg.GetIPAddress()
+	targetHost, xerr := scfg.GetHostname()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	gwUser, _ := gwCfg.GetUser()
-	gwIPAddr, _ := gwCfg.GetIPAddress()
+	targetIPAddr, xerr := scfg.GetIPAddress()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	gwUser, xerr := gwCfg.GetUser()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	gwIPAddr, xerr := gwCfg.GetIPAddress()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
@@ -412,7 +441,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort,
 	)
 
-	logrus.Debugf("Creating SSH tunnel with '%s'", cmdString)
+	logrus.WithContext(context.Background()).Debugf("Creating SSH tunnel with '%s'", cmdString)
 
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = getSyscallAttrs()
@@ -684,7 +713,7 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			return
 		}
 		chRes <- result{invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -816,19 +845,19 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 
 		result["retcode"], ok = note.(int)
 		if !ok {
-			logrus.Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
+			logrus.WithContext(ctx).Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
 		}
 
 		// Make sure all outputs have been processed
 		if !params.collectOutputs {
 			if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-				logrus.Error(pbcErr.Error())
+				logrus.WithContext(ctx).Error(pbcErr.Error())
 			}
 
 			if note, ok = xerr.Annotation("stderr"); ok {
 				result["stderr"], ok = note.(string)
 				if !ok {
-					logrus.Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+					logrus.WithContext(ctx).Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
 				}
 			}
 		} else {
@@ -841,7 +870,7 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			result["stdout"] = string(msgOut)
 			result["stderr"] = string(msgErr)
 		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-			logrus.Error(pbcErr.Error())
+			logrus.WithContext(ctx).Error(pbcErr.Error())
 		}
 	}
 
@@ -856,7 +885,7 @@ func (scmd *CliCommand) Close() fail.Error {
 		err1 = scmd.tunnels.Close()
 	}
 	if err1 != nil {
-		logrus.Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
+		logrus.WithContext(context.Background()).Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
 		defer func() { // lazy removal
 			ierr := utils.LazyRemove(scmd.keyFile.Name())
 			if ierr != nil {
@@ -890,14 +919,26 @@ func createConsecutiveTunnels(sc sshapi.Config, tunnels *Tunnels) (*Tunnel, fail
 		}
 
 		if gwConf != nil {
-			gwi, _ := gwConf.GetIPAddress()
-			gwp, _ := gwConf.GetPort()
+			gwi, xerr := gwConf.GetIPAddress()
+			if xerr != nil {
+				return nil, xerr
+			}
+			gwp, xerr := gwConf.GetPort()
+			if xerr != nil {
+				return nil, xerr
+			}
 
 			if !netutils.CheckRemoteTCP(gwi, int(gwp)) {
 				if !valid.IsNil(sgwConf) {
 					gwConf = sgwConf
-					gwi, _ := sgwConf.GetIPAddress()
-					gwp, _ := sgwConf.GetPort()
+					gwi, xerr := sgwConf.GetIPAddress()
+					if xerr != nil {
+						return nil, xerr
+					}
+					gwp, xerr := sgwConf.GetPort()
+					if xerr != nil {
+						return nil, xerr
+					}
 					if !netutils.CheckRemoteTCP(gwi, int(gwp)) {
 						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
 					}
@@ -1053,7 +1094,7 @@ func createSSHCommand(
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
 
-	logrus.Debugf("Created SSH command '%s'", sshCmdString)
+	logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", sshCmdString)
 
 	return sshCmdString, f, nil
 }
@@ -1173,10 +1214,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
-	defer fail.OnExitTraceError(
-		&ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname,
-		temporal.FormatDuration(timeout),
-	)
+	defer fail.OnExitTraceError(ctx, &ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname, temporal.FormatDuration(timeout))
 
 	originalPhase := phase
 	if phase == "ready" {
@@ -1276,7 +1314,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			temporal.FormatDuration(time.Since(begins)), stdout)
 	}
 
-	logrus.Debugf(
+	logrus.WithContext(ctx).WithContext(ctx).Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname, originalPhase,
 		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
@@ -1322,7 +1360,7 @@ func (sconf *Profile) copy(
 }
 
 // Enter to interactive shell, aka 'safescale ssh connect'
-func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
+func (sconf *Profile) Enter(ctx context.Context, username string, shell string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
@@ -1353,12 +1391,12 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	if xerr != nil {
 		for _, t := range tunnels {
 			if nerr := t.Close(); nerr != nil {
-				logrus.Warnf("Error closing SSH tunnel: %v", nerr)
+				logrus.WithContext(ctx).Warnf("Error closing SSH tunnel: %v", nerr)
 			}
 		}
 		if keyFile != nil {
 			if nerr := utils.LazyRemove(keyFile.Name()); nerr != nil {
-				logrus.Warnf("Error removing file %v", nerr)
+				logrus.WithContext(ctx).Warnf("Error removing file %v", nerr)
 			}
 		}
 		return fail.Wrap(xerr, "unable to create command")
@@ -1367,7 +1405,7 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	defer func() {
 		derr := utils.LazyRemove(keyFile.Name())
 		if derr != nil {
-			logrus.Warnf("Error removing temporary file: %v", derr)
+			logrus.WithContext(ctx).Warnf("Error removing temporary file: %v", derr)
 		}
 	}()
 

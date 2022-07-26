@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -336,6 +337,13 @@ func (x *JSONProperties) Serialize() (_ []byte, ferr fail.Error) {
 		return nil, fail.Wrap(jserr)
 	}
 	return r, nil
+}
+
+func (x *JSONProperties) Sdump() (string, fail.Error) {
+	sq := litter.Options{
+		HidePrivateFields: false,
+	}
+	return sq.Sdump(x.Properties), nil
 }
 
 // Deserialize ...

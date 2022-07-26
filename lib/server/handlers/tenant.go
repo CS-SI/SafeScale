@@ -165,6 +165,11 @@ func NewTenantHandler(job server.Job) TenantHandler {
 
 // Inspect displays tenant configuration
 func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -178,7 +183,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	currentName, err := svc.GetName()
@@ -308,6 +313,11 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 
 // Scan scans the tenant and updates the database
 func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -321,7 +331,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
@@ -890,7 +900,7 @@ func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 		}
 		if !file.IsDir() {
 			if err = os.Remove(theFile); err != nil {
-				logrus.Debugf("Error Suppressing %s : %s", file.Name(), err.Error())
+				logrus.WithContext(handler.job.Context()).Debugf("Error Suppressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

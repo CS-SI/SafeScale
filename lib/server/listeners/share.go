@@ -44,8 +44,8 @@ type ShareListener struct {
 
 // Create calls share service creation
 func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create share")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create share")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -71,7 +71,7 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 	shareType := in.GetType()
 	tracer := debug.NewTracer(ctx, true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	// LEGACY: NFSExportOptions of protocol has been deprecated and replaced by OptionsAsString
 	if in.OptionsAsString == "" && in.Options != nil {
@@ -94,8 +94,8 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 
 // Delete call share service deletion
 func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete share")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete share")
 	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
@@ -119,7 +119,7 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	return empty, handler.Delete(shareName)
@@ -127,8 +127,8 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 
 // List return the list of all available shares
 func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *protocol.ShareList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list shares")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list shares")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -147,7 +147,7 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	shares, xerr := handler.List()
@@ -167,8 +167,8 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 
 // Mount mounts share on a local directory of the given host
 func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot mount share")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot mount share")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -194,7 +194,7 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 	shareType := in.GetType()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	mount, xerr := handler.Mount(shareRef, hostRef, hostPath, in.GetWithCache())
@@ -207,8 +207,8 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 
 // Unmount unmounts share from the given host
 func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot unmount share")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot unmount share")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -234,7 +234,7 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDe
 	shareType := in.GetType()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	if xerr = handler.Unmount(shareRef, hostRef); xerr != nil {
@@ -245,8 +245,8 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDe
 
 // Inspect shows the detail of a share and all connected clients
 func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect share")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect share")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -269,7 +269,7 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	shareInstance, xerr := handler.Inspect(shareRef)

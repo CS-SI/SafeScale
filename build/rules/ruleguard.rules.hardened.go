@@ -512,6 +512,13 @@ func lockchain(m dsl.Matcher) {
 	m.Match(`$mu.localcache.RLock(); $*_; $mu.localcache.RLock()`).Report(`maybe $mu.localcache.RUnLock() was intended?`)
 }
 
+func nodefer(m dsl.Matcher) {
+	m.Match(`$mu.Lock(); $mu.Unlock()`).Report(`maybe you forgot a defer for $mu.Unlock() ?`)
+	m.Match(`$mu.RLock(); $mu.RUnlock()`).Report(`maybe you forgot a defer for $mu.RUnlock() ?`)
+	m.Match(`$mu.localcache.Lock(); $mu.localcache.Unlock()`).Report(`maybe you forgot a defer for $mu.localcache.Unlock() ?`)
+	m.Match(`$mu.localcache.RLock(); $mu.localcache.RUnlock()`).Report(`maybe you forgot a defer $mu.localcache.RUnlock() ?`)
+}
+
 func contextTODO(m dsl.Matcher) {
 	m.Match(`context.TODO()`).Report(`consider to use well-defined context`)
 }

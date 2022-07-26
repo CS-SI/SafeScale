@@ -40,8 +40,8 @@ type LabelListener struct {
 
 // List the available tags
 func (s *LabelListener) List(inctx context.Context, in *protocol.LabelListRequest) (_ *protocol.LabelListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list labels")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list labels")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -63,7 +63,7 @@ func (s *LabelListener) List(inctx context.Context, in *protocol.LabelListReques
 	selectTags := in.GetTags()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%v)", selectTags).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := LabelHandler(job)
 	list, xerr := handler.List(selectTags)
@@ -88,8 +88,8 @@ func (s *LabelListener) List(inctx context.Context, in *protocol.LabelListReques
 
 // Create a new label/tag
 func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRequest) (_ *protocol.LabelInspectResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create label")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create label")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -111,7 +111,7 @@ func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewTagHandler(job)
 	labelInstance, xerr := handler.Create(name, in.GetHasDefault(), in.GetDefaultValue())
@@ -125,8 +125,8 @@ func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRe
 
 // Delete a Label
 func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete Label")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete Label")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -152,7 +152,7 @@ func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectR
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := LabelHandler(job)
 	if xerr = handler.Delete(ref); xerr != nil {
@@ -165,8 +165,8 @@ func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectR
 
 // Inspect a Label/Tag
 func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspectRequest) (_ *protocol.LabelInspectResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect label")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect label")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -191,7 +191,7 @@ func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspect
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	instance, xerr := labelfactory.Load(ctx, job.Service(), ref)
 	if xerr != nil {

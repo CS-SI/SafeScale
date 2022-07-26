@@ -1,6 +1,5 @@
-//go:build !(allintegration || (integration && ostests))
-// +build !allintegration
-// +build !integration !ostests
+//go:build (integration && ostests) || allintegration
+// +build integration,ostests allintegration
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -18,4 +17,18 @@
  * limitations under the License.
  */
 
-package viableos
+package ostests
+
+import (
+	"testing"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
+)
+
+func Test_ViableosCreate(t *testing.T) {
+	helpers.InSection("ostests").Clear().
+		AddScenario(CreateCentosNetwork).
+		AddScenario(CreateDebianNetwork).
+		AddScenario(CreateUbuntuNetwork)
+	helpers.RunScenarios(t)
+}

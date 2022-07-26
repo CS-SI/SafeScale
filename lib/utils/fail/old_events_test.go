@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -30,7 +31,7 @@ import (
 // -------- tests for log helpers ---------
 
 func getNotFoundErrorWithLog() (err error) {
-	defer OnExitLogError(&err)
+	defer OnExitLogError(context.Background(), &err)
 	return NotFoundError("not there !!!")
 }
 
@@ -122,12 +123,12 @@ func callToSomethingThatReturnsErr() error {
 }
 
 func callToSomethingThatReturnsErrButLogsIt() (err error) {
-	defer OnExitLogErrorWithLevel(&err, logrus.WarnLevel)
+	defer OnExitLogErrorWithLevel(context.Background(), &err, logrus.WarnLevel)
 	return getNotFoundError()
 }
 
 func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
-	defer OnExitLogError(&err)
+	defer OnExitLogError(context.Background(), &err)
 	return getNotFoundError()
 }
 

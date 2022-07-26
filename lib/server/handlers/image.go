@@ -47,6 +47,11 @@ func NewImageHandler(job server.Job) ImageHandler {
 
 // List returns the image list
 func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -58,13 +63,18 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	return handler.job.Service().ListImages(handler.job.Context(), all)
 }
 
 // Select selects the image that best fits osname
 func (handler *imageHandler) Select(osname string) (image *abstract.Image, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented") // FIXME: Technical debt
@@ -72,6 +82,11 @@ func (handler *imageHandler) Select(osname string) (image *abstract.Image, ferr 
 
 // Filter filters the images that do not fit osname
 func (handler *imageHandler) Filter(osname string) (image []abstract.Image, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented") // FIXME: Technical debt

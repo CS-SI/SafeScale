@@ -17,6 +17,7 @@
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -118,11 +119,11 @@ func normalizeError(err error) fail.Error {
 			case 504:
 				return fail.NotAvailableError(message)
 			default:
-				logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+				logrus.WithContext(context.Background()).Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
 				return fail.UnknownError("from gcp driver, type='%s', error='%s'", reflect.TypeOf(err), err.Error())
 			}
 		}
-		logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+		logrus.WithContext(context.Background()).Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
 		return fail.UnknownError("from gcp driver, type='%s', error='%s'", reflect.TypeOf(err), err.Error())
 	}
 

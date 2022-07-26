@@ -78,6 +78,11 @@ func NewSSHHandler(job server.Job) SSHHandler {
 
 // GetConfig creates Profile to connect to a host
 func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Connector, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -110,7 +115,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	host, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
@@ -305,6 +310,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
 func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -320,7 +330,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	sshCfg, xerr := handler.GetConfig(hostParam)
 	if xerr != nil {
@@ -332,6 +342,11 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 
 // Run tries to execute command 'cmd' on the host
 func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	const invalid = -1
@@ -355,7 +370,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
@@ -398,9 +413,9 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				if t.Err != nil {
-					logrus.Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", host.GetName(), t.Err.Error())
+					logrus.WithContext(handler.job.Context()).Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", host.GetName(), t.Err.Error())
 				} else {
-					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
+					logrus.WithContext(handler.job.Context()).Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
 				}
 			}
 		},
@@ -499,6 +514,11 @@ func getMD5Hash(text string) string {
 
 // Copy copies file/directory from/to remote host
 func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -518,7 +538,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	hostName := ""
 	var upload bool
@@ -612,7 +632,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				return problem
 			}
 
-			logrus.Debugf("Checking MD5 of remote file...")
+			logrus.WithContext(handler.job.Context()).Debugf("Checking MD5 of remote file...")
 			crcCheck := func() fail.Error {
 				// take local md5...
 				md5hash := ""
@@ -685,6 +705,11 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 // Copy copies file/directory from/to remote host
 func (handler *sshHandler) Copy(from, to, owner, mode string) (_ int, _ string, _ string, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 

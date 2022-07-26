@@ -53,7 +53,7 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	keypair, xerr := abstract.NewKeyPair(name)
 	if xerr != nil {
@@ -76,7 +76,7 @@ func (s stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (fe
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	return s.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey))
 }
@@ -95,7 +95,7 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPa
 		WithStopwatch().
 		Entering().
 		Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeKeyPairByID(ctx, aws.String(id))
 	if xerr != nil {
@@ -124,7 +124,7 @@ func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fa
 		WithStopwatch().
 		Entering().
 		Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeKeyPairs(ctx, nil)
 	if xerr != nil {
@@ -144,7 +144,7 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	return s.rpcDeleteKeyPair(ctx, aws.String(id))
 }
@@ -157,7 +157,7 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeAvailabilityZones(ctx, nil)
 	if xerr != nil {
@@ -184,7 +184,7 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeRegions(ctx, nil)
 	if xerr != nil {
@@ -211,7 +211,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeImageByID(ctx, aws.String(id))
 	if xerr != nil {
@@ -231,7 +231,7 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(id))
 	if xerr != nil {
@@ -323,7 +323,7 @@ func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, f
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeImages(ctx, nil)
 	if xerr != nil {
@@ -363,7 +363,7 @@ func (s stack) ListTemplates(ctx context.Context, all bool) (templates []*abstra
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	var resp []*ec2.InstanceTypeInfo
 	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(ctx, nil)
@@ -450,7 +450,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -507,7 +507,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resourceName := request.ResourceName
 	subnets := request.Subnets
@@ -556,7 +556,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	// Constructs userdata content
 	userData = userdata.NewContent()
 	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
-		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
+		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
@@ -599,7 +599,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		diskSize = 10
 	}
 
-	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
+	logrus.WithContext(ctx).Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
 	// Select usable availability zone, the first one in the list
 	if s.AwsConfig.Zone == "" {
@@ -612,7 +612,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 			break
 		}
 		s.AwsConfig.Zone = az
-		logrus.Debugf("Selected Availability Zone: '%s'", az)
+		logrus.WithContext(ctx).Debugf("Selected Availability Zone: '%s'", az)
 	}
 
 	// --- Initializes resources.Host ---
@@ -645,7 +645,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 
 	// --- query provider for ahf creation ---
 
-	logrus.Debugf("requesting host resource creation...")
+	logrus.WithContext(ctx).Debugf("requesting host resource creation...")
 
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessful(
@@ -672,9 +672,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(captured)
 				default:
-					logrus.Warnf("error creating Host: %+v", captured)
+					logrus.WithContext(ctx).Warnf("error creating Host: %+v", captured)
 
-					if server != nil && server.ID != "" {
+					if server.IsConsistent() {
 						if xerr := s.DeleteHost(ctx, server.ID); xerr != nil {
 							_ = innerXErr.AddConsequence(
 								fail.Wrap(
@@ -722,16 +722,18 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !request.KeepOnFailure {
-			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
-			if derr := s.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
-				logrus.Warnf("Error deleting host in cleanup: %v", derr)
+			if ahf.IsConsistent() {
+				logrus.WithContext(ctx).Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
+				if derr := s.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
+				}
 			}
 		}
 	}()
 
 	if !ahf.OK() {
-		logrus.Warnf("Missing data in ahf: %v", ahf)
+		logrus.WithContext(ctx).Warnf("Missing data in ahf: %v", ahf)
 	}
 
 	return ahf, userData, nil
@@ -759,7 +761,7 @@ func (s stack) buildAwsSpotMachine(
 	}
 
 	lastPrice := resp[len(resp)-1]
-	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
+	logrus.WithContext(ctx).Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
 	instance, xerr := s.rpcRequestSpotInstance(
 		ctx, lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(publicIP), aws.String(template.ID),
@@ -971,7 +973,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeInstanceByName(ctx, aws.String(name))
 	if xerr != nil {
@@ -1003,7 +1005,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeInstances(ctx, nil)
 	if xerr != nil {
@@ -1059,7 +1061,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	ahfn := ahf.GetName()
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	vm, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
@@ -1149,7 +1151,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 				// A missing volume is considered as a successful deletion
 				debug.IgnoreError(xerr)
 			default:
-				logrus.Warnf("failed to delete volume %s (error %s)", volume, reflect.TypeOf(xerr).String())
+				logrus.WithContext(ctx).Warnf("failed to delete volume %s (error %s)", volume, reflect.TypeOf(xerr).String())
 			}
 		}
 	}
@@ -1182,7 +1184,7 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -1238,7 +1240,7 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -1298,7 +1300,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&ferr)
+	defer fail.OnExitTraceError(ctx, &ferr)
 
 	if xerr = s.rpcRebootInstances(ctx, []*string{aws.String(ahf.Core.ID)}); xerr != nil {
 		return xerr

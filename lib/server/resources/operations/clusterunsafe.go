@@ -60,7 +60,7 @@ func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.Cl
 		})
 
 		chRes <- result{clusterIdentity, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -155,7 +155,7 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 		}
 
 		chRes <- result{state, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -208,7 +208,7 @@ func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.I
 		}
 
 		chRes <- result{list, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -268,7 +268,7 @@ func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.Inde
 		}
 
 		chRes <- result{list, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -326,7 +326,7 @@ func (instance *Cluster) unsafeListMasterIPs(inctx context.Context) (_ data.Inde
 		}
 
 		chRes <- result{list, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -377,7 +377,7 @@ func (instance *Cluster) unsafeListNodeIPs(inctx context.Context) (_ data.Indexe
 			return
 		}
 		chRes <- result{outlist, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -454,7 +454,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(inctx context.Context) (_ res
 		}
 
 		chRes <- result{master, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -506,7 +506,7 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 		}
 
 		chRes <- result{list, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -568,7 +568,7 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 		}
 
 		chRes <- result{outlist, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -645,7 +645,7 @@ func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node re
 		}
 
 		chRes <- result{node, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

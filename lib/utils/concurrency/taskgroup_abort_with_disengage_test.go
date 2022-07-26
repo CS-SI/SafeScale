@@ -27,7 +27,12 @@ import (
 )
 
 func doTheDefferedReengage(t *testing.T, overlord *taskGroup) {
-	defer overlord.DisarmAbortSignal()()
+	fu, xerr := overlord.DisarmAbortSignal()
+	if xerr != nil {
+		t.Errorf("Bad abort")
+		t.FailNow()
+	}
+	defer fu()
 
 	fmt.Println("Begin")
 
@@ -42,9 +47,11 @@ func doTheDefferedReengage(t *testing.T, overlord *taskGroup) {
 	time.Sleep(12 * time.Millisecond)
 	if itis, err := overlord.Abortable(); err == nil {
 		if itis {
+			t.Log("It is abortable and it should not!")
 			t.FailNow()
 		}
 	} else {
+		t.Log("problem checking if abortable")
 		t.FailNow()
 	}
 }
@@ -62,9 +69,11 @@ func TestDeferredReengage(t *testing.T) {
 
 	if itis, err := overlord.Abortable(); err == nil {
 		if !itis {
+			t.Log("Is not abortable")
 			t.FailNow()
 		}
 	} else {
+		t.Log("Abortable cannot be checked")
 		t.FailNow()
 	}
 
@@ -82,7 +91,9 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	overlord.DisarmAbortSignal()
+	fu, xerr := overlord.DisarmAbortSignal()
+	require.Nil(t, xerr)
+	fu()
 
 	fmt.Println("Begin")
 
@@ -103,6 +114,8 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 				t.Errorf("Failure aborting: %v", xerr)
 				t.Fail()
 			}
+		} else {
+			t.Errorf("It should be abortable in the first place")
 		}
 	} else {
 		t.FailNow()
@@ -113,7 +126,7 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 	time.Sleep(12 * time.Millisecond)
 
 	_, xerr = overlord.WaitGroup()
-	require.Nil(t, xerr)
+	require.NotNil(t, xerr)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -131,7 +144,9 @@ func TestBadTaskActionCitizenDisengaged(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	overlord.DisarmAbortSignal()
+	fu, xerr := overlord.DisarmAbortSignal()
+	require.Nil(t, xerr)
+	fu()
 	fmt.Println("Begin")
 
 	numChild := 10
@@ -161,7 +176,7 @@ func TestBadTaskActionCitizenDisengaged(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	_, xerr = overlord.WaitGroup()
-	require.Nil(t, xerr)
+	require.NotNil(t, xerr)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -183,7 +198,9 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	overlord.DisarmAbortSignal()
+	fu, xerr := overlord.DisarmAbortSignal()
+	require.Nil(t, xerr)
+	fu()
 	fmt.Println("Begin")
 
 	stCh := make(chan string, 100)

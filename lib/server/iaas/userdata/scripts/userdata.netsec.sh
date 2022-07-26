@@ -1236,7 +1236,7 @@ EOF
 }
 
 function is_network_reachable() {
-  NETROUNDS=2
+  NETROUNDS=4
   REACHED=0
   TRIED=0
 

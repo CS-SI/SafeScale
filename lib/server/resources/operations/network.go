@@ -36,6 +36,7 @@ import (
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 )
 
@@ -69,36 +70,105 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (networkInstance resources.Network, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value")
-	}
-	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
+func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Network, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
+	type result struct {
+		rTr  resources.Network
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		ga, gerr := func() (_ resources.Network, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			if svc == nil {
+				return nil, fail.InvalidParameterError("svc", "cannot be null value")
+			}
+			if ref = strings.TrimSpace(ref); ref == "" {
+				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+			}
+
+			// trick to avoid collisions
+			var kt *Network
+			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+
+			cache, xerr := svc.GetCache(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Network)
+					if ok {
+						return casted, nil
+					}
+				}
+			}
+
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, svc, ref) }
+			anon, xerr := cacheMissLoader()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			networkInstance, ok := anon.(resources.Network)
+			if !ok {
+				return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
+			}
+			if networkInstance == nil {
+				return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
+			}
+
+			// if cache failed we are here, so we better retrieve updated information...
+			xerr = networkInstance.Reload(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if cache != nil {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := networkInstance.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
+					casted, ok := val.(resources.Network)
+					if ok {
+						return casted, nil
+					} else {
+						logrus.WithContext(ctx).Warningf("wrong type of resources.Network")
+					}
+				} else {
+					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				}
+			}
+
+			return networkInstance, nil
+
+		}()
+		chRes <- result{ga, gerr}
+	}()
 	select {
+	case res := <-chRes:
+		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	default:
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
 	}
-
-	cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, svc, ref) }
-	anon, xerr := cacheMissLoader()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var ok bool
-	networkInstance, ok = anon.(resources.Network)
-	if !ok {
-		return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
-	}
-	if networkInstance == nil {
-		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
-	}
-
-	return networkInstance, nil
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
@@ -250,7 +320,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		}()
 
 		// Create the Network
-		logrus.Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
+		logrus.WithContext(ctx).Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 		abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -260,7 +330,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		}
 
 		// Write subnet object metadata
-		logrus.Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
+		logrus.WithContext(ctx).Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
 		abstractNetwork.Imported = false
 		xerr = instance.carry(ctx, abstractNetwork)
 		if xerr != nil {
@@ -352,7 +422,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	}
 
 	// Write subnet object metadata
-	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
+	// logrus.WithContext(ctx).Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
 	abstractNetwork.Imported = true
 	return instance.carry(ctx, abstractNetwork)
 }
@@ -552,10 +622,10 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
-						logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
+						logrus.WithContext(ctx).Debugf("failed to find Network on provider side, cleaning up metadata.")
 						maybeDeleted = true
 					case *fail.ErrTimeout:
-						logrus.Error("cannot delete Network due to a timeout")
+						logrus.WithContext(ctx).Error("cannot delete Network due to a timeout")
 						errWaitMore := retry.WhileUnsuccessful(
 							func() error {
 								select {
@@ -582,13 +652,13 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							return innerXErr
 						}
 					default:
-						logrus.Errorf(innerXErr.Error())
+						logrus.WithContext(ctx).Errorf(innerXErr.Error())
 						return innerXErr
 					}
 				}
 
 				if maybeDeleted {
-					logrus.Debugf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
+					logrus.WithContext(ctx).Debugf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
 				}
 				iterations := 6
 				for {
@@ -599,7 +669,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 					}
 					iterations--
 					if iterations < 0 {
-						logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
+						logrus.WithContext(ctx).Debugf("The network '%s' is still there", abstractNetwork.ID)
 						break
 					}
 					time.Sleep(timings.NormalDelay())
@@ -609,18 +679,26 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{fail.Wrap(xerr, "failure altering metadata")}
-			return
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
+				// continue
+			default:
+				xerr.WithContext(ctx)
+				chRes <- result{xerr}
+				return
+			}
 		}
 
 		// Remove metadata
 		xerr = instance.MetadataCore.Delete(ctx)
 		if xerr != nil {
-			chRes <- result{fail.Wrap(xerr, "failure deleting metadata")}
+			xerr.WithContext(ctx)
+			chRes <- result{xerr}
 			return
 		}
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

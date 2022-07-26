@@ -70,6 +70,11 @@ func NewClusterHandler(job server.Job) ClusterHandler {
 
 // List lists clusters
 func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -78,7 +83,7 @@ func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.E
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return clusterfactory.List(handler.job.Context(), handler.job.Service())
 }
@@ -86,6 +91,11 @@ func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.E
 // Create creates a new cluster
 // Note: returned resources.Cluster has to be .Released() by caller...
 func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.Cluster, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -94,7 +104,7 @@ func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.New(handler.job.Context(), handler.job.Service())
 	if xerr != nil {
@@ -115,6 +125,11 @@ func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.
 
 // State returns the status of a cluster
 func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -125,7 +140,7 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 	}
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -143,6 +158,11 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 // Inspect a cluster
 // Note: returned resources.Cluster has to be .Released() by caller...
 func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -154,13 +174,18 @@ func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr f
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 }
 
 // Start boots an entire cluster
 func (handler *clusterHandler) Start(name string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -169,7 +194,7 @@ func (handler *clusterHandler) Start(name string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -181,6 +206,11 @@ func (handler *clusterHandler) Start(name string) (ferr fail.Error) {
 
 // Stop shutdowns an entire cluster (including the gateways)
 func (handler *clusterHandler) Stop(name string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -192,7 +222,7 @@ func (handler *clusterHandler) Stop(name string) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -204,6 +234,11 @@ func (handler *clusterHandler) Stop(name string) (ferr fail.Error) {
 
 // Delete a cluster
 func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -215,7 +250,7 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -229,6 +264,11 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 // Expand adds node(s) to a cluster
 // Note: returned []resources.host have to be .Released() by caller...
 func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -243,7 +283,7 @@ func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingReq
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -256,6 +296,11 @@ func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingReq
 
 // Shrink removes node(s) from a cluster
 func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -270,7 +315,7 @@ func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -282,6 +327,11 @@ func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv
 
 // ListNodes lists node(s) of a cluster
 func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOfClusterNodes, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -293,7 +343,7 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -306,6 +356,11 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 // InspectNode inspects a node of the cluster
 // Note: returned resources.Host has to be .Released() by caller...
 func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -320,7 +375,7 @@ func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resou
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), svc, clusterName)
@@ -343,6 +398,11 @@ func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resou
 
 // DeleteNode removes node(s) from a cluster
 func (handler *clusterHandler) DeleteNode(clusterName, nodeRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -357,7 +417,7 @@ func (handler *clusterHandler) DeleteNode(clusterName, nodeRef string) (ferr fai
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -379,6 +439,11 @@ func (handler *clusterHandler) DeleteNode(clusterName, nodeRef string) (ferr fai
 
 // StopNode stops a node of the cluster
 func (handler *clusterHandler) StopNode(clusterName, nodeRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -393,7 +458,7 @@ func (handler *clusterHandler) StopNode(clusterName, nodeRef string) (ferr fail.
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -420,6 +485,11 @@ func (handler *clusterHandler) StopNode(clusterName, nodeRef string) (ferr fail.
 
 // StartNode starts a stopped node of the cluster
 func (handler *clusterHandler) StartNode(clusterName, nodeRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -434,7 +504,7 @@ func (handler *clusterHandler) StartNode(clusterName, nodeRef string) (ferr fail
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -461,6 +531,11 @@ func (handler *clusterHandler) StartNode(clusterName, nodeRef string) (ferr fail
 
 // StateNode returns the state of a node of the cluster
 func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststate.Enum, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -475,7 +550,7 @@ func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststa
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -502,6 +577,11 @@ func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststa
 
 // ListMasters returns the list of masters of the cluster
 func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedListOfClusterNodes, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -513,7 +593,7 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -526,6 +606,11 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 // FindAvailableMaster determines the first available master (ie the one that responds on ssh request)
 // Note: returned resources.Host has to be .Released()...
 func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -537,7 +622,7 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -550,6 +635,11 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 // InspectMaster returns the information about a master of the cluster
 // Note: returned resources.Host has to be .Released() by caller...
 func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ resources.Host, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -564,7 +654,7 @@ func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ r
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -586,6 +676,11 @@ func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ r
 
 // StopMaster stops a master of the Cluster
 func (handler *clusterHandler) StopMaster(clusterName, masterRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -600,7 +695,7 @@ func (handler *clusterHandler) StopMaster(clusterName, masterRef string) (ferr f
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -627,6 +722,11 @@ func (handler *clusterHandler) StopMaster(clusterName, masterRef string) (ferr f
 
 // StartMaster starts a stopped master of the Cluster
 func (handler *clusterHandler) StartMaster(clusterName, masterRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -641,7 +741,7 @@ func (handler *clusterHandler) StartMaster(clusterName, masterRef string) (ferr 
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -668,6 +768,11 @@ func (handler *clusterHandler) StartMaster(clusterName, masterRef string) (ferr 
 
 // StateMaster returns the state of a master of the Cluster
 func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hoststate.Enum, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -682,7 +787,7 @@ func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hos
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {

@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime/debug"
@@ -58,6 +59,7 @@ type Error interface {
 	data.NullValue
 	data.Validatable
 
+	WithContext(context.Context)
 	UnformattedError() string
 	ToGRPCStatus() error
 }
@@ -73,6 +75,7 @@ type errorCore struct {
 	annotationFormatter func(data.Annotations) (string, error)
 	consequences        []error
 	grpcCode            codes.Code
+	context             context.Context
 	lock                *sync.RWMutex
 }
 
@@ -332,6 +335,15 @@ func (e *errorCore) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *errorCore) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // Consequences returns the consequences of current error (detected teardown problems)
 func (e errorCore) Consequences() []error {
 	e.lock.RLock()
@@ -355,11 +367,18 @@ func (e *errorCore) Error() string {
 		}
 	}
 
+	if e.context != nil {
+		id, ok := e.context.Value("ID").(string)
+		if ok {
+			msgFinal += fmt.Sprintf(".\n[ctx: %s]", id)
+		}
+	}
+
 	if len(e.annotations) > 0 {
 		sta := string(debug.Stack())
 		num := strings.Count(sta, "(*errorCore).Error") // protection against recursive calls infinite loop
 		if num < 32 {
-			msgFinal += "\nWith annotations: "
+			msgFinal += ".\nWith annotations: "
 			more, fmtErr := e.annotationFormatter(e.annotations)
 			if fmtErr != nil {
 				return msgFinal
@@ -385,8 +404,15 @@ func (e *errorCore) UnformattedError() string {
 func (e *errorCore) unsafeUnformattedError() string {
 	msgFinal := e.message
 
+	if e.context != nil {
+		id, ok := e.context.Value("ID").(string)
+		if ok {
+			msgFinal += fmt.Sprintf(".\n[ctx: %s]", id)
+		}
+	}
+
 	if len(e.annotations) > 0 {
-		msgFinal += "\nWith annotations: "
+		msgFinal += ".\nWith annotations: "
 		more, fmtErr := e.annotationFormatter(e.annotations)
 		if fmtErr != nil {
 			return msgFinal
@@ -465,6 +491,15 @@ func (e *ErrWarning) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrWarning) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrTimeout defines a ErrTimeout error
 type ErrTimeout struct {
 	*errorCore
@@ -531,6 +566,15 @@ func (e *ErrTimeout) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrTimeout) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrNotFound resource not found error
 type ErrNotFound struct {
 	*errorCore
@@ -574,6 +618,11 @@ func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatab
 	return e
 }
 
+func (e *ErrNotFound) WithCtx(ctx context.Context) *ErrNotFound {
+	e.errorCore.WithContext(ctx)
+	return e
+}
+
 // UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotFound) UnformattedError() string {
 	return e.unsafeUnformattedError()
@@ -582,6 +631,15 @@ func (e *ErrNotFound) UnformattedError() string {
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotFound) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrNotFound) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrNotAvailable resource not available error
@@ -631,6 +689,15 @@ func (e *ErrNotAvailable) UnformattedError() string {
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotAvailable) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrNotAvailable) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrDuplicate already exists error
@@ -683,6 +750,15 @@ func (e *ErrDuplicate) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrDuplicate) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrInvalidRequest ...
 type ErrInvalidRequest struct {
 	*errorCore
@@ -731,6 +807,15 @@ func (e *ErrInvalidRequest) Annotate(key string, value data.Annotation) data.Ann
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrInvalidRequest) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrInvalidRequest) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrSyntax ...
@@ -789,6 +874,15 @@ func (e *ErrSyntax) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrSyntax) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrNotAuthenticated when action is done without being authenticated first
 type ErrNotAuthenticated struct {
 	*errorCore
@@ -841,6 +935,15 @@ func (e *ErrNotAuthenticated) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrNotAuthenticated) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrForbidden when action is not allowed.
 type ErrForbidden struct {
 	*errorCore
@@ -891,6 +994,15 @@ func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotata
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrForbidden) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrForbidden) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrAborted is used to signal abortion
@@ -956,6 +1068,15 @@ func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatabl
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrAborted) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrAborted) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrOverflow is used when a limit is reached
@@ -1033,6 +1154,15 @@ func (e *ErrOverflow) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrOverflow) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occurred in a given time).
 type ErrOverload struct {
 	*errorCore
@@ -1080,6 +1210,15 @@ func (e *ErrOverload) Annotate(key string, value data.Annotation) data.Annotatab
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrOverload) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrOverload) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrNotImplemented ...
@@ -1132,6 +1271,15 @@ func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Ann
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrNotImplemented) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrNotImplemented) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrRuntimePanic ...
@@ -1196,6 +1344,15 @@ func (e *ErrRuntimePanic) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrRuntimePanic) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
 type ErrInvalidInstance struct {
 	*errorCore
@@ -1245,6 +1402,15 @@ func (e *ErrInvalidInstance) Annotate(key string, value data.Annotation) data.An
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrInvalidInstance) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrInvalidInstance) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrInvalidParameter ...
@@ -1321,6 +1487,15 @@ func (e *ErrInvalidParameter) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrInvalidParameter) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
 type ErrInvalidInstanceContent struct {
 	*errorCore
@@ -1382,6 +1557,15 @@ func (e *ErrInvalidInstanceContent) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrInvalidInstanceContent) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrInconsistent is used when data used is ErrInconsistent
 type ErrInconsistent struct {
 	*errorCore
@@ -1429,6 +1613,15 @@ func (e *ErrInconsistent) Annotate(key string, value data.Annotation) data.Annot
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrInconsistent) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrInconsistent) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }
 
 // ErrExecution is used when code ErrExecution failed
@@ -1508,6 +1701,15 @@ func (e *ErrExecution) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrExecution) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrAlteredNothing is used when an Alter() call changed nothing
 type ErrAlteredNothing struct {
 	*errorCore
@@ -1557,6 +1759,15 @@ func (e *ErrAlteredNothing) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
 }
 
+func (e *ErrAlteredNothing) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
+}
+
 // ErrUnknown is used when situation is unknown
 type ErrUnknown struct {
 	*errorCore
@@ -1604,4 +1815,13 @@ func (e *ErrUnknown) Annotate(key string, value data.Annotation) data.Annotatabl
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e *ErrUnknown) getGRPCCode() codes.Code {
 	return e.errorCore.getGRPCCode()
+}
+
+func (e *ErrUnknown) WithContext(ctx context.Context) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
+	if ctx != nil && e.context == nil {
+		e.context = ctx
+	}
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mrand "math/rand"
 	"os"
 	"reflect"
 	"strings"
@@ -1454,5 +1455,85 @@ func TestDontComplainWhenWeHaveATimeoutButItsOK(t *testing.T) {
 	if delta > 450*time.Millisecond {
 		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
 		t.FailNow()
+	}
+}
+
+func TestRepeat(at *testing.T) {
+	chErr := make(chan error)
+	go func() {
+		for { // the end of test kills this
+			num := mrand.Intn(123)
+			if num > 3 {
+				chErr <- fmt.Errorf("ouch")
+			} else {
+				chErr <- nil
+			}
+		}
+	}()
+
+	iterations := 0
+	innerIterations := 0
+
+	// Outer retry will write the metadata at most 3 times
+	xerr := Action(
+		func() error {
+			iterations++
+
+			// inner retry does read-after-write; if timeout consider write has failed, then retry write
+			innerXErr := Action(
+				func() error {
+					innerIterations++
+
+					innerErr := <-chErr
+					if innerErr != nil {
+						return innerErr
+					}
+
+					return nil
+				},
+				PrevailDone(Unsuccessful(), Timeout(300), Max(3)),
+				Linear(1),
+				nil,
+				nil,
+				func(t Try, v verdict.Enum) {
+					switch v { // nolint
+					case verdict.Retry:
+						at.Log("Retrying...")
+					default:
+						at.Logf("%v", v)
+					}
+				},
+			)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *ErrStopRetry, *ErrTimeout:
+					return fail.Wrap(innerXErr.Cause(), "stopping retries: %d, %d", iterations, innerIterations)
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		},
+		PrevailDone(Unsuccessful(), Max(6)),
+		Constant(0),
+		nil,
+		nil,
+		func(t Try, v verdict.Enum) {
+			switch v { // nolint
+			case verdict.Retry:
+				at.Log("External Retrying...")
+			}
+		},
+	)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *ErrTimeout:
+			at.Log(xerr)
+		case *ErrStopRetry:
+			at.Log(xerr)
+		default:
+			at.Log(xerr)
+		}
 	}
 }

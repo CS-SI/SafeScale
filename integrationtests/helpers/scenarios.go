@@ -87,7 +87,8 @@ func definedScenarios() []section {
 		"labels",
 		"clusters",
 		"securitygroups",
-		"viableos",
+		"ostests",
+		"validprovider",
 	}
 }
 

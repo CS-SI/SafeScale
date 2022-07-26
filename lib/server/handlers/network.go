@@ -58,8 +58,13 @@ func NewNetworkHandler(job server.Job) NetworkHandler {
 
 // Create a new network
 func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnetReq *abstract.SubnetRequest, gwName string, gwSizing *abstract.HostSizingRequirements) (_ resources.Network, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
-	defer fail.OnExitLogError(&ferr, "cannot create network")
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, "cannot create network")
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -70,7 +75,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 
 	tracer := debug.NewTracer(handler.job.Context(), true, "('%s')", networkReq.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	if networkReq.CIDR == "" {
 		networkReq.CIDR = defaultCIDR
@@ -112,7 +117,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", networkReq.CIDR)
 		}
 
-		logrus.Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", networkReq.Name, subnetNet.String())
+		logrus.WithContext(handler.job.Context()).Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", networkReq.Name, subnetNet.String())
 
 		if gwSizing == nil {
 			gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
@@ -141,6 +146,11 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 
 // List existing networks
 func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -149,7 +159,7 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	if all {
 		return handler.job.Service().ListNetworks(handler.job.Context())
@@ -160,8 +170,13 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 
 // Inspect returns infos on a network
 func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot inspect network")
+	defer fail.OnExitWrapError(handler.job.Context(), &ferr, "cannot inspect network")
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -172,13 +187,18 @@ func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, 
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
 }
 
 // Delete a network
 func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -194,7 +214,7 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 
 	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
 	if xerr != nil {

@@ -103,14 +103,14 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure && !cleanFailure {
-				logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
+				logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
 				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
-					logrus.Errorf(
+					logrus.WithContext(context.Background()).Errorf(
 						"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 					)
 					_ = ferr.AddConsequence(derr)
 				} else {
-					logrus.Debugf(
+					logrus.WithContext(ctx).Debugf(
 						"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 					)
 				}
@@ -129,7 +129,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			req.InitialNodeCount = privateNodeCount
 		}
 		if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-			logrus.Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
+			logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
 			req.InitialNodeCount = privateNodeCount
 		}
 
@@ -144,7 +144,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			req.NodesDef.Image = req.OS
 		}
 
-		// logrus.Warnf("This is the cluster creation request before determination: %s", spew.Sdump(req))
+		// logrus.WithContext(ctx).Warnf("This is the cluster creation request before determination: %s", spew.Sdump(req))
 
 		gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(ctx, req)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -158,37 +158,39 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure { // FIXME: subnetInstance nil
-				logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
-				if derr := subnetInstance.Delete(context.Background()); derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// missing Subnet is considered as a successful deletion, continue
-						debug.IgnoreError(derr)
-					default:
-						cleanFailure = true
-						logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
+				if subnetInstance != nil && networkInstance != nil {
+					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
+					if derr := subnetInstance.Delete(context.Background()); derr != nil {
+						switch derr.(type) {
+						case *fail.ErrNotFound:
+							// missing Subnet is considered as a successful deletion, continue
+							debug.IgnoreError(derr)
+						default:
+							cleanFailure = true
+							logrus.WithContext(context.Background()).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
+								subnetInstance.GetName())
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
+						}
+					} else {
+						logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
 							subnetInstance.GetName())
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
-					}
-				} else {
-					logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
-						subnetInstance.GetName())
-					if req.NetworkID == "" {
-						logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
-						if derr := networkInstance.Delete(context.Background()); derr != nil {
-							switch derr.(type) {
-							case *fail.ErrNotFound:
-								// missing Network is considered as a successful deletion, continue
-								debug.IgnoreError(derr)
-							default:
-								cleanFailure = true
-								logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
+						if req.NetworkID == "" {
+							logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
+							if derr := networkInstance.Delete(context.Background()); derr != nil {
+								switch derr.(type) {
+								case *fail.ErrNotFound:
+									// missing Network is considered as a successful deletion, continue
+									debug.IgnoreError(derr)
+								default:
+									cleanFailure = true
+									logrus.WithContext(context.Background()).Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
+										networkInstance.GetName())
+									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
+								}
+							} else {
+								logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
 									networkInstance.GetName())
-								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 							}
-						} else {
-							logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
-								networkInstance.GetName())
 						}
 					}
 				}
@@ -215,7 +217,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				logrus.Debugf("Cleaning up on failure, deleting Hosts...")
+				logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Hosts...")
 				var list []machineID
 
 				var nodemap map[uint]*propertiesv3.ClusterNode
@@ -262,7 +264,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 								_ = ferr.AddConsequence(tgerr)
 								abErr := tg.AbortWithCause(tgerr)
 								if abErr != nil {
-									logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 								}
 								cleanFailure = true
 								break
@@ -277,7 +279,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 						_ = ferr.AddConsequence(tgerr)
 					}
 				} else {
-					logrus.Warningf("As expected, metadata was a serious mistake")
+					logrus.Warningf("relying on metadata here was a mistake...")
 				}
 			}
 		}()
@@ -483,7 +485,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		chRes <- result{xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -676,7 +678,7 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 		}
 
 		chRes <- result{gatewaysDef, mastersDef, nodesDef, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -732,7 +734,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				return ar.rErr
 			}
 		} else {
-			logrus.Debugf("[Cluster %s] creating Network '%s'", req.Name, req.Name)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Network '%s'", req.Name, req.Name)
 			networkReq := abstract.NetworkRequest{
 				Name:          req.Name,
 				CIDR:          req.CIDR,
@@ -806,7 +808,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		}
 
 		// Creates Subnet
-		logrus.Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 		subnetReq := abstract.SubnetRequest{
 			Name:           req.Name,
 			NetworkID:      nid,
@@ -845,7 +847,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			switch xerr.(type) {
 			case *fail.ErrInvalidRequest:
 				// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
-				logrus.Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
+				logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 				_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
 				err = debug.InjectPlannedError(err)
 				if err != nil {
@@ -879,7 +881,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 					chRes <- ar
 					return ar.rErr
 				}
-				logrus.Infof(
+				logrus.WithContext(ctx).Infof(
 					"CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.",
 					subnetReq.CIDR,
 				)
@@ -954,7 +956,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			return xerr
 		}
 
-		logrus.Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
 		chRes <- result{networkInstance, subnetInstance, nil}
 		return nil
 	}() // nolint
@@ -1022,7 +1024,7 @@ func (instance *Cluster) createHostResources(
 								"cleaning up on failure, failed to abort Task/TaskGroup %s spawn by createHostResources()",
 								reflect.TypeOf(v).String(), taskID(v),
 							)
-							logrus.Error(cleanErr.Error())
+							logrus.WithContext(ctx).Error(cleanErr.Error())
 							_ = ferr.AddConsequence(cleanErr)
 						}
 					}
@@ -1210,7 +1212,7 @@ func (instance *Cluster) createHostResources(
 								)
 								abErr := tg.AbortWithCause(derr)
 								if abErr != nil {
-									logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 								}
 								break
 							}
@@ -1309,7 +1311,7 @@ func (instance *Cluster) createHostResources(
 								)
 								abErr := tg.AbortWithCause(derr)
 								if abErr != nil {
-									logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 								}
 								break
 							}
@@ -1354,7 +1356,7 @@ func (instance *Cluster) createHostResources(
 			chRes <- result{gatewayInstallStatus}
 			return gatewayInstallStatus
 		}
-		logrus.Debugf("gateway install returned: %v", gatewayInstallResult)
+		logrus.WithContext(ctx).Debugf("gateway install returned: %v", gatewayInstallResult)
 
 		var masterCreationResult concurrency.TaskGroupResult
 		if masterCreationResult, mastersStatus = mastersCreateTasks.WaitGroup(); mastersStatus != nil {
@@ -1362,7 +1364,7 @@ func (instance *Cluster) createHostResources(
 			chRes <- result{mastersStatus}
 			return mastersStatus
 		}
-		logrus.Debugf("master creation returned: %v", masterCreationResult)
+		logrus.WithContext(ctx).Debugf("master creation returned: %v", masterCreationResult)
 
 		// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
 		// Configure gateway(s) and waits for the result
@@ -1410,7 +1412,7 @@ func (instance *Cluster) createHostResources(
 			chRes <- result{gatewayConfigurationStatus}
 			return gatewayConfigurationStatus
 		}
-		logrus.Debugf("gateway cfg returned: %v", gatewayCfgResult)
+		logrus.WithContext(ctx).Debugf("gateway cfg returned: %v", gatewayCfgResult)
 
 		// Step 4: configure masters (if masters created successfully and gateways configured successfully)
 		mastersCfgTask, xerr := concurrency.NewTaskWithContext(
@@ -1427,7 +1429,7 @@ func (instance *Cluster) createHostResources(
 			chRes <- result{mastersStatus}
 			return mastersStatus
 		}
-		logrus.Debug("masters finished configuration")
+		logrus.WithContext(ctx).Debugf("masters finished configuration")
 
 		// Step 5: awaits nodes creation
 		var privateNodesResult concurrency.TaskGroupResult
@@ -1436,7 +1438,7 @@ func (instance *Cluster) createHostResources(
 			chRes <- result{privateNodesStatus}
 			return privateNodesStatus
 		}
-		logrus.Debugf("private node creation returned: %v", privateNodesResult)
+		logrus.WithContext(ctx).Debugf("private node creation returned: %v", privateNodesResult)
 
 		// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
 		privateNodesCfgTask, xerr := concurrency.NewTaskGroupWithContext(
@@ -1561,7 +1563,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		if xerr != nil {
 			switch xerr.(type) { // nolint
 			case *fail.ErrDuplicate: // A host already started is considered as a successful run
-				logrus.Tracef("host duplicated, start considered as a success")
+				logrus.WithContext(ctx).Tracef("host duplicated, start considered as a success")
 				debug.IgnoreError(xerr)
 				chRes <- result{nil, nil}
 				return
@@ -1588,7 +1590,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 
 		_, xerr = hostInstance.ForceGetState(ctx)
 		chRes <- result{nil, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1636,7 +1638,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 		if xerr != nil {
 			switch xerr.(type) { // nolint
 			case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
-				logrus.Tracef("host duplicated, stopping considered as a success")
+				logrus.WithContext(ctx).Tracef("host duplicated, stopping considered as a success")
 				debug.IgnoreError(xerr)
 				chRes <- result{nil, nil}
 				return
@@ -1655,7 +1657,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 
 		_, xerr = hostInstance.ForceGetState(ctx)
 		chRes <- result{nil, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1702,10 +1704,8 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Host")}
 			return
 		}
-		variables := p.variables
-		if variables == nil {
-			variables = data.Map{}
-		}
+
+		variables, _ := data.FromMap(p.variables)
 		hostLabel := p.host.GetName()
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
@@ -1717,7 +1717,7 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 			return
 		}
 
-		logrus.Debugf("[%s] starting installation...", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] starting installation...", hostLabel)
 
 		_, xerr = p.host.WaitSSHReady(ctx, timings.HostOperationTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1742,9 +1742,9 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 			return
 		}
 
-		logrus.Debugf("[%s] preparation successful", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] preparation successful", hostLabel)
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1799,7 +1799,7 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
-		logrus.Debugf("[%s] starting configuration...", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
 
 		makers := instance.localCache.makers
 		if makers.ConfigureGateway != nil {
@@ -1811,9 +1811,9 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 			}
 		}
 
-		logrus.Debugf("[%s] configuration successful in [%s].", p.Host.GetName(), tracer.Stopwatch().String())
+		logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", p.Host.GetName(), tracer.Stopwatch().String())
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -1876,7 +1876,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 		clusterName := instance.GetName()
 
 		if p.count == 0 {
-			logrus.Debugf("[Cluster %s] no masters to create.", clusterName)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] no masters to create.", clusterName)
 			chRes <- result{nil, nil}
 			return
 		}
@@ -1887,7 +1887,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 			return
 		}
 
-		logrus.Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
+		logrus.WithContext(ctx).Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
 		timeout := 3 * timings.HostCreationTimeout()
 		var collectedErs []error
@@ -1909,7 +1909,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 				collectedErs = append(collectedErs, ierr)
 				abErr := tg.AbortWithCause(ierr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -1920,7 +1920,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if withTimeout(xerr) {
-				logrus.Warnf("Timeouts creating masters !!")
+				logrus.WithContext(ctx).Warnf("Timeouts creating masters !!")
 			}
 			rerr := fail.NewError("[Cluster %s] failed to create master(s): %s", clusterName, xerr)
 			if len(collectedErs) != 0 {
@@ -1937,9 +1937,9 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 			return
 		}
 
-		logrus.Debugf("[Cluster %s] masters creation successful: %v", clusterName, tr)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] masters creation successful: %v", clusterName, tr)
 		chRes <- result{tr, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -2011,7 +2011,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		defer tracer.Exiting()
 
 		hostLabel := fmt.Sprintf("master #%d", p.index)
-		logrus.Debugf("[%s] starting master Host creation...", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] starting master Host creation...", hostLabel)
 
 		// First creates master in metadata, to keep track of its tried creation, in case of failure
 		var nodeIdx uint
@@ -2212,7 +2212,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 			return xerr
 		}
 
-		logrus.Debugf("[%s] Master creation successful.", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] Master creation successful.", hostLabel)
 		chRes <- result{hostInstance, nil}
 		return nil
 	}() // nolint
@@ -2238,7 +2238,7 @@ func withTimeout(xerr fail.Error) bool {
 	if elist, ok := xerr.(*fail.ErrorList); ok {
 		for _, each := range elist.ToErrorSlice() {
 			if ato, isTout := each.(*fail.ErrTimeout); isTout {
-				logrus.Warnf("Found a tg timeout: %v", ato)
+				logrus.WithContext(context.Background()).Warnf("Found a tg timeout: %v", ato)
 				result = true
 			}
 		}
@@ -2270,12 +2270,12 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			logrus.Debugf(
+			logrus.WithContext(ctx).Debugf(
 				"[Cluster %s] Masters configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		} else {
-			logrus.Debugf(
+			logrus.WithContext(ctx).Debugf(
 				"[Cluster %s] Masters configuration successful in [%s].", instance.GetName(),
 				temporal.FormatDuration(time.Since(started)),
 			)
@@ -2295,14 +2295,11 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 			chRes <- result{nil, fail.InconsistentError("failed to cast 'params' to 'taskConfiguraMastersParameters'")}
 			return
 		}
-		variables := p.variables
-		if variables != nil {
-			variables = data.Map{}
-		}
+		variables, _ := data.FromMap(p.variables)
 		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
-		logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
+		logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", instance.GetName())
 
 		masters, xerr := instance.unsafeListMasters(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2344,7 +2341,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 				loadErrors = append(loadErrors, xerr)
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -2363,7 +2360,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 				taskErrors = append(taskErrors, xerr)
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -2374,7 +2371,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if withTimeout(xerr) {
-				logrus.Warnf("Timeouts configuring masters !!")
+				logrus.WithContext(ctx).Warnf("Timeouts configuring masters !!")
 			}
 			rerr := fail.NewError("[Cluster %s] failed to configure master(s): %s", instance.GetName(), xerr)
 			if len(loadErrors) != 0 {
@@ -2395,9 +2392,9 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 			return
 		}
 
-		logrus.Debugf("[Cluster %s] masters configuration successful: %v", instance.GetName(), tr)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful: %v", instance.GetName(), tr)
 		chRes <- result{tr, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -2432,6 +2429,9 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	type result struct {
 		rTr  concurrency.TaskResult
 		rErr fail.Error
@@ -2456,18 +2456,12 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 			return
 		}
 
-		variables := p.variables
-		if variables == nil {
-			variables = data.Map{}
-		}
-
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
-		defer tracer.Exiting()
+		variables, _ := data.FromMap(p.variables)
 
 		started := time.Now()
 
 		hostLabel := fmt.Sprintf("master #%d (%s)", p.Index, p.Host.GetName())
-		logrus.Debugf("[%s] starting configuration...", hostLabel) // FIXME: OPP Bad index
+		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
 
 		// install docker feature (including docker-compose)
 		xerr = instance.installDocker(ctx, p.Host, hostLabel, variables)
@@ -2487,14 +2481,14 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 				return
 			}
 
-			logrus.Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
+			logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
 			chRes <- result{nil, nil}
 			return
 		}
 
 		// Not finding a callback isn't an error, so return nil in this case
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -2556,11 +2550,11 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		clusterName := instance.GetName()
 
 		if p.count == 0 {
-			logrus.Debugf("[Cluster %s] no nodes to create.", clusterName)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] no nodes to create.", clusterName)
 			chRes <- result{nil, nil}
 			return
 		}
-		logrus.Debugf("[Cluster %s] creating %d node%s...", clusterName, p.count, strprocess.Plural(p.count))
+		logrus.WithContext(ctx).Debugf("[Cluster %s] creating %d node%s...", clusterName, p.count, strprocess.Plural(p.count))
 
 		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2584,7 +2578,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 			if xerr != nil {
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -2594,16 +2588,16 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if withTimeout(xerr) {
-				logrus.Warnf("Timeouts creating nodes !!")
+				logrus.WithContext(ctx).Warnf("Timeouts creating nodes !!")
 			}
 			rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
 			chRes <- result{nil, rerr}
 			return
 		}
 
-		logrus.Debugf("[Cluster %s] %d node%s creation successful.", clusterName, p.count, strprocess.Plural(p.count))
+		logrus.WithContext(ctx).Debugf("[Cluster %s] %d node%s creation successful.", clusterName, p.count, strprocess.Plural(p.count))
 		chRes <- result{tr, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -2676,7 +2670,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		defer tracer.Exiting()
 
 		hostLabel := fmt.Sprintf("node #%d", p.index)
-		logrus.Debugf(tracer.TraceMessage("[%s] starting Host creation...", hostLabel))
+		logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] starting Host creation...", hostLabel))
 
 		// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
 		var nodeIdx uint
@@ -2814,7 +2808,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			return xerr
 		}
 
-		logrus.Debugf(tracer.TraceMessage("[%s] Host updating cluster metadata...", hostLabel))
+		logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host updating cluster metadata...", hostLabel))
 
 		// -- update cluster metadata --
 		var node *propertiesv3.ClusterNode
@@ -2914,7 +2908,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			}
 		}()
 
-		logrus.Debugf(tracer.TraceMessage("[%s] Host installing node requirements...", hostLabel))
+		logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host installing node requirements...", hostLabel))
 
 		xerr = instance.installNodeRequirements(ctx, clusternodetype.Node, hostInstance, hostLabel)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2923,7 +2917,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			return xerr
 		}
 
-		logrus.Debugf("[%s] Node creation successful.", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] Node creation successful.", hostLabel)
 		chRes <- result{node, nil}
 		return nil
 	}() // nolint
@@ -2959,30 +2953,26 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	if !ok {
 		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfigureNodesParameters'")
 	}
-	variables := p.variables
-	if variables == nil {
-		variables = data.Map{}
-	}
+	variables, _ := data.FromMap(p.variables)
+	inctx := task.Context()
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	started := time.Now()
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			logrus.Debugf(
+			logrus.WithContext(ctx).Debugf(
 				"[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		} else {
-			logrus.Debugf(
+			logrus.WithContext(ctx).Debugf(
 				"[Cluster %s] Nodes configuration successful in [%s].", instance.GetName(),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		}
 	}()
-
-	inctx := task.Context()
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
 
 	type result struct {
 		rTr  concurrency.TaskResult
@@ -3007,7 +2997,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 			return
 		}
 
-		logrus.Debugf("[Cluster %s] configuring nodes...", clusterName)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] configuring nodes...", clusterName)
 
 		var (
 			startErrs []error
@@ -3044,7 +3034,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 				startErrs = append(startErrs, xerr)
 				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -3055,7 +3045,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if withTimeout(xerr) {
-				logrus.Warnf("Timeouts configuring nodes !!")
+				logrus.WithContext(ctx).Warnf("Timeouts configuring nodes !!")
 			}
 			rerr := fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), xerr)
 			if len(startErrs) > 0 {
@@ -3072,9 +3062,9 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 			return
 		}
 
-		logrus.Debugf("[Cluster %s] nodes configuration successful: %v", clusterName, tgr)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] nodes configuration successful: %v", clusterName, tgr)
 		chRes <- result{tgr, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3126,16 +3116,13 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Node")}
 			return
 		}
-		variables := p.variables
-		if variables == nil {
-			variables = data.Map{}
-		}
+		variables, _ := data.FromMap(p.variables)
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.index, p.node.Name).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
 		hostLabel := fmt.Sprintf("node #%d (%s)", p.index, p.node.Name)
-		logrus.Debugf("[%s] starting configuration...", hostLabel) // FIXME: OPP Bad index
+		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
 
 		hostInstance, xerr := LoadHost(ctx, instance.Service(), p.node.ID)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -3162,14 +3149,14 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 		xerr = makers.ConfigureNode(instance, p.index, hostInstance)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Error(xerr.Error())
+			logrus.WithContext(ctx).Error(xerr.Error())
 			chRes <- result{nil, xerr}
 			return
 		}
 
-		logrus.Debugf("[%s] configuration successful.", hostLabel)
+		logrus.WithContext(ctx).Debugf("[%s] configuration successful.", hostLabel)
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3222,7 +3209,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				logrus.Tracef("Node %s not found, deletion considered successful", node.Name)
+				logrus.WithContext(ctx).Tracef("Node %s not found, deletion considered successful", node.Name)
 				chRes <- result{nil, nil}
 				return
 			default:
@@ -3233,7 +3220,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 
 		xerr = deleteHostOnFailure(ctx, hostInstance)
 		chRes <- result{nil, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3296,13 +3283,13 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 			nodeName = p.node.ID
 		}
 
-		logrus.Debugf("Deleting Node '%s'", nodeName)
+		logrus.WithContext(ctx).Debugf("Deleting Node '%s'", nodeName)
 		xerr = instance.deleteNode(ctx, p.node, p.master)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				logrus.Debugf("Node %s not found, deletion considered successful", nodeName)
+				logrus.WithContext(ctx).Debugf("Node %s not found, deletion considered successful", nodeName)
 				chRes <- result{nil, nil}
 				return
 			default:
@@ -3311,9 +3298,9 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 			}
 		}
 
-		logrus.Debugf("Successfully deleted Node '%s'", nodeName)
+		logrus.WithContext(ctx).Debugf("Successfully deleted Node '%s'", nodeName)
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3361,17 +3348,17 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 			return
 		}
 
-		nodeName := p.node.Name
-		if nodeName == "" {
-			nodeName = p.node.ID
+		nodeRef := p.node.Name
+		if nodeRef == "" {
+			nodeRef = p.node.ID
 		}
 
-		host, xerr := LoadHost(ctx, instance.Service(), nodeName)
+		host, xerr := LoadHost(ctx, instance.Service(), nodeRef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				logrus.Tracef("Master %s not found, deletion considered successful", p.node.Name)
+				logrus.WithContext(ctx).Tracef("Master %s not found, deletion considered successful", p.node.Name)
 				chRes <- result{nil, nil}
 				return
 			default:
@@ -3380,13 +3367,13 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 			}
 		}
 
-		logrus.Debugf("Deleting Master '%s'", p.node.Name)
+		logrus.WithContext(ctx).Debugf("Deleting Master '%s'", p.node.Name)
 		xerr = instance.deleteMaster(ctx, host)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				logrus.Debugf("Master %s not found, deletion considered successful", p.node.Name)
+				logrus.WithContext(ctx).Debugf("Master %s not found, deletion considered successful", p.node.Name)
 				chRes <- result{nil, nil}
 				return
 			default:
@@ -3395,9 +3382,9 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 			}
 		}
 
-		logrus.Debugf("Successfully deleted Master '%s'", p.node.Name)
+		logrus.WithContext(ctx).Debugf("Successfully deleted Master '%s'", p.node.Name)
 		chRes <- result{nil, nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3441,7 +3428,7 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 		}
 
 		chRes <- result{nil, deleteHostOnFailure(ctx, casted.host)}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3458,21 +3445,21 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 func deleteHostOnFailure(ctx context.Context, instance resources.Host) fail.Error {
 	prefix := "Cleaning up on failure, "
 	hostName := instance.GetName()
-	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
+	logrus.WithContext(ctx).Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 
 	xerr := instance.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Tracef("Host %s not found, deletion considered successful", hostName)
+			logrus.WithContext(ctx).Tracef("Host %s not found, deletion considered successful", hostName)
 			return nil
 		default:
 			return xerr
 		}
 	}
 
-	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
+	logrus.WithContext(ctx).Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
 	return nil
 }
 
@@ -3511,7 +3498,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task,
 
 		xerr := instance.updateClusterInventoryMaster(ctx, casted.master, casted.inventoryData)
 		chRes <- result{nil, xerr}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:
@@ -3613,7 +3600,7 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 		}
 
 		chRes <- result{nil}
-		return // nolint
+
 	}()
 	select {
 	case res := <-chRes:

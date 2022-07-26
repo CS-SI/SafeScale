@@ -18,7 +18,6 @@ package metadataupgrade
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
@@ -26,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -103,22 +101,4 @@ func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.E
 	}
 
 	return nil
-}
-
-// BackupMetadata creates a tar.gz archive of svc metadata content, with current date/time in name
-func BackupMetadata(svc iaas.Service, filename string) fail.Error {
-	targetFilename := filename
-
-	svcName, xerr := svc.GetName()
-	if xerr != nil {
-		return xerr
-	}
-
-	if targetFilename == "" {
-		targetFilename = fmt.Sprintf("safescale.%s-metadata.backup", svcName)
-	}
-
-	logrus.Warnf("trying to backup metadata into %s", targetFilename)
-
-	return fail.NotImplementedError() // FIXME: Technical debt
 }

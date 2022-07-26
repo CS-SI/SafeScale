@@ -91,7 +91,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		operatorUsername, ok = operatorUsernameIf.(string)
 		if ok {
 			if operatorUsername == "" {
-				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				logrus.WithContext(context.Background()).Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
 				operatorUsername = abstract.DefaultUser
 			}
 		}

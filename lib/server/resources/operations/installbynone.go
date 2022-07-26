@@ -81,7 +81,7 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	xerr = w.CanProceed(ctx, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Error(xerr.Error())
+		logrus.WithContext(ctx).Error(xerr.Error())
 		return nil, xerr
 	}
 
@@ -115,7 +115,7 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	xerr = w.CanProceed(ctx, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Error(xerr.Error())
+		logrus.WithContext(ctx).Error(xerr.Error())
 		return nil, xerr
 	}
 

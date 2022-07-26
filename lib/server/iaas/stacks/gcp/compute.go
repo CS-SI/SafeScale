@@ -50,7 +50,7 @@ func (s stack) ListImages(ctx context.Context, _ bool) (out []*abstract.Image, f
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	resp, xerr := s.rpcListImages(ctx)
 	if xerr != nil {
@@ -83,7 +83,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	resp, xerr := s.rpcGetImageByID(ctx, id)
 	if xerr != nil {
@@ -101,7 +101,7 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) (templates []*abstract
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	resp, xerr := s.rpcListMachineTypes(ctx)
 	if xerr != nil {
@@ -137,7 +137,7 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (_ *abstract.Host
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	resp, xerr := s.rpcGetMachineType(ctx, id)
 	if xerr != nil {
@@ -159,7 +159,7 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	return abstract.NewKeyPair(name)
 }
@@ -186,7 +186,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
 
 	resourceName := request.ResourceName
@@ -235,7 +235,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 	userData := userdata.NewContent()
 	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return nil, nil, xerr
 	}
 
@@ -279,7 +279,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 		diskSize = 10
 	}
 
-	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
+	logrus.WithContext(ctx).Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
 	// Select usable availability zone, the first one in the list
 	if s.GcpConfig.Zone == "" {
@@ -292,7 +292,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 			break
 		}
 		s.GcpConfig.Zone = az
-		logrus.Debugf("Selected Availability Zone: '%s'", az)
+		logrus.WithContext(ctx).Debugf("Selected Availability Zone: '%s'", az)
 	}
 
 	// Sets provider parameters to create ahf
@@ -303,7 +303,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 
 	// --- query provider for Host creation ---
 
-	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
+	logrus.WithContext(ctx).Debugf("requesting host '%s' resource creation...", request.ResourceName)
 
 	var ahf *abstract.HostFull
 	// Retry creation until success, for 10 minutes
@@ -324,14 +324,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 			// Starting from here, delete host if exiting with error, to be in good shape to retry
 			defer func() {
 				if innerXErr != nil {
-					hostName := ahf.GetName()
-					logrus.Debugf("Clean up on failure, deleting host '%s'", hostName)
-					if derr := s.DeleteHost(context.Background(), ahf); derr != nil {
-						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", hostName)
-						logrus.Errorf(strprocess.Capitalize(msg))
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
-					} else {
-						logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", hostName)
+					if ahf.IsConsistent() {
+						logrus.WithContext(ctx).Debugf("Clean up on failure, deleting host '%s'", ahf.GetName())
+						if derr := s.DeleteHost(context.Background(), ahf); derr != nil {
+							msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", ahf.GetName())
+							_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
+						} else {
+							logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", ahf.GetName())
+						}
 					}
 				}
 			}()
@@ -366,7 +366,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 		}
 	}
 
-	logrus.Debugf("Host '%s' created.", ahf.GetName())
+	logrus.WithContext(ctx).Debugf("Host '%s' created.", ahf.GetName())
 
 	// Add to abstract.HostFull data that does not come with creation data from provider
 	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to Host description
@@ -393,7 +393,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -497,7 +497,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 	if xerr != nil {
 		return nil, xerr
 	}
-	if !ahf.IsConsistent() {
+	if !(ahf.Core.ID != "" || ahf.Core.Name != "") {
 		return nil, fail.InvalidParameterError(
 			"hostParam",
 			"must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field",
@@ -766,30 +766,30 @@ func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gra
 
 // StartHost starts the host identified by id
 func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
+
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	return s.rpcStartInstance(ctx, ahf.Core.ID)
 }
 
 // RebootHost reboot the host identified by id
 func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
+
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	if xerr := s.rpcStopInstance(ctx, ahf.Core.ID); xerr != nil {
 		return xerr
@@ -800,6 +800,8 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 
 // GetHostState returns the host identified by id
 func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
 	if valid.IsNil(s) {
 		return hoststate.Error, fail.InvalidInstanceError()
 	}
@@ -816,12 +818,12 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
 	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	resp, xerr := s.rpcListZones(ctx)
 	if xerr != nil {
@@ -837,12 +839,12 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 
 // ListRegions ...
 func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
 	var emptySlice []string
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	resp, xerr := s.rpcListRegions(ctx)
 	if xerr != nil {
@@ -858,6 +860,8 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 
 // BindSecurityGroupToHost ...
 func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -885,16 +889,17 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 		return fail.ConvertError(err)
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	return s.rpcAddTagsToInstance(ctx, ahfid, []string{asgid})
 }
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
+
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
@@ -916,8 +921,6 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	return s.rpcRemoveTagsFromInstance(ctx, ahfid, []string{asgid})
 }

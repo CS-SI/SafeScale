@@ -302,7 +302,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 					return finnerXerr
 				}
 				if !strings.Contains(fstdout, md5hash) {
-					logrus.Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", target, fstdout, fstderr, md5hash)
+					logrus.WithContext(ctx).Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", target, fstdout, fstderr, md5hash)
 					return fail.NewError("wrong md5 of '%s'", target)
 				}
 				return nil
@@ -455,7 +455,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	defer func() {
 		rerr := utils.LazyRemove(f.Name())
 		if rerr != nil {
-			logrus.Debugf(rerr.Error())
+			logrus.WithContext(ctx).Debugf(rerr.Error())
 		}
 	}()
 
@@ -473,7 +473,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 				return innerXErr
 			}
 			if retcode != 0 && (stdout != "" || stderr != "") {
-				logrus.Debugf("Ignoring '%s' and '%s'", stdout, stderr)
+				logrus.WithContext(ctx).Debugf("Ignoring '%s' and '%s'", stdout, stderr)
 			}
 			if retcode == 1 && (strings.Contains(stderr, "lost connection") || strings.Contains(stdout, "lost connection")) {
 				problem := fail.NewError(stderr)

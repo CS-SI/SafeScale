@@ -126,7 +126,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 				NormalizeError,
 			)
 			if derr != nil {
-				logrus.Errorf("failed to delete Network '%s': %v", req.Name, derr)
+				logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
 				_ = ferr.AddConsequence(derr)
 			}
 		}
@@ -293,14 +293,14 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
 		NormalizeError,
 	)
 	if xerr != nil {
-		logrus.Errorf("failed to get Network '%s': %+v", id, xerr)
+		logrus.WithContext(ctx).Errorf("failed to get Network '%s': %+v", id, xerr)
 		return xerr
 	}
 
 	sns, xerr := s.ListSubnets(ctx, id)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to list Subnets of Network '%s'", network.Name)
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
 	if len(sns) > 0 {
@@ -315,7 +315,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
 	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to delete Network '%s'", network.Name)
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
 
@@ -718,7 +718,7 @@ func (s stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fa
 		return nil, xerr
 	}
 
-	logrus.Debugf("Openstack router '%s' (%s) successfully created", router.Name, router.ID)
+	logrus.WithContext(ctx).Debugf("Openstack router '%s' (%s) successfully created", router.Name, router.ID)
 	return &Router{
 		ID:        router.ID,
 		Name:      router.Name,

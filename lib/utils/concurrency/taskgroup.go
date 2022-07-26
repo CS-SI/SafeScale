@@ -792,6 +792,10 @@ func (instance *taskGroup) Abort() fail.Error {
 		return nil
 	}
 
+	for _, thing := range instance.children.tasks {
+		_ = thing.task.Abort()
+	}
+
 	if !instance.task.Aborted() {
 		xerr := instance.task.Abort()
 		if xerr != nil {

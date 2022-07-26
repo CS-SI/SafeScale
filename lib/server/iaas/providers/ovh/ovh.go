@@ -163,7 +163,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			return nil, fail.InconsistentError("'OperatorUsername' should be a string")
 		}
 		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			logrus.WithContext(context.Background()).Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
 			operatorUsername = abstract.DefaultUser
 		}
 	}
@@ -367,7 +367,7 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 	// check flavor availability through OVH-API
 	authOpts, err := p.GetAuthenticationOptions(ctx)
 	if err != nil {
-		logrus.Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
+		logrus.WithContext(context.Background()).Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")
@@ -377,7 +377,7 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, xerr := p.requestOVHAPI(ctx, restURL, "GET")
 	if xerr != nil {
-		logrus.Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
+		logrus.WithContext(context.Background()).Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
 		listAvailableTemplates = allTemplates
 	} else {
 		flavorMap := map[string]map[string]interface{}{}
@@ -411,7 +411,7 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 
 				listAvailableTemplates = append(listAvailableTemplates, template)
 			} else {
-				logrus.Debugf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
+				logrus.WithContext(context.Background()).WithContext(ctx).Warnf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
 			}
 		}
 	}

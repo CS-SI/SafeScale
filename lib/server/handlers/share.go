@@ -70,6 +70,11 @@ func (handler *shareHandler) Create(
 	shareName, hostName, apath string, options string, /*securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (share resources.Share, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -91,7 +96,7 @@ func (handler *shareHandler) Create(
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	shareInstance, xerr := sharefactory.New(handler.job.Service())
 	if xerr != nil {
@@ -108,6 +113,11 @@ func (handler *shareHandler) Create(
 
 // Delete a share from host
 func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -123,7 +133,7 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	shareInstance, xerr := sharefactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -135,6 +145,11 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 
 // List return the list of all shares from all servers
 func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.HostShare, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -147,7 +162,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
 	objs, xerr := sharefactory.New(svc)
@@ -194,6 +209,11 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 
 // Mount a share on a local directory of a host
 func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bool) (mount *propertiesv1.HostRemoteMount, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -215,7 +235,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// Retrieve info about the share
 	svc := handler.job.Service()
@@ -235,6 +255,11 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 // Unmount a share from local directory of a host
 func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -253,7 +278,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
@@ -273,6 +298,11 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 // Inspect returns the host and share corresponding to 'shareName'
 // If share isn't found, return (nil, nil, nil, utils.ErrNotFound)
 func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -288,7 +318,7 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, fe
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	return sharefactory.Load(handler.job.Context(), handler.job.Service(), shareRef)
 }

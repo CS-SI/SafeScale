@@ -43,8 +43,8 @@ type TemplateListener struct {
 
 // List available templates
 func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateListRequest) (_ *protocol.TemplateList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list templates")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list templates")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -65,7 +65,7 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 
 	tracer := debug.NewTracer(ctx, true, "(scannedOnly=%v, all=%v)", scannedOnly, all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewTemplateHandler(job)
 	originalList, xerr := handler.List(all)
@@ -83,8 +83,8 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 
 // Match lists templates that match the sizing
 func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMatchRequest) (tl *protocol.TemplateList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list templates")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list templates")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -103,7 +103,7 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "%s", sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	ahsr, _, xerr := converters.HostSizingRequirementsFromStringToAbstract(sizing)
 	if xerr != nil {
@@ -126,8 +126,8 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 
 // Inspect returns information about a tenant
 func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(&ferr)
-	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -149,7 +149,7 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewTemplateHandler(job)
 	at, xerr := handler.Inspect(ref)

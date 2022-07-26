@@ -42,8 +42,8 @@ type SecurityGroupListener struct {
 
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.SecurityGroupListRequest) (_ *protocol.SecurityGroupListResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list security groups")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list security groups")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -62,7 +62,7 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	list, xerr := handler.List(all)
@@ -80,8 +80,8 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 
 // Create creates a new Security Group
 func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.SecurityGroupCreateRequest) (_ *protocol.SecurityGroupResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create security group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot create security group")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -104,7 +104,7 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "('%s', '%s')", networkRefLabel, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.GetRules())
 	if xerr != nil {
@@ -123,8 +123,8 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 
 // Clear calls the clear method to remove all rules from a security group
 func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot clear Security Group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot clear Security Group")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -152,7 +152,7 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	xerr = handler.Clear(ref)
@@ -166,8 +166,8 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 
 // Reset clears the rules of a security group and readds the ones stored in metadata
 func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot reset Security Group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot reset Security Group")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -194,7 +194,7 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	xerr = handler.Reset(ref)
@@ -208,8 +208,8 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 
 // Inspect a host
 func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Reference) (_ *protocol.SecurityGroupResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect security group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot inspect security group")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -236,7 +236,7 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	sgInstance, xerr := handler.Inspect(ref)
@@ -249,8 +249,8 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 
 // Delete a host
 func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.SecurityGroupDeleteRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete Security Group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete Security Group")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -278,7 +278,7 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	xerr = handler.Delete(sgRef, in.GetForce())
@@ -292,8 +292,8 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 
 // AddRule creates a new rule and add it to an existing security group
 func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.SecurityGroupRuleRequest) (sgr *protocol.SecurityGroupResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot add rule to security group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot add rule to security group")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -324,7 +324,7 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	sgInstance, xerr := handler.AddRule(sgRef, rule)
@@ -338,8 +338,8 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 
 // DeleteRule deletes a rule identified by id from a security group
 func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.SecurityGroupRuleDeleteRequest) (_ *protocol.SecurityGroupResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete rule from security group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete rule from security group")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -370,7 +370,7 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	sgInstance, xerr := handler.DeleteRule(ref, rule)
@@ -384,8 +384,8 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata
 func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot sanitize security group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot sanitize security group")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -412,15 +412,15 @@ func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Ref
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	return empty, fail.NotImplementedError("not yet implemented") // FIXME: Technical debt
 }
 
 // Bonds lists the resources bound to the Security Group
 func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.SecurityGroupBondsRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list bonds of Security Group")
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot list bonds of Security Group")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -456,7 +456,7 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(ctx, job.Service(), ref)
 	if xerr != nil {
