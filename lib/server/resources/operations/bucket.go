@@ -156,10 +156,10 @@ func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources
 					if ok {
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Bucket")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Bucket")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 

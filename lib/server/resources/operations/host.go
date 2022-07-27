@@ -149,10 +149,10 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 						incrementExpVar("newhost.cache.hit")
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Host")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 
@@ -197,10 +197,10 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 						incrementExpVar("newhost.cache.hit")
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Host")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 
 			}
@@ -669,13 +669,13 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 				return fail.ConvertError(err)
 			}
 			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-		} else {
-			if casted, ok := thing.(*Host); !ok {
-				return fail.NewError("cache stored the wrong type")
-			} else {
+		} else if _, ok := thing.(*Host); !ok {
+			return fail.NewError("cache stored the wrong type")
+			/* else {
 				dumped, _ := casted.Sdump(ctx)
 				logrus.Warningf("In the cache we got: %s", dumped)
 			}
+			*/
 		}
 	}
 
@@ -688,7 +688,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 
 		changed := false
 		if ahc.LastState != ahf.CurrentState {
-			logrus.Warningf("Owerwriting current state %s with last state %s", ahf.CurrentState.String(), ahc.LastState.String())
+			// logrus.Warningf("Owerwriting current state %s with last state %s", ahf.CurrentState.String(), ahc.LastState.String())
 			ahf.CurrentState = ahc.LastState
 			changed = true
 		}
@@ -1137,7 +1137,7 @@ func (instance *Host) implCreate(
 			if ferr != nil {
 				if ahf.IsConsistent() {
 					if ahf.Core.LastState != hoststate.Deleted {
-						logrus.Warningf("Marking instance '%s' as FAILED", ahf.GetName())
+						logrus.WithContext(context.Background()).Warnf("Marking instance '%s' as FAILED", ahf.GetName())
 						derr := instance.Alter(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 							ahc, ok := clonable.(*abstract.HostCore)
 							if !ok {
@@ -1153,7 +1153,7 @@ func (instance *Host) implCreate(
 						if derr != nil {
 							_ = ferr.AddConsequence(derr)
 						} else {
-							logrus.Warningf("Instance now should be in FAILED state")
+							logrus.WithContext(context.Background()).Warnf("Instance now should be in FAILED state")
 						}
 					}
 				}

@@ -149,10 +149,10 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 					if ok {
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Network")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Network")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 

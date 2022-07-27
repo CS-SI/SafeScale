@@ -6,7 +6,6 @@ import (
 
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
 )
 
 type wrappedCache struct {
@@ -26,9 +25,11 @@ func (w *wrappedCache) Get(ctx context.Context, key interface{}) (interface{}, e
 	defer w.mu.RUnlock()
 
 	val, xerr := w.cacheManager.Get(ctx, key)
-	if xerr == nil {
-		logrus.Warningf("Returning host %s in %p, %p", key, val, &val)
-	}
+	/*
+		if xerr == nil {
+			logrus.Warningf("Returning host %s in %p, %p", key, val, &val)
+		}
+	*/
 	return val, xerr
 }
 
@@ -41,7 +42,7 @@ func (w *wrappedCache) Set(ctx context.Context, key, object interface{}, options
 		return nil
 	}
 
-	logrus.Warningf("Registering host %s in %p, %p, type %T", key, object, &object, object)
+	// logrus.Warningf("Registering host %s in %p, %p, type %T", key, object, &object, object)
 	return w.cacheManager.Set(ctx, key, object, options)
 }
 

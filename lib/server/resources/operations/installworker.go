@@ -1297,7 +1297,6 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			}
 
 			for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
-				sorrow := time.Now()
 				primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1415,7 +1414,6 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 					chRes <- result{xerr}
 					return
 				}
-				logrus.Warningf("Bottleneck is %s", time.Since(sorrow)) // FIXME: OPP Remove this
 			}
 		}
 		chRes <- result{nil}

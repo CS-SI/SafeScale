@@ -379,14 +379,14 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
 					if innerErr := instance.service.ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
 						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
-						logrus.WithContext(ctx).Warningf(innerErr.Error())
+						logrus.WithContext(ctx).Warnf(innerErr.Error())
 						return innerErr
 					}
 
 					if !bytes.Equal(data, target.Bytes()) {
 						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
 						innerErr := fail.NewError("remote content is different from local reference")
-						logrus.WithContext(ctx).Warningf(innerErr.Error())
+						logrus.WithContext(ctx).Warnf(innerErr.Error())
 						return innerErr
 					}
 
@@ -439,7 +439,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 	}
 
 	if iterations > 1 {
-		logrus.WithContext(ctx).Warningf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+		logrus.WithContext(ctx).Warnf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	} else {
 		logrus.WithContext(ctx).Debugf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	}
