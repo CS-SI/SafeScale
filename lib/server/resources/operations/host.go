@@ -669,10 +669,8 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 				return fail.ConvertError(err)
 			}
 			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-		} else {
-			if _, ok := thing.(*Host); !ok {
-				return fail.NewError("cache stored the wrong type")
-			}
+		} else if _, ok := thing.(*Host); !ok {
+			return fail.NewError("cache stored the wrong type")
 			/* else {
 				dumped, _ := casted.Sdump(ctx)
 				logrus.Warningf("In the cache we got: %s", dumped)
