@@ -40,7 +40,7 @@ func AddRuleToExistingSecurityGroup(t *testing.T) {
 }
 
 func OpenPortClosedByDefaultInGateway(t *testing.T) {
-	names := helpers.GetNames("BasicTest", 0, 0, 0, 0, 1, 0, 0, 0)
+	names := helpers.GetNames("sgtest", 0, 0, 0, 0, 1, 0, 0, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -85,10 +85,12 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	pubip, err := helpers.RunJq(out, ".result.public_ip")
 	require.Nil(t, err)
 
+	fmt.Printf("Checking closed port http://%s:7777\n", pubip)
 	// the port is initially closed
 	_, err = http.Get(fmt.Sprintf("http://%s:7777", pubip))
 	require.NotNil(t, err)
 
+	fmt.Println("Listing security groups")
 	out, err = helpers.GetOutput(fmt.Sprintf("safescale host security group list %s", tn))
 	require.Nil(t, err)
 	fmt.Println(out)
@@ -104,6 +106,11 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	}
 
 	theID, err := helpers.RunJq(out, good)
+	require.Nil(t, err)
+
+	// inspect before the drama
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group inspect %s %s", tn, theID))
+	fmt.Println(out)
 	require.Nil(t, err)
 
 	// after that it should be open
