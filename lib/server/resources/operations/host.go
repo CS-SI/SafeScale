@@ -670,12 +670,14 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 			}
 			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 		} else {
-			if casted, ok := thing.(*Host); !ok {
+			if _, ok := thing.(*Host); !ok {
 				return fail.NewError("cache stored the wrong type")
-			} else {
+			}
+			/* else {
 				dumped, _ := casted.Sdump(ctx)
 				logrus.Warningf("In the cache we got: %s", dumped)
 			}
+			*/
 		}
 	}
 
@@ -688,7 +690,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 
 		changed := false
 		if ahc.LastState != ahf.CurrentState {
-			logrus.Warningf("Owerwriting current state %s with last state %s", ahf.CurrentState.String(), ahc.LastState.String())
+			// logrus.Warningf("Owerwriting current state %s with last state %s", ahf.CurrentState.String(), ahc.LastState.String())
 			ahf.CurrentState = ahc.LastState
 			changed = true
 		}
@@ -1137,7 +1139,7 @@ func (instance *Host) implCreate(
 			if ferr != nil {
 				if ahf.IsConsistent() {
 					if ahf.Core.LastState != hoststate.Deleted {
-						logrus.Warningf("Marking instance '%s' as FAILED", ahf.GetName())
+						logrus.WithContext(context.Background()).Warnf("Marking instance '%s' as FAILED", ahf.GetName())
 						derr := instance.Alter(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 							ahc, ok := clonable.(*abstract.HostCore)
 							if !ok {
@@ -1153,7 +1155,7 @@ func (instance *Host) implCreate(
 						if derr != nil {
 							_ = ferr.AddConsequence(derr)
 						} else {
-							logrus.Warningf("Instance now should be in FAILED state")
+							logrus.WithContext(context.Background()).Warnf("Instance now should be in FAILED state")
 						}
 					}
 				}
