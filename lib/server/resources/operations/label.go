@@ -153,10 +153,10 @@ func LoadLabel(inctx context.Context, svc iaas.Service, ref string, options ...d
 					if ok {
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Label")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Label")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 

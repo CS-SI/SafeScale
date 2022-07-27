@@ -306,10 +306,10 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 					if ok {
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Subnet")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Subnet")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 

@@ -266,10 +266,10 @@ func LoadCluster(inctx context.Context, svc iaas.Service, name string, options .
 					chRes <- result{casted, nil}
 					return
 				} else {
-					logrus.WithContext(ctx).Warningf("wrong type of resources.Host")
+					logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 				}
 			} else {
-				logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+				logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 			}
 		}
 

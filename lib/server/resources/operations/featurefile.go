@@ -227,21 +227,31 @@ func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embed
 				return nil, fail.InconsistentError("nil value found in Feature cache for key '%s'", name)
 			}
 
-			// FIXME: Bad
 			if cache != nil {
-				_ = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, featureFileInstance.GetName()), featureFileInstance, &store.Options{Expiration: 1 * time.Minute})
-				hid, _ := featureFileInstance.GetID()
-				_ = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), featureFileInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, featureFileInstance.GetName()), featureFileInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				hid, err := featureFileInstance.GetID()
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), featureFileInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
 					casted, ok := val.(*FeatureFile)
 					if ok {
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.FeatureFile")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.FeatureFile")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 

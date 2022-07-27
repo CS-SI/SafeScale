@@ -149,10 +149,10 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 						incrementExpVar("newhost.cache.hit")
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Host")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
 
@@ -197,10 +197,10 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 						incrementExpVar("newhost.cache.hit")
 						return casted, nil
 					} else {
-						logrus.WithContext(ctx).Warningf("wrong type of resources.Host")
+						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 					}
 				} else {
-					logrus.WithContext(ctx).Warningf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 
 			}
