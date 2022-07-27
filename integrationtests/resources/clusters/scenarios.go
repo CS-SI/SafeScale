@@ -33,7 +33,7 @@ func ClusterK8S(t *testing.T) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := helpers.GetOutput("safescale -v -d cluster create + --cidr 192.168.200.0/24 --disable remotedesktop " + names.Clusters[0])
+	out, err := helpers.GetOutput("safescale -v -d cluster create --cidr 192.168.200.0/24 --disable remotedesktop " + names.Clusters[0])
 	require.Nil(t, err)
 	_ = out
 
