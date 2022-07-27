@@ -251,12 +251,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				return nil, xerr
 			}
 
-			var gwcfg api.Connector
-			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			gwConfig, xerr := gwcfg.Config()
+			gwConfig, xerr := gw.GetSSHConfig(task.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -296,12 +291,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				return nil, xerr
 			}
 
-			var gwcfg api.Connector
-			if gwcfg, xerr = gw.GetSSHConfig(task.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			gwConfig, xerr := gwcfg.Config()
+			gwConfig, xerr := gw.GetSSHConfig(task.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
