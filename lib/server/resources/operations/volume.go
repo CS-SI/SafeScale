@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/eko/gocache/v2/store"
@@ -727,7 +728,12 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				return deeperXErr
 			}
 
-			nfsServer, deeperXErr = nfs.NewServer(svc, sshConfig)
+			sshProfile, deeperXErr := sshfactory.NewConnector(sshConfig)
+			if deeperXErr != nil {
+				return deeperXErr
+			}
+
+			nfsServer, deeperXErr = nfs.NewServer(svc, sshProfile)
 			if deeperXErr != nil {
 				return deeperXErr
 			}
@@ -1069,8 +1075,13 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 				return innerXErr
 			}
 
+			sshProfile, innerXErr := sshfactory.NewConnector(sshConfig)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
 			// Create NFS Server instance
-			nfsServer, innerXErr := nfs.NewServer(svc, sshConfig)
+			nfsServer, innerXErr := nfs.NewServer(svc, sshProfile)
 			if innerXErr != nil {
 				return innerXErr
 			}

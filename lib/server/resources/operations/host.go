@@ -1993,7 +1993,13 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 		}
 
 		duration := time.Duration(sshDefaultTimeout) * time.Minute
-		sshProfile, xerr := instance.GetSSHConfig(ctx)
+		sshCfg, xerr := instance.GetSSHConfig(ctx)
+		if xerr != nil {
+			chRes <- result{"", xerr}
+			return
+		}
+
+		sshProfile, xerr := sshfactory.NewConnector(sshCfg)
 		if xerr != nil {
 			chRes <- result{"", xerr}
 			return
@@ -3053,7 +3059,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error 
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Connector, ferr fail.Error) {
+func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Config, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -3073,7 +3079,7 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Connector, fer
 	}
 	incrementExpVar("host.cache.hit")
 
-	return sshProfile, nil
+	return sshProfile.Config()
 }
 
 // Run tries to execute command 'cmd' on the Host
@@ -3159,7 +3165,12 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 
 	var stdout, stderr string
 	retcode := -1
-	sshProfile, xerr := instance.GetSSHConfig(ctx)
+	sshCfg, xerr := instance.GetSSHConfig(ctx)
+	if xerr != nil {
+		return retcode, stdout, stderr, xerr
+	}
+
+	sshProfile, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}

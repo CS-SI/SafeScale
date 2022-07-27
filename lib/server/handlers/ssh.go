@@ -256,8 +256,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				return nil, xerr
 			}
 
-			cfg, _ := gwcfg.Config()
-			thePort, _ := cfg.GetPort()
+			gwConfig, xerr := gwcfg.Config()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			thePort, _ := gwConfig.GetPort()
 
 			GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
 			sshConfig.GatewayConfig = GatewayConfig
@@ -297,8 +301,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				return nil, xerr
 			}
 
-			cfg, _ := gwcfg.Config()
-			thePort, _ := cfg.GetPort()
+			gwConfig, xerr := gwcfg.Config()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			thePort, _ := gwConfig.GetPort()
 
 			GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
 			sshConfig.SecondaryGatewayConfig = GatewayConfig
@@ -380,7 +388,12 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	}
 
 	// retrieve sshCfg config to perform some commands
-	sshCfg, xerr := host.GetSSHConfig(ctx)
+	sshConfig, xerr := host.GetSSHConfig(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	sshProfile, xerr := sshfactory.NewConnector(sshConfig)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -400,7 +413,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
 
-			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(sshCfg, cmd, timings.HostOperationTimeout())
+			aretCode, astdOut, astdErr, xerr := handler.runWithTimeout(sshProfile, cmd, timings.HostOperationTimeout())
 			if xerr != nil {
 				return xerr
 			}
