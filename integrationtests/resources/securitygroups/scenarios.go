@@ -87,7 +87,20 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 
 	fmt.Printf("Checking closed port http://%s:7777\n", pubip)
 	// the port is initially closed
-	_, err = http.Get(fmt.Sprintf("http://%s:7777", pubip))
+	resp, err := http.Get(fmt.Sprintf("http://%s:7777", pubip))
+	if resp != nil {
+		defer func(Body io.ReadCloser) {
+			_ = Body.Close()
+		}(resp.Body)
+
+		// make sure it works reading the content
+		body, err := ioutil.ReadAll(resp.Body)
+		require.Nil(t, err)
+		if strings.Contains(string(body), "miniserve") {
+			fmt.Println("We don't have a working firewall")
+			t.Errorf("We don't have a working firewall")
+		}
+	}
 	require.NotNil(t, err)
 
 	fmt.Println("Listing security groups")
@@ -114,12 +127,12 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	require.Nil(t, err)
 
 	// after that it should be open
-	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group rule add --direction ingress --port-from 7777 --port-to 7777 --cidr \"0.0.0.0/0\" --cidr \"0.0.0.0/0\" %s %s", tn, theID))
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group rule add --direction ingress --port-from 7777 --port-to 7777 --cidr \"0.0.0.0/0\" --cidr \"%s/32\" %s %s", pubip, tn, theID))
 	fmt.Println(out)
 	require.Nil(t, err)
 
 	// if it's open won't fail
-	resp, err := http.Get(fmt.Sprintf("http://%s:7777", pubip))
+	resp, err = http.Get(fmt.Sprintf("http://%s:7777", pubip))
 	require.Nil(t, err)
 
 	defer func(Body io.ReadCloser) {
