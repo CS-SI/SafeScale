@@ -18,10 +18,10 @@ SafeScale is an Infrastructure and Platform as Code tool.
 
 ## Table of content
   - [Description](#description)
-    - [SafeScale Infra](#safescale-safescale)
+    - [SafeScale Infra](#safescale-infra)
     - [SafeScale Platform](#safescale-platform)
     - [SafeScale Security](#safescale-security)
-  - [Currently available features](#currently-available-features)
+  - [Available features](#available-features)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -67,7 +67,7 @@ Platform can deploy a standard cluster with minimal features:
 For example the following command creates a Kubernetes cluster named `k8s-cluster`using `Normal`complexity (3 masters and 3 nodes):
 
 ```
-$ safescale platform create --flavor k8s --complexity nomal k8s-cluster
+$ safescale cluster create --flavor k8s --complexity Normal k8s-cluster
 ```
 
 Supplemental software and/or configurations can be installed in 2 ways on SafeScale Hosts or Clusters:
@@ -89,7 +89,7 @@ A `Feature` can describe operations using different methods:
 - `helm` (coming soon): uses helm chart, the "package" engine for Kubernetes
 - `ansible` (coming soon): defines playbook to run, SafeScale provising inventory
 
-Additionnaly, a `Feature` is able to apply:
+Additionally, a `Feature` is able to apply:
 - reverse proxy rules
 - Security Group rules
 
@@ -103,7 +103,7 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 The design of a SafeScale Security gateway can be depicted as below:
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
-## Currently available abilities
+## Available features
 SafeScale is currently under active development and does not yet offer all the abilities planned. However, we are already publishing it with the following ones:
 
   - SafeScale Infra:
