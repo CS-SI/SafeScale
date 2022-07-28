@@ -15,7 +15,7 @@ on:
       - 'release/**'
 
 env:
-  GOVERSION: '1.17.11' # The Go version to download (if necessary) and use.
+  GOVERSION: '1.17.12' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:

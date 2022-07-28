@@ -1,6 +1,6 @@
 module github.com/CS-SI/SafeScale/v22
 
-go 1.16
+go 1.17
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
