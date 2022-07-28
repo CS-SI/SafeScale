@@ -1,4 +1,4 @@
-# SafeScale: multicloud management platform
+# SafeScale: Infrastructure and Platform as Code tool
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/CS-SI/SafeScale/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/release/CS-SI/SafeScale.svg)](https://github.com/CS-SI/SafeScale/releases/latest)
