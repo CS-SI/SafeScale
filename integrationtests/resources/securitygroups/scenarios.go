@@ -31,12 +31,68 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func SecurityGroupLife(t *testing.T) {
-	// FIXME: implement this test
-}
+func GwFirewallWorks(t *testing.T) {
+	names := helpers.GetNames("sgtest", 0, 0, 0, 0, 1, 0, 0, 0)
+	names.TearDown()
+	defer names.TearDown()
 
-func AddRuleToExistingSecurityGroup(t *testing.T) {
-	// FIXME: implement this test
+	out, err := helpers.GetOutput("safescale network list")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating network " + names.Networks[0])
+
+	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	tn := fmt.Sprintf("gw-%s", names.Networks[0])
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale ssh run -c \"wget https://github.com/svenstaro/miniserve/releases/download/v0.20.0/miniserve-v0.20.0-x86_64-unknown-linux-musl -O miniserve\" %s", tn))
+	fmt.Println(out)
+	require.Contains(t, out, "miniserve")
+	require.Contains(t, out, "saved")
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale ssh run -c \"chmod u+x ./miniserve\" %s", tn))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale ssh run -c \"mkdir -p test\" %s", tn))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale ssh run -c \"sudo /usr/bin/killall miniserve\" %s", tn))
+	if !strings.Contains(out, "no process found") {
+		require.Nil(t, err)
+	}
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale ssh run -c \"nohup ./miniserve -p 7777 ./test > /dev/null 2>&1 &\" %s", tn))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale host inspect %s", tn))
+	require.Nil(t, err)
+	fmt.Println(out)
+
+	pubip, err := helpers.RunJq(out, ".result.public_ip")
+	require.Nil(t, err)
+
+	fmt.Printf("Checking closed port http://%s:7777\n", pubip)
+	// the port is initially closed
+	resp, err := http.Get(fmt.Sprintf("http://%s:7777", pubip))
+	if resp != nil {
+		defer func(Body io.ReadCloser) {
+			_ = Body.Close()
+		}(resp.Body)
+
+		// make sure it works reading the content
+		body, err := ioutil.ReadAll(resp.Body)
+		require.Nil(t, err)
+		if strings.Contains(string(body), "miniserve") {
+			fmt.Println("We don't have a working firewall")
+			t.Errorf("We don't have a working firewall")
+		}
+	}
 }
 
 func OpenPortClosedByDefaultInGateway(t *testing.T) {
