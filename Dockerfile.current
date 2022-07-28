@@ -7,7 +7,7 @@ ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
 ENV BRANCH_NAME develop
-ENV GOVERSION 1.16.15
+ENV GOVERSION 1.171.12
 ENV PROTOVERSION 3.17.3
 
 # -----------------
@@ -45,11 +45,11 @@ RUN python3 -c "print('testing UTF8: 👌')"
 WORKDIR /tmp
 
 # ----------------------
-# Install GO 1.16.15
+# Install GO 1.171.12
 # ----------------------
-RUN wget https://dl.google.com/go/go1.16.15.linux-amd64.tar.gz \
-&& tar -C /usr/local -xzf go1.16.15.linux-amd64.tar.gz \
-&& rm /tmp/go1.16.15.linux-amd64.tar.gz
+RUN wget https://dl.google.com/go/go1.171.12.linux-amd64.tar.gz \
+&& tar -C /usr/local -xzf go1.171.12.linux-amd64.tar.gz \
+&& rm /tmp/go1.171.12.linux-amd64.tar.gz
 ENV PATH /usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ----------------------
@@ -72,7 +72,7 @@ RUN cd /opt && ./build-safescale-local.sh
 
 # --
 
-FROM golang:1.16.15-alpine
+FROM golang:1.171.12-alpine
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
