@@ -22,20 +22,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// volume is the part of safescale client handing volumes
-type volume struct {
+// volumeConsumer is the part of safescale client handing volumes
+type volumeConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
 // List ...
-func (v volume) List(all bool, timeout time.Duration) (*protocol.VolumeListResponse, error) {
+func (v volumeConsumer) List(all bool, timeout time.Duration) (*protocol.VolumeListResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -57,7 +57,7 @@ func (v volume) List(all bool, timeout time.Duration) (*protocol.VolumeListRespo
 }
 
 // Inspect ...
-func (v volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
+func (v volumeConsumer) Inspect(name string, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -79,7 +79,7 @@ func (v volume) Inspect(name string, timeout time.Duration) (*protocol.VolumeIns
 }
 
 // Delete ...
-func (v volume) Delete(names []string, timeout time.Duration) error {
+func (v volumeConsumer) Delete(names []string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -106,7 +106,7 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 
 	volumeDeleter := func(aname string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
@@ -132,7 +132,7 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 }
 
 // Create ...
-func (v volume) Create(def *protocol.VolumeCreateRequest, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
+func (v volumeConsumer) Create(def *protocol.VolumeCreateRequest, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -154,7 +154,7 @@ func (v volume) Create(def *protocol.VolumeCreateRequest, timeout time.Duration)
 }
 
 // Attach ...
-func (v volume) Attach(def *protocol.VolumeAttachmentRequest, timeout time.Duration) error {
+func (v volumeConsumer) Attach(def *protocol.VolumeAttachmentRequest, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -178,7 +178,7 @@ func (v volume) Attach(def *protocol.VolumeAttachmentRequest, timeout time.Durat
 }
 
 // Detach ...
-func (v volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
+func (v volumeConsumer) Detach(volumeName string, hostName string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 

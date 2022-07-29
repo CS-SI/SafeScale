@@ -88,7 +88,8 @@ func TestMap_Replace(t *testing.T) {
 		"1": "second",
 		"2": "third",
 	}
-	m.Replace(&m1)
+	_, xerr := m.Replace(&m1)
+	require.Nil(t, xerr)
 	areEqual := reflect.DeepEqual(m, m1)
 	if !areEqual {
 		t.Error("Replace not restitute values")
@@ -210,7 +211,7 @@ func TestIndexedListOfStrings_KeysAndValues(t *testing.T) {
 	}
 	keys, values = v.KeysAndValues()
 	for i := range keys {
-		if keys[i] < 0 || keys[i] > 2 {
+		if /*keys[i] < 0 || (na, uint)*/ keys[i] > 2 {
 			t.Errorf("Unexpected index %d", keys[i])
 			t.Fail()
 		}
@@ -235,7 +236,7 @@ func TestIndexedListOfStrings_Keys(t *testing.T) {
 
 	keys = v.Keys()
 	for i := range keys {
-		if keys[i] < 0 || keys[i] > 2 {
+		if /* keys[i] < 0 || (na, uint) */ keys[i] > 2 {
 			t.Errorf("Unexpected index %d", keys[i])
 			t.Fail()
 		}

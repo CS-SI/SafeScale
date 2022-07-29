@@ -17,7 +17,6 @@
 package utils
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,9 +25,9 @@ import (
 func Test_GeneratePassword(t *testing.T) {
 
 	_, err := GeneratePassword(11)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be under 12"), true)
+	require.Contains(t, err.Error(), "cannot be under 12")
 
 	_, err = GeneratePassword(12)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }

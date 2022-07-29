@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +40,7 @@ type TaskGroupGuard interface {
 	WaitGroupFor(time.Duration) (bool, TaskGroupResult, fail.Error)
 }
 
-//go:generate minimock -o mocks/mock_taskgroup.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskGroup
+//go:generate minimock -o mocks/mock_taskgroup.go -i github.com/CS-SI/SafeScale/v22/lib/utils/concurrency.TaskGroup
 
 // TaskGroup is the task group interface
 type TaskGroup interface {
@@ -406,7 +406,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// instance.task.lock.RUnlock()
 
 			results, childrenErrors, waitingFailure := instance.waitChildren()
-			if waitingFailure != nil { // FIXME: Think how to react to that
+			if waitingFailure != nil { // TODO: Think how to react to that
 				logrus.Warnf(waitingFailure.Error())
 			}
 			instance.result = results
@@ -597,7 +597,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
 
 	// all children terminate, now recover results and errors
 	results, childrenErrors, waitingFailure := instance.waitChildren()
-	if waitingFailure != nil { // FIXME: Think how to react to that
+	if waitingFailure != nil { // TODO: Think how to react to that
 		logrus.Warnf(waitingFailure.Error())
 	}
 	instance.result = results

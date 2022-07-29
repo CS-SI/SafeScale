@@ -17,25 +17,26 @@
 package cloudferro
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 var (
@@ -50,11 +51,6 @@ type provider struct {
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
-}
-
-// New creates a new instance of cloudferro provider
-func New() providers.Provider {
-	return &provider{}
 }
 
 // IsNull returns true if the instance is considered as a null value
@@ -212,13 +208,13 @@ next:
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -231,13 +227,13 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 	if valid.IsNil(p) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -262,12 +258,12 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -276,12 +272,12 @@ func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error)
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
+func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)
+	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -309,7 +305,7 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
+func (p *provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
 	if valid.IsNil(p) {
 		return providers.Capabilities{}, fail.InvalidInstanceError()
 	}

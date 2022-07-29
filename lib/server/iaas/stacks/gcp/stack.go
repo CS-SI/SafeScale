@@ -20,15 +20,15 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // stack ...
@@ -59,17 +59,17 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {
-		return stacks.ConfigurationOptions{}, nil
+		return stacks.ConfigurationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.Config, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
 	if valid.IsNil(s) || s.AuthOptions == nil {
-		return stacks.AuthenticationOptions{}, nil
+		return stacks.AuthenticationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.AuthOptions, nil
 }

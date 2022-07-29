@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
@@ -74,13 +74,13 @@ func Test_NFSExportOptionsFromStringToProtocol(t *testing.T) {
 		"subtree_check":                  64,
 		"subtree_check,no_subtree_check": 0,
 	}
-	nfsOpt := &protocol.NFSExportOptions{}
+	nfsOpt := &protocol.NFSExportOptions{} // nolint
 	packed := 0
 	for name, value := range tests {
 		nfsOpt = NFSExportOptionsFromStringToProtocol(name)
 		packed = 0
 		if nfsOpt.ReadOnly {
-			packed += 1
+			packed++
 		}
 		if nfsOpt.RootSquash {
 			packed += 2
@@ -210,16 +210,14 @@ func Test_NodeCountFromStringToInteger(t *testing.T) {
 		"disk >= 0.666":    "*fail.ErrSyntax",
 		"template <=> ;)":  "*fail.ErrSyntax",
 	}
-	for sizing, _ := range invalids {
+	for sizing := range invalids {
 		i, err = NodeCountFromStringToInteger(sizing)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
-		} else {
-			if i != 0 {
-				t.Error("Sizing has no count")
-				t.Fail()
-			}
+		} else if i != 0 {
+			t.Error("Sizing has no count")
+			t.Fail()
 		}
 	}
 
@@ -227,7 +225,7 @@ func Test_NodeCountFromStringToInteger(t *testing.T) {
 
 func TestSizingToken_Push(t *testing.T) {
 
-	var st *sizingToken = nil
+	var st *sizingToken
 	err := st.Push("one")
 	if err == nil {
 		t.Error("Can't push in nil pointer")
@@ -262,7 +260,7 @@ func TestSizingToken_GetKeyword(t *testing.T) {
 	var err fail.Error
 	var result string
 	st := newSizingToken()
-	result, err = st.GetKeyword()
+	_, err = st.GetKeyword()
 	if err == nil {
 		t.Error("Can't get keyword from empty sizingtoken")
 		t.Fail()
@@ -289,7 +287,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 	var err fail.Error
 	var result string
 	st := newSizingToken()
-	result, err = st.GetValue()
+	_, err = st.GetValue()
 	if err == nil {
 		t.Error("Can't get value from empty sizingtoken")
 		t.Fail()
@@ -299,7 +297,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-	result, err = st.GetValue()
+	_, err = st.GetValue()
 	if err == nil {
 		t.Error("Can't get value from not full sizingtoken")
 		t.Fail()
@@ -309,7 +307,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 		t.Error(err)
 		t.Fail()
 	}
-	result, err = st.GetValue()
+	_, err = st.GetValue()
 	if err == nil {
 		t.Error("Can't get value from not full sizingtoken")
 		t.Fail()
@@ -333,7 +331,7 @@ func TestSizingToken_GetValue(t *testing.T) {
 
 func TestSizingToken_String(t *testing.T) {
 
-	var st *sizingToken = nil
+	var st *sizingToken
 	var err fail.Error
 	if st.String() != "" {
 		t.Error("NIl sizingtoken can't be stringify")
@@ -658,11 +656,15 @@ func TestSizingToken_Validate(t *testing.T) {
 			if min != test.expectMin || max != test.expectMax {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s], expect [%s, %s]", min, max, test.expectMin, test.expectMax))
 			}
+		} else {
+			require.Contains(t, err.Error(), test.errorExpected)
 		}
 		if test.errorExpected != "" {
 			if min != test.expectMin || max != test.expectMax || !strings.Contains(err.Error(), test.errorExpected) {
 				t.Error(fmt.Sprintf("Invalid returned value [%s, %s, %s], expect [%s, %s, %s]", min, max, err.Error(), test.expectMin, test.expectMax, test.errorExpected))
 			}
+		} else {
+			require.Nil(t, err)
 		}
 	}
 
@@ -722,9 +724,6 @@ func TestRequest_parseSizingString(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		result, err := parseSizingString(test.request)
-
-		fmt.Println(test.request, "____", result["ram"], err)
-
 		if test.errorExpected == "" && err != nil {
 			t.Error(err)
 		}
@@ -741,8 +740,8 @@ func TestRequest_parseSizingString(t *testing.T) {
 }
 
 func Test_parseSizingString(t *testing.T) {
-	hear_me_roar := "template=e2-medium,gpu = -1, disk >= 22"
-	thing, err := parseSizingString(hear_me_roar)
+	aSizing := "template=e2-medium,gpu = -1, disk >= 22"
+	thing, err := parseSizingString(aSizing)
 	if err != nil {
 		t.Error(err)
 	}
@@ -757,8 +756,8 @@ func Test_parseSizingString(t *testing.T) {
 }
 
 func Test_parseSizingString_disk(t *testing.T) {
-	hear_me_roar := "template=e2-medium"
-	thing, err := parseSizingString(hear_me_roar)
+	aSizing := "template=e2-medium"
+	thing, err := parseSizingString(aSizing)
 	if err != nil {
 		t.Error(err)
 	}

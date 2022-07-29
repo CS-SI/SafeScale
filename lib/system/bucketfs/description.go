@@ -20,11 +20,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 // Description contains the configuration for bucket mount
@@ -51,7 +51,10 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 
 	// cleanup local temporary file
 	defer func() {
-		_ = os.Remove(f.Name())
+		rerr := utils.LazyRemove(f.Name())
+		if rerr != nil {
+			logrus.Debugf(rerr.Error())
+		}
 	}()
 
 	svc := host.Service()
@@ -60,7 +63,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 		return xerr
 	}
 
-	svcConf, xerr := svc.GetConfigurationOptions()
+	svcConf, xerr := svc.GetConfigurationOptions(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -118,7 +121,7 @@ func (desc Description) createConfigurationFile() (*os.File, fail.Error) {
 	}
 
 	// build temporary file
-	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		return nil, xerr
 	}

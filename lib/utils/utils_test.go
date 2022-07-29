@@ -1,3 +1,6 @@
+//go:build alltests
+// +build alltests
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -92,7 +95,7 @@ func Test_AbsPathify(t *testing.T) {
 			}
 		}()
 		result := AbsPathify("{}")
-		require.EqualValues(t, strings.Contains(result, "{}"), true)
+		require.Contains(t, result, "{}")
 	})
 
 	t.Run("5th", func(t *testing.T) {
@@ -104,7 +107,7 @@ func Test_AbsPathify(t *testing.T) {
 			}
 		}()
 		result := AbsPathify("${HOME}")
-		require.EqualValues(t, strings.Contains(result, "${HOME}"), false)
+		require.NotContains(t, result, "${HOME}")
 	})
 
 	t.Run("6th", func(t *testing.T) {
@@ -116,8 +119,8 @@ func Test_AbsPathify(t *testing.T) {
 			}
 		}()
 		result := AbsPathify("${HOME}///////////notfound")
-		require.EqualValues(t, strings.Contains(result, "${HOME}"), false)
-		require.EqualValues(t, strings.Contains(result, "//"), false)
+		require.NotContains(t, result, "${HOME}")
+		require.NotContains(t, result, "//")
 	})
 
 	t.Run("7th", func(t *testing.T) {
@@ -167,12 +170,6 @@ func TestOriginalAbsPathify(t *testing.T) {
 			})
 		}
 	}
-}
-
-func Test_UserConfirmed(t *testing.T) {
-	result := UserConfirmed("Do you confirm")
-	//os.Stdin.Write([]byte("y"))
-	require.EqualValues(t, result, false)
 }
 
 func Test_ExtractRetCode(t *testing.T) {

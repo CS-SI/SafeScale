@@ -16,7 +16,7 @@
 
 package providers
 
-//go:generate minimock -o mocks/mock_config.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers.Config
+//go:generate minimock -o mocks/mock_config.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers.Config
 
 // Config represents key/value configuration.
 type Config interface {

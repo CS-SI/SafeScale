@@ -29,6 +29,7 @@ lib/server/handlers:
 	@(cd handlers && $(MAKE))
 
 clean:
+	@(cd handlers && $(MAKE) $@)
 	@(cd iaas && $(MAKE) $@)
 	@(cd resources && $(MAKE) $@)
 	@$(RM) ./mocks/mock_*.go || true

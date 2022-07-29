@@ -17,6 +17,7 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 STRINGER := golang.org/x/tools/cmd/stringer
 PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
+PROTOVER := v1.28.0
 
 # Build tools
 CONVEY := github.com/smartystreets/goconvey
@@ -48,47 +49,90 @@ export TEST_COVERAGE_ARGS
 
 all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
-	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
 
 with-soft:
 	@echo "go easy running semgrep"
 	@$(eval CERR = "default")
 
-ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep style metalint
+with-race:
+	@echo "force datarace detection"
+	@$(eval RACE_CHECK_TEST = "-race")
+	@$(eval RACE_CHECK = "-race")
+
+ci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock err vet with-soft semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-rawci: logclean ground getdevdeps mod sdk generate lib cli
+rawci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
-	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
-	@md5sum cli/safescaled/safescaled-cover 2>/dev/null >> sums.log || true
-	@md5sum cli/safescale/safescale-cover 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
 
 version:
 	@printf "%b" "$(VERSION)-$$(git rev-parse --abbrev-ref HEAD | tr \"/\" \"_\")";
 
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
-	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
-	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
 
 releasetags:
 	@echo "settings go build tags for release"
 	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
+
+integration:
+	@echo "settings go build tags for integration"
+	@$(eval BUILD_TAGS = "integration,$(BUILD_TAGS)")
+
+allintegration:
+	@echo "settings go build tags for allintegration"
+	@$(eval BUILD_TAGS = "allintegration,$(BUILD_TAGS)")
+
+clustertests:
+	@echo "settings go build tags for clustertests"
+	@$(eval BUILD_TAGS = "clustertests,$(BUILD_TAGS)")
+
+networktests:
+	@echo "settings go build tags for networktests"
+	@$(eval BUILD_TAGS = "networktests,$(BUILD_TAGS)")
+
+subnettests:
+	@echo "settings go build tags for subnettests"
+	@$(eval BUILD_TAGS = "subnettests,$(BUILD_TAGS)")
+
+hosttests:
+	@echo "settings go build tags for hosttests"
+	@$(eval BUILD_TAGS = "hosttests,$(BUILD_TAGS)")
+
+volumetests:
+	@echo "settings go build tags for volumetests"
+	@$(eval BUILD_TAGS = "volumetests,$(BUILD_TAGS)")
+
+ostests:
+	@echo "settings go build tags for ostests"
+	@$(eval BUILD_TAGS = "ostests,$(BUILD_TAGS)")
+
+securitygrouptests:
+	@echo "settings go build tags for securitygrouptests"
+	@$(eval BUILD_TAGS = "securitygrouptests,$(BUILD_TAGS)")
+
+sharetests:
+	@echo "settings go build tags for sharetests"
+	@$(eval BUILD_TAGS = "sharetests,$(BUILD_TAGS)")
 
 ifeq ($(OS),Windows_NT)
 releasearchive:
@@ -106,14 +150,14 @@ with-coverage:
 
 checkbuild: begin
 	@if [ ! -s ./sums.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) checkbuild FAILED, you have to run 'make all' first !$(NO_COLOR)\n";exit 1;fi;
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
 	@(cd lib && $(MAKE) all)
 	@(cd cli && $(MAKE) all)
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
-	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
-	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 endif
@@ -135,10 +179,10 @@ mod:
 		sleep 4 ; \
 	done
 	@($(GO) mod tidy || true)
-	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@v1.27.1 || true)
-	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@v1.27.1 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/emptypb@v1.27.1 || true)
-	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@v1.27.1 || true)
+	@($(GO) get google.golang.org/protobuf/reflect/protoreflect@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/runtime/protoimpl@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/types/known/emptypb@$(PROTOVER) || true)
+	@($(GO) get google.golang.org/protobuf/types/known/timestamppb@$(PROTOVER) || true)
 	@sleep 4
 	@while [ $(ps -ef | grep "mod download") ] ; do \
 		sleep 4 ; \
@@ -150,6 +194,9 @@ cleancache:
 
 modclean: cleancache mod
 
+testclean:
+	@$(GO) clean -testcache
+
 debug:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'debug' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "debug,$(BUILD_TAGS)")
@@ -157,6 +204,11 @@ debug:
 tunnel:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'tunnel' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "tunnel,$(BUILD_TAGS)")
+
+generics:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'generics' flag$(NO_COLOR)\n";
+	$(eval BUILD_TAGS = "generics,$(BUILD_TAGS)")
+	@$(SED) -i '3s/.*/go 1.18/' go.mod || true
 
 alltests:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
@@ -170,6 +222,7 @@ ground: begin
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@command -v $(MD5) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) md5sum is required but it's not installed, install it via 'brew install md5sha1sum' if you are using MacOS.$(NO_COLOR)\n" >&2; }
 	@cp ./hooks/pre-commit ./.git/hooks/pre-commit > /dev/null || true
 	@chmod u+x ./.git/hooks/pre-commit > /dev/null || true
 
@@ -277,8 +330,8 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n"; \
-		$(GO) install $(RULES)@v0.3.15 &>/dev/null || true; \
-		$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true; \
+		$(GO) install $(RULES)@v0.3.16 &>/dev/null || true; \
+		$(GO) get -d $(RULES_DSL)@v0.3.21 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) maintidx > /dev/null; if [ $$? -ne 0 ]; then \
@@ -329,7 +382,7 @@ clean:
 
 zipsources:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Creating a tar.gz file safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz with the sources..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(git archive --format tar.gz --output safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz master)
+	@(git archive --format tar.gz --output safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz $$(git rev-parse --abbrev-ref HEAD))
 
 pack: zipsources
 
@@ -376,18 +429,78 @@ generate: sdk
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
+vettest:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(RM) ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,allintegration ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags buckettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags clustertests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags networktests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags subnettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags hosttests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags featuretests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags sharetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags labeltests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,buckettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,clustertests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,networktests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,subnettests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,hosttests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,featuretests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,volumetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,sharetests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,securitygrouptests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@cd integrationtests && $(GO) vet -tags integration,labeltests ./... 2>&1 | $(TEE) -a ./integration_vet_results.log || true
+	@mv ./integrationtests/integration_vet_results.log .
+	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_vet_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_vet_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_vet_results.log 2>&1 > /dev/null; then exit 1;fi;
+
+validtest: vettest
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking that integration tests are valid (no errors and everything skipped), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(RM) ./integration_results.log || true
+	@cd integrationtests && (echo "tags=" && $(GO) test -v ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=allintegration:" && $(GO) test -v -tags allintegration ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=allintegration,integration:" && $(GO) test -v -json -tags integration,allintegration ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration:" && $(GO) test -v -tags integration ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=buckettests:" && $(GO) test -v -tags buckettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=clustertests:" && $(GO) test -v -tags clustertests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=networktests:" && $(GO) test -v -tags networktests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=subnettests:" && $(GO) test -v -tags subnettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=hosttests:" && $(GO) test -v -tags hosttests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=featuretests:" && $(GO) test -v -tags featuretests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=volumetests:" && $(GO) test -v -tags volumetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=sharetests:" && $(GO) test -v -tags sharetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=securitygrouptests:" && $(GO) test -v -tags securitygrouptests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=labeltests:" && $(GO) test -v -tags labeltests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,buckettests:" && $(GO) test -v -tags integration,buckettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,clustertests:" && $(GO) test -v -tags integration,clustertests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,networktests:" && $(GO) test -v -tags integration,networktests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,subnettests:" && $(GO) test -v -tags integration,subnettests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,hosttests:" && $(GO) test -v -tags integration,hosttests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,featuretests:" && $(GO) test -v -tags integration,featuretests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,volumetests:" && $(GO) test -v -tags integration,volumetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,sharetests:" && $(GO) test -v -tags integration,sharetests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,securitygrouptests:" && $(GO) test -v -tags integration,securitygrouptests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@cd integrationtests && (echo "tags=integration,labeltests:" && $(GO) test -v -tags integration,labeltests ./... 2>&1) | $(TEE) -a ./integration_results.log || true
+	@mv ./integrationtests/integration_results.log .
+	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
+	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
+
+checkforpr: testclean validtest
+
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/fail/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -396,15 +509,9 @@ mintest: begin
 precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/fail/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -414,9 +521,9 @@ test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
@@ -439,9 +546,9 @@ vet: begin generate
 semgrep: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks with '$(CERR)' ruleset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) version | grep go1.18) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Semgrep don't work with go1.18 yet ! $(NO_COLOR)\n" && false) || true;
-	@$(GO) get -d $(RULES_DSL)@v0.3.17 &>/dev/null || true;
+	@$(GO) get -d $(RULES_DSL)@v0.3.21 &>/dev/null || true;
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) semgrep_results.log || true
 	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v _test.go | grep -v mock | grep -v .pb. | awk 'NF' | $(TEE) semgrep_results.log
 	@ruleguard -c=0 -rules build/rules/ruleguard.rules.json.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
@@ -457,7 +564,7 @@ minimock: begin generate
 metalint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) metalint_results.log || true
 	@golangci-lint --color never --timeout=16m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --disable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v "\s*^\s*" | $(TEE) metalint_results.log
 	@if [ -s ./metalint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) metalint FAILED, look at metalint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
@@ -468,9 +575,9 @@ endif
 newissues: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running checks on modified files, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@if [ ! -s ./sums.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) broken FAILED, you have to run 'make all' first !$(NO_COLOR)\n";exit 1;fi;
-	@md5sum --ignore-missing -w -c sums.log 2>&1 | grep FAILED | tr ':' ' ' | awk {'print $$1'} | xargs -L1 golangci-lint run 2>/dev/null  | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v typecheck
+	@$(MD5) --ignore-missing -w -c sums.log 2>&1 | grep FAILED | tr ':' ' ' | awk {'print $$1'} | xargs -L1 golangci-lint run 2>/dev/null  | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v typecheck
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 endif
@@ -478,7 +585,7 @@ endif
 style: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) style_results.log || true
 	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --disable=typecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | grep -v typecheck | awk 'NF' | $(TEE) style_results.log
 	@if [ -s ./style_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) style FAILED, look at style_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
@@ -489,7 +596,7 @@ endif
 maint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running maint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) maintidx > /dev/null || (echo "maintidx not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) maint_results.log || true
 	@maintidx ./... 2>&1 | $(TEE) maint_results.log
 	@if [ -s ./maint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at maint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
@@ -500,7 +607,7 @@ endif
 badpractices: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running bad practices checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) ireturn > /dev/null || (echo "ireturn not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) practices_results.log || true
 	@ireturn ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) practices_results.log
 	@if [ -s ./practices_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at practices_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
@@ -511,9 +618,9 @@ endif
 ctxcheck: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running context checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
-ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
+ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) ctxcheck_results.log || true
-	@contextcheck ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) ctxcheck_results.log
+	@contextcheck ./lib/server/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
 	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -548,6 +655,7 @@ help: with_git
 	@printf "%b" "$(OK_COLOR)BUILD TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "  $(GOLD_COLOR)all          - Builds all binaries$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
+	@echo '  checkbuild   - Fast build, skips dependencies install and UT'
 	@echo '  help         - Prints this help message'
 	@echo '  godocs       - Runs godoc in background at port 6060.'
 	@echo '                 Go to (http://localhost:6060/pkg/github.com/CS-SI/SafeScale/)'
@@ -562,6 +670,7 @@ help: with_git
 	@echo '  test         - Runs all unit tests'
 	@echo '  convey       - Runs goconvey in lib/utils dir'
 	@echo '  show-cov     - Displays coverage info in firefox'
+	@echo '  checkforpr   - Runs build and check everything os ok for Pull Request'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";

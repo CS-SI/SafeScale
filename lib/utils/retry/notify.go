@@ -19,7 +19,7 @@ package retry
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 )
 
 // Notify ...

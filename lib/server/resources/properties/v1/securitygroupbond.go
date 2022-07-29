@@ -19,8 +19,8 @@ package propertiesv1
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup

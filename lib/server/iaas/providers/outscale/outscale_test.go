@@ -17,6 +17,7 @@
 package outscale_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -24,10 +25,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/tests"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 )
 
 func getTester() (*tests.ServiceTester, error) {
@@ -123,15 +124,6 @@ func Test_Volumes(t *testing.T) {
 	tt.Volumes(t)
 }
 
-func Test_VolumeAttachments(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.VolumeAttachments(t)
-}
-
 func Test_Buckets(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
@@ -147,26 +139,27 @@ func Test_NetworksWithDelete(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	net, err := tt.Service.CreateNetwork(abstract.NetworkRequest{
+	net, err := tt.Service.CreateNetwork(context.Background(), abstract.NetworkRequest{
 		Name:       "my-net",
 		CIDR:       "192.168.23.0/24",
 		DNSServers: nil,
 	})
 	assert.NoError(t, err)
-	err = tt.Service.DeleteNetwork(net.ID)
+	err = tt.Service.DeleteNetwork(context.Background(), net.ID)
 	assert.NoError(t, err)
 }
 
 func Test_VMWithGPU(t *testing.T) {
+	ctx := context.Background()
 	tt, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
 
-	img, err := tt.Service.SearchImage("Ubuntu 20.04")
+	img, err := tt.Service.SearchImage(ctx, "Ubuntu 20.04")
 	assert.NoError(t, err)
-	tpls, err := tt.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
+	tpls, err := tt.Service.ListTemplatesBySizing(ctx, abstract.HostSizingRequirements{
 		MinCores:    1,
 		MaxCores:    1,
 		MinRAMSize:  1,
@@ -187,17 +180,17 @@ func Test_VMWithGPU(t *testing.T) {
 		return nil
 	}()
 	assert.NotNil(t, tpl)
-	net, err := tt.Service.CreateNetwork(abstract.NetworkRequest{
+	net, err := tt.Service.CreateNetwork(context.Background(), abstract.NetworkRequest{
 		Name:       "public-net",
 		CIDR:       "192.168.23.0/24",
 		DNSServers: nil,
 	})
 	assert.NoError(t, err)
 	defer func() {
-		_ = tt.Service.DeleteNetwork(net.ID)
+		_ = tt.Service.DeleteNetwork(context.Background(), net.ID)
 	}()
 
-	subnet, err := tt.Service.CreateSubnet(abstract.SubnetRequest{
+	subnet, err := tt.Service.CreateSubnet(context.Background(), abstract.SubnetRequest{
 		Name:       "public-subnet",
 		IPVersion:  ipversion.IPv4,
 		CIDR:       "192.168.23.0/25",
@@ -206,10 +199,10 @@ func Test_VMWithGPU(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	defer func() {
-		_ = tt.Service.DeleteSubnet(subnet.ID)
+		_ = tt.Service.DeleteSubnet(context.Background(), subnet.ID)
 	}()
 
-	h, _, err := tt.Service.CreateHost(abstract.HostRequest{
+	h, _, err := tt.Service.CreateHost(context.Background(), abstract.HostRequest{
 		ResourceName:   "hostWithGPU",
 		HostName:       "host",
 		Subnets:        []*abstract.Subnet{subnet},
@@ -225,6 +218,6 @@ func Test_VMWithGPU(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, h)
-	err = tt.Service.DeleteHost(h.GetID())
+	err = tt.Service.DeleteHost(context.Background(), h.GetID())
 	assert.NoError(t, err)
 }

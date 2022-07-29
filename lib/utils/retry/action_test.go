@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -71,21 +71,21 @@ func Test_Action(t *testing.T) {
 
 	err := Action(nil, arbiter, officer, first, last, notify)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	//	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter run"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+	//	require.Contains(t, err.Error(), "invalid parameter run"), true)
+	require.Contains(t, err.Error(), "cannot be nil!")
 
 	err = Action(run, nil, officer, first, last, notify)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	//	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter arbiter"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+	//	require.Contains(t, err.Error(), "invalid parameter arbiter"), true)
+	require.Contains(t, err.Error(), "cannot be nil!")
 
 	err = Action(run, arbiter, nil, first, last, notify)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	//	require.EqualValues(t, strings.Contains(err.Error(), "invalid parameter officer"), true)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil!"), true)
+	//	require.Contains(t, err.Error(), "invalid parameter officer"), true)
+	require.Contains(t, err.Error(), "cannot be nil!")
 
 	err = Action(run, arbiter, officer, first, last, notify)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -163,27 +163,27 @@ func Test_WhileUnsuccessful(t *testing.T) {
 	maxtries := 5
 	tries := 0
 	err := WhileUnsuccessful(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any errior")
 		}
 	}, 50*time.Millisecond, -1)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, tries, maxtries)
 
 	maxtries = 5
 	tries = 0
 	err = WhileUnsuccessful(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any errior")
 		}
 	}, 50*time.Millisecond, -1)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, tries, maxtries)
 
 }
@@ -199,9 +199,9 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 			40*time.Millisecond,
 			3,
 		)
-		require.EqualValues(t, err, nil)
+		require.Nil(t, err)
 	})
-	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+	require.Contains(t, log, "'delay' greater than 'timeout'")
 
 	err := WhileUnsuccessfulWithLimitedRetries(
 		func() error {
@@ -211,7 +211,7 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 		40*time.Millisecond,
 		3,
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithLimitedRetries(
 		func() error {
@@ -221,7 +221,7 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 		-1*time.Millisecond,
 		3,
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithLimitedRetries(
 		func() error {
@@ -231,7 +231,7 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 		-1*time.Millisecond,
 		0,
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithLimitedRetries(
 		func() error {
@@ -241,7 +241,7 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 		1*time.Second,
 		3,
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithLimitedRetries(
 		func() error {
@@ -251,33 +251,7 @@ func Test_WhileUnsuccessfulWithLimitedRetries(t *testing.T) {
 		1*time.Second,
 		0,
 	)
-	require.EqualValues(t, err, nil)
-
-}
-
-func Test_WhileUnsuccessfulWithHardTimeout(t *testing.T) {
-
-	log := tests.LogrusCapture(func() {
-		err := WhileUnsuccessfulWithHardTimeout(
-			func() error {
-				return nil
-			},
-			100*time.Millisecond,
-			40*time.Millisecond,
-		)
-		require.EqualValues(t, err, nil)
-	})
-
-	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
-
-	err := WhileUnsuccessfulWithHardTimeout(
-		func() error {
-			return nil
-		},
-		100*time.Millisecond,
-		-1*time.Second,
-	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -292,10 +266,10 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 			40*time.Millisecond,
 			DefaultNotifier(),
 		)
-		require.EqualValues(t, err, nil)
+		require.Nil(t, err)
 	})
 
-	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+	require.Contains(t, log, "'delay' greater than 'timeout'")
 
 	err := WhileUnsuccessfulWithHardTimeoutWithNotifier(
 		func() error {
@@ -305,17 +279,19 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		40*time.Millisecond,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
-	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
-		func() error {
-			return nil
-		},
-		100*time.Millisecond,
-		-1*time.Millisecond,
-		DefaultNotifier(),
-	)
-	require.EqualValues(t, err, nil)
+	/*
+		err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
+			func() error {
+				return nil
+			},
+			100*time.Millisecond,
+			-1*time.Millisecond,
+			DefaultNotifier(),
+		)
+		require.Nil(t, err)
+	*/
 
 	err = WhileUnsuccessfulWithHardTimeoutWithNotifier(
 		func() error {
@@ -325,7 +301,7 @@ func Test_WhileUnsuccessfulWithHardTimeoutWithNotifier(t *testing.T) {
 		1*time.Second,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -340,10 +316,10 @@ func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
 			40*time.Millisecond,
 			DefaultNotifier(),
 		)
-		require.EqualValues(t, err, nil)
+		require.Nil(t, err)
 	})
 
-	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+	require.Contains(t, log, "'delay' greater than 'timeout'")
 
 	err := WhileUnsuccessfulWithNotify(
 		func() error {
@@ -353,7 +329,7 @@ func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
 		40*time.Millisecond,
 		nil,
 	)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+	require.Contains(t, err.Error(), "cannot be nil")
 
 	err = WhileUnsuccessfulWithNotify(
 		func() error {
@@ -363,7 +339,7 @@ func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
 		40*time.Millisecond,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithNotify(
 		func() error {
@@ -373,7 +349,7 @@ func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
 		-1*time.Millisecond,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithNotify(
 		func() error {
@@ -383,7 +359,7 @@ func Test_WhileUnsuccessfulWithNotify(t *testing.T) {
 		1*time.Second,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -407,10 +383,10 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 			arb,
 			DefaultNotifier(),
 		)
-		require.EqualValues(t, err, nil)
+		require.Nil(t, err)
 	})
 
-	require.EqualValues(t, strings.Contains(log, "'delay' greater than 'timeout'"), true)
+	require.Contains(t, log, "'delay' greater than 'timeout'")
 
 	err := WhileUnsuccessfulWithAggregator(
 		func() error {
@@ -421,7 +397,7 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 		arb,
 		nil,
 	)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+	require.Contains(t, err.Error(), "cannot be nil")
 
 	err = WhileUnsuccessfulWithAggregator(
 		func() error {
@@ -432,7 +408,7 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 		arb,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithAggregator(
 		func() error {
@@ -443,7 +419,7 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 		arb,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	err = WhileUnsuccessfulWithAggregator(
 		func() error {
@@ -454,7 +430,7 @@ func Test_WhileUnsuccessfulWithAggregator(t *testing.T) {
 		arb,
 		DefaultNotifier(),
 	)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 }
 
@@ -464,27 +440,27 @@ func Test_WhileSuccessful(t *testing.T) {
 	maxtries := 5
 	tries := 0
 	err := WhileUnsuccessful(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any errior")
 		}
 	}, 50*time.Millisecond, -1)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, tries, maxtries)
 
 	maxtries = 5
 	tries = 0
 	err = WhileUnsuccessful(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any errior")
 		}
 	}, 50*time.Millisecond, -1)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, tries, maxtries)
 
 }
@@ -497,14 +473,14 @@ func Test_WhileSuccessfulWithNotify(t *testing.T) {
 	maxtries := 5
 	tries := 0
 	err := WhileSuccessfulWithNotify(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any errior")
 		}
 	}, 50*time.Millisecond, -1, nil)
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be nil"), true)
+	require.Contains(t, err.Error(), "cannot be nil")
 	require.NotEqual(t, tries, maxtries)
 
 	notify = func(Try, verdict.Enum) {
@@ -515,27 +491,27 @@ func Test_WhileSuccessfulWithNotify(t *testing.T) {
 	maxtries = 5
 	tries = 0
 	err = WhileSuccessfulWithNotify(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any error")
 		}
 	}, 50*time.Millisecond, -1, notify)
-	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.Contains(t, err.Error(), "Any error")
 	require.NotEqual(t, tries, maxtries)
 
 	maxtries = 5
 	tries = 0
 	err = WhileSuccessfulWithNotify(func() error {
-		tries = tries + 1
+		tries++
 		if tries >= maxtries {
 			return nil
 		} else {
 			return errors.New("Any error")
 		}
 	}, 50*time.Millisecond, -1, notify)
-	require.EqualValues(t, strings.Contains(err.Error(), "Any error"), true)
+	require.Contains(t, err.Error(), "Any error")
 	require.NotEqual(t, tries, maxtries)
 
 }
@@ -602,7 +578,7 @@ func Test_DefaultNotifierWithContext(t *testing.T) {
 
 	ctx := context.Background()
 	d, err := DefaultNotifierWithContext(ctx)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	n := Try{}
 	log := tests.LogrusCapture(func() {
@@ -1125,8 +1101,8 @@ func TestErrCheckTimeout(t *testing.T) {
 			innerXErr := genHappy()
 			return innerXErr
 		},
+		50*time.Millisecond,
 		1*time.Second,
-		5*time.Second,
 	)
 	if xerr == nil {
 		t.Errorf("the while.. HAS to fail")
@@ -1261,8 +1237,8 @@ func TestErrCheckNoTimeout(t *testing.T) {
 			innerXErr := genSad()
 			return innerXErr
 		},
-		time.Second,
-		5*time.Second,
+		50*time.Millisecond,
+		1*time.Second,
 	)
 	if xerr == nil {
 		t.Errorf("the while.. HAS to fail")
@@ -1327,8 +1303,8 @@ func TestCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(
 		genHappy,
-		PrevailRetry(Successful(), Timeout(6*time.Second)),
-		Constant(1*time.Second),
+		PrevailRetry(Successful(), Timeout(1*time.Second)),
+		Constant(500*time.Millisecond),
 		nil, nil, nil,
 	)
 	if xerr == nil {
@@ -1340,7 +1316,7 @@ func TestCustomActionWithTimeout(t *testing.T) {
 	}
 
 	delta := time.Since(begin)
-	if delta < 6*time.Second {
+	if delta < 1*time.Second {
 		t.Errorf("retry timing didn't work well")
 		t.FailNow()
 	}

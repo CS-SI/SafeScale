@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/metadatamaintenance/upgrade"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/metadatamaintenance/upgrade"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -81,7 +81,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 
 	defer fail.OnExitLogError(&err)
 
-	currentTenant := operations.CurrentTenant()
+	currentTenant := operations.CurrentTenant(ctx)
 	if currentTenant == nil {
 		return nil, fail.NotFoundError("no tenant set")
 	}
@@ -117,7 +117,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 
 	defer fail.OnExitLogError(&err)
 
-	xerr := operations.SetCurrentTenant(in.GetName())
+	xerr := operations.SetCurrentTenant(ctx, in.GetName())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -152,7 +152,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	currentTenant := operations.CurrentTenant()
+	currentTenant := operations.CurrentTenant(ctx)
 	if currentTenant != nil && currentTenant.Name == in.GetName() {
 		return empty, nil
 	}
@@ -163,7 +163,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 		return empty, xerr
 	}
 
-	xerr = service.TenantCleanup(in.Force)
+	xerr = service.TenantCleanup(ctx, in.Force)
 	return empty, xerr
 }
 
@@ -268,7 +268,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 
 	var currentVersion string
 	if !in.Force {
-		currentVersion, xerr = operations.CheckMetadataVersion(svc)
+		currentVersion, xerr = operations.CheckMetadataVersion(ctx, svc)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

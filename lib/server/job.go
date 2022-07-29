@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
@@ -112,6 +112,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 
 	// attach task instance to the context
 	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // nolint
+	ctx = context.WithValue(ctx, concurrency.KeyForID, id)              // nolint
 
 	nj := job{
 		description: description,

@@ -25,7 +25,7 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 
 func kickYouOutOfMyHead(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"$*_, $err := $x; if $y != nil { $*_ }",
@@ -57,7 +57,7 @@ func nilxerr(m dsl.Matcher) {
 // err but no an error
 func errnoterror(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"if $*_, err := $x; $err != nil { $*_ } else if $_ { $*_ }",
@@ -83,7 +83,7 @@ func errnoterror(m dsl.Matcher) {
 // err but no an error
 func xerrnoterror(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"if $*_, xerr := $x; $err != nil { $*_ } else if $_ { $*_ }",
@@ -133,7 +133,7 @@ func wrongxerrcall(m dsl.Matcher) {
 }
 
 func isNullIsDeprecated(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 	m.Match(`if $x.isNull() { return $*_ }`, `if $x.IsNull() { return $*_ }`, `if !$x.isNull() { return $*_ }`, `if !$x.IsNull() { return $*_ }`).Where(m["x"].Text != "instance" && m["x"].Text != "e" && m["x"].Text != "el" && m["x"].Text != "s" && m["x"].Text != "p" && m["x"].Text != "self").
 		Report("isNull is DANGEROUS when called upon something that is NOT a struct, if the code is valid rename the acceptor to 'instance' to disable this warning, if not, consider using instead 'if $x == nil || $x.isNull() {'").
 		Suggest("if $x == nil || $x.isNull() {")
@@ -141,7 +141,7 @@ func isNullIsDeprecated(m dsl.Matcher) {
 
 func isNullIsToxic(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 	m.Match(`if !$x.isNull() { $*_ }`, `if $x.isNull() { $*_ }`, `if !$x.IsNull() { $*_ }`, `if $x.IsNull() { $*_ }`).Where(m["x"].Text != "instance" && m["x"].Text != "e" && m["x"].Text != "el" && m["x"].Text != "s" && m["x"].Text != "p" && m["x"].Text != "self").
 		Report("isNull is DANGEROUS when called upon something that is NOT a struct, if the code is valid rename the acceptor to 'instance' to disable this warning, if not, consider using instead 'if $x == nil || $x.isNull() {'")
 }
@@ -163,19 +163,19 @@ func unexpectedNegatives(m dsl.Matcher) {
 }
 
 func dangerousNegatives(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(!m["z"].Text.Matches(".fail.*") && !m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be nil")
 }
 
 func typedNil(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(m["z"].Text.Matches(".fail.*") && m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be a typed nil")
 }
 
 func usingTypedNil(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(m["z"].Text.Matches(".fail.*") && !m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be a typed nil, so using $x is a serious mistake")
 }

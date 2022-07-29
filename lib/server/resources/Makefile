@@ -8,7 +8,6 @@ all: generate
 
 generate:
 	@(mkdir -p ./mocks) || true
-	@$(GO) generate -run minimock . >/dev/null || true
 	@(cd enums && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))
 

@@ -20,8 +20,8 @@ import (
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 func (s stack) rpcReadSecurityGroups(networkID string, sgIDs []string) ([]osc.SecurityGroup, fail.Error) {

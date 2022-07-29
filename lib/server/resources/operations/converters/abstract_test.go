@@ -21,18 +21,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 )
 
 func Test_HostTemplateToHostEffectiveSizing(t *testing.T) {
@@ -468,45 +469,80 @@ func Test_BucketListFromAbstractToProtocol(t *testing.T) {
 
 func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
 
-	gw_scfg := system.SSHConfig{
-		Hostname:               "SSHConfig GW Hostname",
-		IPAddress:              "SSHConfig GW Hostname",
-		Port:                   42,
-		User:                   "SSHConfig GW Hostname",
-		PrivateKey:             "SSHConfig GW Hostname",
-		LocalPort:              43,
-		GatewayConfig:          nil,
-		SecondaryGatewayConfig: nil,
-	}
-	gw2_scfg := system.SSHConfig{
-		Hostname:               "SSHConfig GW2 Hostname",
-		IPAddress:              "SSHConfig GW2 Hostname",
-		Port:                   0,
-		User:                   "SSHConfig GW2 Hostname",
-		PrivateKey:             "SSHConfig GW2 Hostname",
-		LocalPort:              45,
-		GatewayConfig:          nil,
-		SecondaryGatewayConfig: nil,
-	}
-	scfg := system.SSHConfig{
-		Hostname:               "SSHConfig Hostname",
-		IPAddress:              "SSHConfig Hostname",
-		Port:                   46,
-		User:                   "SSHConfig Hostname",
-		PrivateKey:             "SSHConfig Hostname",
-		LocalPort:              47,
-		GatewayConfig:          &gw_scfg,
-		SecondaryGatewayConfig: &gw2_scfg,
-	}
-	pcfg := SSHConfigFromAbstractToProtocol(scfg)
-	require.EqualValues(t, scfg.Hostname, pcfg.HostName)
-	require.EqualValues(t, scfg.User, pcfg.User)
-	require.EqualValues(t, scfg.IPAddress, pcfg.Host)
-	require.EqualValues(t, scfg.Port, pcfg.Port)
-	require.EqualValues(t, scfg.PrivateKey, pcfg.PrivateKey)
-	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.GatewayConfig), pcfg.Gateway)
-	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.SecondaryGatewayConfig), pcfg.SecondaryGateway)
+	gwConf := ssh.NewConfig("Config GW Hostname", "Config GW Hostname", 42, "Config GW User", "Config GW PrivateKey", 0, "", nil, nil)
+	require.NotNil(t, gwConf)
 
+	gw2Conf := ssh.NewConfig("Config GW2 Hostname", "Config GW2 Hostname", 43, "Config GW2 User", "Config GW2 PrivateKey", 0, "", nil, nil)
+	require.NotNil(t, gwConf)
+
+	hostConf := ssh.NewConfig("Config Hostname", "Config Hostname", 0, "Config User", "Config PrivateKey", 0, "", gwConf, gw2Conf)
+	require.NotNil(t, gwConf)
+
+	pgwcfg := SSHConfigFromAbstractToProtocol(gwConf)
+
+	host, xerr := gwConf.GetHostname()
+	require.Nil(t, xerr)
+	require.EqualValues(t, host, pgwcfg.HostName)
+	user, xerr := gwConf.GetUser()
+	require.Nil(t, xerr)
+	require.EqualValues(t, user, pgwcfg.User)
+	ipaddr, xerr := gwConf.GetIPAddress()
+	require.Nil(t, xerr)
+	require.EqualValues(t, ipaddr, pgwcfg.Host)
+	port, xerr := gwConf.GetPort()
+	require.Nil(t, xerr)
+	require.EqualValues(t, port, pgwcfg.Port)
+	pkey, xerr := gwConf.GetPrivateKey()
+	require.Nil(t, xerr)
+	require.EqualValues(t, pkey, pgwcfg.PrivateKey)
+
+	pgw2cfg := SSHConfigFromAbstractToProtocol(gw2Conf)
+	host, xerr = gw2Conf.GetHostname()
+	require.Nil(t, xerr)
+	require.EqualValues(t, host, pgw2cfg.HostName)
+	user, xerr = gw2Conf.GetUser()
+	require.Nil(t, xerr)
+	require.EqualValues(t, user, pgw2cfg.User)
+	ipaddr, xerr = gw2Conf.GetIPAddress()
+	require.Nil(t, xerr)
+	require.EqualValues(t, ipaddr, pgw2cfg.Host)
+	port, xerr = gw2Conf.GetPort()
+	require.Nil(t, xerr)
+	require.EqualValues(t, port, pgw2cfg.Port)
+	pkey, xerr = gw2Conf.GetPrivateKey()
+	require.Nil(t, xerr)
+	require.EqualValues(t, pkey, pgw2cfg.PrivateKey)
+
+	phostcfg := SSHConfigFromAbstractToProtocol(hostConf)
+	host, xerr = hostConf.GetHostname()
+	require.Nil(t, xerr)
+	require.EqualValues(t, host, phostcfg.HostName)
+	user, xerr = hostConf.GetUser()
+	require.Nil(t, xerr)
+	require.EqualValues(t, user, phostcfg.User)
+	ipaddr, xerr = hostConf.GetIPAddress()
+	require.Nil(t, xerr)
+	require.EqualValues(t, ipaddr, phostcfg.Host)
+	//port, xerr = hostConf.GetPort()
+	//require.Nil(t, xerr)
+	require.EqualValues(t, 22 /*port*/, phostcfg.Port)
+	pkey, xerr = hostConf.GetPrivateKey()
+	require.Nil(t, xerr)
+	require.EqualValues(t, pkey, phostcfg.PrivateKey)
+
+	cgwConf, xerr := hostConf.GetPrimaryGatewayConfig()
+	require.Nil(t, xerr)
+	require.NotNil(t, cgwConf)
+	pgwcfg = SSHConfigFromAbstractToProtocol(cgwConf)
+	require.NotNil(t, pgwcfg)
+	require.EqualValues(t, pgwcfg, phostcfg.Gateway)
+
+	cgw2Conf, xerr := hostConf.GetSecondaryGatewayConfig()
+	require.Nil(t, xerr)
+	require.NotNil(t, cgw2Conf)
+	pgw2cfg = SSHConfigFromAbstractToProtocol(cgw2Conf)
+	require.NotNil(t, pgw2cfg)
+	require.EqualValues(t, pgw2cfg, phostcfg.SecondaryGateway)
 }
 
 func Test_HostStatusFromAbstractToProtocol(t *testing.T) {

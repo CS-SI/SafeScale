@@ -18,12 +18,13 @@ package objectstorage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
@@ -32,18 +33,16 @@ import (
 	_ "gomodules.xyz/stow/s3"
 	_ "gomodules.xyz/stow/swift"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Object
+//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Object
 
 // Object interface
 type Object interface {
-	//	data.Identifiable
-
 	Stored() (bool, fail.Error)
 
 	Read(io.Writer, int64, int64) fail.Error
@@ -132,7 +131,7 @@ func (instance *object) Reload() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Item(instance.name)
 	if err != nil {
@@ -172,7 +171,7 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
 
 	var seekTo int64
 	var length int64
@@ -259,7 +258,7 @@ func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
 		return fail.InvalidInstanceContentError("instance.bucket", "cannot be nil")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Put(instance.name, source, sourceSize, instance.metadata)
 	if err != nil {
@@ -278,7 +277,7 @@ func (instance *object) WriteMultiPart(source io.Reader, sourceSize int64, chunk
 		return nil
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
 
 	metadataCopy := instance.metadata.Clone()
 
@@ -331,7 +330,7 @@ func (instance *object) Delete() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	err := instance.bucket.stowContainer.RemoveItem(instance.name)
 	if err != nil {
@@ -347,7 +346,7 @@ func (instance *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemM
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		instance.metadata[k] = v
@@ -361,7 +360,7 @@ func (instance *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetada
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		_, found := instance.metadata[k]
@@ -378,7 +377,7 @@ func (instance *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMe
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	instance.metadata = newMetadata
 	return nil

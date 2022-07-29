@@ -6,7 +6,6 @@ on:
       - master
       - develop
       - hotfixes
-      - 'feature/**'
       - 'release/**'
       - 'review/**'
   pull_request:
@@ -24,7 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ 1.16.8, 1.16.15, 1.17.8 ]
+        go: [ 1.16.15, 1.17.12 ]
         tags: [ releasetags, debug, tunnel ]
 
     runs-on: ubuntu-latest

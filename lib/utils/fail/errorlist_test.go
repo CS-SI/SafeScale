@@ -40,6 +40,13 @@ func Test_NewErrorList(t *testing.T) {
 
 }
 
+func TestNewErrorList_NewErrorListComplete(t *testing.T) {
+
+	list := NewErrorListComplete([]error{}, errors.New("math: square root of negative number"), []error{}, "can't resolve equation")
+	require.Contains(t, list.Error(), "can't resolve equation")
+
+}
+
 func TestNewErrorList_ToGRPCStatus(t *testing.T) {
 
 	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
@@ -53,7 +60,7 @@ func TestNewErrorList_ToGRPCStatus(t *testing.T) {
 
 func TestErrorList_AddConsequence(t *testing.T) {
 
-	var errs *ErrorList = nil
+	var errs *ErrorList
 	err := errs.AddConsequence(errors.New("math: square root of negative number"))
 	if err == nil {
 		t.Error("Can't AddConsequence to nil pointer ErrorList")
@@ -85,7 +92,7 @@ func TestErrorList_Annotate(t *testing.T) {
 		}
 	}()
 
-	var errs *ErrorList = nil
+	var errs *ErrorList
 	errs.Annotate("stdout", os.Stdout)
 
 	errv := NewErrorList([]error{})
@@ -110,7 +117,7 @@ func TestErrorList_Error(t *testing.T) {
 		}
 	}()
 
-	var errs *ErrorList = nil
+	var errs *ErrorList
 	serr := errs.Error()
 	require.EqualValues(t, serr, "")
 
@@ -135,7 +142,7 @@ func TestErrorList_UnformattedError(t *testing.T) {
 		}
 	}()
 
-	var errs *ErrorList = nil
+	var errs *ErrorList
 	serr := errs.UnformattedError()
 	require.EqualValues(t, serr, "")
 
@@ -159,7 +166,7 @@ func TestErrorList_ToErrorSlice(t *testing.T) {
 			t.Fail()
 		}
 	}()
-	var errs *ErrorList = nil
+	var errs *ErrorList
 	serr := errs.ToErrorSlice()
 	require.EqualValues(t, len(serr), 0)
 

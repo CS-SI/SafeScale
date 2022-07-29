@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
@@ -39,7 +39,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 ) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -59,9 +59,10 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 	}
 
 	sgID := instance.GetID()
+	ctx := task.Context()
 
 	// Unbind Security Group from Host on provider side
-	xerr := instance.Service().UnbindSecurityGroupFromHost(sgID, hostInstance.GetID())
+	xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgID, hostInstance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -74,7 +75,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 	}
 
 	// Updates host metadata regarding Security Groups
-	xerr = hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -101,7 +102,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 ) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -172,7 +173,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 ) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -219,7 +220,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(
 ) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {

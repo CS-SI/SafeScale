@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 
 	"github.com/sethvargo/go-password/password"
 )

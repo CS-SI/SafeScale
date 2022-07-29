@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/sirupsen/logrus"
 )
 

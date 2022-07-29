@@ -19,7 +19,7 @@ package temporal
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -48,11 +48,14 @@ const (
 	// defaultOperationTimeout default timeout to handle operations
 	defaultOperationTimeout = 150 * time.Second
 
+	// defaultWaitAfterReboot time we wait after a reboot before trying SSH connection
+	defaultWaitAfterReboot = 100 * time.Second
+
 	// defaultSSHConnectionTimeout is the default ssh timeout connection
 	defaultSSHConnectionTimeout = 3 * time.Minute
 
 	// defaultConnectionTimeout is the default connection timeout
-	defaultConnectionTimeout = 1 * time.Minute
+	defaultConnectionTimeout = 2 * time.Minute
 
 	// defaultExecutionTimeout is the default linux command operation timeout
 	defaultExecutionTimeout = 8 * time.Minute
@@ -70,7 +73,7 @@ const (
 	defaultBigDelay = 30 * time.Second
 )
 
-//go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v21/lib/utils/temporal.Timings
+//go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v22/lib/utils/temporal.Timings
 
 type Timings interface {
 	// OperationTimeout ...
@@ -106,6 +109,9 @@ type Timings interface {
 	// MetadataTimeout ...
 	MetadataTimeout() time.Duration
 
+	// RebootTimeout
+	RebootTimeout() time.Duration
+
 	// MetadataReadAfterWriteTimeout ...
 	MetadataReadAfterWriteTimeout() time.Duration
 
@@ -129,6 +135,7 @@ type Timeouts struct {
 	SSHConnection          time.Duration `json:"timeout_ssh_connection,omitempty" mapstructure:"sshconnection"`
 	Metadata               time.Duration `json:"timeout_metadata,omitempty" mapstructure:"metadata"`
 	MetadataReadAfterWrite time.Duration `json:"timeout_metadata_raw,omitempty" mapstructure:"metadatareadafterwrite"`
+	RebootTimeout          time.Duration `json:"timeout_reboot,omitempty" mapstructure:"reboot"`
 }
 
 type Delays struct {
@@ -157,6 +164,7 @@ func NewTimings() *MutableTimings {
 			Metadata:               MetadataTimeout(),
 			MetadataReadAfterWrite: MetadataReadAfterWriteTimeout(),
 			SSHConnection:          SSHConnectionTimeout(),
+			RebootTimeout:          RebootTimeout(),
 		},
 		Delays: Delays{
 			Small:  SmallDelay(),
@@ -170,50 +178,24 @@ func (t *MutableTimings) Update(a *MutableTimings) error {
 	if t == nil {
 		return fail.InvalidInstanceError()
 	}
-
 	if a == nil {
 		return nil
 	}
-
-	if t.Communication == 0 && a.Communication != 0 {
-		t.Communication = a.Communication
-	}
-	if t.Connection == 0 && a.Connection != 0 {
-		t.Connection = a.Connection
-	}
-	if t.Context == 0 && a.Context != 0 {
-		t.Context = a.Context
-	}
-	if t.HostCleanup == 0 && a.HostCleanup != 0 {
-		t.HostCleanup = a.HostCleanup
-	}
-	if t.HostCreation == 0 && a.HostCreation != 0 {
-		t.HostCreation = a.HostCreation
-	}
-	if t.HostLongOperation == 0 && a.HostLongOperation != 0 {
-		t.HostLongOperation = a.HostLongOperation
-	}
-	if t.HostOperation == 0 && a.HostOperation != 0 {
-		t.HostOperation = a.HostOperation
-	}
-	if t.Metadata == 0 && a.Metadata != 0 {
-		t.Metadata = a.Metadata
-	}
-	if t.MetadataReadAfterWrite == 0 && a.MetadataReadAfterWrite != 0 {
-		t.MetadataReadAfterWrite = a.MetadataReadAfterWrite
-	}
-	if t.Operation == 0 && a.Operation != 0 {
-		t.Operation = a.Operation
-	}
-	if t.Small == 0 && a.Small != 0 {
-		t.Small = a.Small
-	}
-	if t.Normal == 0 && a.Normal != 0 {
-		t.Normal = a.Normal
-	}
-	if t.Big == 0 && a.Big != 0 {
-		t.Big = a.Big
-	}
+	t.Timeouts.Communication = a.Timeouts.Communication
+	t.Timeouts.Connection = a.Timeouts.Connection
+	t.Timeouts.Context = a.Timeouts.Context
+	t.Timeouts.HostCreation = a.HostCreation
+	t.Timeouts.HostCleanup = a.Timeouts.HostCleanup
+	t.Timeouts.HostOperation = a.HostOperation
+	t.Timeouts.HostLongOperation = a.Timeouts.HostLongOperation
+	t.Timeouts.Operation = a.Operation
+	t.Timeouts.Metadata = a.Timeouts.Metadata
+	t.Timeouts.MetadataReadAfterWrite = a.MetadataReadAfterWrite
+	t.Timeouts.SSHConnection = a.Timeouts.SSHConnection
+	t.Timeouts.RebootTimeout = a.Timeouts.RebootTimeout
+	t.Delays.Small = a.Delays.Small
+	t.Delays.Normal = a.Delays.Normal
+	t.Delays.Big = a.Delays.Big
 
 	return nil
 }
@@ -334,6 +316,15 @@ func (t *MutableTimings) MetadataReadAfterWriteTimeout() time.Duration {
 	return t.Timeouts.MetadataReadAfterWrite
 }
 
+// RebootTimeout returns the time we wait after a reboot before trying SSH connection
+func (t *MutableTimings) RebootTimeout() time.Duration {
+	if t == nil {
+		return RebootTimeout()
+	}
+
+	return t.Timeouts.RebootTimeout
+}
+
 // SmallDelay returns the duration of a small delay
 func (t *MutableTimings) SmallDelay() time.Duration {
 	if t == nil {
@@ -363,66 +354,84 @@ func (t *MutableTimings) BigDelay() time.Duration {
 
 // CommunicationTimeout ...
 func CommunicationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultCommunicationTimeout, "SAFESCALE_COMMUNICATION_TIMEOUT")
 }
 
 // MetadataReadAfterWriteTimeout ...
 func MetadataReadAfterWriteTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultMetadataReadAfterWriteTimeout, "SAFESCALE_METADATA_READ_AFTER_WRITE_TIMEOUT")
+}
+
+func RebootTimeout() time.Duration {
+	//FIXME: add env var doc
+	return getFromEnv(defaultWaitAfterReboot, "SAFESCALE_REBOOT_TIMEOUT")
 }
 
 // HostLongOperationTimeout ...
 func HostLongOperationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostLongOperationTimeout, "SAFESCALE_HOST_LONG_OPERATION_TIMEOUT")
 }
 
 // ContextTimeout ...
 func ContextTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultContextTimeout, "SAFESCALE_CONTEXT_TIMEOUT")
 }
 
 // MetadataTimeout ...
 func MetadataTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultMetadataTimeout, "SAFESCALE_METADATA_TIMEOUT")
 }
 
 // HostOperationTimeout ...
 func HostOperationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostOperationTimeout, "SAFESCALE_HOST_TIMEOUT")
 }
 
 // OperationTimeout ...
 func OperationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultOperationTimeout, "SAFESCALE_OP_TIMEOUT", "SAFESCALE_OPERATION_TIMEOUT")
 }
 
 // HostCreationTimeout ...
 func HostCreationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostCreationTimeout, "SAFESCALE_HOST_CREATION_TIMEOUT")
 }
 
 // HostCleanupTimeout ...
 func HostCleanupTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostCleanupTimeout, "SAFESCALE_HOST_CLEANUP_TIMEOUT")
 }
 
 // SSHConnectionTimeout ...
 func SSHConnectionTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultSSHConnectionTimeout, "SAFESCALE_SSH_CONNECTION_TIMEOUT", "SAFESCALE_SSH_CONNECT_TIMEOUT")
 }
 
 // ConnectionTimeout ...
 func ConnectionTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultConnectionTimeout, "SAFESCALE_CONNECTION_TIMEOUT", "SAFESCALE_CONNECT_TIMEOUT")
 }
 
 // ExecutionTimeout ...
 func ExecutionTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultExecutionTimeout, "SAFESCALE_EXECUTION_TIMEOUT")
 }
 
 // MinDelay ...
 func MinDelay() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultSmallDelay, "SAFESCALE_MIN_DELAY", "SAFESCALE_SMALL_DELAY")
 }
 
@@ -433,6 +442,7 @@ func SmallDelay() time.Duration {
 
 // NormalDelay returns the duration for a normal delay
 func NormalDelay() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultNormalDelay, "SAFESCALE_DEFAULT_DELAY", "SAFESCALE_NORMAL_DELAY")
 }
 
@@ -443,5 +453,6 @@ func DefaultDelay() time.Duration {
 
 // BigDelay returns the duration for a big delay
 func BigDelay() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultBigDelay, "SAFESCALE_BIG_DELAY")
 }

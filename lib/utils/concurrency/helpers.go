@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"golang.org/x/exp/rand"
 )
 
@@ -33,7 +33,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	c := make(chan struct{})
 	go func() {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer close(c)
 		wg.Wait()

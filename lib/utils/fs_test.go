@@ -17,11 +17,11 @@
 package utils
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_LazyRemove(t *testing.T) {
@@ -53,6 +53,6 @@ func Test_LazyRemove(t *testing.T) {
 			os.RemoveAll("/tmp/safescale-test")
 		}
 	})
-	fmt.Println(log)
+	require.EqualValues(t, log, "")
 
 }

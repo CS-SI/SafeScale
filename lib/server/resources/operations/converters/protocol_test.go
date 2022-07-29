@@ -22,13 +22,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,37 +36,42 @@ func Test_SSHConfigFromProtocolToSystem(t *testing.T) {
 
 	sc := &protocol.SshConfig{
 		User:       "User",
-		Host:       "Host",
+		HostName:   "HostName",
+		Host:       "127.0.0.1",
 		PrivateKey: "PrivateKey",
 		Port:       0,
 		Gateway: &protocol.SshConfig{
 			User:       "Gateway User",
-			Host:       "Gateway Host",
+			HostName:   "Gateway HostName",
+			Host:       "127.0.0.1",
 			PrivateKey: "Gateway PrivateKey",
 			Port:       0,
-			HostName:   "Gateway HostName",
 		},
 		SecondaryGateway: &protocol.SshConfig{
 			User:       "SecondaryGateway User",
-			Host:       "SecondaryGateway Host",
+			HostName:   "SecondaryGateway HostName",
+			Host:       "127.0.0.1",
 			PrivateKey: "SecondaryGateway PrivateKey",
 			Port:       0,
-			HostName:   "SecondaryGateway HostName",
 		},
-		HostName: "HostName",
 	}
 
 	ssc := SSHConfigFromProtocolToSystem(sc)
-
-	require.EqualValues(t, sc.User, ssc.User)
-	require.EqualValues(t, sc.HostName, ssc.Hostname)
-	require.EqualValues(t, sc.Host, ssc.IPAddress)
-	require.EqualValues(t, sc.PrivateKey, ssc.PrivateKey)
-	require.EqualValues(t, sc.Port, ssc.Port)
-
-}
-
-func Test_FeatureSettingsFromProtocolToResource(t *testing.T) {
+	user, xerr := ssc.GetUser()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.User, user)
+	host, xerr := ssc.GetHostname()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.HostName, host)
+	ipaddr, xerr := ssc.GetIPAddress()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.Host, ipaddr)
+	pkey, xerr := ssc.GetPrivateKey()
+	require.Nil(t, xerr)
+	require.EqualValues(t, sc.PrivateKey, pkey)
+	port, xerr := ssc.GetPort()
+	require.Nil(t, xerr)
+	require.EqualValues(t, 0, port)
 
 	rfs := FeatureSettingsFromProtocolToResource(nil)
 	require.EqualValues(t, reflect.TypeOf(rfs).String(), "resources.FeatureSettings")
@@ -195,6 +200,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -217,6 +223,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -239,6 +246,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -261,6 +269,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -283,6 +292,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "isn't a valid number",
 		},
@@ -305,6 +315,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "'count' can only use '='",
 		},
@@ -327,6 +338,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "'count' can only use '='",
 		},
@@ -349,6 +361,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "'count' can only use '='",
 		},
@@ -371,6 +384,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 				MasterOptions:  "",
 				NodeOptions:    "",
 				Force:          false,
+				DefaultSshPort: 22,
 			},
 			expectError: "",
 		},
@@ -396,7 +410,7 @@ func Test_ClusterRequestFromProtocolToAbstract(t *testing.T) {
 
 func Test_SecurityGroupRuleFromProtocolToAbstract(t *testing.T) {
 
-	result, xerr := SecurityGroupRuleFromProtocolToAbstract(nil)
+	_, xerr := SecurityGroupRuleFromProtocolToAbstract(nil)
 	if xerr == nil {
 		t.Error("Can't SecurityGroupRuleFromProtocolToAbstract to nil pointer")
 		t.Fail()
@@ -411,7 +425,7 @@ func Test_SecurityGroupRuleFromProtocolToAbstract(t *testing.T) {
 		PortTo:    0,
 		Involved:  []string{"Involve1"},
 	}
-	result, xerr = SecurityGroupRuleFromProtocolToAbstract(sgr)
+	result, xerr := SecurityGroupRuleFromProtocolToAbstract(sgr)
 	if xerr != nil {
 		t.Error(xerr)
 		t.Fail()
@@ -480,10 +494,8 @@ func Test_SecurityGroupRulesFromProtocolToAbstract(t *testing.T) {
 		switch asgrs[i].Direction {
 		case securitygroupruledirection.Ingress:
 			require.EqualValues(t, asgrs[i].Sources, sgrs[i].Involved)
-			break
 		case securitygroupruledirection.Egress:
 			require.EqualValues(t, asgrs[i].Targets, sgrs[i].Involved)
-			break
 		}
 
 	}

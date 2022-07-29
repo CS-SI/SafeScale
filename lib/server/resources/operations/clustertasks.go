@@ -27,29 +27,29 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusternodetype"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/consts"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/v21/lib/utils/net"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusternodetype"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/consts"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
@@ -60,6 +60,8 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
 	}
+
+	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
 	_, xerr := LoadCluster(task.Context(), instance.Service(), req.Name)
@@ -88,7 +90,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure && !cleanFailure {
 			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-			if derr := instance.MetadataCore.Delete(); derr != nil {
+			if derr := instance.MetadataCore.Delete(ctx); derr != nil {
 				logrus.Errorf(
 					"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 				)
@@ -110,7 +112,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Obtain number of nodes to create
-	_, privateNodeCount, _, xerr := instance.determineRequiredNodes()
+	_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -120,10 +122,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		req.InitialNodeCount = privateNodeCount
 	}
 	if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-		logrus.Warnf(
-			"[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')",
-			req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String(),
-		)
+		logrus.Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
 		req.InitialNodeCount = privateNodeCount
 	}
 
@@ -140,7 +139,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 	// logrus.Warnf("This is the cluster creation request before determination: %s", spew.Sdump(req))
 
-	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(req)
+	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -214,7 +213,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 			logrus.Debugf("Cleaning up on failure, deleting Hosts...")
 			var list map[uint]*propertiesv3.ClusterNode
-			derr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
@@ -261,7 +260,6 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					}
 				}
 
-				// FIXME: WaitGroupFor NEEDS more UT
 				_, _, tgerr = tg.WaitGroupFor(timings.HostLongOperationTimeout())
 				tgerr = debug.InjectPlannedFail(tgerr)
 				if tgerr != nil {
@@ -280,7 +278,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Sets nominal state of the new Cluster in metadata
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// update metadata about disabled default features
 		innerXErr := props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
@@ -332,120 +330,118 @@ func (instance *Cluster) firstLight(ctx context.Context, req abstract.ClusterReq
 		return xerr
 	}
 
-	xerr = instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			aci, ok := clonable.(*abstract.ClusterIdentity)
-			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
-
-			innerXErr := props.Alter(
-				clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterFeatures' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
-					// VPL: For now, always disable addition of feature proxycache
-					featuresV1.Disabled["proxycache"] = struct{}{}
-					// ENDVPL
-					for k := range req.DisabledDefaultFeatures {
-						featuresV1.Disabled[k] = struct{}{}
-					}
-					return nil
-				},
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		aci, ok := clonable.(*abstract.ClusterIdentity)
+		if !ok {
+			return fail.InconsistentError(
+				"'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String(),
 			)
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to disable feature 'proxycache'")
-			}
+		}
 
-			// Sets initial state of the new Cluster and create metadata
-			innerXErr = props.Alter(
-				clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-					stateV1, ok := clonable.(*propertiesv1.ClusterState)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					stateV1.State = clusterstate.Creating
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to set initial state of Cluster")
-			}
-
-			// sets default sizing from req
-			innerXErr = props.Alter(clusterproperty.DefaultsV3, func(clonable data.Clonable) fail.Error {
-				defaultsV3, ok := clonable.(*propertiesv3.ClusterDefaults)
+		innerXErr := props.Alter(
+			clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 				if !ok {
 					return fail.InconsistentError(
-						"'*propertiesv3.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
-				}
-
-				defaultsV3.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
-				defaultsV3.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
-				defaultsV3.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
-				defaultsV3.Image = req.NodesDef.Image
-				defaultsV3.GatewayTemplateID = req.GatewaysDef.Template
-				defaultsV3.NodeTemplateID = req.NodesDef.Template
-				defaultsV3.MasterTemplateID = req.MastersDef.Template
-				defaultsV3.FeatureParameters = req.FeatureParameters
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
-			innerXErr = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
-				compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv1.ClusterComposite' expected, '%s' provided",
+						"'*propertiesv1.ClusterFeatures' expected, '%s' provided",
 						reflect.TypeOf(clonable).String(),
 					)
 				}
-
-				compositeV1.Tenants = []string{req.Tenant}
+				// VPL: For now, always disable addition of feature proxycache
+				featuresV1.Disabled["proxycache"] = struct{}{}
+				// ENDVPL
+				for k := range req.DisabledDefaultFeatures {
+					featuresV1.Disabled[k] = struct{}{}
+				}
 				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
+			},
+		)
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to disable feature 'proxycache'")
+		}
+
+		// Sets initial state of the new Cluster and create metadata
+		innerXErr = props.Alter(
+			clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+				stateV1, ok := clonable.(*propertiesv1.ClusterState)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
+				stateV1.State = clusterstate.Creating
+				return nil
+			},
+		)
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to set initial state of Cluster")
+		}
+
+		// sets default sizing from req
+		innerXErr = props.Alter(clusterproperty.DefaultsV3, func(clonable data.Clonable) fail.Error {
+			defaultsV3, ok := clonable.(*propertiesv3.ClusterDefaults)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv3.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
 			}
 
-			// Create a KeyPair for the user cladm
-			kpName := "cluster_" + req.Name + "_cladm_key"
-			kp, innerXErr := abstract.NewKeyPair(kpName)
-			if innerXErr != nil {
-				return innerXErr
+			defaultsV3.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
+			defaultsV3.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
+			defaultsV3.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
+			defaultsV3.Image = req.NodesDef.Image
+			defaultsV3.GatewayTemplateID = req.GatewaysDef.Template
+			defaultsV3.NodeTemplateID = req.NodesDef.Template
+			defaultsV3.MasterTemplateID = req.MastersDef.Template
+			defaultsV3.FeatureParameters = req.FeatureParameters
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
+		innerXErr = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
+			compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv1.ClusterComposite' expected, '%s' provided",
+					reflect.TypeOf(clonable).String(),
+				)
 			}
 
-			aci.Keypair = kp
+			compositeV1.Tenants = []string{req.Tenant}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			// Generate needed password for account cladm
-			cladmPassword, innerErr := utils.GeneratePassword(16)
-			if innerErr != nil {
-				return fail.ConvertError(innerErr)
-			}
-			aci.AdminPassword = cladmPassword
+		// Create a KeyPair for the user cladm
+		kpName := "cluster_" + req.Name + "_cladm_key"
+		kp, innerXErr := abstract.NewKeyPair(kpName)
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			// Links maker based on Flavor
-			return instance.bootstrap(aci.Flavor)
-		},
-	)
+		aci.Keypair = kp
+
+		// Generate needed password for account cladm
+		cladmPassword, innerErr := utils.GeneratePassword(16)
+		if innerErr != nil {
+			return fail.ConvertError(innerErr)
+		}
+		aci.AdminPassword = cladmPassword
+
+		// Links maker based on Flavor
+		return instance.bootstrap(aci.Flavor)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	return xerr
 }
 
 // determineSizingRequirements calculates the sizings needed for the hosts of the Cluster
-func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest) (
+func (instance *Cluster) determineSizingRequirements(ctx context.Context, req abstract.ClusterRequest) (
 	_ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, xerr fail.Error,
 ) {
 
@@ -459,7 +455,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// Determine default image
 	imageQuery = req.NodesDef.Image
 	if imageQuery == "" {
-		cfg, xerr := instance.Service().GetConfigurationOptions()
+		cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
 		if xerr != nil {
 			return nil, nil, nil, fail.Wrap(xerr, "failed to get configuration options")
 		}
@@ -480,7 +476,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		imageQuery = consts.DEFAULTOS
 	}
 	svc := instance.Service()
-	_, imageID, xerr = determineImageID(svc, imageQuery)
+	_, imageID, xerr = determineImageID(ctx, svc, imageQuery)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -515,7 +511,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 
-	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
+	tmpl, xerr := svc.FindTemplateBySizing(ctx, *gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -547,7 +543,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 
-	tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
+	tmpl, xerr = svc.FindTemplateBySizing(ctx, *mastersDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -578,7 +574,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 
-	tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
+	tmpl, xerr = svc.FindTemplateBySizing(ctx, *nodesDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -586,7 +582,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	nodesDef.Template = tmpl.ID
 
 	// Updates property
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
@@ -621,9 +617,11 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
+	ctx := task.Context()
+
 	// Determine if getGateway Failover must be set
 	svc := instance.Service()
-	caps, xerr := svc.GetCapabilities()
+	caps, xerr := svc.GetCapabilities(ctx)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -679,25 +677,23 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			}
 		}()
 	}
-	xerr = instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-					networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(
+			clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+				networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					networkV3.NetworkID = networkInstance.GetID()
-					networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
-					networkV3.CIDR = req.CIDR
-					return nil
-				},
-			)
-		},
-	)
+				networkV3.NetworkID = networkInstance.GetID()
+				networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
+				networkV3.CIDR = req.CIDR
+				return nil
+			},
+		)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -797,7 +793,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	}
 
 	// Updates again Cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
 			if !ok {
@@ -871,6 +867,8 @@ func (instance *Cluster) createHostResources(
 		}
 		return fail.AbortedError(lerr, "parent task killed")
 	}
+
+	ctx := task.Context()
 
 	var startedTasks []concurrency.Task
 
@@ -977,7 +975,7 @@ func (instance *Cluster) createHostResources(
 		return fail.AbortedError(lerr, "parent task killed")
 	}
 
-	masterCount, _, _, xerr := instance.determineRequiredNodes()
+	masterCount, _, _, xerr := instance.determineRequiredNodes(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1045,7 +1043,7 @@ func (instance *Cluster) createHostResources(
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			list, merr := instance.unsafeListMasters()
+			list, merr := instance.unsafeListMasters(task.Context())
 			if merr != nil {
 				_ = ferr.AddConsequence(merr)
 				return
@@ -1131,7 +1129,7 @@ func (instance *Cluster) createHostResources(
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			list, merr := instance.unsafeListNodes()
+			list, merr := instance.unsafeListNodes(task.Context())
 			if merr != nil {
 				_ = ferr.AddConsequence(merr)
 				return
@@ -1379,7 +1377,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1406,7 +1404,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, xerr
 	}
 
-	xerr = svc.StartHost(id)
+	xerr = svc.StartHost(task.Context(), id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1440,7 +1438,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1460,7 +1458,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 	}
 
 	svc := instance.Service()
-	xerr = svc.StopHost(id, false)
+	xerr = svc.StopHost(task.Context(), id, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1493,7 +1491,7 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1564,7 +1562,7 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1620,7 +1618,7 @@ type taskCreateMastersParameters struct {
 func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1667,7 +1665,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 
 	logrus.Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
-	timeout := 2 * timings.HostCreationTimeout()
+	timeout := 3 * timings.HostCreationTimeout()
 	var collectedErs []error
 
 	for i := uint(1); i <= p.count; i++ {
@@ -1729,12 +1727,14 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
+	ctx := task.Context()
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMasterParameters)
@@ -1750,7 +1750,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
-	hostReq.ResourceName, xerr = instance.buildHostname("master", clusternodetype.Master)
+	hostReq.ResourceName, xerr = instance.buildHostname(ctx, "master", clusternodetype.Master)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1772,30 +1772,28 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	// First creates master in metadata, to keep track of its tried creation, in case of failure
 	var nodeIdx uint
-	xerr = instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(
+			clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					nodesV3.GlobalLastIndex++
-					nodeIdx = nodesV3.GlobalLastIndex
+				nodesV3.GlobalLastIndex++
+				nodeIdx = nodesV3.GlobalLastIndex
 
-					node := &propertiesv3.ClusterNode{
-						NumericalID: nodeIdx,
-						Name:        hostReq.ResourceName,
-					}
-					nodesV3.ByNumericalID[nodeIdx] = node
-					return nil
-				},
-			)
-		},
-	)
+				node := &propertiesv3.ClusterNode{
+					NumericalID: nodeIdx,
+					Name:        hostReq.ResourceName,
+				}
+				nodesV3.ByNumericalID[nodeIdx] = node
+				return nil
+			},
+		)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
@@ -1804,24 +1802,22 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			derr := instance.Alter(
-				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(
-						clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-							if !ok {
-								return fail.InconsistentError(
-									"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-									reflect.TypeOf(clonable).String(),
-								)
-							}
+			derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(
+					clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+						nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+						if !ok {
+							return fail.InconsistentError(
+								"'*propertiesv3.ClusterNodes' expected, '%s' provided",
+								reflect.TypeOf(clonable).String(),
+							)
+						}
 
-							delete(nodesV3.ByNumericalID, nodeIdx)
-							return nil
-						},
-					)
-				},
-			)
+						delete(nodesV3.ByNumericalID, nodeIdx)
+						return nil
+					},
+				)
+			})
 			if derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
@@ -1840,7 +1836,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	netCfg, xerr := instance.GetNetworkConfig()
+	netCfg, xerr := instance.GetNetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1854,19 +1850,17 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	// -- Create the Host --
-	xerr = subnet.Inspect(
-		func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
+	xerr = subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError(
+				"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+			)
+		}
 
-			hostReq.Subnets = []*abstract.Subnet{as}
-			return nil
-		},
-	)
+		hostReq.Subnets = []*abstract.Subnet{as}
+		return nil
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1913,48 +1907,46 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		}
 	}()
 
-	xerr = instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(
+			clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					node := nodesV3.ByNumericalID[nodeIdx]
-					node.ID = hostInstance.GetID()
+				node := nodesV3.ByNumericalID[nodeIdx]
+				node.ID = hostInstance.GetID()
 
-					// Recover public IP of the master if it exists
-					var inErr fail.Error
-					node.PublicIP, inErr = hostInstance.GetPublicIP(task.Context())
-					if inErr != nil {
-						switch inErr.(type) {
-						case *fail.ErrNotFound:
-							// No public IP, this can happen; continue
-						default:
-							return inErr
-						}
-					}
-
-					// Recover the private IP of the master that MUST exist
-					node.PrivateIP, inErr = hostInstance.GetPrivateIP(task.Context())
-					if inErr != nil {
+				// Recover public IP of the master if it exists
+				var inErr fail.Error
+				node.PublicIP, inErr = hostInstance.GetPublicIP(task.Context())
+				if inErr != nil {
+					switch inErr.(type) {
+					case *fail.ErrNotFound:
+						// No public IP, this can happen; continue
+					default:
 						return inErr
 					}
+				}
 
-					// Updates property
-					nodesV3.Masters = append(nodesV3.Masters, nodeIdx)
-					nodesV3.MasterByName[node.Name] = node.NumericalID
-					nodesV3.MasterByID[node.ID] = node.NumericalID
+				// Recover the private IP of the master that MUST exist
+				node.PrivateIP, inErr = hostInstance.GetPrivateIP(task.Context())
+				if inErr != nil {
+					return inErr
+				}
 
-					return nil
-				},
-			)
-		},
-	)
+				// Updates property
+				nodesV3.Masters = append(nodesV3.Masters, nodeIdx)
+				nodesV3.MasterByName[node.Name] = node.NumericalID
+				nodesV3.MasterByID[node.ID] = node.NumericalID
+
+				return nil
+			},
+		)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
@@ -2005,7 +1997,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2048,7 +2040,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 
 	logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
 
-	masters, xerr := instance.unsafeListMasters()
+	masters, xerr := instance.unsafeListMasters(task.Context())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2147,7 +2139,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2224,7 +2216,7 @@ type taskCreateNodesParameters struct {
 func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2270,7 +2262,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		return nil, xerr
 	}
 
-	timeout := 2 * timings.HostCreationTimeout()
+	timeout := 3 * timings.HostCreationTimeout()
 	for i := uint(1); i <= p.count; i++ {
 		captured := i
 		_, xerr := tg.StartWithTimeout(
@@ -2317,12 +2309,14 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
+	ctx := task.Context()
 
 	// Convert then validate parameters
 	p, ok := params.(taskCreateNodeParameters)
@@ -2338,7 +2332,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
-	hostReq.ResourceName, xerr = instance.buildHostname("node", clusternodetype.Node)
+	hostReq.ResourceName, xerr = instance.buildHostname(ctx, "node", clusternodetype.Node)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2360,29 +2354,27 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
 	var nodeIdx uint
-	xerr = instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(
+			clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					nodesV3.GlobalLastIndex++
-					nodeIdx = nodesV3.GlobalLastIndex
-					node := &propertiesv3.ClusterNode{
-						NumericalID: nodeIdx,
-						Name:        hostReq.ResourceName,
-					}
-					nodesV3.ByNumericalID[nodeIdx] = node
-					return nil
-				},
-			)
-		},
-	)
+				nodesV3.GlobalLastIndex++
+				nodeIdx = nodesV3.GlobalLastIndex
+				node := &propertiesv3.ClusterNode{
+					NumericalID: nodeIdx,
+					Name:        hostReq.ResourceName,
+				}
+				nodesV3.ByNumericalID[nodeIdx] = node
+				return nil
+			},
+		)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
@@ -2394,7 +2386,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
@@ -2411,7 +2403,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
-	netCfg, xerr := instance.GetNetworkConfig()
+	netCfg, xerr := instance.GetNetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2425,7 +2417,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	// -- Create the Host instance corresponding to the new node --
-	xerr = subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2491,43 +2483,41 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	// -- update cluster metadata --
 	var node *propertiesv3.ClusterNode
-	xerr = instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(
+			clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					node = nodesV3.ByNumericalID[nodeIdx]
-					node.ID = hostInstance.GetID()
-					var inErr fail.Error
-					node.PublicIP, inErr = hostInstance.GetPublicIP(task.Context())
-					if inErr != nil {
-						switch inErr.(type) {
-						case *fail.ErrNotFound:
-							// No public IP, this can happen; continue
-						default:
-							return inErr
-						}
-					}
-
-					if node.PrivateIP, inErr = hostInstance.GetPrivateIP(task.Context()); inErr != nil {
+				node = nodesV3.ByNumericalID[nodeIdx]
+				node.ID = hostInstance.GetID()
+				var inErr fail.Error
+				node.PublicIP, inErr = hostInstance.GetPublicIP(task.Context())
+				if inErr != nil {
+					switch inErr.(type) {
+					case *fail.ErrNotFound:
+						// No public IP, this can happen; continue
+					default:
 						return inErr
 					}
+				}
 
-					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
-					nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
-					nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
+				if node.PrivateIP, inErr = hostInstance.GetPrivateIP(task.Context()); inErr != nil {
+					return inErr
+				}
 
-					return nil
-				},
-			)
-		},
-	)
+				nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
+				nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
+				nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
+
+				return nil
+			},
+		)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
@@ -2536,37 +2526,35 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	// Starting from here, rollback on cluster metadata in case of failure
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			derr := instance.Alter(
-				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(
-						clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-							if !ok {
-								return fail.InconsistentError(
-									"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-									reflect.TypeOf(clonable).String(),
+			derr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(
+					clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+						nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+						if !ok {
+							return fail.InconsistentError(
+								"'*propertiesv3.ClusterNodes' expected, '%s' provided",
+								reflect.TypeOf(clonable).String(),
+							)
+						}
+
+						if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, nodeIdx); found {
+							length := len(nodesV3.PrivateNodes)
+							if indexInSlice < length-1 {
+								nodesV3.PrivateNodes = append(
+									nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...,
 								)
+							} else {
+								nodesV3.PrivateNodes = nodesV3.PrivateNodes[:indexInSlice]
 							}
+						}
 
-							if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, nodeIdx); found {
-								length := len(nodesV3.PrivateNodes)
-								if indexInSlice < length-1 {
-									nodesV3.PrivateNodes = append(
-										nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...,
-									)
-								} else {
-									nodesV3.PrivateNodes = nodesV3.PrivateNodes[:indexInSlice]
-								}
-							}
+						delete(nodesV3.PrivateNodeByName, hostInstance.GetName())
+						delete(nodesV3.PrivateNodeByID, hostInstance.GetID())
 
-							delete(nodesV3.PrivateNodeByName, hostInstance.GetName())
-							delete(nodesV3.PrivateNodeByID, hostInstance.GetID())
-
-							return nil
-						},
-					)
-				},
-			)
+						return nil
+					},
+				)
+			})
 			if derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
@@ -2599,7 +2587,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2643,7 +2631,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	list, err := instance.unsafeListNodes()
+	list, err := instance.unsafeListNodes(task.Context())
 	err = debug.InjectPlannedFail(err)
 	if err != nil {
 		return nil, err
@@ -2729,7 +2717,7 @@ type taskConfigureNodeParameters struct {
 func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2806,7 +2794,7 @@ type taskDeleteNodeOnFailureParameters struct {
 func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2854,7 +2842,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2875,6 +2863,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	if p.node.ID == "" && p.node.Name == "" {
 		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
 	}
+
 	nodeName := p.node.Name
 	if nodeName == "" {
 		nodeName = p.node.ID
@@ -2916,7 +2905,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -2985,7 +2974,7 @@ type taskDeleteHostOnFailureParameters struct {
 func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -3029,12 +3018,12 @@ type taskUpdateClusterInventoryMasterParameters struct {
 	inventoryData string
 }
 
-// taskUpdateClusterInventoryMaster task to updates a Host (master) ansible inventory
+// taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory
 func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -3059,7 +3048,7 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	rfcItem := Item{
 		Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
-		RemoteOwner:  "safescale:safescale",
+		RemoteOwner:  "cladm:cladm",
 		RemoteRights: "ou+rx-w,g+rwx",
 	}
 
@@ -3092,10 +3081,10 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 	}
 	if retcode != 0 {
 		xerr := fail.NewError("%sfail to clean previous temporaries", prerr)
-		_ = xerr.Annotate("cmd", cmd)
-		_ = xerr.Annotate("stdout", stdout)
-		_ = xerr.Annotate("stderr", stderr)
-		_ = xerr.Annotate("retcode", retcode)
+		xerr.Annotate("cmd", cmd)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode)
 		return xerr
 	}
 
@@ -3106,7 +3095,8 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 	}
 
 	// Run update commands
-	for i, cmd := range commands {
+	for a, acmd := range commands {
+		i, cmd := a, acmd
 		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, connTimeout, delay)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -3114,10 +3104,10 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 		}
 		if retcode != 0 {
 			xerr := fail.NewError(errmsg[i])
-			_ = xerr.Annotate("cmd", cmd)
-			_ = xerr.Annotate("stdout", stdout)
-			_ = xerr.Annotate("stderr", stderr)
-			_ = xerr.Annotate("retcode", retcode)
+			xerr.Annotate("cmd", cmd)
+			xerr.Annotate("stdout", stdout)
+			xerr.Annotate("stderr", stderr)
+			xerr.Annotate("retcode", retcode)
 			return xerr
 		}
 	}

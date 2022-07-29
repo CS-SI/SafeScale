@@ -19,7 +19,7 @@ package exitcode_test
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/stretchr/testify/require"
 )
 

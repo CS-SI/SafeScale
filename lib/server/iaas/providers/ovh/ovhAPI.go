@@ -17,15 +17,16 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ovh/go-ovh/ovh"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail.Error) {
-	authOpts, xerr := p.GetAuthenticationOptions()
+func (p *provider) requestOVHAPI(ctx context.Context, url string, httpCode string) (interface{}, fail.Error) {
+	authOpts, xerr := p.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -60,11 +61,11 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail
 			return nil, fail.ConvertError(err)
 		}
 	case "PUT":
-		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt
 	case "POST":
-		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt
 	case "DELETE":
-		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt
 	default:
 		return nil, fail.NewError("unexpected HTTP code: %s", httpCode)
 	}

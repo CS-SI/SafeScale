@@ -25,7 +25,7 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 
 func xerrShouldNotBeARawError(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"if $*_, err := $x; $err != nil { $*_ } else if $_ { $*_ }",
@@ -50,7 +50,7 @@ func xerrShouldNotBeARawError(m dsl.Matcher) {
 
 func failuresShouldBeXerrs(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"if $*_, err := $x; $err != nil { $*_ } else if $_ { $*_ }",

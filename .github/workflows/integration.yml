@@ -1,0 +1,61 @@
+name: Custom Integrations CI
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - hotfixes
+      - 'release/**'
+      - 'review/**'
+  pull_request:
+    branches:
+      - master
+      - develop
+      - hotfixes
+      - 'release/**'
+      - 'review/**'
+
+env:
+  PROTOCVERSION: 3.17.3
+
+jobs:
+
+  build-linux:
+
+    strategy:
+      matrix:
+        go: [ 1.17.12 ]
+        tags: [ releasetags, integration, allintegration ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go }}
+    - name: Install Protoc
+      run: |
+        cd /tmp
+        PROTOCZIP=$(echo "protoc-${{env.PROTOCVERSION}}-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip")
+        wget https://github.com/google/protobuf/releases/download/v${{env.PROTOCVERSION}}/$PROTOCZIP
+        sudo unzip -d /opt/protoc $PROTOCZIP
+        sudo chmod a+r -R /opt/protoc
+        sudo chmod a+xr /opt/protoc/bin/protoc
+        sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
+    - run: make ${{ matrix.tags }} ci with-coverage validtest
+    - uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        name: linux-artefacts
+        path: |
+          generation_results.log
+          vet_results.log
+          test_results.log
+          style_results.log
+          semgrep_results.log
+          integration_vet_results.log
+          integration_results.log
+          go.mod
+          go.sum

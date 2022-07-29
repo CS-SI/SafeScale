@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,7 +54,7 @@ func TestSubnet_NewSubnet(t *testing.T) {
 
 func TestSubnet_Replace(t *testing.T) {
 
-	var s *Subnet = nil
+	var s *Subnet
 	replaced, err := s.Replace(NewSubnet())
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -105,7 +105,7 @@ func TestSubnet_Clone(t *testing.T) {
 func TestSubnet_Serialize(t *testing.T) {
 
 	var s *Subnet = nil
-	serial, err := s.Serialize()
+	_, err := s.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
@@ -127,7 +127,7 @@ func TestSubnet_Serialize(t *testing.T) {
 	s.DefaultSSHPort = 42
 	s.SingleHostCIDRIndex = 14
 
-	serial, err = s.Serialize()
+	serial, err := s.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -150,7 +150,7 @@ func TestSubnet_Serialize(t *testing.T) {
 func TestSubnet_Deserialize(t *testing.T) {
 
 	serial := []byte("{\"id\":\"Subnet ID\",\"name\":\"Subnet Name\",\"network\":\"Subnet Network\",\"mask\":\"Subnet CIDR\",\"domain\":\"Subnet Domain\",\"dns_servers\":[\"DNS1\",\"DNS2\",\"DNS3\"], \"gateway_id\":[\"GatewayID1\",\"GatewayID2\",\"GatewayID3\"],\"ip_version\":4,\"gw_security_group_id\":\"Subnet GWSecurityGroupID\",\"publicip_security_group_id\":\"Subnet PublicIPSecurityGroupID\",\"internal_security_group_id\":\"Subnet InternalSecurityGroupID\",\"default_ssh_port\":42,\"single_host_cidr_index\":14,\"tags\":{\"CreationDate\":\"2022-01-21T16:46:55+01:00\",\"ManagedBy\":\"safescale\"}}\"")
-	var s *Subnet = nil
+	var s *Subnet
 	err := s.Deserialize(serial)
 	if err == nil {
 		t.Error("Can't deserialize to nil pointer")
@@ -199,15 +199,9 @@ func TestVirtualIP_Clone(t *testing.T) {
 
 func TestSubnet_GetName(t *testing.T) {
 
-	var s *Subnet = nil
-	name := s.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.Name = "Subnet Name"
-	name = s.GetName()
+	name := s.GetName()
 	if name != s.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -217,15 +211,9 @@ func TestSubnet_GetName(t *testing.T) {
 
 func TestSubnet_GetID(t *testing.T) {
 
-	var s *Subnet = nil
-	id := s.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.ID = "Subnet ID"
-	id = s.GetID()
+	id := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -235,15 +223,9 @@ func TestSubnet_GetID(t *testing.T) {
 
 func TestSubnet_GetCIDR(t *testing.T) {
 
-	var s *Subnet = nil
-	cidr := s.GetCIDR()
-	if cidr != "" {
-		t.Error("Can't get cidr from nil pointer")
-		t.Fail()
-	}
-	s = NewSubnet()
+	s := NewSubnet()
 	s.ID = "Subnet ID"
-	cidr = s.GetCIDR()
+	cidr := s.GetCIDR()
 	if cidr != s.CIDR {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -253,12 +235,7 @@ func TestSubnet_GetCIDR(t *testing.T) {
 
 func TestVirtualIP_IsNull(t *testing.T) {
 
-	var v *VirtualIP = nil
-	if !v.IsNull() {
-		t.Error("Nil pointer virtual ip is null")
-		t.Fail()
-	}
-	v = NewVirtualIP()
+	v := NewVirtualIP()
 	if !v.IsNull() {
 		t.Error("Virtual ip without ID or Name is null")
 		t.Fail()

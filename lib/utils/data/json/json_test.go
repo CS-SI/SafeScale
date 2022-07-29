@@ -30,12 +30,10 @@ func Test_Marshal(t *testing.T) {
 		"c": "3",
 	}
 	encoded, err := Marshal(data)
+	require.Nil(t, err)
 	var decoded map[string]string
 	err = Unmarshal(encoded, &decoded)
-	if err != nil {
-		t.Error(err)
-		t.Fail()
-	}
+	require.Nil(t, err)
 	require.EqualValues(t, data, decoded)
 
 	formatted, err := MarshalIndent(data, "", "    ")

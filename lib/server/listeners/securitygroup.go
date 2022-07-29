@@ -25,14 +25,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
-	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
+	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SecurityGroupListener security-group service server grpc
@@ -125,7 +125,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, xerr
 	}
 
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // Clear calls the clear method to remove all rules from a security group
@@ -255,7 +255,7 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 		return nil, xerr
 	}
 
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // Delete a host
@@ -350,7 +350,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	}
 
 	tracer.Trace("Rule successfully added to security group %s", sgRefLabel)
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // DeleteRule deletes a rule identified by id from a security group
@@ -399,7 +399,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	}
 
 	tracer.Trace("Rule successfully added to security group %s", refLabel)
-	return sgInstance.ToProtocol()
+	return sgInstance.ToProtocol(ctx)
 }
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata
@@ -434,7 +434,7 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return empty, fail.NotImplementedError("not yet implemented")
+	return empty, fail.NotImplementedError("not yet implemented") // FIXME: Technical debt
 }
 
 // Bonds lists the resources bound to the Security Group

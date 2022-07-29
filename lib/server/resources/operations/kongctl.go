@@ -25,19 +25,19 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 )
 
 const (
@@ -53,6 +53,7 @@ type KongController struct {
 	gateway          resources.Host
 	gatewayPrivateIP string
 	gatewayPublicIP  string
+	service          iaas.Service
 }
 
 // NewKongController creates a controller for Kong
@@ -74,7 +75,11 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	}
 
 	var present bool
-	installedFeatures := addressedGateway.InstalledFeatures()
+	installedFeatures, xerr := addressedGateway.InstalledFeatures(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	for _, v := range installedFeatures {
 		if v == "edgeproxy4subnet" || v == "reverseproxy" {
 			present = true
@@ -97,7 +102,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		}
 
 		if results.Successful() {
-			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = addressedGateway.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 					if !ok {
@@ -107,7 +112,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 					item := propertiesv1.NewHostInstalledFeature()
 					item.HostContext = true
 					var innerXErr fail.Error
-					item.Requires, innerXErr = featureInstance.Dependencies()
+					item.Requires, innerXErr = featureInstance.Dependencies(ctx)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -131,6 +136,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	ctrl := &KongController{
 		subnet:  subnet,
 		gateway: addressedGateway,
+		service: svc,
 	}
 	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -179,7 +185,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	xerr = k.subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = k.subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -426,7 +432,7 @@ func (k *KongController) addSourceControl(ctx context.Context,
 }
 
 func (k *KongController) get(ctx context.Context, name, url string) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -453,7 +459,7 @@ func (k *KongController) get(ctx context.Context, name, url string) (map[string]
 
 // post creates a rule
 func (k *KongController) post(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -488,7 +494,7 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 
 // put updates or creates a rule
 func (k *KongController) put(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -523,7 +529,7 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 
 // patch updates an existing rule
 func (k *KongController) patch(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	timings, xerr := k.subnet.Service().Timings()
+	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
 	}

@@ -19,23 +19,21 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // Server getServer structure
 type Server struct {
 	svc       iaas.Service
-	SSHConfig *system.SSHConfig
+	SSHConfig sshapi.Connector
 }
 
 // NewServer instantiates a new nfs.getServer struct
-func NewServer(svc iaas.Service, sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
+func NewServer(svc iaas.Service, sshconfig sshapi.Connector) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
@@ -58,7 +56,7 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 		return xerr
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install nfs server")
@@ -126,7 +124,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 		"Path": path,
 	}
 
-	stdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
 		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
@@ -153,7 +151,7 @@ func (s *Server) MountBlockDevice(
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		istdout, xerr := executeScript(ctx, timings, *s.SSHConfig, "block_device_mount.sh", data)
+		istdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
 			return fail.Wrap(xerr, "error executing script to mount block device")
@@ -180,15 +178,9 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 		"UUID": volumeUUID,
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// FIXME: Add a retry here only if we catch an executionerror of a connection error
+	// FIXME: Add a retry here only if we catch an ExecutionError or a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		stdout, xerr := executeScript(task.Context(), timings, *s.SSHConfig, "block_device_unmount.sh", data)
+		stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")

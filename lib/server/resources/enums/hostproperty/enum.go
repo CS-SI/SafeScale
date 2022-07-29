@@ -29,4 +29,5 @@ const (
 	ClusterMembershipV1 = "10" // optional additional information about the cluster membership of the host
 	SecurityGroupsV1    = "11" // optional additional information about security groups binded to the host
 	NetworkV2           = "12" // optional additional information about network of the host
+	LabelsV1            = "13" // optional additional info about tags (ie labels without value) on the host
 )

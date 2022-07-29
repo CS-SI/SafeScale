@@ -20,9 +20,9 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/system/nfs/enums/securityflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ExportOptions ...
@@ -87,7 +87,7 @@ func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
 		"Options": s.Options,
 	}
 
-	if _, xerr := executeScript(ctx, timings, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
+	if _, xerr := executeScript(ctx, timings, s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
 		return fail.Wrap(xerr, "failed to export a shared directory")
 	}
 	return nil

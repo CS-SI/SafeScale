@@ -17,10 +17,11 @@
 package converters
 
 import (
+	"context"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
 )
 
 func Test_IndexedListOfClusterNodesFromResourceToProtocol(t *testing.T) {
@@ -73,7 +74,7 @@ func Test_IndexedListOfClusterNodesFromResourceToProtocol(t *testing.T) {
 func Test_FeatureSliceFromResourceToProtocol(t *testing.T) {
 
 	rf := []resources.Feature{}
-	flr := FeatureSliceFromResourceToProtocol(rf)
+	flr := FeatureSliceFromResourceToProtocol(context.Background(), rf)
 	if len(flr.Features) != 0 {
 		t.Error("Invalid FeatureListResponse len")
 		t.Fail()

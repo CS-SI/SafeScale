@@ -19,7 +19,7 @@ package net
 import (
 	"net"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // FirstIncludedSubnet takes a parent CIDR range and gives the first subnet within it

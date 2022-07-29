@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -28,19 +27,19 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installaction"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/template"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installaction"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 const (
@@ -439,7 +438,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -464,7 +463,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	if xerr != nil {
 		return nil, xerr
 	}
-	clonedV["CIDR"], xerr = sn.GetCIDR()
+	clonedV["CIDR"], xerr = sn.GetCIDR(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -540,9 +539,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		Remote: filename,
 	}
 
-	defer func() {
-		_ = os.Remove(rfcItem.Local)
-	}()
 	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

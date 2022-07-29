@@ -20,11 +20,11 @@ package network
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
@@ -43,7 +43,7 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 
 	var list []*abstract.Network
 
-	withDefaultNetwork, err := svc.HasDefaultNetwork()
+	withDefaultNetwork, err := svc.HasDefaultNetwork(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 	// Default network has no metadata, so we need to "simulate" them.
 	if withDefaultNetwork {
 		var an *abstract.Network
-		an, xerr = svc.GetDefaultNetwork()
+		an, xerr = svc.GetDefaultNetwork(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -78,5 +78,5 @@ func New(svc iaas.Service) (resources.Network, fail.Error) {
 
 // Load loads the metadata of a network and returns an instance of resources.Network
 func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-	return operations.LoadNetwork(ctx, svc, ref, operations.WithReloadOption)
+	return operations.LoadNetwork(ctx, svc, ref)
 }

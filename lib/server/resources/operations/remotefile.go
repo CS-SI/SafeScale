@@ -21,16 +21,16 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
 // Item is a helper struct to ease the copy of local files to remote
@@ -42,7 +42,7 @@ type Item struct {
 }
 
 // Upload transfers the local file to the hostname
-func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Error) {
+func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Error) { // FIXME: This function should NOT exist
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -64,28 +64,25 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 	}
 
 	// Check the local file exists first
-	if _, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
+	uploadSize := int64(0)
+	info, err := os.Stat(rfc.Local)
+	if errors.Is(err, os.ErrNotExist) {
 		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+	uploadSize = info.Size()
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+	uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
+	timeout := 6 * uploadTime
 
-	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracerFromCtx(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	iterations := 0
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			iterations++
-			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, timings.ExecutionTimeout())
+			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, uploadTime)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				xerr.Annotate("iterations", iterations)
@@ -110,7 +107,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 			return nil
 		},
 		timings.NormalDelay(),
-		timings.ConnectionTimeout()+2*timings.ExecutionTimeout(),
+		timeout,
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
@@ -135,14 +132,25 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
 
+	defer func() {
+		if derr := utils.LazyRemove(f.Name()); derr != nil {
+			logrus.Debugf("Error deleting file: %v", derr)
+		}
+	}()
+
 	rfc.Local = f.Name()
-	return rfc.Upload(ctx, host)
+	xerr = rfc.Upload(ctx, host)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // RemoveRemote deletes the remote file from host

@@ -22,18 +22,18 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
-	featurefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/feature"
-	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/cluster"
+	featurefactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/feature"
+	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -98,7 +98,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		return converters.FeatureSliceFromResourceToProtocol(list), nil
+		return converters.FeatureSliceFromResourceToProtocol(ctx, list), nil
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
 		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
@@ -116,7 +116,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		return converters.FeatureSliceFromResourceToProtocol(list), nil
+		return converters.FeatureSliceFromResourceToProtocol(ctx, list), nil
 	}
 
 	// Should not reach this

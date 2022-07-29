@@ -17,8 +17,8 @@
 package metadataupgrade
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 type Mutator interface {

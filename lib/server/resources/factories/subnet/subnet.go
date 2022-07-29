@@ -20,11 +20,11 @@ package subnet
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // List returns a list of available subnets
@@ -39,5 +39,5 @@ func New(svc iaas.Service) (resources.Subnet, fail.Error) {
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
 func Load(ctx context.Context, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef, operations.WithReloadOption)
+	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef)
 }

@@ -18,10 +18,13 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestClusterInstalledFeature_IsNull(t *testing.T) {
@@ -85,6 +88,13 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 		t.Fail()
 	}
 
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, err = cif2.Replace(network)
+	require.Contains(t, err.Error(), "p is not a *ClusterInstalledFeature")
+
 }
 
 func TestClusterInstalledFeature_Clone(t *testing.T) {
@@ -122,8 +132,8 @@ func TestClusterFeatures_IsNull(t *testing.T) {
 		t.Fail()
 	}
 	cf = &ClusterFeatures{
-		Installed: make(map[string]*ClusterInstalledFeature, 0),
-		Disabled:  make(map[string]struct{}, 0),
+		Installed: make(map[string]*ClusterInstalledFeature),
+		Disabled:  make(map[string]struct{}),
 	}
 	if !cf.IsNull() {
 		t.Error("ClusterFeatures without Installed or Disabledis null")
@@ -135,7 +145,7 @@ func TestClusterFeatures_IsNull(t *testing.T) {
 				Name: "Feature",
 			},
 		},
-		Disabled: make(map[string]struct{}, 0),
+		Disabled: make(map[string]struct{}),
 	}
 	if cf.IsNull() {
 		t.Error("ClusterFeatures is not null")
@@ -154,6 +164,19 @@ func TestClusterFeatures_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := cif2.Replace(network)
+	if xerr == nil {
+		t.Error("ClusterFeatures.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *ClusterFeatures") {
+		t.Errorf("Expect error \"p is not a *ClusterFeatures\", has \"%s\"", xerr.Error())
+	}
 
 }
 
@@ -179,7 +202,7 @@ func TestClusterFeatures_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)

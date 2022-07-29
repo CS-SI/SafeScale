@@ -18,6 +18,7 @@ package iaas
 
 import (
 	"bytes"
+	"context"
 	"expvar"
 	"fmt"
 	"regexp"
@@ -25,19 +26,18 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 var (
 	allProviders = map[string]Service{}
-	allTenants   = map[string]string{}
 )
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
@@ -54,8 +54,8 @@ func Register(name string, provider providers.Provider) {
 
 // GetTenantNames returns all known tenants names
 func GetTenantNames() (map[string]string, fail.Error) {
-	err := loadConfig()
-	return allTenants, err
+	out, err := loadConfig()
+	return out, err
 }
 
 // GetTenants returns all known tenants
@@ -72,6 +72,8 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 func UseService(tenantName, metadataVersion string) (newService Service, ferr fail.Error) {
 	defer fail.OnExitLogError(&ferr)
 	defer fail.OnPanic(&ferr)
+
+	ctx := context.Background() // FIXME: Check context
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
@@ -159,7 +161,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		// 	}
 		// }
 
-		authOpts, xerr := providerInstance.GetAuthenticationOptions()
+		authOpts, xerr := providerInstance.GetAuthenticationOptions(ctx)
 		if xerr != nil {
 			return NullService(), xerr
 		}
@@ -217,7 +219,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 			}
 
 			if metadataLocationConfig.BucketName == "" {
-				serviceCfg, xerr := providerInstance.GetConfigurationOptions()
+				serviceCfg, xerr := providerInstance.GetConfigurationOptions(ctx)
 				if xerr != nil {
 					return NullService(), xerr
 				}
@@ -423,6 +425,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	config.AuthURL, _ = ostorage["AuthURL"].(string)   // nolint
 	config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
+	if _, ok := ostorage["Direct"]; ok {
+		config.Direct, _ = ostorage["Direct"].(bool) // nolint
+	}
 
 	if config.User, ok = ostorage["AccessKey"].(string); !ok {
 		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
@@ -701,10 +706,13 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	return config, nil
 }
 
-func loadConfig() fail.Error {
+// loadConfig loads the configuration from tenants file
+// FIXME: use an approach allowing to refresh tenant list from file on file change, not at each call
+func loadConfig() (map[string]string, fail.Error) {
+	out := map[string]string{}
 	tenantsCfg, v, err := getTenantsFromCfg()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, tenant := range tenantsCfg {
 		name, ok := tenant["name"].(string)
@@ -717,15 +725,15 @@ func loadConfig() fail.Error {
 				provider, ok = tenant["Client"].(string)
 			}
 			if ok {
-				allTenants[name] = provider
+				out[name] = provider
 			} else {
-				return fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
+				return nil, fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}
 		} else {
-			return fail.SyntaxError("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
+			return nil, fail.SyntaxError("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
 		}
 	}
-	return nil
+	return out, nil
 }
 
 func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
