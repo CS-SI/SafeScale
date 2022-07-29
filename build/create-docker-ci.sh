@@ -10,7 +10,7 @@ fi
 stamp=$(date +"%s")
 
 [ -z "$BRANCH_NAME" ] && BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-[ -z "$GOVERSION" ] && GOVERSION=1.16.15
+[ -z "$GOVERSION" ] && GOVERSION=1.17.12
 [ -z "$PROTOVERSION" ] && PROTOVERSION=3.17.3
 
 [ -z "$TENANT" ] && {

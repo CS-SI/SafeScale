@@ -60,7 +60,7 @@ type Service interface {
 	GetProviderName() (string, fail.Error)
 	GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
-	GetCache(context.Context) (cache.CacheInterface, fail.Error) // FIXME: OPP Check performance diff tuning this thing // FIXME: OPP Remove this
+	GetCache(context.Context) (cache.CacheInterface, fail.Error)
 	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)
 	ListHostsByName(context.Context, bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)

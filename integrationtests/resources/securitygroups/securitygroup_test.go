@@ -26,6 +26,6 @@ import (
 )
 
 func Test_SecurityGroupCreate(t *testing.T) {
-	helpers.InSection("securitygroups").Clear().AddScenario(OpenPortClosedByDefaultInGateway)
+	helpers.InSection("securitygroups").Clear().AddScenario(OpenPortClosedByDefaultInGateway).AddScenario(GwFirewallWorks)
 	helpers.RunScenarios(t)
 }

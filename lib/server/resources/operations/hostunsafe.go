@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/sirupsen/logrus"
@@ -77,7 +78,12 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	)
 
 	hostName := instance.GetName()
-	sshProfile, xerr := instance.GetSSHConfig(ctx)
+	sshCfg, xerr := instance.GetSSHConfig(ctx)
+	if xerr != nil {
+		return retCode, stdOut, stdErr, xerr
+	}
+
+	sshProfile, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return retCode, stdOut, stdErr, xerr
 	}
@@ -235,7 +241,12 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		stdout, stderr string
 	)
 	retcode := -1
-	sshProfile, xerr := instance.GetSSHConfig(ctx)
+	sshCfg, xerr := instance.GetSSHConfig(ctx)
+	if xerr != nil {
+		return retcode, stdout, stderr, xerr
+	}
+
+	sshProfile, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}

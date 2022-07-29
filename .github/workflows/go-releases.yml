@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ 1.17.12, 1.17.11 ]
+        go: [ 1.17.12 ]
         tags: [ releasetags ]
 
     runs-on: ubuntu-latest

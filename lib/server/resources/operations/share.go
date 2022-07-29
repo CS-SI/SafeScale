@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
@@ -419,7 +420,12 @@ func (instance *Share) Create(
 		return xerr
 	}
 
-	nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
+	sshProfile, xerr := sshfactory.NewConnector(sshConfig)
+	if xerr != nil {
+		return xerr
+	}
+
+	nfsServer, xerr := nfs.NewServer(instance.Service(), sshProfile)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -790,8 +796,13 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	targetSSHConfig, xerr := target.GetSSHConfig(ctx)
+	targetSSHConfigThing, xerr := target.GetSSHConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	sshProfile, xerr := sshfactory.NewConnector(targetSSHConfigThing)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -811,7 +822,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 			ashareID := hostSharesV1.ByName[shareName]
 
-			nfsClient, xerr := nfs.NewNFSClient(targetSSHConfig)
+			nfsClient, xerr := nfs.NewNFSClient(sshProfile)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -869,7 +880,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 			}
 
 			var nfsClient *nfs.Client
-			if nfsClient, derr = nfs.NewNFSClient(targetSSHConfig); derr != nil {
+			if nfsClient, derr = nfs.NewNFSClient(sshProfile); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to delete Share"))
 				return
 			}
@@ -1034,7 +1045,12 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 				return inErr
 			}
 
-			nfsClient, inErr := nfs.NewNFSClient(sshConfig)
+			sshProfile, inErr := sshfactory.NewConnector(sshConfig)
+			if inErr != nil {
+				return inErr
+			}
+
+			nfsClient, inErr := nfs.NewNFSClient(sshProfile)
 			if inErr != nil {
 				return inErr
 			}
@@ -1164,7 +1180,12 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 
-			nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
+			sshProfile, xerr := sshfactory.NewConnector(sshConfig)
+			if xerr != nil {
+				return xerr
+			}
+
+			nfsServer, xerr := nfs.NewServer(instance.Service(), sshProfile)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
