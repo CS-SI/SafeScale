@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"net"
 
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
@@ -28,10 +31,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -322,7 +324,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	}
 
 	// Reload from metadata before sending the response
-	xerr = networkInstance.Reload()
+	xerr = networkInstance.Reload(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
