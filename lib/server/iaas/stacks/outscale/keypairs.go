@@ -17,17 +17,18 @@
 package outscale
 
 import (
+	"context"
 	"encoding/base64"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (akp *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -35,7 +36,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, ferr fail.Erro
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var xerr fail.Error
@@ -55,14 +56,14 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (ferr fail.Error) {
 		return fail.InvalidParameterError("keyair", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcCreateKeypair(keypair.Name, base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)))
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (akp *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -70,7 +71,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadKeypairByName(id)
@@ -86,12 +87,12 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, ferr fail.Error
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s stack) ListKeyPairs(context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadKeypairs(nil)
@@ -111,16 +112,16 @@ func (s stack) ListKeyPairs() (_ []*abstract.KeyPair, ferr fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(name string) (ferr fail.Error) {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if name == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("name")
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteKeypair(name)
+	return s.rpcDeleteKeypair(id)
 }

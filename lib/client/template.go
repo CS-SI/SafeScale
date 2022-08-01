@@ -20,18 +20,18 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
-// host is the safescale client part handling hosts
-type template struct {
+// templateConsumer is the safescale client part handling templates
+type templateConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
-// List returns the list of available templates on the current tenant
-func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.TemplateList, error) {
+// List returns the list of available templates on the current templates
+func (t templateConsumer) List(all, scannedOnly bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -53,7 +53,7 @@ func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.
 }
 
 // Match returns the list of templates that match the sizing
-func (t template) Match(sizing string, timeout time.Duration) (*protocol.TemplateList, error) {
+func (t templateConsumer) Match(sizing string, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -75,7 +75,7 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 }
 
 // Inspect returns details of a template identified by name of ID
-func (t template) Inspect(name string, timeout time.Duration) (*protocol.HostTemplate, error) {
+func (t templateConsumer) Inspect(name string, timeout time.Duration) (*protocol.HostTemplate, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 

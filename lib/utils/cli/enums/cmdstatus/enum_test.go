@@ -19,7 +19,7 @@ package cmdstatus_test
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/cmdstatus"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/cmdstatus"
 	"github.com/stretchr/testify/require"
 )
 

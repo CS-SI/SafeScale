@@ -17,6 +17,7 @@
 package iaas
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -30,49 +31,47 @@ import (
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	imagefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	imagefilters "github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract/filters/templates"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -o mocks/mock_service.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas.Service
+//go:generate minimock -o mocks/mock_service.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas.Service
 
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
-	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
-	FilterImages(string) ([]*abstract.Image, fail.Error)
-	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
-	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
-	FindTemplateByID(string) (*abstract.HostTemplate, fail.Error)
+	FilterImages(context.Context, string) ([]*abstract.Image, fail.Error)
+	FindTemplateBySizing(context.Context, abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
+	FindTemplateByName(context.Context, string) (*abstract.HostTemplate, fail.Error)
+	FindTemplateByID(context.Context, string) (*abstract.HostTemplate, fail.Error)
 	GetProviderName() (string, fail.Error)
-	GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error)
+	GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
-	InspectHostByName(string) (*abstract.HostFull, fail.Error)
-	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
-	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
-	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
-	ObjectStorageConfiguration() (objectstorage.Config, fail.Error)
-	SearchImage(string) (*abstract.Image, fail.Error)
-	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
-	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
-	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
+	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)
+	ListHostsByName(context.Context, bool) (map[string]*abstract.HostFull, fail.Error)
+	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
+	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
+	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
+	TenantCleanup(context.Context, bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
+	WaitHostState(context.Context, string, hoststate.Enum, time.Duration) fail.Error
+	WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
 
-	LookupRuleInSecurityGroup(*abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
+	LookupRuleInSecurityGroup(context.Context, *abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
@@ -150,7 +149,7 @@ func (instance service) GetProviderName() (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
-	svcName, xerr := instance.GetName()
+	svcName, xerr := instance.Provider.GetName()
 	if xerr != nil {
 		return "", xerr
 	}
@@ -168,7 +167,7 @@ func (instance service) GetName() (string, fail.Error) {
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
-func (instance service) GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error) {
+func (instance service) GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
@@ -201,7 +200,7 @@ func (instance *service) ChangeProvider(provider providers.Provider) fail.Error 
 // WaitHostState waits until a host achieves state 'state'
 // If host is in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
+func (instance service) WaitHostState(ctx context.Context, hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -225,7 +224,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 				return
 			}
 		}()
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		for {
 			select {
@@ -234,7 +233,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 			default:
 			}
 
-			host, rerr = instance.InspectHost(host) // FIXME: all service functions should accept ctx in order to be canceled
+			host, rerr = instance.InspectHost(ctx, host) // FIXME: all service functions should accept ctx in order to be canceled
 			if rerr != nil {
 				errCh <- rerr
 				return
@@ -273,9 +272,7 @@ func (instance service) WaitHostState(hostID string, state hoststate.Enum, timeo
 
 // WaitVolumeState waits a host achieve state
 // If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitVolumeState(
-	volumeID string, state volumestate.Enum, timeout time.Duration,
-) (*abstract.Volume, fail.Error) {
+func (instance service) WaitVolumeState(ctx context.Context, volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -287,7 +284,7 @@ func (instance service) WaitVolumeState(
 	next := make(chan bool)
 	vc := make(chan *abstract.Volume)
 
-	go pollVolume(instance, volumeID, state, cout, next, vc)
+	go pollVolume(ctx, instance, volumeID, state, cout, next, vc)
 	for {
 		select {
 		case res := <-cout:
@@ -308,13 +305,13 @@ func (instance service) WaitVolumeState(
 }
 
 func pollVolume(
-	svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
+	ctx context.Context, svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
 ) {
 	var crash error
-	defer fail.OnPanic(&crash)
+	defer fail.SilentOnPanic(&crash)
 
 	for {
-		v, err := svc.InspectVolume(volumeID)
+		v, err := svc.InspectVolume(ctx, volumeID)
 		if err != nil {
 			cout <- 0
 			return
@@ -333,12 +330,12 @@ func pollVolume(
 
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (instance service) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
+func (instance service) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := instance.Provider.ListTemplates(all)
+	allTemplates, err := instance.Provider.ListTemplates(ctx, all)
 	if err != nil {
 		return nil, err
 	}
@@ -351,12 +348,12 @@ func (instance service) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.
 }
 
 // FindTemplateByName returns the template by its name
-func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate, fail.Error) {
+func (instance service) FindTemplateByName(ctx context.Context, name string) (*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := instance.Provider.ListTemplates(true)
+	allTemplates, err := instance.Provider.ListTemplates(ctx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -370,12 +367,12 @@ func (instance service) FindTemplateByName(name string) (*abstract.HostTemplate,
 }
 
 // FindTemplateByID returns the template by its ID
-func (instance service) FindTemplateByID(id string) (*abstract.HostTemplate, fail.Error) {
+func (instance service) FindTemplateByID(ctx context.Context, id string) (*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, err := instance.Provider.ListTemplates(true)
+	allTemplates, err := instance.Provider.ListTemplates(ctx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -389,18 +386,18 @@ func (instance service) FindTemplateByID(id string) (*abstract.HostTemplate, fai
 }
 
 // FindTemplateBySizing returns an abstracted template corresponding to the Host Sizing Requirements
-func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
+func (instance service) FindTemplateBySizing(ctx context.Context, sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
 	useScannerDB := sizing.MinGPU > 0 || sizing.MinCPUFreq > 0
 
 	// if we want a specific template and there is a match, we take it
 	if sizing.Template != "" {
 		// if match by name, we take it
-		if ft, xerr := instance.FindTemplateByName(sizing.Template); xerr == nil {
+		if ft, xerr := instance.FindTemplateByName(ctx, sizing.Template); xerr == nil {
 			return ft, nil
 		}
 
 		// match by ID is also valid
-		if ft, xerr := instance.FindTemplateByID(sizing.Template); xerr == nil {
+		if ft, xerr := instance.FindTemplateByID(ctx, sizing.Template); xerr == nil {
 			return ft, nil
 		}
 
@@ -408,7 +405,7 @@ func (instance service) FindTemplateBySizing(sizing abstract.HostSizingRequireme
 		logrus.Warnf("template %s not found", sizing.Template)
 	}
 
-	templates, xerr := instance.ListTemplatesBySizing(sizing, useScannerDB)
+	templates, xerr := instance.ListTemplatesBySizing(ctx, sizing, useScannerDB)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
 	}
@@ -477,16 +474,16 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 // ListTemplatesBySizing select templates satisfying sizing requirements
 // returned list is ordered by size fitting
 func (instance service) ListTemplatesBySizing(
-	sizing abstract.HostSizingRequirements, force bool,
+	ctx context.Context, sizing abstract.HostSizingRequirements, force bool,
 ) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true, "").Entering()
+	tracer := debug.NewTracer(context.Background(), true, "").Entering()
 	defer tracer.Exiting()
 
-	allTpls, rerr := instance.ListTemplates(false)
+	allTpls, rerr := instance.ListTemplates(ctx, false)
 	if rerr != nil {
 		return nil, rerr
 	}
@@ -509,7 +506,7 @@ func (instance service) ListTemplatesBySizing(
 				return nil, fail.NewError(noHostError)
 			}
 		} else {
-			authOpts, rerr := instance.GetAuthenticationOptions()
+			authOpts, rerr := instance.GetAuthenticationOptions(ctx)
 			if rerr != nil {
 				return nil, rerr
 			}
@@ -544,7 +541,7 @@ func (instance service) ListTemplatesBySizing(
 				var images []abstract.StoredCPUInfo
 				for _, f := range imageList {
 					imageFound := abstract.StoredCPUInfo{}
-					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+					if err := json.Unmarshal(f, &imageFound); err != nil {
 						return nil, fail.Wrap(err, "error unmarshalling image '%s'")
 					}
 
@@ -692,12 +689,12 @@ func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
-func (instance service) FilterImages(filter string) ([]*abstract.Image, fail.Error) {
+func (instance service) FilterImages(ctx context.Context, filter string) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := instance.ListImages(false)
+	imgs, err := instance.ListImages(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -766,12 +763,12 @@ func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 }
 
 // ListImages reduces the list of needed, if all bool is true, all images are returned, if not, images are filtered using blacklists and whitelists
-func (instance service) ListImages(all bool) ([]*abstract.Image, fail.Error) {
+func (instance service) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := instance.Provider.ListImages(all)
+	imgs, err := instance.Provider.ListImages(ctx, all)
 	if err != nil {
 		return nil, err
 	}
@@ -779,7 +776,7 @@ func (instance service) ListImages(all bool) ([]*abstract.Image, fail.Error) {
 }
 
 // SearchImage search an image corresponding to OS Name
-func (instance service) SearchImage(osname string) (*abstract.Image, fail.Error) {
+func (instance service) SearchImage(ctx context.Context, osname string) (*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -787,7 +784,7 @@ func (instance service) SearchImage(osname string) (*abstract.Image, fail.Error)
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
 	}
 
-	imgs, xerr := instance.ListImages(false)
+	imgs, xerr := instance.ListImages(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -852,7 +849,7 @@ func addPadding(in string, maxLength int) string {
 }
 
 // CreateHostWithKeyPair creates a host
-func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
+func (instance service) CreateHostWithKeyPair(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
@@ -860,7 +857,7 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 	found := true
 	ah := abstract.NewHostCore()
 	ah.Name = request.ResourceName
-	_, rerr := instance.InspectHost(ah)
+	_, rerr := instance.InspectHost(ctx, ah)
 	var nilErrNotFound *fail.ErrNotFound = nil // nolint
 	if rerr != nil && rerr != nilErrNotFound {
 		if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
@@ -881,7 +878,7 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 	}
 
 	kpName := kpNameuuid.String()
-	kp, rerr := instance.CreateKeyPair(kpName)
+	kp, rerr := instance.CreateKeyPair(ctx, kpName)
 	if rerr != nil {
 		return nil, nil, nil, rerr
 	}
@@ -900,7 +897,7 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 		// DefaultGateway: request.DefaultGateway,
 		TemplateID: request.TemplateID,
 	}
-	host, userData, rerr := instance.CreateHost(hostReq)
+	host, userData, rerr := instance.CreateHost(ctx, hostReq)
 	if rerr != nil {
 		return nil, nil, nil, rerr
 	}
@@ -908,12 +905,12 @@ func (instance service) CreateHostWithKeyPair(request abstract.HostRequest) (*ab
 }
 
 // ListHostsByName list hosts by name
-func (instance service) ListHostsByName(details bool) (map[string]*abstract.HostFull, fail.Error) {
+func (instance service) ListHostsByName(ctx context.Context, details bool) (map[string]*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	hosts, err := instance.ListHosts(details)
+	hosts, err := instance.ListHosts(ctx, details)
 	if err != nil {
 		return nil, err
 	}
@@ -927,17 +924,17 @@ func (instance service) ListHostsByName(details bool) (map[string]*abstract.Host
 // TenantCleanup removes everything related to SafeScale from tenant (mainly metadata)
 // if force equals false and there is metadata, returns an error
 // WARNING: !!! this will make SafeScale unable to handle the resources !!!
-func (instance service) TenantCleanup(force bool) fail.Error {
+func (instance service) TenantCleanup(ctx context.Context, force bool) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	return fail.NotImplementedError("service.TenantCleanup() not yet implemented")
+	return fail.NotImplementedError("service.TenantCleanup() not yet implemented") // FIXME: Technical debt
 }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (instance service) LookupRuleInSecurityGroup(
-	asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
+	ctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
 ) (bool, fail.Error) {
 	if valid.IsNil(asg) {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
@@ -956,23 +953,23 @@ func (instance service) LookupRuleInSecurityGroup(
 }
 
 // InspectHostByName hides the "complexity" of the way to get Host by name
-func (instance service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+func (instance service) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return instance.InspectHost(abstract.NewHostCore().SetName(name))
+	return instance.InspectHost(ctx, abstract.NewHostCore().SetName(name))
 }
 
 // InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
-func (instance service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
+func (instance service) InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return instance.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+	return instance.InspectSecurityGroup(ctx, abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 }
 
 // ObjectStorageConfiguration returns the configuration of Object Storage location
-func (instance service) ObjectStorageConfiguration() (objectstorage.Config, fail.Error) {
+func (instance service) ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error) {
 	if valid.IsNil(instance) {
 		return objectstorage.Config{}, fail.InvalidInstanceError()
 	}

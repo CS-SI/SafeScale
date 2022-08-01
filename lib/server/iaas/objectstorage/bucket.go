@@ -17,20 +17,21 @@
 package objectstorage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"gomodules.xyz/stow"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage.Bucket
+//go:generate minimock -o ../mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage.Bucket
 
 const (
 	// RootPath defines the path corresponding of the root of a Bucket
@@ -102,7 +103,7 @@ func (instance bucket) CreateObject(objectName string) (_ Object, ferr fail.Erro
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -118,7 +119,7 @@ func (instance bucket) InspectObject(objectName string) (_ Object, ferr fail.Err
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -175,7 +176,7 @@ func (instance bucket) ListObjects(path, prefix string) (_ []string, ferr fail.E
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%s, %s)", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%s, %s)", path, prefix).Entering().Exiting()
 
 	var list []string
 
@@ -211,7 +212,7 @@ func (instance bucket) Browse(path, prefix string, callback func(Object) fail.Er
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -242,7 +243,7 @@ func (instance bucket) Clear(path, prefix string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -278,7 +279,7 @@ func (instance bucket) DeleteObject(objectName string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -294,7 +295,7 @@ func (instance bucket) ReadObject(objectName string, target io.Writer, from int6
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -314,7 +315,7 @@ func (instance bucket) WriteObject(objectName string, source io.Reader, sourceSi
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -346,7 +347,7 @@ func (instance bucket) WriteMultiPartObject(
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -380,7 +381,7 @@ func (instance bucket) GetCount(path, prefix string) (_ int64, ferr fail.Error) 
 		return 0, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	var count int64
 	fullPath := buildFullPath(path, prefix)
@@ -414,7 +415,7 @@ func (instance bucket) GetSize(path, prefix string) (_ int64, _ string, ferr fai
 		return 0, "", fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 

@@ -21,12 +21,13 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"golang.org/x/net/context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // stack contains the needs to operate on stack OpenStack
@@ -64,6 +65,8 @@ func NullStack() *stack { // nolint
 
 // New authenticates and returns a stack pointer
 func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
+	ctx := context.Background()
+
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
@@ -92,7 +95,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		cfgOpts:  cfg,
 	}
 
-	// FIXME: detect versions instead of statically declare them
+	// TODO: detect versions instead of statically declare them
 	s.versions = map[string]string{
 		"compute": "v2",
 		"volume":  "v2",
@@ -212,8 +215,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		}
 	}
 
-	// FIXME: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
-	validAvailabilityZones, xerr := s.ListAvailabilityZones()
+	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
+	validAvailabilityZones, xerr := s.ListAvailabilityZones(ctx)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

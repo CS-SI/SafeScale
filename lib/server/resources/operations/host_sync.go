@@ -4,28 +4,23 @@
 package operations
 
 import (
-	"fmt"
-	"time"
+	"os"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 )
 
-func getCommand(file string) string {
-	command := fmt.Sprintf("sudo bash %s; exit $?", file)
-	logrus.Debugf("running '%s'", command)
-	return command
-}
+func getDefaultConnectorType() (string, error) {
+	if choice := os.Getenv("SAFESCALE_DEFAULT_SSH"); choice != "" {
+		switch choice {
+		case "cli":
+			return "cli", nil
+		case "lib":
+			return "lib", nil
+		default:
+			logrus.Debugf("unexpected SAFESCALE_DEFAULT_SSH: %s, using cli instead", choice)
+			return "cli", nil
+		}
+	}
 
-func getPhase2Timeout(timings temporal.Timings) time.Duration {
-	return timings.HostOperationTimeout()
-}
-
-func getPhase4Timeout(timings temporal.Timings) time.Duration {
-	waitingTime := temporal.MaxTimeout(4*time.Minute, timings.HostCreationTimeout())
-	return waitingTime
-}
-
-func inBackground() bool {
-	return false
+	return "cli", nil
 }

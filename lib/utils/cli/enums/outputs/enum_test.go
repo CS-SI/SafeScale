@@ -19,7 +19,7 @@ package outputs_test
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/stretchr/testify/require"
 )
 

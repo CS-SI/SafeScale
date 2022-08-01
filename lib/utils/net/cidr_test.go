@@ -28,37 +28,42 @@ import (
 func Test_CIDRToIPv4Range(t *testing.T) {
 
 	// Invalid
-	ipv4l, ipv4h, err := CIDRToIPv4Range("")
+	_, _, err := CIDRToIPv4Range("")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be empty string"), true)
+	require.Contains(t, err.Error(), "cannot be empty string")
 
-	ipv4l, ipv4h, err = CIDRToIPv4Range("0.0.0.0/-4")
+	_, _, err = CIDRToIPv4Range("0.0.0.0/-4")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "fail to extract network mask"), true)
+	require.Contains(t, err.Error(), "fail to extract network mask")
 
-	ipv4l, ipv4h, err = CIDRToIPv4Range("127.0.0.1/33")
+	_, _, err = CIDRToIPv4Range("127.0.0.1/33")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid network mask"), true)
+	require.Contains(t, err.Error(), "invalid network mask")
 
 	// Almost valid
-	ipv4l, ipv4h, err = CIDRToIPv4Range("127.0.0.1")
+	ipv4l, ipv4h, err := CIDRToIPv4Range("127.0.0.1")
+	require.Nil(t, err)
 	require.EqualValues(t, ipv4l, "127.0.0.1")
 	require.EqualValues(t, ipv4h, "127.0.0.1")
 
 	ipv4l, ipv4h, err = CIDRToIPv4Range("0/28")
+	require.Nil(t, err)
 	require.EqualValues(t, ipv4l, "0.0.0.0")
 	require.EqualValues(t, ipv4h, "0.0.0.15")
 
 	ipv4l, ipv4h, err = CIDRToIPv4Range("douze.168.0.1/24")
+	require.Nil(t, err)
 	require.EqualValues(t, ipv4l, "0.168.0.1")
 	require.EqualValues(t, ipv4h, "0.168.0.255")
 
 	// valid
 	ipv4l, ipv4h, err = CIDRToIPv4Range("127.0.0.1/32")
+	require.Nil(t, err)
 	require.EqualValues(t, ipv4l, "127.0.0.1")
 	require.EqualValues(t, ipv4h, "127.0.0.1")
 
 	ipv4l, ipv4h, err = CIDRToIPv4Range("192.168.0.1/24")
+	require.Nil(t, err)
 	require.EqualValues(t, ipv4l, "192.168.0.1")
 	require.EqualValues(t, ipv4h, "192.168.0.255")
 
@@ -67,25 +72,27 @@ func Test_CIDRToIPv4Range(t *testing.T) {
 func Test_CIDRToUInt32Range(t *testing.T) {
 
 	// Invalid
-	ipv4l, ipv4h, err := CIDRToUInt32Range("")
+	_, _, err := CIDRToUInt32Range("")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "cannot be empty string"), true)
+	require.Contains(t, err.Error(), "cannot be empty string")
 
-	ipv4l, ipv4h, err = CIDRToUInt32Range("0.0.0.0/-4")
+	_, _, err = CIDRToUInt32Range("0.0.0.0/-4")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "fail to extract network mask"), true)
+	require.Contains(t, err.Error(), "fail to extract network mask")
 
-	ipv4l, ipv4h, err = CIDRToUInt32Range("127.0.0.1/33")
+	_, _, err = CIDRToUInt32Range("127.0.0.1/33")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid network mask"), true)
+	require.Contains(t, err.Error(), "invalid network mask")
 
 	// Almost valid
-	ipv4l, ipv4h, err = CIDRToUInt32Range("127.0.0.1")
+	ipv4l, ipv4h, err := CIDRToUInt32Range("127.0.0.1")
+	require.Nil(t, err)
 	require.EqualValues(t, ipv4l, 2130706433)
 	require.EqualValues(t, ipv4h, 2130706433)
 
 	// Valid
 	ipv4l, ipv4h, err = CIDRToUInt32Range("192.168.0.1/24")
+	require.Nil(t, err)
 	require.EqualValues(t, uint64(ipv4l), uint64(3232235521))
 	require.EqualValues(t, uint64(ipv4h), uint64(3232235775))
 }
@@ -99,7 +106,7 @@ func Test_IsCIDRRoutable(t *testing.T) {
 		t.Fail()
 	} else {
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-		require.EqualValues(t, strings.Contains(err.Error(), "cannot be empty string"), true)
+		require.Contains(t, err.Error(), "cannot be empty string")
 	}
 
 	result, err = IsCIDRRoutable("0.0.0.0/-4")
@@ -109,7 +116,7 @@ func Test_IsCIDRRoutable(t *testing.T) {
 		t.Fail()
 	} else {
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-		require.EqualValues(t, strings.Contains(err.Error(), "fail to extract network mask"), true)
+		require.Contains(t, err.Error(), "fail to extract network mask")
 	}
 
 	result, err = IsCIDRRoutable("127.0.0.1/33")
@@ -119,41 +126,41 @@ func Test_IsCIDRRoutable(t *testing.T) {
 		t.Fail()
 	} else {
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-		require.EqualValues(t, strings.Contains(err.Error(), "invalid network mask"), true)
+		require.Contains(t, err.Error(), "invalid network mask")
 	}
 
 	result, err = IsCIDRRoutable("127.0.0.1")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, true)
 
 	result, err = IsCIDRRoutable("0/28")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, true)
 
 	result, err = IsCIDRRoutable("douze.168.0.1/24")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, true)
 
 	result, err = IsCIDRRoutable("127.0.0.1/32")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, true)
 
 	result, err = IsCIDRRoutable("192.168.0.1/24")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, false)
 
 	// Special not routables
 
 	result, err = IsCIDRRoutable("10.0.0.0/8")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, false)
 
 	result, err = IsCIDRRoutable("172.16.0.0/12")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, false)
 
 	result, err = IsCIDRRoutable("192.168.0.0/16")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, result, false)
 
 }
@@ -213,9 +220,8 @@ func Test_CIDROverlap(t *testing.T) {
 		},
 	}
 
-	var result = false
 	for i := range tests {
-		result = CIDROverlap(tests[i].ip1, tests[i].ip2)
+		result := CIDROverlap(tests[i].ip1, tests[i].ip2)
 		require.EqualValues(t, result, tests[i].result)
 	}
 
@@ -233,22 +239,22 @@ func TestCIDRString_Contains(t *testing.T) {
 	source = ""
 	target = "192.168.0.1/28"
 	result, err = source.Contains(target)
-	require.NotEqual(t, err, nil)
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid CIDR"), true)
-	require.EqualValues(t, result, false)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "invalid CIDR")
+	require.False(t, result)
 
 	source = "192.168.0.1/24"
 	target = ""
 	result, err = source.Contains(target)
-	require.NotEqual(t, err, nil)
-	require.EqualValues(t, strings.Contains(err.Error(), "invalid CIDR"), true)
-	require.EqualValues(t, result, false)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), "invalid CIDR")
+	require.False(t, result)
 
 	source = "192.168.0.1/24"
 	target = "192.168.0.1/28"
 	result, err = source.Contains(target)
-	require.EqualValues(t, err, nil)
-	require.EqualValues(t, result, true)
+	require.Nil(t, err)
+	require.True(t, result)
 
 }
 
@@ -405,7 +411,7 @@ func TestCIDRString_IntersectsWith(t *testing.T) {
 					if !strings.Contains(err.Error(), tests[i].expectErrorFragment) {
 						t.Errorf("%s not found in %s for test %d", tests[i].expectErrorFragment, err.Error(), i)
 					}
-					require.EqualValues(t, strings.Contains(err.Error(), tests[i].expectErrorFragment), true)
+					require.Contains(t, err.Error(), tests[i].expectErrorFragment)
 				}
 			}
 		}

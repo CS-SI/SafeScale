@@ -17,9 +17,11 @@
 package huaweicloud
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"context"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // GetAuthOpts returns the auth options
@@ -36,11 +38,11 @@ func (s stack) GetAuthOpts() (providers.Config, error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	return s.cfgOpts, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
 	return s.authOpts, nil
 }

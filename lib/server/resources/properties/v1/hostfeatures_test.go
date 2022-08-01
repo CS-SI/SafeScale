@@ -18,15 +18,18 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestHostInstalledFeature_IsNull(t *testing.T) {
 
-	var hf *HostInstalledFeature = nil
+	var hf *HostInstalledFeature
 	if !hf.IsNull() {
 		t.Error("Nil pointer HostInstalledFeature is null")
 		t.Fail()
@@ -92,6 +95,13 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 		t.Fail()
 	}
 
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, err = hif2.Replace(network)
+	require.Contains(t, err.Error(), "p is not a *HostInstalledFeature")
+
 }
 
 func TestHostInstalledFeature_Clone(t *testing.T) {
@@ -152,7 +162,7 @@ func TestHostFeatures_Reset(t *testing.T) {
 
 func TestHostFeatures_IsNull(t *testing.T) {
 
-	var hf *HostFeatures = nil
+	var hf *HostFeatures
 	if !hf.IsNull() {
 		t.Error("Nil pointer HostFeatures is null")
 		t.Fail()
@@ -203,6 +213,7 @@ func TestHostFeatures_Clone(t *testing.T) {
 
 	clonedHf, ok := cloned.(*HostFeatures)
 	if !ok {
+		t.Error("Cloned HostFeatures not castable to *HostFeatures", err)
 		t.Fail()
 	}
 
@@ -213,7 +224,7 @@ func TestHostFeatures_Clone(t *testing.T) {
 
 func TestHostFeatures_Replace(t *testing.T) {
 
-	var hf *HostFeatures = nil
+	var hf *HostFeatures
 	hf2 := &HostFeatures{
 		Installed: map[string]*HostInstalledFeature{
 			"Feature": {
@@ -248,6 +259,19 @@ func TestHostFeatures_Replace(t *testing.T) {
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
+	}
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := hf2.Replace(network)
+	if xerr == nil {
+		t.Error("HostFeatures.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostFeatures") {
+		t.Errorf("Expect error \"p is not a *HostFeatures\", has \"%s\"", xerr.Error())
 	}
 
 }

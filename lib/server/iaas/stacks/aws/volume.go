@@ -17,31 +17,32 @@
 package aws
 
 import (
+	"context"
 	"sort"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // CreateVolume ...
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	volumeType, minSize := fromAbstractVolumeSpeed(request.Speed)
@@ -74,7 +75,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 }
 
 // InspectVolume ...
-func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -82,7 +83,7 @@ func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
 	// VPL: caller must log; sometimes InspectVolume() returned error is to be considered as an information, not a real error
 	// defer fail.OnExitLogError(&xerr)
 
@@ -185,12 +186,12 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
+func (s stack) ListVolumes(context.Context) (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	var resp *ec2.DescribeVolumesOutput
@@ -232,7 +233,7 @@ func (s stack) ListVolumes() (_ []*abstract.Volume, ferr fail.Error) {
 }
 
 // DeleteVolume ...
-func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -240,7 +241,7 @@ func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	query := ec2.DeleteVolumeInput{
@@ -256,12 +257,12 @@ func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 }
 
 // CreateVolumeAttachment ...
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	availableDevices := initAvailableDevices()
@@ -353,7 +354,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 }
 
 // InspectVolumeAttachment returns information about a volume attachment
-func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
 		return nilA, fail.InvalidInstanceError()
@@ -365,7 +366,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 		return nilA, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	// VPL: caller MUST log; sometimes, InspectVolumeAttachment returned error may be considered as an information of non-existence, not a real error
 	// defer fail.OnExitLogError(&xerr)
 
@@ -398,7 +399,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 }
 
 // ListVolumeAttachments ...
-func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -406,7 +407,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttac
 		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
@@ -442,12 +443,12 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []*abstract.VolumeAttac
 	return vas, nil
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
-func (s stack) DeleteVolumeAttachment(serverID, id string) (ferr fail.Error) {
+func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -458,7 +459,7 @@ func (s stack) DeleteVolumeAttachment(serverID, id string) (ferr fail.Error) {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s, %s)", serverID, id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s, %s)", serverID, id).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DetachVolumeInput{
 		InstanceId: aws.String(serverID),

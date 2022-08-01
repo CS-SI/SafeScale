@@ -24,10 +24,10 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 // tracer ...
@@ -103,8 +103,8 @@ func (t *tracer) exiting() *tracer {
 
 // buildMessage builds the message with available information from stack trace
 func (t *tracer) buildMessage() string {
-	if t == nil || valid.IsNil(t) {
-		return ""
+	if valid.IsNil(t) {
+		return "" // FIXME: Error hiding
 	}
 
 	message := t.taskSig

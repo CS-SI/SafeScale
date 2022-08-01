@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
@@ -363,10 +363,10 @@ func TestChildrenWaitingGameEnoughTimeAfterWF(t *testing.T) {
 	}
 
 	// Look at the pressure supported by GC
-	funk(1, 40, 50, 250, 20, 40, 20)
-	funk(2, 40, 50, 250, 20, 40, 20)
-	funk(3, 40, 50, 250, 20, 40, 20)
-	funk(4, 40, 50, 250, 20, 40, 20)
+	funk(1, 4, 50, 250, 20, 40, 20)
+	funk(2, 4, 50, 250, 20, 40, 20)
+	funk(3, 4, 50, 250, 20, 40, 20)
+	funk(4, 4, 50, 250, 20, 40, 20)
 }
 
 func TestStatesWF(t *testing.T) {
@@ -887,7 +887,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF(t *testing.T) {
 		}()
 
 		if _, _, xerr := overlord.WaitGroupFor(5 * time.Second); xerr != nil {
-			switch xerr.(type) {
+			switch xerr.(type) { // nolint
 			case *fail.ErrAborted:
 				// Wanted situation, continue
 			case *fail.ErrorList:

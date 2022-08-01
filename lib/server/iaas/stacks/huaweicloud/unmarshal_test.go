@@ -30,8 +30,8 @@ func Test_recoverImageInfo(t *testing.T) {
 	id := properties["Properties"].(thing)["image"].(thing)["id"].(string)
 	name := properties["Properties"].(thing)["image"].(thing)["name"].(string)
 
-	require.Equal(t, float64(1024), r)
-	require.Equal(t, float64(40), d)
-	require.Equal(t, "0249222b-c9be-419b-a953-f47e91c3fc81", id)
-	require.Equal(t, "OBS Ubuntu 18.04", name)
+	require.EqualValues(t, float64(1024), r)
+	require.EqualValues(t, float64(40), d)
+	require.EqualValues(t, "0249222b-c9be-419b-a953-f47e91c3fc81", id)
+	require.EqualValues(t, "OBS Ubuntu 18.04", name)
 }

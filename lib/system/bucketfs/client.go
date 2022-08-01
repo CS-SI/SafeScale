@@ -19,8 +19,8 @@ package bucketfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Client defines the structure of a Client object

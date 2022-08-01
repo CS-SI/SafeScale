@@ -19,30 +19,29 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Volume -o mocks/mock_volume.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Volume -o mocks/mock_volume.go
 
 // Volume links Object Storage folder and getVolumes
 type Volume interface {
 	Metadata
 	data.Identifiable
-	observer.Observable
+	Consistent
 
 	Attach(ctx context.Context, host Host, path, format string, doNotFormat, doNotMount bool) fail.Error // attaches a volume to a host
 	Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) fail.Error                   // walks through all the metadata objects in network
 	Create(ctx context.Context, req abstract.VolumeRequest) fail.Error                                   // creates a volume
 	Delete(ctx context.Context) fail.Error                                                               // deletes a volume
 	Detach(ctx context.Context, host Host) fail.Error                                                    // detaches the volume identified by ref, ref can be the name or the id
-	GetAttachments() (*propertiesv1.VolumeAttachments, fail.Error)                                       // returns the property containing where the volume is attached
-	GetSize() (int, fail.Error)                                                                          // returns the size of volume in GB
-	GetSpeed() (volumespeed.Enum, fail.Error)                                                            // returns the speed of the volume (more or less the type of hardware)
+	GetAttachments(ctx context.Context) (*propertiesv1.VolumeAttachments, fail.Error)                    // returns the property containing where the volume is attached
+	GetSize(ctx context.Context) (int, fail.Error)                                                       // returns the size of volume in GB
+	GetSpeed(ctx context.Context) (volumespeed.Enum, fail.Error)                                         // returns the speed of the volume (more or less the type of hardware)
 	ToProtocol(ctx context.Context) (*protocol.VolumeInspectResponse, fail.Error)                        // converts volume to equivalent protocol message
 }

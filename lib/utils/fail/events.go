@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/commonlog"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/commonlog"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 const (
@@ -156,7 +156,6 @@ func OnExitTraceError(err interface{}, msg ...interface{}) {
 }
 
 // OnPanic captures panic error and fill the error pointer with a ErrRuntimePanic.
-// func OnPanic(err *error) {
 func OnPanic(err interface{}) {
 	logCall := getEventLogger()
 
@@ -224,5 +223,84 @@ func OnPanic(err interface{}) {
 		default:
 			logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but parameter 'err' is invalid", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 4))
 		}
+	}
+}
+
+// SilentOnPanic captures panic error and logs the error, is intended for functions that DON'T return errors
+func SilentOnPanic(err interface{}) {
+	logCall := getEventLogger()
+
+	if x := recover(); x != nil {
+		switch v := err.(type) {
+		case *ErrorList:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrUnqualified:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrWarning:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrTimeout:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotFound:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrAborted:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrRuntimePanic:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotAvailable:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrDuplicate:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidRequest:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrSyntax:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotAuthenticated:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrForbidden:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrOverflow:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrOverload:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrNotImplemented:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidInstance:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidParameter:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInvalidInstanceContent:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrInconsistent:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrExecution:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrAlteredNothing:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *ErrUnknown:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "coding mistake", "functions that can panic MUST NOT return *fail.Whatever, only fail.Error", 4))
+		case *Error:
+			if v != nil {
+				recTrace := callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.LastOccurrence)
+				*v = RuntimePanicError("runtime panic occurred:\n%s", recTrace)
+				logCall("%s", RuntimePanicError("runtime panic occurred:\n%s", recTrace))
+			} else {
+				logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but '*err' is nil", "", 4))
+			}
+		case *error:
+			if v != nil {
+				*v = RuntimePanicError("runtime panic occurred: %+v", x)
+				logCall("%s", RuntimePanicError("runtime panic occurred: %+v", x))
+			} else {
+				logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but '*err' is nil", "", 4))
+			}
+		default:
+			logCall(callstack.DecorateWith("fail.OnPanic()", "intercepted panic but parameter 'err' is invalid", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 4))
+		}
+	}
+}
+
+func IgnoreProblems(_ interface{}) {
+	if x := recover(); x != nil { // nolint
+		// nothing to do
 	}
 }

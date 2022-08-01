@@ -18,9 +18,10 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -30,9 +31,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 type stack struct {
@@ -64,17 +65,17 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) {
-		return stacks.ConfigurationOptions{}, nil
+		return stacks.ConfigurationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.Config, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
 	if valid.IsNil(s) {
-		return stacks.AuthenticationOptions{}, nil
+		return stacks.AuthenticationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.AuthOptions, nil
 }

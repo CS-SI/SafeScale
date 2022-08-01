@@ -2,30 +2,12 @@ package debug
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
 )
-
-func logrus_capture(routine func()) string {
-
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	logrus.SetOutput(w)
-
-	routine()
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-	return string(out)
-
-}
 
 func trackSomething(ref string) (err error) {
 	tracer := NewTracer(nil, true, "('%s')", ref).WithStopwatch().Entering()
@@ -40,7 +22,7 @@ func trackSomething(ref string) (err error) {
 }
 
 func rage() string {
-	return logrus_capture(func() {
+	return tests.LogrusCapture(func() {
 		_ = trackSomething("you have reason to fear")
 	})
 }
@@ -51,10 +33,7 @@ func Test_tracer_EnteringMessage(t *testing.T) {
 	if !strings.Contains(ct, "something bad happened: terrible glimpses") {
 		failed = true
 	}
-	if !strings.Contains(ct, "tracer_test.go:37]: you fade away") {
-		failed = true
-	}
-	if !strings.Contains(ct, "tracer_test.go:39]: something bad") {
+	if !strings.Contains(ct, "you fade away") {
 		failed = true
 	}
 	if failed {

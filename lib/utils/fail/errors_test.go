@@ -27,12 +27,57 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 )
+
+type BrokenError struct {
+	msg      string
+	grpcCode uint
+}
+
+//data.Annotatable
+func (e *BrokenError) Annotate(key string, value data.Annotation) data.Annotatable { return nil }
+func (e *BrokenError) Annotations() data.Annotations                               { return nil }
+func (e *BrokenError) Annotation(key string) (data.Annotation, bool)               { return nil, false }
+
+//causer
+func (e *BrokenError) Cause() error     { return nil }
+func (e *BrokenError) RootCause() error { return nil }
+
+//consequencer
+func (e *BrokenError) Consequences() []error      { return make([]error, 0) }
+func (e *BrokenError) AddConsequence(error) Error { return nil }
+
+//error
+func (e *BrokenError) Error() string { return e.msg }
+
+//NullValue
+func (e *BrokenError) IsNull() bool { return e.msg == "" }
+
+//ToGRPCStatus
+func (e *BrokenError) Valid() bool { return e.msg != "" }
+
+//Error
+func (e *BrokenError) UnformattedError() string { return e.msg }
+func (e *BrokenError) ToGRPCStatus() error      { return nil }
+
+func Test_IgnoreError(t *testing.T) {
+
+	ret := IgnoreError("any", NewError(errors.New("mayday !")))
+	require.EqualValues(t, ret, "any")
+
+}
+
+func Test_TakeError(t *testing.T) {
+
+	ret := TakeError("any", NewErrorWithCause(errors.New("any"), "beacauseof"))
+	require.Contains(t, ret.Error(), "beacauseof: any")
+
+}
 
 func Test_NewError(t *testing.T) {
 
@@ -74,7 +119,7 @@ func Test_newError(t *testing.T) {
 
 func TestErrorCore_IsNull(t *testing.T) {
 
-	var err *errorCore = nil
+	var err *errorCore
 	require.EqualValues(t, valid.IsNil(err), true)
 	err = &errorCore{
 		message:             "houston, we have a problem",
@@ -117,6 +162,9 @@ func Test_defaultCauseFormatter(t *testing.T) {
 
 	result := defaultCauseFormatter(nil)
 	require.EqualValues(t, result, "")
+
+	berr := &BrokenError{msg: "houston, we have a problem"}
+	result = defaultCauseFormatter(berr)
 
 	broken := &ErrUnqualified{
 		errorCore: nil,
@@ -187,7 +235,7 @@ func TestErrorCore_CauseFormatter(t *testing.T) {
 		}
 	}()
 
-	var err *errorCore = nil
+	var err *errorCore
 	_ = err.setCauseFormatter(func(e Error) string {
 		return e.Error()
 	})
@@ -297,7 +345,7 @@ func TestErrorCore_Cause(t *testing.T) {
 		lock:                &sync.RWMutex{},
 	}
 	err = errCore.Cause()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	errCore = errorCore{
 		message:             "houston, we have a problem",
@@ -321,7 +369,7 @@ func TestErrorCore_RootCauseBad(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer OnPanic(&panicked)
-		var err *errorCore = nil
+		var err *errorCore
 		_ = err.RootCause() // this panics
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
@@ -432,7 +480,7 @@ func TestErrorCore_Annotation(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	ann, ok := errCore.Annotation("two")
+	_, ok := errCore.Annotation("two")
 	require.EqualValues(t, ok, false)
 
 	errCore = errorCore{
@@ -445,7 +493,7 @@ func TestErrorCore_Annotation(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	ann, ok = errCore.Annotation("two")
+	_, ok = errCore.Annotation("two")
 	require.EqualValues(t, ok, false)
 
 	errCore = errorCore{
@@ -462,7 +510,7 @@ func TestErrorCore_Annotation(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	ann, ok = errCore.Annotation("two")
+	ann, ok := errCore.Annotation("two")
 	require.EqualValues(t, ok, true)
 	require.EqualValues(t, ann, "second")
 
@@ -507,6 +555,13 @@ func TestErrorCore_Annotate(t *testing.T) {
 
 func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 
+	var errC *errorCore = nil
+	err := errC.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
+		return "any", nil
+	})
+	require.Contains(t, err.Error(), "invalid call: errorCore.setAnnotationFormatter()")
+	require.Contains(t, err.Error(), "from null value")
+
 	errCore := errorCore{
 		message:             "houston, we have a problem",
 		cause:               errors.New("math: can't divide by zero"),
@@ -517,7 +572,7 @@ func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 		annotationFormatter: defaultAnnotationFormatter,
 		lock:                &sync.RWMutex{},
 	}
-	err := errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
+	err = errCore.setAnnotationFormatter(func(anns data.Annotations) (string, error) {
 		return "any", nil
 	})
 	if err != nil {
@@ -797,7 +852,7 @@ func TestErrorCore_ToGRPCStatus(t *testing.T) {
 		lock:                &sync.RWMutex{},
 	}
 	err = errCore.ToGRPCStatus()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
 	errCore = errorCore{
 		message:             "houston, we have a problem",
@@ -816,6 +871,11 @@ func TestErrorCore_ToGRPCStatus(t *testing.T) {
 
 func Test_WarningError(t *testing.T) {
 	err := WarningError(errors.New("math: can't divide by zero"), "Any message")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrWarning")
+}
+
+func Test_WarningErrorWithCauseAndConsequences(t *testing.T) {
+	err := WarningErrorWithCauseAndConsequences(errors.New("math: can't divide by zero"), []error{errors.New("it fails")}, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrWarning")
 }
 
@@ -1340,7 +1400,7 @@ func TestErrNotFound_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := notfound.Annotate("two", ann)
+	_ = notfound.Annotate("two", ann)
 
 	notfound = &ErrNotFound{
 		errorCore: &errorCore{
@@ -1354,7 +1414,7 @@ func TestErrNotFound_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = notfound.Annotate("two", ann)
+	result := notfound.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
 
 }
@@ -1560,7 +1620,7 @@ func TestErrNotAvailable_Annotate(t *testing.T) {
 			price  float64
 		}{"chicken", 1.75},
 	}
-	result := notavailable.Annotate("two", ann)
+	_ = notavailable.Annotate("two", ann)
 
 	notavailable = &ErrNotAvailable{
 		errorCore: &errorCore{
@@ -1574,7 +1634,7 @@ func TestErrNotAvailable_Annotate(t *testing.T) {
 			lock:                &sync.RWMutex{},
 		},
 	}
-	result = notavailable.Annotate("two", ann)
+	result := notavailable.Annotate("two", ann)
 	require.EqualValues(t, result.Annotations()["two"], ann)
 
 }
@@ -1869,10 +1929,13 @@ func TestErrDuplicate_GRPCCode(t *testing.T) {
 }
 
 func Test_InvalidRequestError(t *testing.T) {
-
 	err := InvalidRequestError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidRequest")
+}
 
+func Test_InvalidRequestErrorWithCause(t *testing.T) {
+	err := InvalidRequestErrorWithCause(errors.New("houston, we have a problem"), []error{}, "Any message")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidRequest")
 }
 
 func TestErrInvalidRequest_IsNull(t *testing.T) {
@@ -2199,6 +2262,9 @@ func TestErrSyntax_AddConsequence(t *testing.T) {
 
 func TestErrSyntax_UnformattedError(t *testing.T) {
 
+	var nilErr *ErrSyntax = nil
+	require.EqualValues(t, nilErr.UnformattedError(), "")
+
 	syntaxerr := &ErrSyntax{
 		errorCore: &errorCore{
 			message:             "houston, we have a problem",
@@ -2273,6 +2339,9 @@ func TestErrSyntax_Annotate(t *testing.T) {
 
 func TestErrSyntax_GRPCCode(t *testing.T) {
 
+	var nilErr *ErrSyntax = nil
+	require.EqualValues(t, nilErr.getGRPCCode(), codes.InvalidArgument)
+
 	syntaxerr := &ErrSyntax{
 		errorCore: &errorCore{
 			message:             "houston, we have a problem",
@@ -2306,10 +2375,13 @@ func TestErrSyntax_GRPCCode(t *testing.T) {
 }
 
 func Test_NotAuthenticatedError(t *testing.T) {
-
 	err := NotAuthenticatedError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotAuthenticated")
+}
 
+func Test_NotAuthenticatedErrorWithCause(t *testing.T) {
+	err := NotAuthenticatedErrorWithCause(errors.New("houston, we have a problem"), []error{}, "Any message")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotAuthenticated")
 }
 
 func TestErrNotAuthenticated_IsNull(t *testing.T) {
@@ -2413,6 +2485,9 @@ func TestErrNotAuthenticated_AddConsequence(t *testing.T) {
 }
 
 func TestErrNotAuthenticated_UnformattedError(t *testing.T) {
+
+	var nilErr *ErrNotAuthenticated = nil
+	require.EqualValues(t, nilErr.UnformattedError(), "")
 
 	autherr := &ErrNotAuthenticated{
 		errorCore: &errorCore{
@@ -2521,10 +2596,13 @@ func TestErrNotAuthenticated_GRPCCode(t *testing.T) {
 }
 
 func Test_ForbiddenError(t *testing.T) {
-
 	err := ForbiddenError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrForbidden")
+}
 
+func Test_ForbiddenErrorWithCause(t *testing.T) {
+	err := ForbiddenErrorWithCause(errors.New("houston, we have a problem"), []error{}, "Any message")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrForbidden")
 }
 
 func TestErrForbidden_IsNull(t *testing.T) {
@@ -2628,6 +2706,9 @@ func TestErrForbidden_AddConsequence(t *testing.T) {
 }
 
 func TestErrForbidden_UnformattedError(t *testing.T) {
+
+	var nilErr *ErrForbidden = nil
+	require.EqualValues(t, nilErr.UnformattedError(), "")
 
 	forbiderr := &ErrForbidden{
 		errorCore: &errorCore{
@@ -2745,6 +2826,11 @@ func Test_AbortedError(t *testing.T) {
 
 }
 
+func Test_AbortedErrorWithCauseAndConsequences(t *testing.T) {
+	err := AbortedErrorWithCauseAndConsequences(errors.New("math: can't divide by zero"), []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAborted")
+}
+
 func TestErrAborted_IsNull(t *testing.T) {
 
 	var err *ErrAborted = nil
@@ -2846,6 +2932,9 @@ func TestErrAborted_AddConsequence(t *testing.T) {
 }
 
 func TestErrAborted_UnformattedError(t *testing.T) {
+
+	var nilErr *ErrAborted = nil
+	require.EqualValues(t, nilErr.UnformattedError(), "")
 
 	aborterr := &ErrAborted{
 		errorCore: &errorCore{
@@ -2953,10 +3042,13 @@ func TestErrAborted_GRPCCode(t *testing.T) {
 }
 
 func Test_OverflowError(t *testing.T) {
-
 	err := OverflowError(errors.New("math: can't divide by zero"), 30, "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverflow")
+}
 
+func Test_OverflowErrorWithCause(t *testing.T) {
+	err := OverflowErrorWithCause(errors.New("math: can't divide by zero"), 30, []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverflow")
 }
 
 func TestErrOverflow_IsNull(t *testing.T) {
@@ -3060,6 +3152,9 @@ func TestErrOverflow_AddConsequence(t *testing.T) {
 }
 
 func TestErrOverflow_UnformattedError(t *testing.T) {
+
+	var nilErr *ErrOverflow = nil
+	require.EqualValues(t, nilErr.UnformattedError(), "")
 
 	ovflowterr := &ErrOverflow{
 		errorCore: &errorCore{
@@ -3168,10 +3263,13 @@ func TestErrOverflow_GRPCCode(t *testing.T) {
 }
 
 func Test_OverloadError(t *testing.T) {
-
 	err := OverloadError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverload")
+}
 
+func Test_OverloadErrorWithCause(t *testing.T) {
+	err := OverloadErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverload")
 }
 
 func TestErrOverload_IsNull(t *testing.T) {
@@ -3493,6 +3591,9 @@ func TestErrNotImplemented_AddConsequence(t *testing.T) {
 
 func TestErrNotImplemented_UnformattedError(t *testing.T) {
 
+	var errNil *ErrNotImplemented = nil
+	require.EqualValues(t, errNil.UnformattedError(), "")
+
 	notImplementedErr := &ErrNotImplemented{
 		errorCore: &errorCore{
 			message:             "Houston, we have a problem",
@@ -3600,10 +3701,13 @@ func TestErrNotImplemented_GRPCCode(t *testing.T) {
 }
 
 func Test_RuntimePanicError(t *testing.T) {
-
 	err := RuntimePanicError("pattern %s", "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
+}
 
+func Test_RuntimePanicErrorWithCauseAndConsequences(t *testing.T) {
+	err := RuntimePanicErrorWithCauseAndConsequences(errors.New("houston, we have a problem"), []error{}, false, "pattern %s", "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
 }
 
 func TestErrRuntimePanic_IsNull(t *testing.T) {
@@ -3815,10 +3919,13 @@ func TestErrRuntimePanic_GRPCCode(t *testing.T) {
 }
 
 func Test_InvalidInstanceError(t *testing.T) {
-
 	err := InvalidInstanceError()
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
+}
 
+func Test_InvalidInstanceErrorWithCause(t *testing.T) {
+	err := InvalidInstanceErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any message")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
 }
 
 func TestErrInvalidInstance_IsNull(t *testing.T) {
@@ -4030,10 +4137,13 @@ func TestErrInvalidInstance_GRPCCode(t *testing.T) {
 }
 
 func Test_InvalidParameterError(t *testing.T) {
-
 	err := InvalidParameterError("what is it", "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+}
 
+func Test_InvalidParameterErrorWithCauseAndConsequences(t *testing.T) {
+	err := InvalidParameterErrorWithCauseAndConsequences(errors.New("houston, we have a problem"), []error{}, "what is it", 1, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
 }
 
 func Test_InvalidParameterCannotBeNilError(t *testing.T) {
@@ -4259,10 +4369,13 @@ func TestErrInvalidParameter_GRPCCode(t *testing.T) {
 }
 
 func Test_InvalidInstanceContentError(t *testing.T) {
-
 	err := InvalidInstanceContentError("what is it", "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
+}
 
+func Test_InvalidInstanceContentErrorWithCause(t *testing.T) {
+	err := InvalidInstanceContentErrorWithCause(errors.New("houston, we have a problem"), []error{}, "what is it", "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
 }
 
 func TestErrInvalidInstanceContent_IsNull(t *testing.T) {
@@ -4474,10 +4587,13 @@ func TestErrInvalidInstanceContent_GRPCCode(t *testing.T) {
 }
 
 func Test_InconsistentError(t *testing.T) {
-
 	err := InconsistentError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInconsistent")
+}
 
+func Test_InconsistentErrorWithCause(t *testing.T) {
+	err := InconsistentErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInconsistent")
 }
 
 func TestErrInconsistent_IsNull(t *testing.T) {
@@ -4691,7 +4807,7 @@ func TestErrInconsistent_GRPCCode(t *testing.T) {
 func Test_ExecutionError(t *testing.T) {
 	xerr := ExecutionError(errors.New("exit error"), "any error")
 	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrExecution")
-	require.EqualValues(t, strings.Contains(xerr.Error(), "any error"), true)
+	require.Contains(t, xerr.Error(), "any error")
 
 	var cmd *exec.Cmd
 
@@ -4714,18 +4830,25 @@ func Test_ExecutionError(t *testing.T) {
 		if reflect.TypeOf(err).String() == "*exec.ExitError" {
 			xerr = ExecutionError(err, "any error")
 			require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrExecution")
-			require.EqualValues(t, strings.Contains(xerr.Error(), "any error"), true)
+			require.Contains(t, xerr.Error(), "any error")
 			if runtime.GOOS != "windows" {
-				require.EqualValues(t, strings.Contains(xerr.Error(), "signal: killed"), true)
+				require.Contains(t, xerr.Error(), "signal: killed")
 			}
 		}
 	}
+}
+
+func Test_ExecutionErrorWithCause(t *testing.T) {
+	xerr := ExecutionErrorWithCause(errors.New("exit error"), []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrExecution")
+	require.Contains(t, xerr.Error(), "any error")
 }
 
 func TestErrExecution_IsNull(t *testing.T) {
 
 	var err *ErrExecution = nil
 	require.EqualValues(t, valid.IsNil(err), true)
+	require.EqualValues(t, valid.IsNull(err), true)
 
 	err = &ErrExecution{
 		errorCore: &errorCore{
@@ -4740,20 +4863,23 @@ func TestErrExecution_IsNull(t *testing.T) {
 		},
 	}
 	require.EqualValues(t, valid.IsNil(err), false)
+	require.EqualValues(t, valid.IsNull(err), false)
 
 	err = &ErrExecution{
 		errorCore: &errorCore{
 			message:             "houston, we have a problem",
 			cause:               errors.New("math: can't divide by zero"),
 			consequences:        []error{errors.New("can't resolve equation")},
-			annotations:         make(data.Annotations),
+			annotations:         data.Annotations{"retcode": errors.New("-1")},
 			grpcCode:            codes.Unknown,
 			causeFormatter:      defaultCauseFormatter,
 			annotationFormatter: defaultAnnotationFormatter,
 			lock:                &sync.RWMutex{},
 		},
 	}
+
 	require.EqualValues(t, valid.IsNil(err), false)
+	require.EqualValues(t, valid.IsNull(err), false)
 
 }
 
@@ -4931,10 +5057,13 @@ func TestErrExecution_GRPCCode(t *testing.T) {
 }
 
 func Test_AlteredNothingError(t *testing.T) {
-
 	err := AlteredNothingError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAlteredNothing")
+}
 
+func Test_AlteredNothingErrorWithCause(t *testing.T) {
+	err := AlteredNothingErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAlteredNothing")
 }
 
 func TestErrAlteredNothing_IsNull(t *testing.T) {
@@ -5146,10 +5275,13 @@ func TestErrAlteredNothing_GRPCCode(t *testing.T) {
 }
 
 func Test_UnknownError(t *testing.T) {
-
 	err := UnknownError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrUnknown")
+}
 
+func Test_UnknownErrorWithCause(t *testing.T) {
+	err := UnknownErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any error")
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrUnknown")
 }
 
 func TestErrUnknown_IsNull(t *testing.T) {

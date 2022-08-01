@@ -17,12 +17,13 @@
 package utils
 
 import (
+	"io/ioutil"
 	"os"
 	"reflect"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // LazyRemove is identical to os.Remove, but doesn't raise an error, and
@@ -38,4 +39,32 @@ func LazyRemove(path string) fail.Error {
 		}
 	}
 	return nil
+}
+
+// CreateTempFileFromString creates a temporary file containing 'content'
+func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
+	defaultTmpDir := os.TempDir()
+
+	f, err := ioutil.TempFile(defaultTmpDir, "")
+	if err != nil {
+		return nil, fail.ExecutionError(err, "failed to create temporary file")
+	}
+	_, err = f.WriteString(content)
+	if err != nil {
+		return nil, fail.ExecutionError(err, "failed to wrote string to temporary file")
+	}
+
+	err = f.Chmod(filemode)
+	if err != nil {
+		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
+	}
+
+	err = f.Close()
+	if err != nil {
+		return nil, fail.ExecutionError(err, "failed to close temporary file")
+	}
+
+	// logrus.Tracef("New temporary file %s", f.Name())
+
+	return f, nil
 }

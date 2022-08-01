@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -21,10 +24,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // SingleCache proposes a cache of Cacheable
@@ -161,7 +164,7 @@ func (instance *SingleCache) unsafeLoadEntry(ctx context.Context, key string) (*
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
 func (instance *SingleCache) ReserveEntry(ctx context.Context, key string, timeout time.Duration) fail.Error {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -184,7 +187,7 @@ func (instance *SingleCache) unsafeReserveEntry(ctx context.Context, key string,
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
 func (instance *SingleCache) CommitEntry(ctx context.Context, key string, content Cacheable) (ce *Entry, xerr fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -209,7 +212,7 @@ func (instance *SingleCache) unsafeCommitEntry(ctx context.Context, key string, 
 
 // FreeEntry removes the reservation in cache
 func (instance *SingleCache) FreeEntry(ctx context.Context, key string) fail.Error {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {

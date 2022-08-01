@@ -17,13 +17,17 @@
 package commands
 
 import (
+	"os"
+	"time"
+
+	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v21/lib/client"
-	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/client"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 var imageCmdName = "image"
@@ -49,6 +53,27 @@ var imageList = cli.Command{
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Listing images"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
 
 		images, err := ClientSession.Image.List(c.Bool("all"), 0)
 		if err != nil {

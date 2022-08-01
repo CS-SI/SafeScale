@@ -17,13 +17,64 @@
 package objectstorage
 
 import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func minioIsRunning() (bool, error) {
+	value, ok := os.LookupEnv("MINIO_HEALTH_ENDPOINT")
+	if !ok {
+		// putting in place previous env variable is responsibility of the script running the tests (or DOCKER env, or GitHub Action, etc.) or needs to be tailored by the developer to fit dev environment
+		value = "http://localhost:9000/minio/health/live"
+	}
+
+	// See https://docs.min.io/minio/baremetal/monitoring/healthcheck-probe.html
+	resp, err := http.Get(value) // nolint
+	if err != nil {
+		return false, err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	good := false
+
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("failure: it seems something went wrong starting minio in: %s", value)
+	}
+
+	for k, v := range resp.Header {
+		if k == "Server" {
+			for _, vals := range v {
+				if strings.Contains(vals, "MinIO") {
+					good = true
+					break
+				}
+			}
+		}
+	}
+
+	if !good {
+		return false, fmt.Errorf("failure: it seems minio is not running in: %s", value)
+	}
+
+	return true, nil
+}
+
 func Test_NewLocation(t *testing.T) {
+	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
+	require.Nil(t, err)
 
 	cfg := Config{
 		Type:         "s3",
@@ -35,15 +86,21 @@ func Test_NewLocation(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
-	require.EqualValues(t, err, nil)
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
+	require.Nil(t, err)
 
 }
 
 func TestLocation_IsNull(t *testing.T) {
+	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
+	require.Nil(t, err)
 
 	var nilLoc *location = nil
-	require.EqualValues(t, nilLoc.IsNull(), true)
+	require.True(t, nilLoc.IsNull())
 
 	cfg := Config{
 		Type:         "s3",
@@ -55,15 +112,20 @@ func TestLocation_IsNull(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
-	require.EqualValues(t, err, nil)
-
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
+	require.Nil(t, err)
 }
 
 func TestLocation_Connect(t *testing.T) {
+	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
+	require.Nil(t, err)
 
 	var nilLoc *location = nil
-	err := nilLoc.connect()
+	err = nilLoc.connect()
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
 
 	cfg := Config{
@@ -76,11 +138,44 @@ func TestLocation_Connect(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
-	require.EqualValues(t, err, nil)
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
+	require.Nil(t, err)
 }
 
 func TestLocation_Protocol(t *testing.T) {
+	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
+	require.Nil(t, err)
+
+	cfg := Config{
+		Type:         "s3",
+		EnvAuth:      false,
+		AuthVersion:  1,
+		EndpointType: "EndpointType",
+		Endpoint:     "http://localhost:9000",
+		User:         "admin",
+		SecretKey:    "password",
+	}
+	loc, err := NewLocation(cfg)
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
+	require.Nil(t, err)
+
+	c, err := loc.Protocol()
+	require.EqualValues(t, c, "s3")
+	require.Nil(t, err)
+
+}
+
+func TestLocation_CreateBucket(t *testing.T) {
+	good, err := minioIsRunning()
+	if !good {
+		t.Log("Test require Minio started")
+		t.Skip()
+	}
+	require.Nil(t, err)
 
 	cfg := Config{
 		Type:         "s3",
@@ -93,10 +188,15 @@ func TestLocation_Protocol(t *testing.T) {
 	}
 	loc, err := NewLocation(cfg)
 	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 
-	c, err := loc.Protocol()
-	require.EqualValues(t, c, "s3")
-	require.EqualValues(t, err, nil)
+	if there, err := loc.FindBucket("boo"); err == nil {
+		if there {
+			return
+		}
+	}
 
+	osb, err := loc.CreateBucket("boo")
+	require.Nil(t, err)
+	require.NotNil(t, osb)
 }

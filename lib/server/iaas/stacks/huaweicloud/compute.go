@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -39,17 +40,17 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 type blockDevice struct {
@@ -298,7 +299,7 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var emptyMap map[string]bool
@@ -306,7 +307,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -343,19 +344,19 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, ferr fail.Error) {
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
+func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		cfg, err := s.GetRawAuthenticationOptions()
+		cfg, err := s.GetRawAuthenticationOptions(ctx)
 		if err != nil {
 			return "", err
 		}
 		s.selectedAvailabilityZone = cfg.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
-			azList, xerr := s.ListAvailabilityZones()
+			azList, xerr := s.ListAvailabilityZones(ctx)
 			if xerr != nil {
 				return "", xerr
 			}
@@ -414,13 +415,13 @@ func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 }
 
 // CreateHost creates a new host
-func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
@@ -476,12 +477,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get template")
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -516,7 +517,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	// Select usable availability zone
-	zone, xerr := s.SelectedAvailabilityZone()
+	zone, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
@@ -596,11 +597,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(
-									fail.Wrap(
-										derr, "cleaning up on failure, failed to delete host",
-									),
-								)
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 							}
 						}
 					}
@@ -622,45 +619,46 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
+			ahc.ID = server.ID
+			ahc.Name = server.Name
+
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ahc.ID)
 			if zoneErr != nil {
-				logrus.Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
+				logrus.Tracef("Host '%s' successfully created but cannot confirm Availability Zone: %s", server.Name, zoneErr)
 			} else {
-				logrus.Tracef("Host successfully created in requested Availability Zone '%s'", creationZone)
-				if creationZone != srvOpts.AvailabilityZone {
-					if srvOpts.AvailabilityZone != "" {
-						logrus.Warnf(
-							"Host created in the WRONG availability zone: requested '%s' and got instead '%s'",
-							srvOpts.AvailabilityZone, creationZone,
-						)
-					}
+				logrus.Tracef("Host '%s' successfully created in requested Availability Zone '%s'", server.Name, creationZone)
+				if creationZone != srvOpts.AvailabilityZone && srvOpts.AvailabilityZone != "" {
+					logrus.Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", server.Name, srvOpts.AvailabilityZone, creationZone)
 				}
 			}
 
 			defer func() {
-				if innerXErr != nil {
-					derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+				if innerXErr != nil && ahc.ID != "" {
+					derr := servers.Delete(s.ComputeClient, ahc.ID).ExtractErr()
 					if derr != nil {
 						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+					} else {
+						ahc.ID = ""
+						ahc.Name = ""
 					}
 				}
 			}()
 
-			ahc.ID = server.ID
-			ahc.Name = server.Name
-
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timings.HostOperationTimeout())
+			//FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
+			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
+			//       We should think of a way to increase this timing based on number of hosts are created
+			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
 					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
+						// ahc.ID = server.ID
+						// ahc.Name = server.Name
 						ahc.LastState = hoststate.Error
 					}
-
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
+
 				default:
 					return innerXErr
 				}
@@ -670,6 +668,25 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		timings.NormalDelay(),
 		timings.HostLongOperationTimeout(),
 	)
+
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		if ferr != nil && ahc.ID != "" {
+			derr := s.DeleteHost(ctx, ahc.ID)
+			if derr != nil {
+				switch derr.(type) {
+				case *fail.ErrNotFound:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr)
+				case *fail.ErrTimeout:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
+				default:
+					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
+				}
+				_ = ferr.AddConsequence(derr)
+			}
+		}
+	}()
+
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
@@ -681,27 +698,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		}
 	}
 
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		if ferr != nil {
-			derr := s.DeleteHost(ahc.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf(
-						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
-					)
-				case *fail.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
-				}
-				_ = ferr.AddConsequence(derr)
-			}
-		}
-	}()
-
-	host, xerr = s.complementHost(ahc, server)
+	host, xerr = s.complementHost(ctx, ahc, server)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -840,7 +837,7 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -848,7 +845,7 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
@@ -894,14 +891,14 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
-func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -911,7 +908,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, timings.OperationTimeout())
+	server, xerr := s.WaitHostState(ctx, ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -931,7 +928,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	host, xerr = s.complementHost(ahf.Core, server)
+	host, xerr = s.complementHost(ctx, ahf.Core, server)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -943,14 +940,14 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(context.Context, bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -985,12 +982,12 @@ func (s stack) ListImages(bool) (imgList []*abstract.Image, ferr fail.Error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(context.Context, bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
@@ -1039,7 +1036,7 @@ func (s stack) ListTemplates(bool) ([]*abstract.HostTemplate, fail.Error) {
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
+func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
@@ -1127,7 +1124,7 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 	var errors []error
 	for subnetID, subnetName := range completedHost.Networking.SubnetsByID {
 		if subnetName == "" {
-			subnet, xerr := s.InspectSubnet(subnetID)
+			subnet, xerr := s.InspectSubnet(ctx, subnetID)
 			if xerr != nil {
 				logrus.Errorf("failed to get network '%s'", subnetID)
 				errors = append(errors, xerr)
@@ -1203,7 +1200,7 @@ func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversio
 }
 
 // ListHosts lists available hosts
-func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
+func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
 	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
@@ -1224,7 +1221,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 						h.ID = srv.ID
 						var ah *abstract.HostFull
 						if details {
-							ah, err = s.complementHost(h, &srv)
+							ah, err = s.complementHost(ctx, h, &srv)
 							if err != nil {
 								return false, err
 							}
@@ -1249,17 +1246,17 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, xerr = s.InspectHost(ahf)
+	_, xerr = s.InspectHost(ctx, ahf)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable: // It's in ERROR state, but it's there
@@ -1518,7 +1515,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 	portID, xerr := s.getOpenstackPortID(host)
 	if xerr != nil {
-		return fail.NewError("failed to disable Router Mode on host '%s'", host.Core.Name)
+		return fail.NewErrorWithCause(xerr, "failed to disable Router Mode on host '%s'", host.Core.Name)
 	}
 	if portID == nil {
 		return fail.NewError(

@@ -9,6 +9,7 @@ on:
   pull_request:
     branches:
       - master
+      - develop
       - 'release/**'
 
 env:
@@ -20,7 +21,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ 1.16.8, 1.16.15, 1.17.8, 1.18 ]
+        go: [ 1.16.15, 1.17.12, 1.18.4 ]
         tags: [ releasetags, tunnel ]
 
     runs-on: macos-latest
@@ -34,6 +35,7 @@ jobs:
       run: |
         brew update
         brew install protoc-gen-go
+        brew install md5sha1sum
 
     - run: make ${{ matrix.tags }} rawci with-coverage
     - uses: actions/upload-artifact@v2

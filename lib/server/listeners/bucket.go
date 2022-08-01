@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -136,6 +136,47 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.BucketRequest)
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return empty, handlers.NewBucketHandler(job).Delete(bucketName)
+}
+
+// Download a bucket
+func (s *BucketListener) Download(ctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketDownloadResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot download bucket")
+
+	empty := &protocol.BucketDownloadResponse{}
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "can't be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	bucketName := in.GetName()
+	if bucketName == "" {
+		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
+	}
+
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/download", bucketName))
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	handler := handlers.NewBucketHandler(job)
+	empty.Content, xerr = handler.Download(bucketName)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	return empty, nil
 }
 
 // Inspect a bucket

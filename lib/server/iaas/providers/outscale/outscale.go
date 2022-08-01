@@ -17,20 +17,21 @@
 package outscale
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/outscale"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/outscale"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -205,12 +206,12 @@ next:
 }
 
 // GetAuthenticationOptions returns authentication parameters
-func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -223,12 +224,12 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions returns configuration parameters
-func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -240,13 +241,13 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 
 	cfg := providers.ConfigMap{}
 	cfg.Set("DNSList", opts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", true)
-	cfg.Set("UseLayer3Networking", false)
+	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", provName)
-	cfg.Set("BuildSubnets", false)
+	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
@@ -273,24 +274,22 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
+func (p provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
-		PublicVirtualIP: false,
-		// FIXME: not tested, corresponding code inside stack is commented
-		// PrivateVirtualIP: true,
+		PublicVirtualIP:  false,
 		PrivateVirtualIP: false,
 		Layer3Networking: false,
 	}, nil
 }
 
 // ListImages ...
-func (p provider) ListImages(all bool) ([]*abstract.Image, fail.Error) {
-	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
+func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
+	return p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
 }
 
 // ListTemplates ...
-func (p provider) ListTemplates(all bool) ([]*abstract.HostTemplate, fail.Error) {
-	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
+func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU

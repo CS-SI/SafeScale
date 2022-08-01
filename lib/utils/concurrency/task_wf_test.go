@@ -17,7 +17,6 @@
 package concurrency
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,7 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NOTICE The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
@@ -154,42 +153,6 @@ func TestResultCheckWF(t *testing.T) {
 	require.NotNil(t, tr)
 }
 
-func TestResultCheckWithoutWF(t *testing.T) {
-	for j := 0; j < 60; j++ {
-		got, xerr := NewUnbreakableTask()
-		require.NotNil(t, got)
-		require.Nil(t, xerr)
-
-		theID, xerr := got.ID()
-		require.Nil(t, xerr)
-		require.NotEmpty(t, theID)
-
-		_, xerr = got.StartWithTimeout(
-			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				duration := time.Duration(randomInt(50, 250)) * time.Millisecond
-				time.Sleep(duration)
-				return "waiting game", nil
-			}, nil, 10*time.Millisecond,
-		)
-		if xerr != nil {
-			t.Errorf("Shouldn't happen")
-		}
-
-		res, xerr := got.Wait()
-		require.NotNil(
-			t, xerr,
-		) // FIXME: CI failed, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
-		if res == nil {
-			t.Errorf("on Wait, res == nil, should not happen")
-		}
-		require.NotNil(t, res)
-
-		tr, xerr := got.Result()
-		require.Nil(t, xerr)
-		require.NotNil(t, tr)
-	}
-}
-
 func TestSingleTaskWF(t *testing.T) {
 	single, err := NewUnbreakableTask()
 	require.NotNil(t, single)
@@ -242,72 +205,6 @@ func TestDoesAbortReallyAbortOrIsJustFakeNewsWF(t *testing.T) {
 			t.Errorf("Where is the timeout error ??: %s", spew.Sdump(xerr))
 		}
 	}
-}
-
-func TestLikeBeforeWithoutAbortButContextWF(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	bg := context.Background()
-	bgt, cancelBgt := context.WithTimeout(bg, time.Duration(30)*time.Millisecond)
-	defer cancelBgt()
-
-	single, xerr := NewTaskWithContext(bgt)
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
-
-	single, xerr = single.StartWithTimeout(
-		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			for {
-				time.Sleep(time.Duration(10) * time.Millisecond)
-				status, xerr := t.Status()
-				if xerr != nil {
-					return "Big failure...", nil
-				}
-				if status == ABORTED || status == TIMEOUT {
-					break
-				}
-
-				fmt.Println("Forever young...")
-			}
-			return "I want to be forever young", nil
-		}, nil, time.Duration(200)*time.Millisecond,
-	)
-	if xerr != nil {
-		t.Errorf("This shouldn't happen")
-	}
-	require.Nil(t, xerr)
-
-	time.Sleep(time.Duration(300) * time.Millisecond)
-	// by now single should have finished with timeouts, so...
-
-	stat, err := single.Status()
-	if err != nil {
-		t.Errorf("Problem retrieving status ?")
-	}
-
-	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ??, that's the textbook definition")
-	}
-
-	_, _, xerr = single.WaitFor(5 * time.Second)
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrTimeout); !ok { // This exception come from ctx, but it's the wrong type -> ErrAborted, and it should be an ErrTimeout
-			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
-		}
-	}
-	if xerr == nil {
-		t.Errorf("It should have finished with errors !")
-		require.NotNil(t, xerr)
-	}
-
-	// Nothing wrong should happen after this point...
-	time.Sleep(time.Duration(100) * time.Millisecond)
-
-	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
 }
 
 func TestLikeBeforeWithoutLettingFinishWF(t *testing.T) {

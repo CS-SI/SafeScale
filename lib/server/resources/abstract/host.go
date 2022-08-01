@@ -22,14 +22,14 @@ import (
 	"math"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // KeyPair represents a SSH key pair
@@ -229,15 +229,16 @@ func (ht HostTemplate) OK() bool {
 }
 
 // HostCore contains the core information about a host
-// This information should not change over time // FIXME: Broken assumption
+// This information should not change over time, but IT ACTUALLY happens
 type HostCore struct {
-	ID         string            `json:"id,omitempty"`
-	Name       string            `json:"name,omitempty"`
-	PrivateKey string            `json:"private_key,omitempty"`
-	SSHPort    uint32            `json:"ssh_port,omitempty"`
-	Password   string            `json:"password,omitempty"`
-	LastState  hoststate.Enum    `json:"last_state,omitempty"`
-	Tags       map[string]string `json:"tags,omitempty"`
+	ID                string            `json:"id,omitempty"`
+	Name              string            `json:"name,omitempty"`
+	PrivateKey        string            `json:"private_key,omitempty"`
+	SSHPort           uint32            `json:"ssh_port,omitempty"`
+	Password          string            `json:"password,omitempty"`
+	LastState         hoststate.Enum    `json:"last_state"`         // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
+	ProvisioningState hoststate.Enum    `json:"provisioning_state"` // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
+	Tags              map[string]string `json:"tags,omitempty"`
 }
 
 // NewHostCore ...
@@ -247,6 +248,8 @@ func NewHostCore() *HostCore {
 		Tags:    make(map[string]string),
 	}
 
+	hc.LastState = hoststate.Unknown
+	hc.ProvisioningState = hoststate.Unknown
 	hc.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	hc.Tags["ManagedBy"] = "safescale"
 	return hc
@@ -342,18 +345,12 @@ func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName returns the name of the host
 // Satisfies interface data.Identifiable
 func (hc *HostCore) GetName() string {
-	if hc == nil {
-		return ""
-	}
 	return hc.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
 func (hc *HostCore) GetID() string {
-	if hc == nil {
-		return ""
-	}
 	return hc.ID
 }
 
@@ -396,7 +393,7 @@ type HostFull struct {
 	Sizing       *HostEffectiveSizing
 	Networking   *HostNetworking
 	Description  *HostDescription
-	CurrentState hoststate.Enum `json:"current_state,omitempty"`
+	CurrentState hoststate.Enum `json:"current_state"`
 }
 
 // NewHostFull creates an instance of HostFull

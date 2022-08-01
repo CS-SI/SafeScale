@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
@@ -126,7 +126,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
 			if xerr != nil {
 				t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
-				switch xerr.(type) {
+				switch xerr.(type) {                       // nolint
 				case *fail.ErrAborted:
 					switch xerr.(type) {
 					case *fail.ErrAborted:
@@ -550,7 +550,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		chansize := 10
 		for {
 			iter++
-			if iter > 3 {
+			if iter > 1 {
 				break
 			}
 			if enough {
@@ -759,7 +759,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		chansize := 10
 		for {
 			iter++
-			if iter > 3 {
+			if iter > 1 {
 				break
 			}
 			if enough {
@@ -956,21 +956,17 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		// check for error inconsistencies
 		if iter == 1 {
 			previousErr = xerr
-		} else {
-			// VPL: testing errors like this does not seem to work: with 2 errors *fail.ErrAborted, the test fails, leading to "aborted != aborted"...
-			// if xerr != previousErr {
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAborted:
-					if previousErr != nil {
-						switch previousErr.(type) {
-						case *fail.ErrAborted:
-							// same kind of error, good
-						default:
-							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-							t.Fail()
-							return
-						}
+		} else if xerr != nil {
+			switch xerr.(type) { // nolint
+			case *fail.ErrAborted:
+				if previousErr != nil {
+					switch previousErr.(type) {
+					case *fail.ErrAborted:
+						// same kind of error, good
+					default:
+						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+						t.Fail()
+						return
 					}
 				}
 			}

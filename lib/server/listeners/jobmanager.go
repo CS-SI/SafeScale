@@ -19,14 +19,14 @@ package listeners
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -45,14 +45,14 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 			return nil, xerr
 		}
 
-		bucket, ierr := service.GetMetadataBucket()
+		bucket, ierr := service.GetMetadataBucket(ctx)
 		if ierr != nil {
 			return nil, ierr
 		}
 
 		tenant = &operations.Tenant{Name: tenantID, BucketName: bucket.GetName(), Service: service}
 	} else {
-		tenant = operations.CurrentTenant()
+		tenant = operations.CurrentTenant(ctx)
 		if tenant == nil {
 			return nil, fail.NotFoundError("no tenant set")
 		}

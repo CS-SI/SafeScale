@@ -23,10 +23,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
@@ -150,25 +150,16 @@ func (s *Subnet) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName ...
 // satisfies interface data.Identifiable
 func (s *Subnet) GetName() string {
-	if s == nil {
-		return ""
-	}
 	return s.Name
 }
 
 // GetID ...
 // satisfies interface data.Identifiable
 func (s *Subnet) GetID() string {
-	if s == nil {
-		return ""
-	}
 	return s.ID
 }
 
 func (s *Subnet) GetCIDR() string {
-	if s == nil {
-		return ""
-	}
 	return s.CIDR
 }
 

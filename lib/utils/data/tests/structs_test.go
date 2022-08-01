@@ -19,13 +19,13 @@ package tests
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStructWithoutPointers_IsNull(t *testing.T) {
 
-	var s *StructWithoutPointers = nil
+	var s *StructWithoutPointers
 	require.EqualValues(t, s.IsNull(), true)
 	s = &StructWithoutPointers{
 		Content: "",
@@ -48,7 +48,7 @@ func TestStructWithoutPointers_IsNull(t *testing.T) {
 
 func TestStructWithPointersAndDefectiveReplace_IsNull(t *testing.T) {
 
-	var s *StructWithPointersAndDefectiveReplace = nil
+	var s *StructWithPointersAndDefectiveReplace
 
 	require.EqualValues(t, s.IsNull(), true)
 	s = &StructWithPointersAndDefectiveReplace{
@@ -82,7 +82,7 @@ func TestStructWithPointersAndDefectiveReplace_IsNull(t *testing.T) {
 
 func TestStructWithPointersAndCorrectReplace_IsNull(t *testing.T) {
 
-	var s *StructWithPointersAndCorrectReplace = nil
+	var s *StructWithPointersAndCorrectReplace
 
 	require.EqualValues(t, s.IsNull(), true)
 	s = &StructWithPointersAndCorrectReplace{
@@ -119,14 +119,14 @@ func TestStructWithPointersAndCorrectReplace_Replace(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			t.Error("Expect panc")
+			t.Error("Expect panic")
 			t.Fail()
 		}
 
 	}()
 
-	var s *StructWithPointersAndCorrectReplace = nil
-	var c data.Clonable = nil
+	var s *StructWithPointersAndCorrectReplace
+	var c data.Clonable
 	_, _ = s.Replace(c)
 
 }

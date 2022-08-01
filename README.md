@@ -1,4 +1,4 @@
-# SafeScale: multicloud management platform
+# SafeScale: Infrastructure and Platform as Code tool
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/CS-SI/SafeScale/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/release/CS-SI/SafeScale.svg)](https://github.com/CS-SI/SafeScale/releases/latest)
@@ -8,20 +8,20 @@
 ![Forks](https://img.shields.io/github/forks/CS-SI/SafeScale?style=flat)
 ![Stars](https://img.shields.io/github/stars/CS-SI/SafeScale)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/CS-SI/SafeScale/v21)](https://goreportcard.com/report/github.com/CS-SI/SafeScale/v21)
-![Go Versions](https://img.shields.io/badge/go-1.16%2C1.17-brightgreen)
+[![Go Report Card](https://goreportcard.com/badge/github.com/CS-SI/SafeScale/v22)](https://goreportcard.com/report/github.com/CS-SI/SafeScale/v22)
+![Go Versions](https://img.shields.io/badge/go-1.16%2C1.17%2C1.18-brightgreen)
 ![CodeSizeInBytes](https://img.shields.io/github/languages/code-size/CS-SI/SafeScale)
 
-[![Packages Documentation](https://img.shields.io/badge/go-documentation-blue.svg?label=packages)](https://pkg.go.dev/github.com/CS-SI/SafeScale/v21/lib)
+[![Packages Documentation](https://img.shields.io/badge/go-documentation-blue.svg?label=packages)](https://pkg.go.dev/github.com/CS-SI/SafeScale/v22/lib)
 
 SafeScale is an Infrastructure and Platform as Code tool.
 
 ## Table of content
   - [Description](#description)
-    - [SafeScale Infra](#safescale-safescale)
+    - [SafeScale Infra](#safescale-infra)
     - [SafeScale Platform](#safescale-platform)
     - [SafeScale Security](#safescale-security)
-  - [Currently available features](#currently-available-features)
+  - [Available features](#available-features)
   - [Contributing](#contributing)
   - [License](#license)
 
@@ -67,7 +67,7 @@ Platform can deploy a standard cluster with minimal features:
 For example the following command creates a Kubernetes cluster named `k8s-cluster`using `Normal`complexity (3 masters and 3 nodes):
 
 ```
-$ safescale platform create --flavor k8s --complexity nomal k8s-cluster
+$ safescale cluster create --flavor k8s --complexity Normal k8s-cluster
 ```
 
 Supplemental software and/or configurations can be installed in 2 ways on SafeScale Hosts or Clusters:
@@ -89,7 +89,7 @@ A `Feature` can describe operations using different methods:
 - `helm` (coming soon): uses helm chart, the "package" engine for Kubernetes
 - `ansible` (coming soon): defines playbook to run, SafeScale provising inventory
 
-Additionnaly, a `Feature` is able to apply:
+Additionally, a `Feature` is able to apply:
 - reverse proxy rules
 - Security Group rules
 
@@ -103,7 +103,7 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 The design of a SafeScale Security gateway can be depicted as below:
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
-## Currently available abilities
+## Available features
 SafeScale is currently under active development and does not yet offer all the abilities planned. However, we are already publishing it with the following ones:
 
   - SafeScale Infra:

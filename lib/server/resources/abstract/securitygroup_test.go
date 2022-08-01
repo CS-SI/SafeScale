@@ -22,10 +22,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +49,7 @@ func TestSecurityGroupRule_IsNull(t *testing.T) {
 		t.Fail()
 	}
 	sgr.Sources = []string{}
-	sgr.Targets = append(sgr.Sources, "Target 1")
+	sgr.Targets = append(sgr.Sources, "Target 1") //nolint
 	if sgr.IsNull() {
 		t.Error("SecurityGroupRule is not null")
 		t.Fail()
@@ -69,7 +69,7 @@ func TestSecurityGroupRule_EqualTo(t *testing.T) {
 	sgr.Sources = []string{"Source1", "Source2", "Source3"}
 	sgr.Targets = []string{"Target1", "Target2", "Target3"}
 
-	var sgr2 *SecurityGroupRule = nil
+	var sgr2 *SecurityGroupRule
 	if sgr2.EqualTo(sgr) {
 		t.Error("Can't resolve equals with nil SecurityGroupRule")
 		t.Fail()
@@ -146,7 +146,7 @@ func TestSecurityGroupRule_EqualTo(t *testing.T) {
 
 func TestSecurityGroupRule_EquivalentTo(t *testing.T) {
 
-	var sgr1 *SecurityGroupRule = &SecurityGroupRule{
+	var sgr1 = &SecurityGroupRule{
 		IDs:         []string{"a", "b", "c"},
 		Description: "SecurityGroupRule Description",
 		EtherType:   ipversion.IPv4,
@@ -157,7 +157,7 @@ func TestSecurityGroupRule_EquivalentTo(t *testing.T) {
 		Sources:     []string{"Source1", "Source2", "Source3"},
 		Targets:     []string{"Target1", "Target2", "Target3"},
 	}
-	var sgr2 *SecurityGroupRule = nil
+	var sgr2 *SecurityGroupRule
 	if sgr2.EquivalentTo(sgr1) {
 		t.Error("Can't resolve EquivalentTo with nil SecurityGroupRule")
 		t.Fail()
@@ -219,7 +219,7 @@ func TestSecurityGroupRule_EquivalentTo(t *testing.T) {
 
 func TestSecurityGroupRule_SourcesConcernGroups(t *testing.T) {
 
-	var sgr *SecurityGroupRule = nil
+	var sgr *SecurityGroupRule
 	_, err := sgr.SourcesConcernGroups()
 	if err == nil {
 		t.Error("Can't run SourcesConcernGroups on nil SecurityGroupRule")
@@ -241,7 +241,7 @@ func TestSecurityGroupRule_SourcesConcernGroups(t *testing.T) {
 
 func TestSecurityGroupRule_TargetsConcernGroups(t *testing.T) {
 
-	var sgr *SecurityGroupRule = nil
+	var sgr *SecurityGroupRule
 	_, err := sgr.TargetsConcernGroups()
 	if err == nil {
 		t.Error("Can't run SourcesConcernGroups on nil SecurityGroupRule")
@@ -283,7 +283,7 @@ func Test_concernsGroups(t *testing.T) {
 
 func TestSecurityGroupRule_Validate(t *testing.T) {
 
-	var sgr *SecurityGroupRule = nil
+	var sgr *SecurityGroupRule
 	err := sgr.Validate()
 	if err == nil {
 		t.Error("Can't validate nil SecurityGroupRule")
@@ -364,7 +364,7 @@ func TestSecurityGroupRule_Validate(t *testing.T) {
 
 func TestSecurityGroupRule_Replace(t *testing.T) {
 
-	var sgr1 *SecurityGroupRule = nil
+	var sgr1 *SecurityGroupRule
 	sgr2 := &SecurityGroupRule{
 		EtherType: ipversion.IPv4,
 		Direction: securitygroupruledirection.Ingress,
@@ -384,7 +384,7 @@ func TestSecurityGroupRule_Replace(t *testing.T) {
 func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 
 	var sgrs SecurityGroupRules = nil
-	var sgr *SecurityGroupRule = &SecurityGroupRule{
+	var sgr = &SecurityGroupRule{
 		IDs:         []string{"a1", "b1", "c1"},
 		Description: "SG1 Description",
 		EtherType:   ipversion.IPv6,
@@ -396,12 +396,12 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 		Targets:     []string{"trg_a1", "trg_b1", "trg_c1"},
 	}
 
-	result, err := sgrs.IndexOfEquivalentRule(nil)
+	_, err := sgrs.IndexOfEquivalentRule(nil)
 	if err == nil {
 		t.Error("Can't find nil value")
 		t.Fail()
 	}
-	result, err = sgrs.IndexOfEquivalentRule(sgr)
+	_, err = sgrs.IndexOfEquivalentRule(sgr)
 	if err == nil {
 		t.Error("Can't find an item in empty list")
 		t.Fail()
@@ -431,7 +431,7 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
 		},
 	}
-	result, err = sgrs.IndexOfEquivalentRule(sgr)
+	_, err = sgrs.IndexOfEquivalentRule(sgr)
 	if err == nil {
 		t.Error("Can't find an item, is it not in list")
 		t.Fail()
@@ -472,7 +472,7 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
 		},
 	}
-	result, err = sgrs.IndexOfEquivalentRule(sgr)
+	result, err := sgrs.IndexOfEquivalentRule(sgr)
 	if err != nil {
 		t.Error("Shound found item in list")
 		t.Fail()
@@ -486,7 +486,7 @@ func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
 
 func TestSecurityGroupRules_IndexOfRuleByID(t *testing.T) {
 
-	var sgrs SecurityGroupRules = SecurityGroupRules{
+	var sgrs = SecurityGroupRules{
 		nil,
 		&SecurityGroupRule{
 			IDs:         []string{"a1", "b1", "c1"},
@@ -523,12 +523,12 @@ func TestSecurityGroupRules_IndexOfRuleByID(t *testing.T) {
 		},
 	}
 
-	result, err := sgrs.IndexOfRuleByID("toto")
+	_, err := sgrs.IndexOfRuleByID("toto")
 	if err == nil {
 		t.Error("Mathing item not in list")
 		t.Fail()
 	}
-	result, err = sgrs.IndexOfRuleByID("b2")
+	result, err := sgrs.IndexOfRuleByID("b2")
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -627,16 +627,9 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 
 func TestSecurityGroup_SetID(t *testing.T) {
 
-	var sg *SecurityGroup = nil
+	sg := NewSecurityGroup()
 	sg.SetID("toto")
 	id := sg.GetID()
-	if id != "" {
-		t.Error("Can set id to nil SecurityGroup")
-		t.Fail()
-	}
-	sg = NewSecurityGroup()
-	sg.SetID("toto")
-	id = sg.GetID()
 	if id != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -646,16 +639,9 @@ func TestSecurityGroup_SetID(t *testing.T) {
 
 func TestSecurityGroup_SetName(t *testing.T) {
 
-	var sg *SecurityGroup = nil
+	sg := NewSecurityGroup()
 	sg.SetName("toto")
 	name := sg.GetName()
-	if name != "" {
-		t.Error("Can set name to nil SecurityGroup")
-		t.Fail()
-	}
-	sg = NewSecurityGroup()
-	sg.SetName("toto")
-	name = sg.GetName()
 	if name != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -665,16 +651,9 @@ func TestSecurityGroup_SetName(t *testing.T) {
 
 func TestSecurityGroup_SetNetworkID(t *testing.T) {
 
-	var sg *SecurityGroup = nil
+	sg := NewSecurityGroup()
 	sg.SetNetworkID("toto")
 	network := sg.GetNetworkID()
-	if network != "" {
-		t.Error("Can set network to nil SecurityGroup")
-		t.Fail()
-	}
-	sg = NewSecurityGroup()
-	sg.SetNetworkID("toto")
-	network = sg.GetNetworkID()
 	if network != "toto" {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -684,7 +663,7 @@ func TestSecurityGroup_SetNetworkID(t *testing.T) {
 
 func TestSecurityGroupRules_Clone(t *testing.T) {
 
-	var sgrs SecurityGroupRules = SecurityGroupRules{nil}
+	var sgrs = SecurityGroupRules{nil}
 	clone, err := sgrs.Clone()
 	if err != nil {
 		t.Error(err)
@@ -735,7 +714,6 @@ func TestSecurityGroupRules_Clone(t *testing.T) {
 		t.Error(err)
 	}
 	areEqual = reflect.DeepEqual(sgrs, clone)
-	fmt.Println(sgrs, clone, areEqual)
 	if !areEqual {
 		t.Error("Clone uncomplete")
 		t.Fail()
@@ -904,7 +882,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
 
-	var sgc *SecurityGroup = nil
+	var sgc *SecurityGroup
 	sgcr, _ := sgc.Replace(sg)
 	if fmt.Sprintf("%p", sgcr) != "0x0" {
 		t.Error("Can't replace a nil pointer")
@@ -915,8 +893,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sgcr, _ = sgc.Replace(sg)
 
 	assert.Equal(t, sgc, sgcr)
-	var clob data.Clonable
-	clob = sg
+	var clob data.Clonable = sg
 	require.EqualValues(t, clob, sgcr)
 
 	areEqual := reflect.DeepEqual(&sg, sgcr.(*SecurityGroup))
@@ -937,7 +914,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 func TestSecurityGroup_Serialize(t *testing.T) {
 
 	var sg *SecurityGroup = nil
-	serial, err := sg.Serialize()
+	_, err := sg.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
@@ -984,7 +961,7 @@ func TestSecurityGroup_Serialize(t *testing.T) {
 		},
 	}
 
-	serial, err = sg.Serialize()
+	serial, err := sg.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -1054,7 +1031,7 @@ func TestSecurityGroup_Deserialize(t *testing.T) {
 		t.Fail()
 	}
 
-	var sg2 *SecurityGroup = nil
+	var sg2 *SecurityGroup
 	err = sg2.Deserialize(serial)
 	if err == nil {
 		t.Error("Can't serialize nil pointer")

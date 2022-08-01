@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +28,7 @@ func Test_BuildBashLibraryDefinition(t *testing.T) {
 
 	v := temporal.NewTimings()
 	result, err := BuildBashLibraryDefinition(v)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*system.BashLibraryDefinition")
 
 }
@@ -36,11 +36,11 @@ func TestBashLibraryDefinition_ToMap(t *testing.T) {
 
 	v := temporal.NewTimings()
 	result, err := BuildBashLibraryDefinition(v)
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*system.BashLibraryDefinition")
 
 	m, err := result.ToMap()
-	require.EqualValues(t, err, nil)
+	require.Nil(t, err)
 	require.EqualValues(t, reflect.TypeOf(m).String(), "map[string]interface {}")
 
 }

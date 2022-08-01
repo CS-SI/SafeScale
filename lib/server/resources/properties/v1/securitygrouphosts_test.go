@@ -18,10 +18,13 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestSecurityGroupHosts_IsNull(t *testing.T) {
@@ -51,6 +54,20 @@ func TestSecurityGroupHosts_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := sgh2.Replace(network)
+	if xerr == nil {
+		t.Error("SecurityGroupHosts.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *SecurityGroupHosts") {
+		t.Errorf("Expect error \"p is not a *SecurityGroupHosts\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestSecurityGroupHosts_Clone(t *testing.T) {
@@ -76,6 +93,7 @@ func TestSecurityGroupHosts_Clone(t *testing.T) {
 
 	clonedSgh, ok := cloned.(*SecurityGroupHosts)
 	if !ok {
+		t.Error("Cloned SecurityGroupHosts not castable to *SecurityGroupHosts", err)
 		t.Fail()
 	}
 
@@ -86,7 +104,7 @@ func TestSecurityGroupHosts_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(sgh, clonedSgh)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, sgh, clonedSgh)

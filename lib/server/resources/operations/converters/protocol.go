@@ -21,36 +21,30 @@ package converters
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
-func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
-	var pgw, sgw *system.SSHConfig
+// SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a ssh.Profile
+func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) sshapi.Config {
+	var pgw, sgw sshapi.Config
 	if from.Gateway != nil {
 		pgw = SSHConfigFromProtocolToSystem(from.Gateway)
 	}
 	if from.SecondaryGateway != nil {
 		sgw = SSHConfigFromProtocolToSystem(from.SecondaryGateway)
 	}
-	return &system.SSHConfig{
-		User:                   from.User,
-		Hostname:               from.HostName,
-		IPAddress:              from.Host,
-		PrivateKey:             from.PrivateKey,
-		Port:                   int(from.Port),
-		GatewayConfig:          pgw,
-		SecondaryGatewayConfig: sgw,
-	}
+
+	return ssh.NewConfig(from.HostName, from.Host, int(from.Port), from.User, from.PrivateKey, 0, "", pgw, sgw)
 }
 
 // FeatureSettingsFromProtocolToResource ...

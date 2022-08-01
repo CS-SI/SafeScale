@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NetworkRequest represents network requirements to create a network/VPC where CIDR contains a non-routable network
@@ -141,17 +141,11 @@ func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName ...
 // satisfies interface data.Identifiable
 func (n *Network) GetName() string {
-	if n == nil {
-		return ""
-	}
 	return n.Name
 }
 
 // GetID ...
 // satisfies interface data.Identifiable
 func (n *Network) GetID() string {
-	if n == nil {
-		return ""
-	}
 	return n.ID
 }

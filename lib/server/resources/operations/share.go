@@ -23,23 +23,22 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/system/nfs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/system/nfs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 const (
@@ -140,7 +139,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(ctx context.Context, svc iaas.Service, ref string) (_ resources.Share, ferr fail.Error) {
+func LoadShare(ctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Share, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -180,11 +179,11 @@ func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 		return nil, innerXErr
 	}
 
-	if innerXErr = shareInstance.Read(ref); innerXErr != nil {
+	if innerXErr = shareInstance.Read(ctx, ref); innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(shareInstance.Sdump()).(string), fail.IgnoreError(blank.Sdump()).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(shareInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("share with ref '%s' does NOT exist", ref)
 	}
 
@@ -194,6 +193,12 @@ func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+}
+
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
+func (instance *Share) Exists(ctx context.Context) (bool, fail.Error) {
+	// FIXME: There is no InspectShare
+	return true, nil
 }
 
 // carry creates metadata and add Volume to service cache
@@ -209,7 +214,7 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(clonable)
+	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -233,33 +238,12 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
+	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		si := &ShareIdentity{}
-		xerr = si.Deserialize(buf)
+		xerr := si.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
-		}
-
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
 		}
 
 		return callback(si.HostName, si.ShareID)
@@ -295,23 +279,9 @@ func (instance *Share) Create(
 		return fail.InvalidParameterCannotBeNilError("server")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	targetName := server.GetName()
 
-	var state hoststate.Enum
-	state, xerr = server.GetState()
+	state, xerr := server.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -321,7 +291,7 @@ func (instance *Share) Create(
 	}
 
 	// Check if a Share already exists with the same name
-	_, xerr = server.GetShare(shareName)
+	_, xerr = server.GetShare(ctx, shareName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -341,7 +311,7 @@ func (instance *Share) Create(
 	}
 
 	// -- make some validations --
-	xerr = server.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = server.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if the path to Share isn't a remote mount or contains a remote mount
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			serverMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -354,10 +324,6 @@ func (instance *Share) Create(
 			}
 
 			for k := range serverMountsV1.RemoteMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if strings.Index(sharePath, k) == 0 {
 					return fail.InvalidRequestError("export path '%s' contains a Share mounted in '%s'", sharePath, k)
 				}
@@ -371,14 +337,10 @@ func (instance *Share) Create(
 	}
 
 	// Installs NFS getServer software if needed
-	sshConfig, xerr := server.GetSSHConfig(task.Context())
+	sshConfig, xerr := server.GetSSHConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
@@ -388,7 +350,7 @@ func (instance *Share) Create(
 	}
 
 	// Nothing will be changed in instance, but we do not want more than 1 goroutine to install NFS if needed
-	xerr = server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -397,7 +359,7 @@ func (instance *Share) Create(
 
 			if len(serverSharesV1.ByID) == 0 {
 				// Host doesn't have shares yet, so install NFS
-				xerr = nfsServer.Install(task.Context())
+				xerr = nfsServer.Install(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -455,9 +417,6 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
 			if derr := nfsServer.RemoveShare(context.Background(), sharePath); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
@@ -466,7 +425,7 @@ func (instance *Share) Create(
 
 	// Updates Host Property propertiesv1.HostShares
 	var hostShare *propertiesv1.HostShare
-	xerr = server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -499,7 +458,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := server.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -532,12 +491,12 @@ func (instance *Share) Create(
 func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostID, hostName string
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -579,7 +538,7 @@ func (instance *Share) GetServer(ctx context.Context) (_ resources.Host, ferr fa
 	// defer instance.lock.RUnlock()
 
 	var hostID, hostName string
-	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -626,19 +585,6 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	var (
 		export               string
 		targetName, targetID string
@@ -648,8 +594,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	targetName = target.GetName()
 
-	var state hoststate.Enum
-	state, xerr = target.GetState()
+	state, xerr := target.GetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -659,7 +604,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}
 
 	// Retrieve info about the Share
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -673,7 +618,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(task.Context())
+	rhServer, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -681,12 +626,12 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	// serverID = rhServer.ID()
 	// serverName = rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(task.Context())
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = rhServer.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -709,10 +654,6 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	// Sanitize path
 	mountPath, xerr := sanitize(spath)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -722,7 +663,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	// Lock for read, won't change data other than properties, which are protected by their own way
 	targetID = target.GetID()
-	xerr = target.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = target.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if Share is already mounted
 		// Check if there is already volume mounted in the path (or in subpath)
 		innerXErr := props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
@@ -736,20 +677,12 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 			}
 
 			for _, i := range targetMountsV1.LocalMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if i.Path == spath {
 					// cannot mount a Share in place of a volume (by convention, nothing technically preventing it)
 					return fail.InvalidRequestError(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, spath))
 				}
 			}
 			for _, i := range targetMountsV1.RemoteMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if strings.Index(spath, i.Path) == 0 {
 					// cannot mount a Share inside another Share (at least by convention, if not technically)
 					return fail.InvalidRequestError("there is already a Share mounted in '%s:%s'", targetName, i.Path)
@@ -770,14 +703,14 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 		return nil, xerr
 	}
 
-	targetSSHConfig, xerr := target.GetSSHConfig(task.Context())
+	targetSSHConfig, xerr := target.GetSSHConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// -- Mount the Share on host --
-	xerr = rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -831,7 +764,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := rhServer.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -863,7 +796,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	}()
 
 	var mount *propertiesv1.HostRemoteMount
-	xerr = target.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = target.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -913,7 +846,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -922,19 +855,6 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	if target == nil {
 		return fail.InvalidParameterCannotBeNilError("target")
 	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	var (
 		shareName, shareID string
@@ -945,8 +865,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 
 	targetName := target.GetName()
 
-	var state hoststate.Enum
-	state, xerr = target.GetState()
+	state, xerr := target.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -956,7 +875,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	}
 
 	// Retrieve info about the Share
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -971,20 +890,20 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 		return xerr
 	}
 
-	rhServer, xerr := instance.unsafeGetServer(task.Context())
+	rhServer, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	serverName := rhServer.GetName()
-	serverPrivateIP, xerr := rhServer.GetPrivateIP(task.Context())
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = rhServer.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			rhServer, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -1007,7 +926,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	var mountPath string
 	remotePath := serverPrivateIP + ":" + hostShare.Path
 	targetID := target.GetID()
-	xerr = target.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = target.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -1020,7 +939,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 			}
 
 			// Unmount Share from client
-			sshConfig, inErr := target.GetSSHConfig(task.Context())
+			sshConfig, inErr := target.GetSSHConfig(ctx)
 			if inErr != nil {
 				return inErr
 			}
@@ -1030,7 +949,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 				return inErr
 			}
 
-			inErr = nfsClient.Unmount(task.Context(), instance.Service(), serverPrivateIP+":"+hostShare.Path)
+			inErr = nfsClient.Unmount(ctx, instance.Service(), serverPrivateIP+":"+hostShare.Path)
 			if inErr != nil {
 				return inErr
 			}
@@ -1049,7 +968,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 	}
 
 	// Remove host from client lists of the Share
-	xerr = rhServer.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rhServer.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -1073,25 +992,12 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	var (
 		shareID, shareName string
@@ -1100,7 +1006,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 
 	// -- Retrieve info about the Share --
 	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1115,7 +1021,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	objserver, xerr := instance.unsafeGetServer(task.Context())
+	objserver, xerr := instance.unsafeGetServer(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1124,7 +1030,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	targetName := objserver.GetName()
 
 	var state hoststate.Enum
-	state, xerr = objserver.GetState()
+	state, xerr = objserver.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1133,7 +1039,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidRequestError(fmt.Sprintf("cannot delete share on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	xerr = objserver.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = objserver.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -1157,16 +1063,12 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 			if len(hostShare.ClientsByName) > 0 {
 				var list []string
 				for k := range hostShare.ClientsByName {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					list = append(list, "'"+k+"'")
 				}
 				return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
 			}
 
-			sshConfig, xerr := objserver.GetSSHConfig(task.Context())
+			sshConfig, xerr := objserver.GetSSHConfig(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1178,9 +1080,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 
-			defer task.DisarmAbortSignal()()
-
-			xerr = nfsServer.RemoveShare(ctx, hostShare.Path)
+			xerr = nfsServer.RemoveShare(context.Background(), hostShare.Path)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1196,10 +1096,8 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	defer task.DisarmAbortSignal()()
-
 	// Remove Share metadata
-	return instance.MetadataCore.Delete()
+	return instance.MetadataCore.Delete(ctx)
 }
 
 func sanitize(in string) (string, fail.Error) {
@@ -1215,7 +1113,7 @@ func sanitize(in string) (string, fail.Error) {
 func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1230,7 +1128,7 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 		return nil, xerr
 	}
 
-	share, xerr := server.GetShare(shareID)
+	share, xerr := server.GetShare(ctx, shareID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1256,7 +1154,7 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 			continue
 		}
 
-		mounts, xerr := h.GetMounts()
+		mounts, xerr := h.GetMounts(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())

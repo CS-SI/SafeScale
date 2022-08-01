@@ -17,14 +17,14 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ImageHandler
+//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ImageHandler
 
 // TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -62,19 +62,19 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
-	return handler.job.Service().ListImages(all)
+	return handler.job.Service().ListImages(handler.job.Context(), all)
 }
 
 // Select selects the image that best fits osname
 func (handler *imageHandler) Select(osname string) (image *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented")
+	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented") // FIXME: Technical debt
 }
 
 // Filter filters the images that do not fit osname
 func (handler *imageHandler) Filter(osname string) (image []abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented")
+	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented") // FIXME: Technical debt
 }

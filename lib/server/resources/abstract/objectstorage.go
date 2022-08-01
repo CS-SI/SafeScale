@@ -20,10 +20,10 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)
@@ -123,18 +123,12 @@ func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName name returns the name of the host
 // Satisfies interface data.Identifiable
 func (instance ObjectStorageBucket) GetName() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
 	return instance.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
 func (instance ObjectStorageBucket) GetID() string {
-	if valid.IsNil(instance) {
-		return ""
-	}
 	return instance.ID
 }
 

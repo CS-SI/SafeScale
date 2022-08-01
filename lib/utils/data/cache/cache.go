@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -16,14 +19,14 @@
 
 package cache
 
-//go:generate minimock -o mocks/mock_cache.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/cache.Cache
+//go:generate minimock -o mocks/mock_cache.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/cache.Cache
 
 import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Cache interface describing what a struct must implement to be considered as a cache

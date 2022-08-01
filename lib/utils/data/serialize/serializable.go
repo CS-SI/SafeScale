@@ -16,7 +16,7 @@
 
 package serialize
 
-//go:generate minimock -o mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize.Serializable
+//go:generate minimock -o mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize.Serializable
 
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
 // and reverse operation (Deserialize()

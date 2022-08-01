@@ -20,21 +20,21 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
-// tenant is the part of safescale client handling tenants
-type tenant struct {
+// tenantConsumer is the part of safescale client handling tenants
+type tenantConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
 // List ...
-func (t tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
+func (t tenantConsumer) List(timeout time.Duration) (*protocol.TenantList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -57,7 +57,7 @@ func (t tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
 }
 
 // Get ...
-func (t tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
+func (t tenantConsumer) Get(timeout time.Duration) (*protocol.TenantName, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -79,7 +79,7 @@ func (t tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
 }
 
 // Set ...
-func (t tenant) Set(name string, timeout time.Duration) error {
+func (t tenantConsumer) Set(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -102,7 +102,7 @@ func (t tenant) Set(name string, timeout time.Duration) error {
 }
 
 // Inspect ...
-func (t tenant) Inspect(name string, timeout time.Duration) (*protocol.TenantInspectResponse, error) {
+func (t tenantConsumer) Inspect(name string, timeout time.Duration) (*protocol.TenantInspectResponse, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -124,7 +124,7 @@ func (t tenant) Inspect(name string, timeout time.Duration) (*protocol.TenantIns
 }
 
 // Cleanup ...
-func (t tenant) Cleanup(name string, timeout time.Duration) error {
+func (t tenantConsumer) Cleanup(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -147,7 +147,7 @@ func (t tenant) Cleanup(name string, timeout time.Duration) error {
 }
 
 // Scan ...ScanRequest
-func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.Duration) (*protocol.ScanResultList, error) {
+func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeout time.Duration) (*protocol.ScanResultList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -170,7 +170,7 @@ func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.
 }
 
 // Upgrade ...
-func (t tenant) Upgrade(name string, dryRun bool, timeout time.Duration) ([]string, error) {
+func (t tenantConsumer) Upgrade(name string, dryRun bool, timeout time.Duration) ([]string, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 

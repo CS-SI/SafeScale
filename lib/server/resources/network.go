@@ -20,20 +20,19 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// DISABLED go:generate minimock -i github.com/CS-SI/SafeScale/v21/lib/server/resources.Network -o mocks/mock_network.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/server/resources.Network -o mocks/mock_network.go
 
 // Network links Object Storage folder and Network
 type Network interface {
 	Metadata
 	data.Identifiable
-	observer.Observable
+	Consistent
 
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network
 	AdoptSubnet(ctx context.Context, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network
@@ -42,5 +41,5 @@ type Network interface {
 	Delete(ctx context.Context) fail.Error
 	Import(ctx context.Context, ref string) fail.Error
 	InspectSubnet(ctx context.Context, subnetRef string) (Subnet, fail.Error) // returns the Subnet instance corresponding to Subnet reference (ID or name) provided (if Subnet is attached to the Network)
-	ToProtocol() (*protocol.Network, fail.Error)                              // converts the network to protobuf message
+	ToProtocol(ctx context.Context) (*protocol.Network, fail.Error)           // converts the network to protobuf message
 }
