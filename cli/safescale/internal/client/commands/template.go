@@ -17,11 +17,8 @@
 package commands
 
 import (
-	"os"
 	"strings"
-	"time"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -62,26 +59,7 @@ var templateList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing templates"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing templates")()
 
 		templates, err := ClientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), 0)
 		if err != nil {
@@ -105,26 +83,7 @@ var templateMatch = cli.Command{
 		sizing = append(sizing, c.Args().Tail()...)
 		sizingAsString := strings.Join(sizing, ",")
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Filtering templates"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Filtering templates")()
 
 		templates, err := ClientSession.Template.Match(sizingAsString, 0)
 		if err != nil {
@@ -144,26 +103,7 @@ var templateInspect = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting templates"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting templates")()
 
 		template, err := ClientSession.Template.Inspect(c.Args().First(), 0)
 		if err != nil {

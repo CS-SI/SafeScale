@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -43,6 +42,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -78,10 +78,6 @@ var ClusterCommand = cli.Command{
 		clusterKubectlCommand,
 		clusterHelmCommand,
 		clusterAnsibleCommands,
-		clusterListFeaturesCommand,
-		clusterCheckFeatureCommand,
-		clusterAddFeatureCommand,
-		clusterRemoveFeatureCommand,
 		clusterFeatureCommands,
 	},
 }
@@ -96,26 +92,7 @@ var clusterListCommand = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing clusters"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing clusters")()
 
 		list, err := ClientSession.Cluster.List(0)
 		if err != nil {
@@ -226,26 +203,7 @@ var clusterInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting cluster"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting cluster")()
 
 		cluster, err := ClientSession.Cluster.Inspect(clusterName, 0)
 		if err != nil {
@@ -548,29 +506,9 @@ var clusterCreateCommand = cli.Command{
 			DefaultSshPort: gatewaySSHPort,
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating cluster"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Creating cluster")()
 
 		res, err := ClientSession.Cluster.Create(&req, 0)
-
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
@@ -694,26 +632,7 @@ var clusterStateCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Getting cluster state"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Getting cluster state")()
 
 		state, err := ClientSession.Cluster.GetState(clusterName, 0)
 		if err != nil {
@@ -797,26 +716,7 @@ var clusterExpandCommand = cli.Command{
 			Parameters:    c.StringSlice("param"),
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Expanding cluster"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Expanding cluster")()
 
 		hosts, err := ClientSession.Cluster.Expand(&req, 0)
 		if err != nil {
@@ -966,12 +866,7 @@ var clusterKubectlCommand = cli.Command{
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
 
-		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+		err = executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -1073,12 +968,7 @@ var clusterHelmCommand = cli.Command{
 		}
 		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") // + useTLS
 
-		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+		err = executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -1105,7 +995,7 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(clientSession *client.Session, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
+func executeCommand(command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 
 	master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
@@ -1114,14 +1004,14 @@ func executeCommand(clientSession *client.Session, command string, files *client
 	}
 
 	if files != nil && files.Count() > 0 {
-		defer files.Cleanup(clientSession, master.GetId())
-		xerr := files.Upload(clientSession, master.GetId())
+		defer files.Cleanup(ClientSession, master.GetId())
+		xerr := files.Upload(ClientSession, master.GetId())
 		if xerr != nil {
 			return xerr
 		}
 	}
 
-	retcode, _, _, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), 0)
+	retcode, _, _, xerr := ClientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), 0)
 	if xerr != nil {
 		return fmt.Errorf("failed to execute command on master '%s' of cluster '%s': %w", master.GetName(), clusterName, xerr)
 	}
@@ -1129,79 +1019,6 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		return cli.NewExitError("" /*msg*/, retcode)
 	}
 	return nil
-}
-
-// clusterListFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
-var clusterListFeaturesCommand = cli.Command{
-	Name:      "list-features",
-	Aliases:   []string{"list-installed-features"},
-	Usage:     "List the features installed on the cluster",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		// cli.StringSliceFlag{
-		//	Name:    "param",
-		//	Aliases: []string{"p"},
-		//	Usage:   "Allow to define content of feature parameters",
-		// },
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "If used, list all features eligible to be installed on the cluster",
-		},
-	},
-
-	Action: clusterFeatureListAction,
-}
-
-// clusterAddFeatureCommand handles 'deploy cluster add-feature CLUSTERNAME FEATURENAME'
-var clusterAddFeatureCommand = cli.Command{
-	Name:      "add-feature",
-	Aliases:   []string{"install-feature"},
-	Usage:     "add-feature CLUSTERNAME FEATURENAME",
-	ArgsUsage: "CLUSTERNAME FEATURENAME",
-
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of Feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-		},
-		cli.BoolFlag{
-			Name:  "skip-proxy",
-			Usage: "Disables reverse proxy rules",
-		},
-	},
-
-	Action: clusterFeatureAddAction,
-}
-
-// clusterCheckFeatureCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
-var clusterCheckFeatureCommand = cli.Command{
-	Name:      "check-feature",
-	Aliases:   []string{"verify-feature"},
-	Usage:     "check-feature CLUSTERNAME FEATURENAME",
-	ArgsUsage: "CLUSTERNAME FEATURENAME",
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-		},
-	},
-	Action: clusterFeatureCheckAction,
-}
-
-// clusterRemoveFeatureCommand handles 'deploy host <host name or id> package <pkgname> delete'
-var clusterRemoveFeatureCommand = cli.Command{
-	Name:      "remove-feature",
-	Aliases:   []string{"destroy-feature", "delete-feature", "rm-feature", "uninstall-feature"},
-	Usage:     "delete-feature CLUSTERNAME FEATURENAME",
-	ArgsUsage: "CLUSTERNAME FEATURENAME",
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-		},
-	},
-	Action: clusterFeatureRemoveAction,
 }
 
 const clusterNodeCmdLabel = "node"
@@ -1239,46 +1056,7 @@ var clusterNodeListCommand = cli.Command{
 
 		var formatted []map[string]interface{}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			pb := progressbar.Default(-1, "Listing cluster nodes")
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing cluster nodes"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing cluster nodes")()
 
 		list, err := ClientSession.Cluster.ListNodes(clusterName, 0)
 		if err != nil {
@@ -1314,26 +1092,7 @@ var clusterNodeInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting cluster node"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting cluster node")()
 
 		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
 		if err != nil {
@@ -1472,26 +1231,7 @@ var clusterNodeStateCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Getting node state"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Getting node state")()
 
 		resp, err := ClientSession.Cluster.StateNode(clusterName, hostName, 0)
 		if err != nil {
@@ -1542,26 +1282,7 @@ var clusterMasterListCommand = cli.Command{
 
 		var formatted []map[string]interface{}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing masters"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing masters")
 
 		list, err := ClientSession.Cluster.ListMasters(clusterName, 0)
 		if err != nil {
@@ -1598,26 +1319,7 @@ var clusterMasterInspectCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting nodes"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting nodes")()
 
 		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
 		if err != nil {
@@ -1702,26 +1404,7 @@ var clusterMasterStateCommand = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Checking master state"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Checking master state")()
 
 		resp, err := ClientSession.Cluster.StateMaster(clusterName, hostName, 0)
 		if err != nil {
@@ -1781,26 +1464,7 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Listing features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Listing features")()
 
 	features, err := ClientSession.Cluster.ListFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
 	if err != nil {
@@ -1843,26 +1507,7 @@ func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Inspecting features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Inspecting features")()
 
 	details, err := ClientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
@@ -1910,26 +1555,7 @@ func clusterFeatureExportAction(c *cli.Context) (ferr error) {
 		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Exporting feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Exporting feature")()
 
 	export, err := ClientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
@@ -1981,26 +1607,7 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Adding feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Adding feature")()
 
 	if err := ClientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
@@ -2053,26 +1660,7 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Checking cluster feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Checking cluster feature")()
 
 	if err := ClientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0); err != nil { // FIXME: define duration
 		err = fail.FromGRPCStatus(err)
@@ -2117,26 +1705,7 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 	settings.SkipProxy = true
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Remove cluster feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Remove cluster feature")()
 
 	if err := ClientSession.Cluster.RemoveFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
@@ -2172,35 +1741,11 @@ var clusterAnsibleInventoryCommands = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		// Set client session
-		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Finding available master"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		endFeedback := interactiveFeedback("Finding available master")
 
 		// Get cluster master
 		master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
+		endFeedback()
 		if err != nil {
 			msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -2274,31 +1819,13 @@ var clusterAnsibleInventoryCommands = cli.Command{
 			}
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Running ansible-inventory"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		endFeedback = interactiveFeedback("Running ansible-inventory")
 
 		// Make command line
 		cmdStr := `sudo -u cladm -i ansible-inventory -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
-		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), 0)
+		retcode, _ /*stdout*/, stderr, xerr := ClientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), 0)
+		endFeedback()
 		if xerr != nil {
 			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -2324,32 +1851,7 @@ var clusterAnsibleRunCommands = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		// Set client session
-		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Running cluster command"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Running cluster command")()
 
 		// Get cluster master
 		master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
@@ -2412,7 +1914,7 @@ var clusterAnsibleRunCommands = cli.Command{
 		// Make command line
 		cmdStr := `sudo -u cladm -i ansible -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
-		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), 0)
+		retcode, _ /*stdout*/, stderr, xerr := ClientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), 0)
 		if xerr != nil {
 			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -2653,22 +2155,16 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		// Set client session
-		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		// Check for feature
 		values = map[string]string{}
 		settings = protocol.FeatureSettings{}
-		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+		if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking Feature \"ansible\" on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
-		err = playAnsible(c, clientSession, playbookFile, askForVault, vaultFile, ansibleDir, inventoryPath, filteredArgs)
+		err = playAnsible(c, playbookFile, askForVault, vaultFile, ansibleDir, inventoryPath, filteredArgs)
 		if err != nil {
 			switch err.(type) {
 			case *cli.ExitError:
@@ -2682,7 +2178,7 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 	},
 }
 
-func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile string, askForVault bool, vaultFile string, ansibleDir string, inventoryPath string, filteredArgs []string) error {
+func playAnsible(c *cli.Context, playbookFile string, askForVault bool, vaultFile string, ansibleDir string, inventoryPath string, filteredArgs []string) error {
 	var treeStruct = []string{
 		"group_vars",
 		"hosts_vars",
@@ -3035,7 +2531,7 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 	)
 
 	// Run playbook
-	err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+	err = executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 	if err != nil {
 		return err
 	}
@@ -3047,7 +2543,7 @@ func playAnsible(c *cli.Context, clientSession *client.Session, playbookFile str
 	}
 	cmdStr = fmt.Sprintf("%s sudo -u cladm rm -f %splaybook.zip", cmdStr, tmpDirectory)
 
-	err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+	err = executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
 	if err != nil {
 		return err
 	}

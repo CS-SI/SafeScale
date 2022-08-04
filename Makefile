@@ -10,8 +10,8 @@ THIS_FILE := $(lastword $(MAKEFILE_LIST))
 include ./common.mk
 
 # Binaries generated
-EXECS=cli/safescale/safescale$(EXT) cli/safescaled/safescaled$(EXT)
-COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(EXT)
+EXECS=cli/safescale/safescale$(EXT) #cli/safescaled/safescaled$(EXT)
+COVEREXECS=cli/safescale/safescale-cover$(EXT) #cli/safescaled/safescaled-cover$(EXT)
 
 # Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
@@ -70,7 +70,7 @@ rawci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock
 
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
 	@(cd cli/safescale && $(MAKE) $(@))
-	@(cd cli/safescaled && $(MAKE) $(@))
+	#@(cd cli/safescaled && $(MAKE) $(@))
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.yml | xargs $(MD5) 2>/dev/null >> sums.log || true
@@ -137,11 +137,11 @@ sharetests:
 ifeq ($(OS),Windows_NT)
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
-	@tar caf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale.exe -C ../../cli/safescaled safescaled.exe
+	@tar caf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale.exe #-C ../../cli/safescaled safescaled.exe
 else
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
-	@tar caf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale -C ../../cli/safescaled safescaled
+	@tar caf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale #-C ../../cli/safescaled safescaled
 endif
 
 with-coverage:

@@ -1,5 +1,5 @@
-//go:build !release
-// +build !release
+//go:build debug && !darwin
+// +build debug,!darwin
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,19 +17,25 @@
  * limitations under the License.
  */
 
-package main
+package commands
 
-// appTrace contains the default parts that we want to trace
-func appTrace() string {
-	return `
-{
-    "concurrency": {
-        "lock": false,
-        "task": false
-    },
-    "ssh": {},
-    "resources": {
-        "cluster": true
-    }
-}`
+import (
+	"runtime"
+
+	"github.com/nakabonne/gosivy/agent"
+	"github.com/sirupsen/logrus"
+)
+
+func startTrack() {
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(5)
+
+	// Track goroutines with gosivy
+	if err := agent.Listen(agent.Options{}); err != nil {
+		logrus.Fatal(err)
+	}
+}
+
+func endTrack() {
+	defer agent.Close()
 }

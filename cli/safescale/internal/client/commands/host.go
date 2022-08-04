@@ -19,12 +19,8 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
-	"time"
 
-	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
@@ -33,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -56,10 +53,6 @@ var HostCommand = cli.Command{
 		hostReboot,
 		hostStart,
 		hostStop,
-		hostCheckFeatureCommand,  // DEPRECATED: deprecated
-		hostAddFeatureCommand,    // DEPRECATED: deprecated
-		hostRemoveFeatureCommand, // DEPRECATED: deprecated
-		hostListFeaturesCommand,  // DEPRECATED: deprecated
 		hostSecurityCommands,
 		hostFeatureCommands,
 		hostTagCommands,
@@ -339,26 +332,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating host"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Creating host")()
 
 		resp, err := ClientSession.Host.Create(&req, 0)
 		if err != nil {
@@ -423,26 +397,7 @@ var hostResize = cli.Command{ // nolint
 			Force:    c.Bool("force"),
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Resizing host"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Resizing host")()
 
 		resp, err := ClientSession.Host.Resize(&def, 0)
 		if err != nil {
@@ -469,28 +424,10 @@ var hostDelete = cli.Command{
 		hostList = append(hostList, c.Args().First())
 		hostList = append(hostList, c.Args().Tail()...)
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Deleting host"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
+		defer interactiveFeedback("Deleting host")()
 
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
-		if err := ClientSession.Host.Delete(hostList, 0); err != nil {
+		err := ClientSession.Host.Delete(hostList, 0)
+		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
 		}
@@ -510,26 +447,7 @@ var hostSSH = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Getting SSH config"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Getting SSH config")()
 
 		resp, err := ClientSession.Host.SSHConfig(c.Args().First())
 		if err != nil {
@@ -565,78 +483,6 @@ func formatSSHConfig(in sshapi.Config) (map[string]interface{}, fail.Error) {
 		out["port"] = 22
 	}
 	return out, nil
-}
-
-// hostListFeaturesCommand handles 'safescale host list-features'
-var hostListFeaturesCommand = cli.Command{
-	Name:      "list-features",
-	Aliases:   []string{"list-available-features"},
-	Usage:     "!DEPRECATED! See safescale host feature list instead!",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "Lists all features available",
-		},
-	},
-
-	Action: hostFeatureListAction,
-}
-
-// hostAddFeatureCommand handles 'safescale host add-feature <host name or id> <pkgname>'
-var hostAddFeatureCommand = cli.Command{
-	Name:      "add-feature",
-	Aliases:   []string{"install-feature"},
-	Usage:     "!DEPRECATED! See safescale host feature add instead!",
-	ArgsUsage: "HOSTNAME FEATURENAME",
-
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-		},
-		cli.BoolFlag{
-			Name:  "skip-proxy",
-			Usage: "Disable reverse proxy rules",
-		},
-	},
-
-	Action: hostFeatureAddAction,
-}
-
-// hostCheckFeatureCommand handles 'safescale host check-feature <host name or id> <pkgname>'
-var hostCheckFeatureCommand = cli.Command{
-	Name:      "check-feature",
-	Aliases:   []string{"verify-feature"},
-	Usage:     "!DEPRECATED! See safescale host feature check instead!",
-	ArgsUsage: "HOSTNAME FEATURENAME",
-
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-		},
-	},
-
-	Action: hostFeatureCheckAction,
-}
-
-// hostRemoveFeatureCommand handles 'safescale host delete-feature <host name> <feature name>'
-var hostRemoveFeatureCommand = cli.Command{
-	Name:      "remove-feature",
-	Aliases:   []string{"rm-feature", "delete-feature", "uninstall-feature"},
-	Usage:     "!DEPRECATED! See safescale host feature delete instead!",
-	ArgsUsage: "HOSTNAME FEATURENAME",
-
-	Flags: []cli.Flag{
-		cli.StringSliceFlag{
-			Name:  "param, p",
-			Usage: "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-		},
-	},
-
-	Action: hostFeatureRemoveAction,
 }
 
 // hostSecurityCommands commands
@@ -680,26 +526,7 @@ var hostSecurityGroupAddCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Binding security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Binding security group")()
 
 		err := ClientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), 0)
 		if err != nil {
@@ -723,26 +550,7 @@ var hostSecurityGroupRemoveCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Unbinding security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Unbinding security group")()
 
 		err := ClientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
@@ -782,26 +590,7 @@ var hostSecurityGroupListCommand = cli.Command{
 			state = "all"
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing security groups")()
 
 		resp, err := ClientSession.Host.ListSecurityGroups(c.Args().First(), state, 0)
 		if err != nil {
@@ -845,26 +634,7 @@ var hostSecurityGroupEnableCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Enabling security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Enabling security groups")()
 
 		err := ClientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
@@ -888,26 +658,7 @@ var hostSecurityGroupDisableCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Disabling security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Disabling security group")()
 
 		err := ClientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
@@ -960,26 +711,7 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Listing host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Listing host features")()
 
 	list, err := ClientSession.Host.ListFeatures(hostName, c.Bool("all"), 0)
 	if err != nil {
@@ -1022,26 +754,7 @@ func hostFeatureInspectAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Inspecting host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Inspecting host features")()
 
 	details, err := ClientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {
@@ -1087,26 +800,7 @@ func hostFeatureExportAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Exporting host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
+	defer interactiveFeedback("Exporting host features")()
 
 	export, err := ClientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
 	if err != nil {

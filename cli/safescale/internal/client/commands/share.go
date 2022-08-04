@@ -17,11 +17,8 @@
 package commands
 
 import (
-	"os"
 	"sync/atomic"
-	"time"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -119,26 +116,7 @@ var shareCreate = cli.Command{
 			SecurityModes: c.StringSlice("securityModes"),
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Creating share")()
 
 		err := ClientSession.Share.Create(&def, 0)
 		if err != nil {
@@ -171,26 +149,7 @@ var shareDelete = cli.Command{
 		shareList = append(shareList, c.Args().First())
 		shareList = append(shareList, c.Args().Tail()...)
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Deleting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Deleting share")()
 
 		if err := ClientSession.Share.Delete(shareList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -208,26 +167,7 @@ var shareList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing share")()
 
 		list, err := ClientSession.Share.List(0)
 		if err != nil {
@@ -272,26 +212,7 @@ var shareMount = cli.Command{
 			WithCache: c.Bool("ac"),
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Mounting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Mounting share")()
 
 		err := ClientSession.Share.Mount(&def, 0)
 		if err != nil {
@@ -322,26 +243,7 @@ var shareUnmount = cli.Command{
 			Share: &protocol.Reference{Name: shareName},
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Unmounting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Unmounting share")()
 
 		err := ClientSession.Share.Unmount(&def, 0)
 		if err != nil {
@@ -365,26 +267,7 @@ var shareInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SHARE_REF."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting share"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting share")()
 
 		list, err := ClientSession.Share.Inspect(c.Args().Get(0), 0)
 		if err != nil {

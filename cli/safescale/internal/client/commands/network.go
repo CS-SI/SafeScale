@@ -70,26 +70,7 @@ var networkList = cli.Command{
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing networks"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing networks")()
 
 		networks, err := ClientSession.Network.List(c.Bool("all"), 0)
 		if err != nil {
@@ -125,26 +106,7 @@ var networkDelete = cli.Command{
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Deleting networks"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Deleting networks")()
 
 		err := ClientSession.Network.Delete(networkList, 0, c.Bool("force"))
 		if err != nil {
@@ -168,26 +130,7 @@ var networkInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting networks"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting network")()
 
 		network, err := ClientSession.Network.Inspect(c.Args().First(), 0)
 		if err != nil {
@@ -264,7 +207,7 @@ var networkInspect = cli.Command{
 					mapped["subnet_state_label"] = subnetstate.Enum(int32(staltnum)).String()
 				}
 
-				if err = queryGatewaysInformation(ClientSession, subnet, mapped, false); err != nil {
+				if err = queryGatewaysInformation(subnet, mapped, false); err != nil {
 					return err
 				}
 
@@ -277,13 +220,13 @@ var networkInspect = cli.Command{
 }
 
 // Get gateway(s) information
-func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}, subnetContext bool) (err error) {
+func queryGatewaysInformation(subnet *protocol.Subnet, mapped map[string]interface{}, subnetContext bool) (err error) {
 	var pgw, sgw *protocol.Host
 	gwIDs := subnet.GetGatewayIds()
 
 	var gateways = make(map[string]string, len(gwIDs))
 	if len(gwIDs) > 0 {
-		pgw, err = session.Host.Inspect(gwIDs[0], 0)
+		pgw, err = ClientSession.Host.Inspect(gwIDs[0], 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			var what string
@@ -296,7 +239,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 		gateways[pgw.Name] = pgw.Id
 	}
 	if len(gwIDs) > 1 {
-		sgw, err = session.Host.Inspect(gwIDs[1], 0)
+		sgw, err = ClientSession.Host.Inspect(gwIDs[1], 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
@@ -408,26 +351,7 @@ var networkCreate = cli.Command{
 
 		gatewaySSHPort := uint32(c.Int("gwport"))
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating network"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Creating network")()
 
 		network, err := ClientSession.Network.Create(
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
@@ -481,33 +405,11 @@ var networkSecurityGroupList = cli.Command{
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 
 		// networkRef := c.Args().First()
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing security groups")()
 
 		list, err := ClientSession.SecurityGroup.List(c.Bool("all"), 0)
 		if err != nil {
@@ -519,11 +421,7 @@ var networkSecurityGroupList = cli.Command{
 			for _, v := range list.SecurityGroups {
 				item, xerr := reformatSecurityGroup(v, false)
 				if xerr != nil {
-					return clitools.FailureResponse(
-						clitools.ExitOnErrorWithMessage(
-							exitcode.Run, strprocess.Capitalize(xerr.Error()),
-						),
-					)
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 				}
 				resp = append(resp, item)
 			}
@@ -554,26 +452,7 @@ var networkSecurityGroupInspect = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting security groups")()
 
 		resp, err := ClientSession.SecurityGroup.Inspect(c.Args().Get(1), 0)
 		if err != nil {
@@ -665,26 +544,7 @@ var networkSecurityGroupCreate = cli.Command{
 			Description: c.String("description"),
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Creating security groups")()
 
 		resp, err := ClientSession.SecurityGroup.Create(c.Args().First(), req, 0)
 		if err != nil {
@@ -717,26 +577,7 @@ var networkSecurityGroupClear = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Clearing security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Clearing security groups")()
 
 		err := ClientSession.SecurityGroup.Clear(c.Args().Get(1), 0)
 		if err != nil {
@@ -774,26 +615,7 @@ var networkSecurityGroupDelete = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Deleting security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Deleting security groups")()
 
 		err := ClientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), 0)
 		if err != nil {
@@ -834,26 +656,7 @@ var networkSecurityGroupBonds = cli.Command{
 
 		kind := strings.ToLower(c.String("kind"))
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Binding security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Binding security groups")()
 
 		list, err := ClientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, 0)
 		if err != nil {
@@ -991,26 +794,7 @@ var networkSecurityGroupRuleAdd = cli.Command{
 			rule.Targets = c.StringSlice("cidr")
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Adding rules to security groups"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Adding rules to security groups")()
 
 		if err := ClientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1099,26 +883,7 @@ var networkSecurityGroupRuleDelete = cli.Command{
 			rule.Targets = c.StringSlice("cidr")
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Deleting rule from security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Deleting rule from security group")()
 
 		err := ClientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, 0)
 		if err != nil {
@@ -1158,9 +923,7 @@ var subnetList = cli.Command{
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1172,26 +935,7 @@ var subnetList = cli.Command{
 			networkRef = ""
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing subnets"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing subnets")()
 
 		resp, err := ClientSession.Subnet.List(networkRef, c.Bool("all"), 0)
 		if err != nil {
@@ -1255,26 +999,7 @@ var subnetDelete = cli.Command{
 		var list []string
 		list = append(list, c.Args().Tail()...)
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Deleting subnets"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Deleting subnets")()
 
 		err := ClientSession.Subnet.Delete(networkRef, list, 0, c.Bool("force"))
 		if err != nil {
@@ -1309,26 +1034,7 @@ var subnetInspect = cli.Command{
 			networkRef = ""
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Inspecting subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Inspecting subnet")()
 
 		subnet, err := ClientSession.Subnet.Inspect(networkRef, c.Args().Get(1), 0)
 		if err != nil {
@@ -1347,7 +1053,7 @@ var subnetInspect = cli.Command{
 			return err
 		}
 
-		if err = queryGatewaysInformation(ClientSession, subnet, mapped, true); err != nil {
+		if err = queryGatewaysInformation(subnet, mapped, true); err != nil {
 			return err
 		}
 
@@ -1437,26 +1143,7 @@ var subnetCreate = cli.Command{
 			return err
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Creating subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Creating subnet")()
 
 		network, err := ClientSession.Subnet.Create(
 			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
@@ -1533,10 +1220,7 @@ var subnetVIPInspectCommand = cli.Command{
 	},
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1721,26 +1405,7 @@ var subnetSecurityGroupAddCommand = cli.Command{
 			networkRef = ""
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Binding security group to subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Binding security group to subnet")()
 
 		err := ClientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), 0)
 		if err != nil {
@@ -1776,26 +1441,7 @@ var subnetSecurityGroupRemoveCommand = cli.Command{
 			networkRef = ""
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Unbinding security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Unbinding security group")()
 
 		err := ClientSession.Subnet.UnbindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
 		if err != nil {
@@ -1846,26 +1492,7 @@ var subnetSecurityGroupListCommand = cli.Command{
 			state = c.String("state")
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Listing security group of subnet"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Listing security group of subnet")()
 
 		list, err := ClientSession.Subnet.ListSecurityGroups(networkRef, c.Args().Get(1), state, 0)
 		if err != nil {
@@ -1901,39 +1528,12 @@ var subnetSecurityGroupEnableCommand = cli.Command{
 			networkRef = ""
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Enabling subnet security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Enabling subnet security group")()
 
 		err := ClientSession.Subnet.EnableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "enabling security group on network", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1967,39 +1567,12 @@ var subnetSecurityGroupDisableCommand = cli.Command{
 			networkRef = ""
 		}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Disabling subnet security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
+		defer interactiveFeedback("Disabling subnet security group")()
 
 		err := ClientSession.Subnet.DisableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "disabling bound security group on network", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

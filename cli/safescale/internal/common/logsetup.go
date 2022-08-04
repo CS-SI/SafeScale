@@ -14,22 +14,23 @@
  * limitations under the License.
  */
 
-package main
+package common
 
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/commonlog"
 )
 
-func init() {
-	log.SetFormatter(commonlog.GetDefaultFormatter())
-	log.SetLevel(log.DebugLevel)
+func LogSetup(suffix string) {
+	logrus.SetFormatter(commonlog.GetDefaultFormatter())
+	logrus.SetLevel(logrus.DebugLevel)
 
 	// Log as JSON instead of the default ASCII formatter.
 	// log.SetFormatter(&log.JSONFormatter{})
@@ -49,7 +50,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	logFileName := utils.AbsPathify("$HOME/.safescale/safescale-session.log")
+	logFileName := utils.AbsPathify("$HOME/.safescale/safescale" + suffix + "-session.log")
 	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Printf("Unable to access file %s, make sure the file is writable\n", logFileName)

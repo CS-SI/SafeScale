@@ -73,7 +73,8 @@ func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 	var xerr fail.Error
 	// Validate server parameter (can be empty string...)
 	if server != "" {
-		if server, xerr = validateServerString(server); xerr != nil {
+		server, xerr = validateServerString(server)
+		if xerr != nil {
 			return nil, fail.Wrap(xerr, "server is invalid")
 		}
 	}

@@ -17,228 +17,115 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/signal"
-	"path"
 	"runtime"
-	"sort"
-	"strings"
-	"sync/atomic"
 	"syscall"
 
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/commands"
-	"github.com/CS-SI/SafeScale/v22/lib/client"
-	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client"
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/daemon"
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/webui"
 	// Autoload embedded provider drivers
 	_ "github.com/CS-SI/SafeScale/v22/lib/server"
 )
 
-var profileCloseFunc = func() {}
-
-func cleanup(clientSession *client.Session, onAbort *uint32) {
-	var crash error
-	defer fail.SilentOnPanic(&crash) // nolint
-
-	if atomic.CompareAndSwapUint32(onAbort, 0, 0) {
-		profileCloseFunc()
-		os.Exit(0) // nolint
-	}
-
-	fmt.Println("\nBe careful: stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible.")
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
-	text, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Println("failed to read the input : ", err.Error())
-		text = "y"
-	}
-	if strings.TrimRight(text, "\n") == "y" {
-		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
-		if err != nil {
-			fmt.Printf("failed to stop the process %v\n", err)
-		}
-	}
-	profileCloseFunc()
-	os.Exit(0)
-}
-
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	var onAbort uint32
 
 	// mainCtx, cancelfunc := context.WithCancel(context.Background())
 
 	signalCh := make(chan os.Signal, 1)
+	// Starts ctrl+c handler before app.RunContext()
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 
-	app := cli.NewApp()
-	app.Writer = os.Stderr
-	app.Name = "safescale"
-	app.Usage = "safescale COMMAND"
-	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
-	if              //goland:noinspection GoBoolExpressions
-	len(Tags) > 1 { // nolint
-		app.Version += fmt.Sprintf(", with Tags: (%s)", Tags)
-	}
-	app.Authors = []cli.Author{
-		{
-			Name:  "CS-SI",
-			Email: "safescale@csgroup.eu",
-		},
-	}
+	// app.Flags = append(app.Flags, []cli.Flag{
+	// 	&cli.StringFlag{
+	// 		Name:  "server, S",
+	// 		Usage: "Connect to daemon on server SERVER (default: localhost:50051)",
+	// 		Value: "",
+	// 	},
+	// 	&cli.StringFlag{
+	// 		Name:  "tenant, T",
+	// 		Usage: "Use tenant TENANT (default: none)",
+	// 	},
+	// }...)
 
-	app.EnableBashCompletion = true
-
-	cli.VersionFlag = &cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "Print program version",
+	// 1st try to see if command is daemon
+	err := tryDaemon(signalCh)
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
-	app.Flags = []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Increase verbosity",
-		},
-		&cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug information",
-		},
-		&cli.StringFlag{
-			Name: "profile",
-			Usage: `Profiles binary
-            value is a comma-separated list of <keyword> (ie '<keyword>[:<params>][,<keyword>[:<params>]...]) where <keyword>
-            can be 'cpu', 'ram', 'trace', and 'web'.
-            <params> may contain :
-                for 'ram', 'cpu' and 'trace': optional destination folder of output file (default: current working directory)
-                for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
-		},
-		&cli.StringFlag{
-			Name:  "server, S",
-			Usage: "Connect to daemon on server SERVER (default: localhost:50051)",
-			Value: "",
-		},
-		&cli.StringFlag{
-			Name:  "tenant, T",
-			Usage: "Use tenant TENANT (default: none)",
-		},
+	// 2nd, try with webui
+	err = tryWebUI(signalCh)
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
-	app.Before = func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		// Define trace settings of the application (what to trace if trace is wanted)
-		// TODO: is it the good behavior ? Shouldn't we fail ?
-		// If trace settings cannot be registered, report it but do not fail
-		// TODO: introduce use of configuration file with autoreload on change
-		err := tracing.RegisterTraceSettings(appTrace())
-		if err != nil {
-			logrus.Errorf(err.Error())
-		}
+	// Finally, try the remaining possibilities
+	err = tryCli(signalCh)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
 
-		// Sets profiling
-		if c.IsSet("profile") {
-			what := c.String("profile")
-			profileCloseFunc = debug.Profile(what)
-		}
-
-		// Default level is INFO
-		logrus.SetLevel(logrus.InfoLevel)
-
-		// Defines trace level wanted by user
-		if appwide.Verbose = c.Bool("verbose"); appwide.Verbose {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		if appwide.Debug = c.Bool("debug"); appwide.Debug {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		if appwide.Debug && appwide.Verbose {
-			logrus.SetLevel(logrus.TraceLevel)
-		}
-
-		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			logrus.SetLevel(logrus.TraceLevel)
-			appwide.Verbose = true
-			appwide.Debug = true
-		}
-
-		commands.ClientSession, err = client.New(c.String("server"), c.String("tenant"))
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-
-		// Starts ctrl+c handler before app.RunContext()
-		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-		go func() {
-			var crash error
-			defer fail.SilentOnPanic(&crash)
-
-			for {
-				<-signalCh
-				atomic.StoreUint32(&onAbort, 1)
-				cleanup(commands.ClientSession, &onAbort)
-				// cancelfunc()
-			}
-		}()
-		return nil
+func tryDaemon(signalCh chan os.Signal) error {
+	app, err := common.NewApp()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 
-	app.After = func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		cleanup(commands.ClientSession, &onAbort)
-		return nil
+	// 1st try to see if command is daemon
+	daemon.SetCommands(app)
+
+	// VPL: there is no RunContext in urfave/cli/v1
+	// err := app.RunContext(mainCtx, os.Args)
+	err = common.RunApp(app, signalCh, daemon.Cleanup)
+	if err != nil {
+		return fmt.Errorf("Error Running daemon: " + err.Error())
+	}
+	return nil
+}
+
+func tryWebUI(signalCh chan os.Signal) error {
+	app, err := common.NewApp()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 
-	app.Commands = append(app.Commands, commands.NetworkCommand)
-	sort.Sort(cli.CommandsByName(commands.NetworkCommand.Subcommands))
+	app, err = common.NewApp()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
-	app.Commands = append(app.Commands, commands.TenantCommand)
-	sort.Sort(cli.CommandsByName(commands.TenantCommand.Subcommands))
+	webui.AddFlags(app)
+	webui.SetCommands(app)
 
-	app.Commands = append(app.Commands, commands.HostCommand)
-	sort.Sort(cli.CommandsByName(commands.HostCommand.Subcommands))
+	// VPL: there is no RunContext in urfave/cli/v1
+	// err := app.RunContext(mainCtx, os.Args)
+	err = common.RunApp(app, signalCh, webui.Cleanup)
+	if err != nil {
+		fmt.Errorf("Error Running WebUI: " + err.Error())
+	}
+	return nil
+}
 
-	app.Commands = append(app.Commands, commands.VolumeCommand)
-	sort.Sort(cli.CommandsByName(commands.VolumeCommand.Subcommands))
+func tryCli(signalCh chan os.Signal) error {
+	app, err := common.NewApp()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 
-	app.Commands = append(app.Commands, commands.SSHCommand)
-	sort.Sort(cli.CommandsByName(commands.SSHCommand.Subcommands))
+	client.AddFlags(app)
 
-	app.Commands = append(app.Commands, commands.BucketCommand)
-	sort.Sort(cli.CommandsByName(commands.BucketCommand.Subcommands))
-
-	app.Commands = append(app.Commands, commands.ShareCommand)
-	sort.Sort(cli.CommandsByName(commands.ShareCommand.Subcommands))
-
-	app.Commands = append(app.Commands, commands.ImageCommand)
-	sort.Sort(cli.CommandsByName(commands.ImageCommand.Subcommands))
-
-	app.Commands = append(app.Commands, commands.TemplateCommand)
-	sort.Sort(cli.CommandsByName(commands.TemplateCommand.Subcommands))
-
-	app.Commands = append(app.Commands, commands.ClusterCommand)
-	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
-
-	app.Commands = append(app.Commands, commands.LabelCommand)
-	sort.Sort(cli.CommandsByName(commands.LabelCommand.Subcommands))
-
-	app.Commands = append(app.Commands, commands.TagCommand)
-	sort.Sort(cli.CommandsByName(commands.TagCommand.Subcommands))
-
-	sort.Sort(cli.CommandsByName(app.Commands))
+	client.SetBefore(app)
+	client.SetCommands(app)
 
 	// if last argument has "--" or "-" and is NOT help we are probably writing a wrong command
 	/*
@@ -256,8 +143,9 @@ func main() {
 
 	// VPL: there is no RunContext in urfave/cli/v1
 	// err := app.RunContext(mainCtx, os.Args)
-	err := app.Run(os.Args)
+	err = common.RunApp(app, signalCh, client.Cleanup)
 	if err != nil {
-		fmt.Println("Error Running App : " + err.Error())
+		return fmt.Errorf("Error Running cli: " + err.Error())
 	}
+	return nil
 }

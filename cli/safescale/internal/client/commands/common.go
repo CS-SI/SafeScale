@@ -18,10 +18,13 @@ package commands
 
 import (
 	"fmt"
+	"os"
+	"time"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	libclient "github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
@@ -32,8 +35,7 @@ const (
 	DoInstanciate    = true
 )
 
-// ClientSession contains the session allowing to communicate with safescaled
-var ClientSession *client.Session
+var ClientSession *libclient.Session
 
 // extractFeatureArgument returns the name of the feature from the command arguments
 func extractFeatureArgument(c *cli.Context) (string, error) {
@@ -59,13 +61,8 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 
 	var hostInstance *protocol.Host
 	if instanciate {
-		Session, xerr := client.New(c.String("server"), c.String("tenant"))
-		if xerr != nil {
-			return "", nil, clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
 		var err error
-		hostInstance, err = Session.Host.Inspect(hostName, 0)
+		hostInstance, err = ClientSession.Host.Inspect(hostName, 0)
 		if err != nil {
 			return "", nil, clitools.ExitOnRPC(err.Error())
 		}
@@ -86,4 +83,28 @@ func extractNodeArgument(c *cli.Context, nodePos int) (string, error) {
 	}
 
 	return hostName, nil
+}
+
+func interactiveFeedback(description string) func() {
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+		go func() {
+			for {
+				if pb.IsFinished() {
+					return
+				}
+				err := pb.Add(1)
+				if err != nil {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		return func() {
+			_ = pb.Finish()
+		}
+	}
+
+	return func() {}
 }

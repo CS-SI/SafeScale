@@ -1,5 +1,5 @@
-//go:build release
-// +build release
+//go:build !release
+// +build !release
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,10 +17,10 @@
  * limitations under the License.
  */
 
-package main
+package client
 
-// appTrace contains the default parts that we want to trace
-func appTrace() string {
+// traceSettings contains the default parts that we want to trace
+func traceSettings() string {
 	return `
 {
     "concurrency": {
