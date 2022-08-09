@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -40,7 +40,7 @@ import (
 var sshCmdName = "ssh"
 
 // SSHCommand ssh command
-var SSHCommand = cli.Command{
+var SSHCommand = &cobra.Command{
 	Name:  "ssh",
 	Usage: "ssh COMMAND",
 	Subcommands: cli.Commands{
@@ -52,7 +52,7 @@ var SSHCommand = cli.Command{
 	},
 }
 
-var sshRun = cli.Command{
+var sshRun = &cobra.Command{
 	Name:      "run",
 	Usage:     "Run a command on the host",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -66,7 +66,7 @@ var sshRun = cli.Command{
 			Value: "5",
 			Usage: "timeout in minutes",
 		}},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -84,7 +84,7 @@ var sshRun = cli.Command{
 		retcode, _, _, err := ClientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh run", false).Error())))
 		}
 		if retcode != 0 {
 			return cli.NewExitError("", retcode)
@@ -101,7 +101,7 @@ func normalizeFileName(fileName string) string { // FIXME: OPP Don't ignore erro
 	return absPath
 }
 
-var sshCopy = cli.Command{
+var sshCopy = &cobra.Command{
 	Name:      "copy",
 	Usage:     "Copy a local file/directory to a host or copy from host to local",
 	ArgsUsage: "from to  Ex: /my/local/file.txt host1:/remote/path/",
@@ -111,7 +111,7 @@ var sshCopy = cli.Command{
 			Value: "5",
 			Usage: "timeout in minutes",
 		}},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -131,7 +131,7 @@ var sshCopy = cli.Command{
 		retcode, _, _, err := ClientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("copy failed: retcode=%d", retcode)))
@@ -140,7 +140,7 @@ var sshCopy = cli.Command{
 	},
 }
 
-var sshConnect = cli.Command{
+var sshConnect = &cobra.Command{
 	Name:      "connect",
 	Usage:     "Connect to the host with interactive shell",
 	ArgsUsage: "<Host_name|Host_ID>",
@@ -156,7 +156,7 @@ var sshConnect = cli.Command{
 			Usage: "Shell to use (default: bash)",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -168,7 +168,7 @@ var sshConnect = cli.Command{
 		resp, err := ClientSession.Host.GetStatus(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "status of host", false).Error())))
 		}
 
 		converted := converters.HostStateFromProtocolToEnum(resp.Status)
@@ -188,13 +188,13 @@ var sshConnect = cli.Command{
 		err = ClientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh connect", false).Error()))
+			return clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh connect", false).Error()))
 		}
 		return nil
 	},
 }
 
-var sshTunnel = cli.Command{
+var sshTunnel = &cobra.Command{
 	Name:      "tunnel",
 	Usage:     "Create a ssh tunnel between admin host and a host in the cloud",
 	ArgsUsage: "<Host_name|Host_ID --local local_port  --remote remote_port>",
@@ -215,7 +215,7 @@ var sshTunnel = cli.Command{
 			Usage: "timeout in minutes",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -239,13 +239,13 @@ var sshTunnel = cli.Command{
 		err := ClientSession.SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh tunnel", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh tunnel", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var sshClose = cli.Command{
+var sshClose = &cobra.Command{
 	Name:      "close",
 	Usage:     "Close one or several ssh tunnel",
 	ArgsUsage: "<Host_name|Host_ID> --local local_port --remote remote_port",
@@ -266,7 +266,7 @@ var sshClose = cli.Command{
 			Usage: "timeout in minutes",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -293,7 +293,7 @@ var sshClose = cli.Command{
 		err := ClientSession.SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh close", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh close", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

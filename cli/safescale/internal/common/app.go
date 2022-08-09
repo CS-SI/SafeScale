@@ -23,113 +23,77 @@ import (
 	"runtime"
 	"strings"
 
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/spf13/cobra"
 )
 
-func NewApp() (*cli.App, error) {
-	app := cli.NewApp()
-	app.Writer = os.Stderr
-	app.Name = "safescale"
-	app.Usage = "safescale COMMAND"
-	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
-	//goland:noinspection GoBoolExpressions
-	if len(Tags) > 1 { // nolint
+func NewApp() (*cobra.Command, error) {
+	app := &cobra.Command{
+		Use:              "safescale",
+		Short:            "safescale COMMAND",
+		Version:          Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")",
+		TraverseChildren: true,
+	}
+	if Tags != "" {
 		app.Version += fmt.Sprintf(", with Build Tags: (%s)", Tags)
 	}
-	app.Authors = []cli.Author{
-		{
-			Name:  "CSGroup",
-			Email: "safescale@csgroup.eu",
-		},
-	}
 
-	app.EnableBashCompletion = true
+	// app.Authors = []cli.Author{
+	// 	{
+	// 		Name:  "CSGroup",
+	// 		Email: "safescale@csgroup.eu",
+	// 	},
+	// }
 
-	cli.VersionFlag = &cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "Print program version",
-	}
+	// app.EnableBashCompletion = true
 
-	app.Flags = []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Increase verbosity",
-		},
-		&cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug information",
-		},
-		&cli.StringFlag{
-			Name: "profile",
-			Usage: `Profiles binary
-            value is a comma-separated list of <keyword> (ie '<keyword>[:<params>][,<keyword>[:<params>]...]) where <keyword>
-            can be 'cpu', 'ram', 'trace', and 'web'.
-            <params> may contain :
-                for 'ram', 'cpu' and 'trace': optional destination folder of output file (default: current working directory)
-                for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
-		},
-	}
+	// app.VersionFlag = &cli.BoolFlag{
+	// 	Name:  "version, V",
+	// 	Usage: "Print program version",
+	// }
 
-	app.Before = func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-
+	app.PreRun = func(cmd *cobra.Command, args []string) {
 		// Sets profiling
-		if c.IsSet("profile") {
-			what := c.String("profile")
-			ProfileCloseFunc = debug.Profile(what)
+		flag := cmd.Flags().Lookup("profile")
+		if flag != nil {
+			ProfileCloseFunc = debug.Profile(flag.Value.String())
 		}
 
 		// Default level is INFO
 		logrus.SetLevel(logrus.InfoLevel)
 
 		// Defines trace level wanted by user
-		if appwide.Verbose = c.Bool("verbose"); appwide.Verbose {
+		if appwide.Config.Verbose || appwide.Config.Debug {
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 
-		if appwide.Debug = c.Bool("debug"); appwide.Debug {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		if appwide.Debug && appwide.Verbose {
+		if appwide.Config.Verbose && appwide.Config.Debug {
 			logrus.SetLevel(logrus.TraceLevel)
 		}
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
-			appwide.Verbose = true
-			appwide.Debug = true
+			appwide.Config.Verbose = true
+			appwide.Config.Debug = true
 		}
-
-		// VPL: moved in commands package
-		// commands.ClientSession, err = client.New(c.String("server"), c.String("tenant"))
-		// if err != nil {
-		// 	return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		// }
-		//
-		return nil
 	}
 
 	return app, nil
 }
 
-func RunApp(app *cli.App, signalCh chan os.Signal, cleanup func()) error {
+func RunApp(app *cobra.Command, signalCh chan os.Signal, cleanup func(*cobra.Command)) error {
 	if app == nil {
 		return fail.InvalidParameterCannotBeNilError("app")
 	}
 
 	// Adding code to react to external signals app.Before
-	previousBefore := app.Before
-	app.Before = func(c *cli.Context) (ferr error) {
-		if previousBefore != nil {
-			err := previousBefore(c)
-			if err != nil {
-				return err
-			}
+	previousPreRun := app.PreRun
+	app.PreRun = func(cmd *cobra.Command, args []string) {
+		if previousPreRun != nil {
+			previousPreRun(cmd, args)
 		}
 
 		go func() {
@@ -145,18 +109,16 @@ func RunApp(app *cli.App, signalCh chan os.Signal, cleanup func()) error {
 				}
 
 				if cleanup != nil {
-					cleanup()
+					cleanup(cmd)
 				}
 				// cancelfunc()
 			}
 		}()
-
-		return nil
 	}
 
 	// VPL: there is no RunContext in urfave/cli/v1
 	// err := app.RunContext(mainCtx, os.Args)
-	err := app.Run(os.Args)
+	err := app.Execute()
 	if err != nil {
 		fmt.Println("Error Running safescale: " + err.Error())
 	}
@@ -171,4 +133,21 @@ func VersionString() string {
 		version += fmt.Sprintf(", with Tags: (%s)", Tags)
 	}
 	return version
+}
+
+// AddFlags adds flags useable in every command
+func AddFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("verbose", false, "Increase verbosity")
+
+	if cmd.Name() == BackendCmdLabel || cmd.Name() == WebUICmdLabel {
+		cmd.Flags().String("profile", "", `Profiles binary
+            value is a comma-separated list of <keyword> (ie '<keyword>[:<params>][,<keyword>[:<params>]...]) where <keyword>
+            can be 'cpu', 'ram', 'trace', and 'web'.
+            <params> may contain :
+                for 'ram', 'cpu' and 'trace': optional destination folder of output file (default: current working directory)
+                for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
+		)
+	}
+	// cmd.Flags().Bool("verbose", false, "")
+	// cmd.Flags().Bool("debug", false, "")
 }

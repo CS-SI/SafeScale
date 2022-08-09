@@ -22,9 +22,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -33,7 +33,7 @@ import (
 var shareCmdName = "share"
 
 // ShareCommand ssh command
-var ShareCommand = cli.Command{
+var ShareCommand = &cobra.Command{
 	Name:    "share",
 	Aliases: []string{"nas"},
 	Usage:   "share COMMAND",
@@ -47,7 +47,7 @@ var ShareCommand = cli.Command{
 	},
 }
 
-var shareCreate = cli.Command{
+var shareCreate = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a nfs server on a host and exports a directory",
@@ -91,7 +91,7 @@ var shareCreate = cli.Command{
 			Usage: "{sys(the default, no security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -121,18 +121,18 @@ var shareCreate = cli.Command{
 		err := ClientSession.Share.Create(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "creation of share", true).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "creation of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareDelete = cli.Command{
+var shareDelete = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove a share",
 	ArgsUsage: "<Share_name> [<Share_name>...]",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -153,17 +153,17 @@ var shareDelete = cli.Command{
 
 		if err := ClientSession.Share.Delete(shareList, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of share", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of share", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareList = cli.Command{
+var shareList = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List all created shared",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 
@@ -172,13 +172,13 @@ var shareList = cli.Command{
 		list, err := ClientSession.Share.List(0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "list of shares", false).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "list of shares", false).Error()))
 		}
 		return clitools.SuccessResponse(list.ShareList)
 	},
 }
 
-var shareMount = cli.Command{
+var shareMount = &cobra.Command{
 	Name:      "mount",
 	Usage:     "Mount an exported nfs directory on a host",
 	ArgsUsage: "SHARE_REF HOST_REF",
@@ -193,7 +193,7 @@ var shareMount = cli.Command{
 			Usage: "Disable cache coherence to improve performances",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -217,18 +217,18 @@ var shareMount = cli.Command{
 		err := ClientSession.Share.Mount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "mount of nas", true).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "mount of nas", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareUnmount = cli.Command{
+var shareUnmount = &cobra.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a Share from a host",
 	ArgsUsage: "SHARE_REF HOST_REF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -248,18 +248,18 @@ var shareUnmount = cli.Command{
 		err := ClientSession.Share.Unmount(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "unmount of share", true).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "unmount of share", true).Error()))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var shareInspect = cli.Command{
+var shareInspect = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "inspect the Share information and clients connected to it",
 	ArgsUsage: "SHARE_REF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -272,7 +272,7 @@ var shareInspect = cli.Command{
 		list, err := ClientSession.Share.Inspect(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "inspection of share", false).Error()))
+			return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "inspection of share", false).Error()))
 		}
 		return clitools.SuccessResponse(list)
 	},

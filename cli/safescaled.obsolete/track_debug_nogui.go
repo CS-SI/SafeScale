@@ -1,5 +1,5 @@
-//go:build debug && darwin
-// +build debug,darwin
+//go:build ignore && debug && darwin
+// +build ignore,debug,darwin
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

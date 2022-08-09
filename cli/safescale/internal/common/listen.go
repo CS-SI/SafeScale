@@ -20,13 +20,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/app/env"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 // AssembleListenString constructs the listen string we will use in net.Listen()
-func AssembleListenString(c *cli.Context, defaultHost, defaultPort string) string {
+func AssembleListenString(c *cobra.Command, defaultHost, defaultPort string) string {
 	// Value listen from parameters
 	listen := c.String("listen")
 	if listen == "" {

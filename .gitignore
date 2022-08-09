@@ -58,7 +58,7 @@ lib/Pipfile.lock
 cli/safescale/version.go
 cli/safescaled/version.go
 cli/scanner/version.go
-lib/server/resources/operations/iaas/userdata/version.go
+lib/backend/resources/operations/iaas/userdata/version.go
 
 vendor
 Gopkg.lock
@@ -103,7 +103,7 @@ cli/safescaled/__debug_bin
 
 .atom/
 
-lib/server/iaas/userdata/version.go
+lib/backend/iaas/userdata/version.go
 
 .run/
 

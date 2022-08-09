@@ -15,8 +15,8 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) #cli/safescaled/safescaled-cover$
 
 # Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
-PROTOC := github.com/golang/protobuf
-PROTOBUF := github.com/golang/protobuf/protoc-gen-go
+PROTOC := google.golang.org/protobuf
+PROTOBUF := google.golang.org/protobuf/protoc-gen-go
 PROTOVER := v1.28.0
 
 # Build tools
@@ -47,7 +47,7 @@ export BUILD_TAGS
 TEST_COVERAGE_ARGS =
 export TEST_COVERAGE_ARGS
 
-all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet semgrep style metalint
+all: logclean ground getdevdeps modclean sdk generate lib cli minimock err vet semgrep style metalint #mintest
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
@@ -205,11 +205,6 @@ tunnel:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'tunnel' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "tunnel,$(BUILD_TAGS)")
 
-generics:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'generics' flag$(NO_COLOR)\n";
-	$(eval BUILD_TAGS = "generics,$(BUILD_TAGS)")
-	@$(SED) -i '3s/.*/go 1.18/' go.mod || true
-
 alltests:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "alltests,$(BUILD_TAGS)")
@@ -284,7 +279,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \
-		$(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
+		$(GO) install google.golang.org/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
@@ -300,7 +295,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n"; \
-		$(GO) install $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
+		$(GO) install $(ERRCHECK)@v1.6.2 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) goconvey > /dev/null; if [ $$? -ne 0 ]; then \
@@ -365,6 +360,9 @@ sdk: getdevdeps unmerged
 	@(cd lib && $(MAKE) $(@))
 
 force_sdk_python: sdk
+	@(cd lib && $(MAKE) $(@))
+
+force_sdk_js: sdk
 	@(cd lib && $(MAKE) $(@))
 
 lib: common
@@ -500,7 +498,7 @@ mintest: begin
 	@$(RM) ./test_results.log || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -511,7 +509,7 @@ precommittest: begin
 	@$(RM) ./test_results.log || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -523,7 +521,7 @@ test: begin coverdeps # Run unit tests
 	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
@@ -620,7 +618,7 @@ ctxcheck: begin
 	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) ctxcheck_results.log || true
-	@contextcheck ./lib/server/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
+	@contextcheck ./lib/backend/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
 	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

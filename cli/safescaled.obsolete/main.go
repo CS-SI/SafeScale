@@ -1,3 +1,6 @@
+//go:build ignore && !debug
+// +build ignore,!debug
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -33,12 +36,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	_ "github.com/CS-SI/SafeScale/v22/lib/server"
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/server/listeners"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -61,7 +64,7 @@ func cleanup(onAbort bool) {
 }
 
 // *** MAIN ***
-func work(c *cli.Context) {
+func work(c *cobra.Command, args []string) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -155,7 +158,7 @@ func work(c *cli.Context) {
 }
 
 // assembleListenString constructs the listen string we will use in net.Listen()
-func assembleListenString(c *cli.Context) string {
+func assembleListenString(c *cobra.Command, args []string) string {
 	// Get listen from parameters
 	listen := c.String("listen")
 	if listen == "" {
@@ -239,7 +242,7 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) (ferr error) {
+	app.Before = func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		// Sets profiling
 		if c.IsSet("profile") {
@@ -281,7 +284,7 @@ func main() {
 		return nil
 	}
 
-	app.Action = func(c *cli.Context) (ferr error) {
+	app.Action = func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		work(c)
 		return nil

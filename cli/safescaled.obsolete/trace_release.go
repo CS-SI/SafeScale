@@ -1,5 +1,5 @@
-//go:build release
-// +build release
+//go:build ignore && release
+// +build ignore,release
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

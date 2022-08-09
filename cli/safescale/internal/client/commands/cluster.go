@@ -31,13 +31,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
@@ -55,7 +55,7 @@ var (
 const clusterCmdLabel = "cluster"
 
 // ClusterCommand command
-var ClusterCommand = cli.Command{
+var ClusterCommand = &cobra.Command{
 	Name:      "cluster",
 	Aliases:   []string{"datacenter", "dc", "platform"},
 	Usage:     "create and manage cluster",
@@ -83,12 +83,12 @@ var ClusterCommand = cli.Command{
 }
 
 // clusterListCommand handles 'deploy cluster list'
-var clusterListCommand = cli.Command{
+var clusterListCommand = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available clusters",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
@@ -97,7 +97,7 @@ var clusterListCommand = cli.Command{
 		list, err := ClientSession.Cluster.List(0)
 		if err != nil {
 			err := fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
 		}
 
 		var formatted []interface{}
@@ -189,13 +189,13 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterInspectCommand = cli.Command{
+var clusterInspectCommand = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "get"},
 	Usage:     "inspect CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
@@ -219,7 +219,7 @@ var clusterInspectCommand = cli.Command{
 	},
 }
 
-func extractClusterName(c *cli.Context) (ferr error) {
+func extractClusterName(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	if c.NArg() < 1 {
 		_ = cli.ShowSubcommandHelp(c)
@@ -322,7 +322,7 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 }
 
 // clusterCreateCmd handles 'deploy cluster <clustername> create'
-var clusterCreateCommand = cli.Command{
+var clusterCreateCommand = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a cluster",
@@ -426,7 +426,7 @@ var clusterCreateCommand = cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) (err error) {
+	RunE: func(c *cobra.Command, args []string) (err error) {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 		if err = extractClusterName(c); err != nil {
@@ -533,7 +533,7 @@ var clusterCreateCommand = cli.Command{
 }
 
 // clusterDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterDeleteCommand = cli.Command{
+var clusterDeleteCommand = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"destroy", "remove", "rm"},
 	Usage:     "delete CLUSTERNAME",
@@ -548,7 +548,7 @@ var clusterDeleteCommand = cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -572,13 +572,13 @@ var clusterDeleteCommand = cli.Command{
 }
 
 // clusterStopCmd handles 'deploy cluster <clustername> stop'
-var clusterStopCommand = cli.Command{
+var clusterStopCommand = &cobra.Command{
 	Name:      "stop",
 	Aliases:   []string{"freeze", "halt"},
 	Usage:     "stop CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -595,13 +595,13 @@ var clusterStopCommand = cli.Command{
 	},
 }
 
-var clusterStartCommand = cli.Command{
+var clusterStartCommand = &cobra.Command{
 	Name:      "start",
 	Aliases:   []string{"unfreeze"},
 	Usage:     "start CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -612,19 +612,19 @@ var clusterStartCommand = cli.Command{
 
 		if err = ClientSession.Cluster.Start(clusterRef, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of cluster", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "start of cluster", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
 // clusterStateCmd handles 'deploy cluster <clustername> state'
-var clusterStateCommand = cli.Command{
+var clusterStateCommand = &cobra.Command{
 	Name:      "state",
 	Usage:     "state CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -649,7 +649,7 @@ var clusterStateCommand = cli.Command{
 }
 
 // clusterExpandCmd handles 'deploy cluster <clustername> expand'
-var clusterExpandCommand = cli.Command{
+var clusterExpandCommand = &cobra.Command{
 	Name:      "expand",
 	Usage:     "expand CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
@@ -680,7 +680,7 @@ var clusterExpandCommand = cli.Command{
 			Usage: "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -728,7 +728,7 @@ var clusterExpandCommand = cli.Command{
 }
 
 // clusterShrinkCommand handles 'deploy cluster <clustername> shrink'
-var clusterShrinkCommand = cli.Command{
+var clusterShrinkCommand = &cobra.Command{
 	Name:      "shrink",
 	Usage:     "shrink CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
@@ -745,7 +745,7 @@ var clusterShrinkCommand = cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -781,13 +781,13 @@ var clusterShrinkCommand = cli.Command{
 	},
 }
 
-var clusterKubectlCommand = cli.Command{
+var clusterKubectlCommand = &cobra.Command{
 	Name:      "kubectl",
 	Category:  "Administrative commands",
 	Usage:     "kubectl CLUSTERNAME [KUBECTL_COMMAND]... [-- [KUBECTL_OPTIONS]...]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -799,7 +799,7 @@ var clusterKubectlCommand = cli.Command{
 		args := c.Args().Tail()
 		var filteredArgs []string
 		ignoreNext := false
-		valuesOnRemote := &client.RemoteFilesHandler{}
+		valuesOnRemote := &cmdline.RemoteFilesHandler{}
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
 		for idx, arg := range args {
 			if ignoreNext {
@@ -841,7 +841,7 @@ var clusterKubectlCommand = cli.Command{
 						}
 
 						if localFile != "-" {
-							rfi := client.RemoteFileItem{
+							rfi := cmdline.RemoteFileItem{
 								Local:  localFile,
 								Remote: fmt.Sprintf("%s/kubectl_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
 							}
@@ -875,13 +875,13 @@ var clusterKubectlCommand = cli.Command{
 	},
 }
 
-var clusterHelmCommand = cli.Command{
+var clusterHelmCommand = &cobra.Command{
 	Name:      "helm",
 	Category:  "Administrative commands",
 	Usage:     "helm CLUSTERNAME COMMAND [[--][PARAMS ...]]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -895,7 +895,7 @@ var clusterHelmCommand = cli.Command{
 		args := c.Args().Tail()
 		ignoreNext := false
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
-		valuesOnRemote := &client.RemoteFilesHandler{}
+		valuesOnRemote := &cmdline.RemoteFilesHandler{}
 		for idx, arg := range args {
 			if ignoreNext {
 				ignoreNext = false
@@ -946,7 +946,7 @@ var clusterHelmCommand = cli.Command{
 						}
 
 						if localFile != "-" {
-							rfc := client.RemoteFileItem{
+							rfc := cmdline.RemoteFileItem{
 								Local:  localFile,
 								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
 							}
@@ -977,13 +977,13 @@ var clusterHelmCommand = cli.Command{
 	},
 }
 
-var clusterRunCommand = cli.Command{
+var clusterRunCommand = &cobra.Command{
 	Name:      "run",
 	Aliases:   []string{"execute", "exec"},
 	Usage:     "run CLUSTERNAME COMMAND",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -995,7 +995,7 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
+func executeCommand(command string, files *cmdline.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 
 	master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
@@ -1024,7 +1024,7 @@ func executeCommand(command string, files *client.RemoteFilesHandler, outs outpu
 const clusterNodeCmdLabel = "node"
 
 // clusterNodeCommands handles 'safescale cluster node' commands
-var clusterNodeCommands = cli.Command{
+var clusterNodeCommands = &cobra.Command{
 	Name:      clusterNodeCmdLabel,
 	Usage:     "manage cluster nodes",
 	ArgsUsage: "COMMAND",
@@ -1040,13 +1040,13 @@ var clusterNodeCommands = cli.Command{
 }
 
 // clusterNodeListCommand handles 'deploy cluster node list CLUSTERNAME'
-var clusterNodeListCommand = cli.Command{
+var clusterNodeListCommand = &cobra.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "Lists the nodes of a cluster",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1074,12 +1074,12 @@ var clusterNodeListCommand = cli.Command{
 }
 
 // clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterNodeInspectCommand = cli.Command{
+var clusterNodeInspectCommand = &cobra.Command{
 	Name:      "inspect",
 	Usage:     "Show details about a cluster node",
 	ArgsUsage: "CLUSTERNAME HOSTNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1104,7 +1104,7 @@ var clusterNodeInspectCommand = cli.Command{
 }
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterNodeDeleteCommand = cli.Command{
+var clusterNodeDeleteCommand = &cobra.Command{
 	Name:    "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
 
@@ -1119,7 +1119,7 @@ var clusterNodeDeleteCommand = cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1158,12 +1158,12 @@ var clusterNodeDeleteCommand = cli.Command{
 }
 
 // clusterNodeStopCmd handles 'deploy cluster <clustername> node <nodename> stop'
-var clusterNodeStopCommand = cli.Command{
+var clusterNodeStopCommand = &cobra.Command{
 	Name:      "stop",
 	Aliases:   []string{"freeze"},
 	Usage:     "node stop CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME HOSTNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1191,7 +1191,7 @@ var clusterNodeStartCommand = cli.Command{
 	Aliases:   []string{"unfreeze"},
 	Usage:     "node start CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME NODENAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1218,7 +1218,7 @@ var clusterNodeStateCommand = cli.Command{
 	Name:      "state",
 	Usage:     "node state CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME NODENAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1272,7 +1272,7 @@ var clusterMasterListCommand = cli.Command{
 	Usage:     "list CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1306,7 +1306,7 @@ var clusterMasterInspectCommand = cli.Command{
 	Usage:     "Show details about a Cluster master",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
 
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1336,7 +1336,7 @@ var clusterMasterStopCommand = cli.Command{
 	Aliases:   []string{"freeze"},
 	Usage:     "master stop CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1364,7 +1364,7 @@ var clusterMasterStartCommand = cli.Command{
 	Aliases:   []string{"unfreeze"},
 	Usage:     "master start CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -1391,7 +1391,7 @@ var clusterMasterStateCommand = cli.Command{
 	Name:      "state",
 	Usage:     "master state CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
@@ -2503,8 +2503,8 @@ func playAnsible(c *cli.Context, playbookFile string, askForVault bool, vaultFil
 	}
 
 	// Upload playbook archive
-	valuesOnRemote := &client.RemoteFilesHandler{}
-	rfc := client.RemoteFileItem{
+	valuesOnRemote := &cmdline.RemoteFilesHandler{}
+	rfc := cmdline.RemoteFileItem{
 		Local:  fmt.Sprintf("%splaybook.zip", tmpDirectory),
 		Remote: fmt.Sprintf("%s/ansible_playbook.zip", utils.TempFolder),
 	}

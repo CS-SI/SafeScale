@@ -24,7 +24,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/urfave/cli"
 
-	libclient "github.com/CS-SI/SafeScale/v22/lib/client"
+	libclient "github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
@@ -38,7 +38,7 @@ const (
 var ClientSession *libclient.Session
 
 // extractFeatureArgument returns the name of the feature from the command arguments
-func extractFeatureArgument(c *cli.Context) (string, error) {
+func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
 	if c.NArg() < 2 {
 		_ = cli.ShowSubcommandHelp(c)
 		return "", clitools.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
@@ -53,7 +53,7 @@ func extractFeatureArgument(c *cli.Context) (string, error) {
 }
 
 // Use the 'hostnamePos'th argument of the command as a host name and use it to get the host instance
-func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (string, *protocol.Host, error) {
+func extractHostArgument(c *cobra.Command, hostnamePos int, instanciate bool) (string, *protocol.Host, error) {
 	hostName := c.Args().Get(hostnamePos)
 	if hostName == "" {
 		return "", nil, clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
@@ -76,7 +76,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int, instanciate bool) (str
 }
 
 // Use the 'nodePos'th argument of the command as a node reference and init hostName with it
-func extractNodeArgument(c *cli.Context, nodePos int) (string, error) {
+func extractNodeArgument(c *cobra.Command, nodePos int) (string, error) {
 	hostName := c.Args().Get(nodePos)
 	if hostName == "" {
 		return "", clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")

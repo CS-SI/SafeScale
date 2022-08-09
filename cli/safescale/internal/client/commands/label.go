@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
@@ -38,7 +38,7 @@ var (
 )
 
 // LabelCommand tag command
-var LabelCommand = cli.Command{
+var LabelCommand = &cobra.Command{
 	Name:  labelCmdName,
 	Usage: labelCmdName + " COMMAND",
 	Subcommands: cli.Commands{
@@ -49,18 +49,18 @@ var LabelCommand = cli.Command{
 	},
 }
 
-var labelListCommand = cli.Command{
+var labelListCommand = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available Labels",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
 
 		list, err := ClientSession.Label.List(false, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Labels", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Labels", false).Error())))
 		}
 
 		var output []map[string]interface{}
@@ -79,12 +79,12 @@ var labelListCommand = cli.Command{
 	},
 }
 
-var labelInspectCommand = cli.Command{
+var labelInspectCommand = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspect Label",
 	ArgsUsage: "LABELREF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -95,7 +95,7 @@ var labelInspectCommand = cli.Command{
 		labelInfo, err := ClientSession.Label.Inspect(c.Args().First(), false, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of Label", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of Label", false).Error())))
 		}
 
 		output := map[string]interface{}{
@@ -116,7 +116,7 @@ var labelInspectCommand = cli.Command{
 	},
 }
 
-var labelDeleteCommand = cli.Command{
+var labelDeleteCommand = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove Label",
@@ -127,7 +127,7 @@ var labelDeleteCommand = cli.Command{
 			Usage: "Force deletion even if the Label has resources bound to it",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -142,13 +142,13 @@ var labelDeleteCommand = cli.Command{
 		err := ClientSession.Label.Delete(list, false, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of Label", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of Label", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var labelCreateCommand = cli.Command{
+var labelCreateCommand = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a Label",
@@ -159,7 +159,7 @@ var labelCreateCommand = cli.Command{
 			Usage: "defines the default value of the Label",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -170,14 +170,14 @@ var labelCreateCommand = cli.Command{
 		label, err := ClientSession.Label.Create(c.Args().First(), true, c.String("value"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of Label", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of Label", true).Error())))
 		}
 		return clitools.SuccessResponse(label)
 	},
 }
 
 // TagCommand tag command
-var TagCommand = cli.Command{
+var TagCommand = &cobra.Command{
 	Name:  "tag",
 	Usage: "tag COMMAND",
 	Subcommands: cli.Commands{
@@ -188,30 +188,30 @@ var TagCommand = cli.Command{
 	},
 }
 
-var tagListCommand = cli.Command{
+var tagListCommand = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available Tags in Tenant",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
 
 		list, err := ClientSession.Label.List(true, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Tags", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Tags", false).Error())))
 		}
 
 		// Remove hosts from list content for this command
 		jsoned, err := json.Marshal(list.Labels)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
 		var body []map[string]interface{}
 		err = json.Unmarshal(jsoned, &body)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
 		for _, v := range body {
@@ -221,12 +221,12 @@ var tagListCommand = cli.Command{
 	},
 }
 
-var tagInspectCommand = cli.Command{
+var tagInspectCommand = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspect tag",
 	ArgsUsage: "TAGREF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -237,7 +237,7 @@ var tagInspectCommand = cli.Command{
 		tagInfo, err := ClientSession.Label.Inspect(c.Args().First(), true, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of Tag", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of Tag", false).Error())))
 		}
 
 		if tagInfo.HasDefault {
@@ -260,7 +260,7 @@ var tagInspectCommand = cli.Command{
 	},
 }
 
-var tagDeleteCommand = cli.Command{
+var tagDeleteCommand = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove tag",
@@ -271,7 +271,7 @@ var tagDeleteCommand = cli.Command{
 			Usage: "Force deletion even if the tag has resources bound",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -286,18 +286,18 @@ var tagDeleteCommand = cli.Command{
 		err := ClientSession.Label.Delete(list, true, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of Tag", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of Tag", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var tagCreateCommand = cli.Command{
+var tagCreateCommand = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a tag",
 	ArgsUsage: "TAGNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -308,7 +308,7 @@ var tagCreateCommand = cli.Command{
 		tag, err := ClientSession.Label.Create(c.Args().First(), false, "", temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of Tag", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of Tag", true).Error())))
 		}
 
 		return clitools.SuccessResponse(tag)

@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -31,7 +31,7 @@ import (
 var templateCmdName = "template"
 
 // TemplateCommand command
-var TemplateCommand = cli.Command{
+var TemplateCommand = &cobra.Command{
 	Name:  "template",
 	Usage: "template COMMAND",
 	Subcommands: cli.Commands{
@@ -41,7 +41,7 @@ var TemplateCommand = cli.Command{
 	},
 }
 
-var templateList = cli.Command{
+var templateList = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available templates",
@@ -55,7 +55,7 @@ var templateList = cli.Command{
 			Usage: "Display only templates with scanned information",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
@@ -64,17 +64,17 @@ var templateList = cli.Command{
 		templates, err := ClientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
 		}
 		return clitools.SuccessResponse(templates.GetTemplates())
 	},
 }
 
-var templateMatch = cli.Command{
+var templateMatch = &cobra.Command{
 	Name:      "match",
 	Usage:     "List templates that match the SIZING",
 	ArgsUsage: "SIZING",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
@@ -88,18 +88,18 @@ var templateMatch = cli.Command{
 		templates, err := ClientSession.Template.Match(sizingAsString, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
 		}
 		return clitools.SuccessResponse(templates.GetTemplates())
 	},
 }
 
-var templateInspect = cli.Command{
+var templateInspect = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Display available template information",
 	ArgsUsage: "NAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
@@ -108,7 +108,7 @@ var templateInspect = cli.Command{
 		template, err := ClientSession.Template.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of template information", false).Error())))
 		}
 		return clitools.SuccessResponse(template)
 	},

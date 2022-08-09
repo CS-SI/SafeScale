@@ -88,7 +88,8 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 			replaced := strings.Replace(ticket, "[20", ""+strings.Repeat(" ", 8-len(entry.Level.String()))+"[20", 1)
 			replaced = strings.Replace(replaced, "] ", "]["+entry.Level.String()+"]["+f.pid+"] ", 1)
 			if entry.Context != nil {
-				theID, ok := entry.Context.Value("ID").(string)
+				anon := entry.Context.Value("ID")
+				theID, ok := anon.(string)
 				if ok {
 					replaced = strings.Replace(replaced, "] ", "]["+theID+"] ", 1)
 				}

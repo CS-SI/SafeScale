@@ -1,6 +1,3 @@
-//go:build !generics
-// +build !generics
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -50,7 +47,7 @@ func Capitalize(value string) string {
 
 // FormatStrings formats the strings passed as parameters, using first one as format specifier for fmt.Sprintf if
 // there are more than 1 string.
-func FormatStrings(msg ...interface{}) string {
+func FormatStrings(msg ...any) string {
 	if msg == nil {
 		return ""
 	}
@@ -59,6 +56,7 @@ func FormatStrings(msg ...interface{}) string {
 	if l == 0 {
 		return ""
 	}
+
 	if len(msg) > 1 {
 		if _, ok := msg[0].(string); ok {
 			return fmt.Sprintf(msg[0].(string), msg[1:]...)

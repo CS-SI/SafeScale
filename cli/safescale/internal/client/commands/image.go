@@ -20,7 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -29,7 +29,7 @@ import (
 var imageCmdName = "image"
 
 // ImageCommand command
-var ImageCommand = cli.Command{
+var ImageCommand = &cobra.Command{
 	Name:  "image",
 	Usage: "image COMMAND",
 	Subcommands: cli.Commands{
@@ -37,7 +37,7 @@ var ImageCommand = cli.Command{
 	},
 }
 
-var imageList = cli.Command{
+var imageList = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available images",
@@ -46,7 +46,7 @@ var imageList = cli.Command{
 			Name:  "all",
 			Usage: "List all available images in tenant (without any filter)",
 		}},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
 
@@ -55,7 +55,7 @@ var imageList = cli.Command{
 		images, err := ClientSession.Image.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of images", false).Error())))
 		}
 		return clitools.SuccessResponse(images.GetImages())
 	},

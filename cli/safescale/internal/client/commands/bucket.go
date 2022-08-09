@@ -23,8 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -34,7 +34,7 @@ import (
 const bucketCmdLabel = "bucket"
 
 // BucketCommand bucket command
-var BucketCommand = cli.Command{
+var BucketCommand = &cobra.Command{
 	Name:  "bucket",
 	Usage: "bucket COMMAND",
 	Subcommands: cli.Commands{
@@ -48,7 +48,7 @@ var BucketCommand = cli.Command{
 	},
 }
 
-var bucketList = cli.Command{
+var bucketList = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List buckets",
@@ -58,7 +58,7 @@ var bucketList = cli.Command{
 			Usage: "List all Buckets on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 
@@ -67,13 +67,13 @@ var bucketList = cli.Command{
 		resp, err := ClientSession.Bucket.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of buckets", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
-var bucketDownload = cli.Command{
+var bucketDownload = &cobra.Command{
 	Name:    "download",
 	Aliases: []string{"download"},
 	Usage:   "Downloads a bucket",
@@ -86,7 +86,7 @@ var bucketDownload = cli.Command{
 		},
 	},
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -104,7 +104,7 @@ var bucketDownload = cli.Command{
 		dr, err := ClientSession.Bucket.Download(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bucket download", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bucket download", true).Error())))
 		}
 
 		err = ioutil.WriteFile(filename, dr.Content, 0644)
@@ -116,12 +116,12 @@ var bucketDownload = cli.Command{
 	},
 }
 
-var bucketCreate = cli.Command{
+var bucketCreate = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -134,18 +134,18 @@ var bucketCreate = cli.Command{
 		err := ClientSession.Bucket.Create(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var bucketDelete = cli.Command{
+var bucketDelete = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Remove a bucket",
 	ArgsUsage: "BUCKET_NAME [BUCKET_NAME...]",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -162,18 +162,18 @@ var bucketDelete = cli.Command{
 		err := ClientSession.Bucket.Delete(bucketList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var bucketInspect = cli.Command{
+var bucketInspect = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -186,13 +186,13 @@ var bucketInspect = cli.Command{
 		resp, err := ClientSession.Bucket.Inspect(c.Args().Get(0), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
-var bucketMount = cli.Command{
+var bucketMount = &cobra.Command{
 	Name:      "mount",
 	Usage:     "Mount a bucket on the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
@@ -203,7 +203,7 @@ var bucketMount = cli.Command{
 			Usage: "Mount point of the bucket",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		switch c.NArg() {
@@ -221,18 +221,18 @@ var bucketMount = cli.Command{
 		err := ClientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "mount of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "mount of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var bucketUnmount = cli.Command{
+var bucketUnmount = &cobra.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a Bucket from the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		switch c.NArg() {
@@ -250,7 +250,7 @@ var bucketUnmount = cli.Command{
 		err := ClientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

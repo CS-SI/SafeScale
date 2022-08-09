@@ -24,10 +24,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -36,7 +36,7 @@ import (
 var volumeCmdName = "volume"
 
 // VolumeCommand volume command
-var VolumeCommand = cli.Command{
+var VolumeCommand = &cobra.Command{
 	Name:  "volume",
 	Usage: "volume COMMAND",
 	Subcommands: cli.Commands{
@@ -49,7 +49,7 @@ var VolumeCommand = cli.Command{
 	},
 }
 
-var volumeList = cli.Command{
+var volumeList = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available volumes",
@@ -59,7 +59,7 @@ var volumeList = cli.Command{
 			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 
@@ -68,18 +68,18 @@ var volumeList = cli.Command{
 		volumes, err := ClientSession.Volume.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of volumes", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of volumes", false).Error())))
 		}
 		return clitools.SuccessResponse(volumes.Volumes)
 	},
 }
 
-var volumeInspect = cli.Command{
+var volumeInspect = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -92,18 +92,18 @@ var volumeInspect = cli.Command{
 		volumeInfo, err := ClientSession.Volume.Inspect(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of volume", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
 	},
 }
 
-var volumeDelete = cli.Command{
+var volumeDelete = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove volume",
 	ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -120,13 +120,13 @@ var volumeDelete = cli.Command{
 		err := ClientSession.Volume.Delete(volumeList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of volume", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of volume", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var volumeCreate = cli.Command{
+var volumeCreate = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Create a volume",
@@ -143,7 +143,7 @@ var volumeCreate = cli.Command{
 			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -173,13 +173,13 @@ var volumeCreate = cli.Command{
 		volume, err := ClientSession.Volume.Create(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(toDisplayableVolume(volume))
 	},
 }
 
-var volumeAttach = cli.Command{
+var volumeAttach = &cobra.Command{
 	Name:      "attach",
 	Aliases:   []string{"bind"},
 	Usage:     "Attach a volume to a host",
@@ -204,7 +204,7 @@ var volumeAttach = cli.Command{
 			Usage: "Prevent the volume to be mounted",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -226,18 +226,18 @@ var volumeAttach = cli.Command{
 		err := ClientSession.Volume.Attach(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "attach of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "attach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var volumeDetach = cli.Command{
+var volumeDetach = &cobra.Command{
 	Name:      "detach",
 	Aliases:   []string{"unbind"},
 	Usage:     "Detach a volume from a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -250,7 +250,7 @@ var volumeDetach = cli.Command{
 		err := ClientSession.Volume.Detach(c.Args().Get(0), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unattach of volume", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unattach of volume", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},

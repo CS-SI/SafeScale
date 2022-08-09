@@ -23,12 +23,15 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/backend"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/daemon"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/webui"
 	// Autoload embedded provider drivers
-	_ "github.com/CS-SI/SafeScale/v22/lib/server"
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
 )
 
 func main() {
@@ -52,26 +55,7 @@ func main() {
 	// 	},
 	// }...)
 
-	// 1st try to see if command is daemon
-	err := tryDaemon(signalCh)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	// 2nd, try with webui
-	err = tryWebUI(signalCh)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
 	// Finally, try the remaining possibilities
-	err = tryCli(signalCh)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-}
-
-func tryDaemon(signalCh chan os.Signal) error {
 	app, err := common.NewApp()
 	if err != nil {
 		fmt.Println(err.Error())
@@ -79,52 +63,8 @@ func tryDaemon(signalCh chan os.Signal) error {
 	}
 
 	// 1st try to see if command is daemon
-	daemon.SetCommands(app)
-
-	// VPL: there is no RunContext in urfave/cli/v1
-	// err := app.RunContext(mainCtx, os.Args)
-	err = common.RunApp(app, signalCh, daemon.Cleanup)
-	if err != nil {
-		return fmt.Errorf("Error Running daemon: " + err.Error())
-	}
-	return nil
-}
-
-func tryWebUI(signalCh chan os.Signal) error {
-	app, err := common.NewApp()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	app, err = common.NewApp()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	webui.AddFlags(app)
+	backend.SetCommands(app)
 	webui.SetCommands(app)
-
-	// VPL: there is no RunContext in urfave/cli/v1
-	// err := app.RunContext(mainCtx, os.Args)
-	err = common.RunApp(app, signalCh, webui.Cleanup)
-	if err != nil {
-		fmt.Errorf("Error Running WebUI: " + err.Error())
-	}
-	return nil
-}
-
-func tryCli(signalCh chan os.Signal) error {
-	app, err := common.NewApp()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	client.AddFlags(app)
-
-	client.SetBefore(app)
 	client.SetCommands(app)
 
 	// if last argument has "--" or "-" and is NOT help we are probably writing a wrong command
@@ -141,11 +81,21 @@ func tryCli(signalCh chan os.Signal) error {
 		}
 	*/
 
-	// VPL: there is no RunContext in urfave/cli/v1
-	// err := app.RunContext(mainCtx, os.Args)
-	err = common.RunApp(app, signalCh, client.Cleanup)
+	err = common.RunApp(app, signalCh, cleanup)
 	if err != nil {
-		return fmt.Errorf("Error Running cli: " + err.Error())
+		logrus.Error("Error running cli: " + err.Error())
+		os.Exit(1)
 	}
-	return nil
+	os.Exit(0)
+}
+
+func cleanup(cmd *cobra.Command) {
+	switch cmd.Name() {
+	case common.BackendCmdLabel:
+		backend.Cleanup()
+	case common.WebUICmdLabel:
+		webui.Cleanup()
+	default:
+		client.Cleanup()
+	}
 }

@@ -35,7 +35,7 @@ func GenerateClientIdentity() string {
 }
 
 // constructHostDefinitionStringFromCLI ...
-func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, error) {
+func constructHostDefinitionStringFromCLI(c *cobra.Command, key string) (string, error) {
 	var sizing string
 	if c.IsSet(key) {
 		if c.IsSet("cpu") || c.IsSet("cpufreq") || c.IsSet("gpu") || c.IsSet("ram") || c.IsSet("disk") {

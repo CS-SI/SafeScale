@@ -26,9 +26,9 @@ import (
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v22/lib/client"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
@@ -39,7 +39,7 @@ import (
 const hostCmdLabel = "host"
 
 // HostCommand command
-var HostCommand = cli.Command{
+var HostCommand = &cobra.Command{
 	Name:  hostCmdLabel,
 	Usage: "host COMMAND",
 	Subcommands: cli.Commands{
@@ -60,11 +60,11 @@ var HostCommand = cli.Command{
 	},
 }
 
-var hostStart = cli.Command{
+var hostStart = &cobra.Command{
 	Name:      "start",
 	Usage:     "start Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -76,17 +76,17 @@ var hostStart = cli.Command{
 		err := ClientSession.Host.Start(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "start of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostStop = cli.Command{
+var hostStop = &cobra.Command{
 	Name:      "stop",
 	Usage:     "stop Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -98,17 +98,17 @@ var hostStop = cli.Command{
 		err := ClientSession.Host.Stop(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "stop of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "stop of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostReboot = cli.Command{
+var hostReboot = &cobra.Command{
 	Name:      "reboot",
 	Usage:     "reboot Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -120,13 +120,13 @@ var hostReboot = cli.Command{
 		err := ClientSession.Host.Reboot(hostRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reboot of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "reboot of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostList = cli.Command{
+var hostList = &cobra.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available hosts (created by SafeScale)",
@@ -136,25 +136,25 @@ var hostList = cli.Command{
 			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
 		hosts, err := ClientSession.Host.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
 		jsoned, err := json.Marshal(hosts.GetHosts())
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
 		var result []map[string]interface{}
 		err = json.Unmarshal(jsoned, &result)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
 		for _, v := range result {
@@ -166,12 +166,12 @@ var hostList = cli.Command{
 	},
 }
 
-var hostInspect = cli.Command{
+var hostInspect = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "inspect Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -220,12 +220,12 @@ var hostInspect = cli.Command{
 	},
 }
 
-var hostStatus = cli.Command{
+var hostStatus = &cobra.Command{
 	Name:      "state",
 	Aliases:   []string{"status"},
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -236,7 +236,7 @@ var hostStatus = cli.Command{
 		resp, err := ClientSession.Host.GetStatus(c.Args().First(), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "status of host", false).Error())))
 		}
 		formatted := make(map[string]interface{})
 		formatted["name"] = resp.Name
@@ -247,7 +247,7 @@ var hostStatus = cli.Command{
 	},
 }
 
-var hostCreate = cli.Command{
+var hostCreate = &cobra.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a new host",
@@ -308,7 +308,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 				--sizing "cpu <= 8, ram ~ 16"`,
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%v", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -337,13 +337,13 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 		resp, err := ClientSession.Host.Create(&req, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of host", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
-var hostResize = cli.Command{ // nolint
+var hostResize = &cobra.Command{ // nolint
 	Name:      "resize",
 	Aliases:   []string{"upgrade"},
 	Usage:     "resizes a host",
@@ -375,7 +375,7 @@ var hostResize = cli.Command{ // nolint
 			Usage: "Minimum cpu frequency required for the host (GHz)",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -402,18 +402,18 @@ var hostResize = cli.Command{ // nolint
 		resp, err := ClientSession.Host.Resize(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of host", true).Error())))
 		}
 		return clitools.SuccessResponse(resp)
 	},
 }
 
-var hostDelete = cli.Command{
+var hostDelete = &cobra.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove host",
 	ArgsUsage: "<Host_name|Host_ID> [<Host_name|Host_ID>...]",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -429,17 +429,17 @@ var hostDelete = cli.Command{
 		err := ClientSession.Host.Delete(hostList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostSSH = cli.Command{
+var hostSSH = &cobra.Command{
 	Name:      "ssh",
 	Usage:     "Get ssh config to connect to host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -452,7 +452,7 @@ var hostSSH = cli.Command{
 		resp, err := ClientSession.Host.SSHConfig(c.Args().First())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 
 		out, xerr := formatSSHConfig(resp)
@@ -486,7 +486,7 @@ func formatSSHConfig(in sshapi.Config) (map[string]interface{}, fail.Error) {
 }
 
 // hostSecurityCommands commands
-var hostSecurityCommands = cli.Command{
+var hostSecurityCommands = &cobra.Command{
 	Name:  securityCmdLabel,
 	Usage: "Manages host security",
 	Subcommands: cli.Commands{
@@ -495,7 +495,7 @@ var hostSecurityCommands = cli.Command{
 }
 
 // networkSecurityGroupCommands commands
-var hostSecurityGroupCommands = cli.Command{
+var hostSecurityGroupCommands = &cobra.Command{
 	Name:  groupCmdLabel,
 	Usage: "Manages host Security Groups",
 	Subcommands: cli.Commands{
@@ -507,7 +507,7 @@ var hostSecurityGroupCommands = cli.Command{
 	},
 }
 
-var hostSecurityGroupAddCommand = cli.Command{
+var hostSecurityGroupAddCommand = &cobra.Command{
 	Name:      "add",
 	Aliases:   []string{"attach", "bind"},
 	Usage:     "add HOSTNAME GROUPNAME",
@@ -518,7 +518,7 @@ var hostSecurityGroupAddCommand = cli.Command{
 			Usage: "adds the security group to the host but does not activate it",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -531,18 +531,18 @@ var hostSecurityGroupAddCommand = cli.Command{
 		err := ClientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostSecurityGroupRemoveCommand = cli.Command{
+var hostSecurityGroupRemoveCommand = &cobra.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm", "detach", "unbind"},
 	Usage:     "remove HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -555,13 +555,13 @@ var hostSecurityGroupRemoveCommand = cli.Command{
 		err := ClientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostSecurityGroupListCommand = cli.Command{
+var hostSecurityGroupListCommand = &cobra.Command{
 	Name:      "list",
 	Aliases:   []string{"show", "ls"},
 	Usage:     "list HOSTNAME",
@@ -577,7 +577,7 @@ var hostSecurityGroupListCommand = cli.Command{
 			Usage: "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')",
 		},
 	},
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -595,12 +595,12 @@ var hostSecurityGroupListCommand = cli.Command{
 		resp, err := ClientSession.Host.ListSecurityGroups(c.Args().First(), state, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
 
 		out, err := reformatHostGroups(resp.Hosts)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "formatting of result", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "formatting of result", false).Error())))
 		}
 		return clitools.SuccessResponse(out)
 	},
@@ -621,12 +621,12 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 	return out, nil
 }
 
-var hostSecurityGroupEnableCommand = cli.Command{
+var hostSecurityGroupEnableCommand = &cobra.Command{
 	Name:      "enable",
 	Aliases:   []string{"activate"},
 	Usage:     "enable NETWORKNAME GROUPNAME",
 	ArgsUsage: "NETWORKNAME GROUPNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -639,18 +639,18 @@ var hostSecurityGroupEnableCommand = cli.Command{
 		err := ClientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enable security group of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "enable security group of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
 }
 
-var hostSecurityGroupDisableCommand = cli.Command{
+var hostSecurityGroupDisableCommand = &cobra.Command{
 	Name:      "disable",
 	Aliases:   []string{"deactivate"},
 	Usage:     "disable HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -663,7 +663,7 @@ var hostSecurityGroupDisableCommand = cli.Command{
 		err := ClientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disable security group of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "disable security group of host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -672,7 +672,7 @@ var hostSecurityGroupDisableCommand = cli.Command{
 const hostFeatureCmdLabel = "feature"
 
 // HostFeatureCommands command
-var hostFeatureCommands = cli.Command{
+var hostFeatureCommands = &cobra.Command{
 	Name:  hostFeatureCmdLabel,
 	Usage: hostFeatureCmdLabel + " COMMAND",
 	Subcommands: cli.Commands{
@@ -686,7 +686,7 @@ var hostFeatureCommands = cli.Command{
 }
 
 // hostFeatureListCommand handles 'safescale host feature list'
-var hostFeatureListCommand = cli.Command{
+var hostFeatureListCommand = &cobra.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
 	Usage:     "List the available features for the host",
@@ -699,10 +699,10 @@ var hostFeatureListCommand = cli.Command{
 		},
 	},
 
-	Action: hostFeatureListAction,
+	RunE: hostFeatureListAction,
 }
 
-func hostFeatureListAction(c *cli.Context) (ferr error) {
+func hostFeatureListAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
@@ -724,7 +724,7 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 
 // hostFeatureInspectCommand handles 'safescale host feature inspect <cluster name or id> <feature name>'
 // Displays information about the feature (parameters, if eligible on host, if installed, ...)
-var hostFeatureInspectCommand = cli.Command{
+var hostFeatureInspectCommand = &cobra.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show"},
 	Usage:     "Inspects the feature",
@@ -737,10 +737,10 @@ var hostFeatureInspectCommand = cli.Command{
 		},
 	},
 
-	Action: hostFeatureInspectAction,
+	RunE: hostFeatureInspectAction,
 }
 
-func hostFeatureInspectAction(c *cli.Context) (ferr error) {
+func hostFeatureInspectAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
@@ -783,10 +783,10 @@ var hostFeatureExportCommand = cli.Command{
 		},
 	},
 
-	Action: hostFeatureExportAction,
+	RunE: hostFeatureExportAction,
 }
 
-func hostFeatureExportAction(c *cli.Context) (ferr error) {
+func hostFeatureExportAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
@@ -833,10 +833,10 @@ var hostFeatureAddCommand = cli.Command{
 		},
 	},
 
-	Action: hostFeatureAddAction,
+	RunE: hostFeatureAddAction,
 }
 
-func hostFeatureAddAction(c *cli.Context) (ferr error) {
+func hostFeatureAddAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
@@ -878,10 +878,10 @@ var hostFeatureCheckCommand = cli.Command{
 		},
 	},
 
-	Action: hostFeatureCheckAction,
+	RunE: hostFeatureCheckAction,
 }
 
-func hostFeatureCheckAction(c *cli.Context) (ferr error) {
+func hostFeatureCheckAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
@@ -924,10 +924,10 @@ var hostFeatureRemoveCommand = cli.Command{
 		},
 	},
 
-	Action: hostFeatureRemoveAction,
+	RunE: hostFeatureRemoveAction,
 }
 
-func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
+func hostFeatureRemoveAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
@@ -972,7 +972,7 @@ var hostTagListCommand = cli.Command{
 	Aliases:   []string{"ls", "show"},
 	Usage:     "list Tags bound to Host",
 	ArgsUsage: "HOSTNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostTagCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -983,7 +983,7 @@ var hostTagListCommand = cli.Command{
 		result, err := ClientSession.Host.ListLabels(c.Args().First(), true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "tag of host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "tag of host", false).Error())))
 		}
 
 		var list []map[string]interface{}
@@ -1013,7 +1013,7 @@ var hostTagBindCommand = cli.Command{
 	Aliases:   []string{"attach"},
 	Usage:     "bind Tag to Host",
 	ArgsUsage: "HOSTREF TAGREF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cobra.Command, args []string) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostTagCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -1028,7 +1028,7 @@ var hostTagBindCommand = cli.Command{
 		label, err := ClientSession.Label.Inspect(labelRef, true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
 		}
 
 		if label.GetHasDefault() {
@@ -1039,7 +1039,7 @@ var hostTagBindCommand = cli.Command{
 		err = ClientSession.Host.BindLabel(hostRef, labelRef, "", 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Tag to Host", false).Error())))
 		}
 
 		return clitools.SuccessResponse(nil)
@@ -1051,7 +1051,7 @@ var hostTagUnbindCommand = cli.Command{
 	Aliases:   []string{"detach"},
 	Usage:     "unbind Tag from Host",
 	ArgsUsage: "HOSTNAME TAGNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostTagCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -1064,7 +1064,7 @@ var hostTagUnbindCommand = cli.Command{
 		label, err := ClientSession.Label.Inspect(labelRef, true, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Tag from Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unbind Tag from Host", false).Error())))
 		}
 
 		if label.GetHasDefault() {
@@ -1074,7 +1074,7 @@ var hostTagUnbindCommand = cli.Command{
 		err = ClientSession.Host.UnbindLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Tag from Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unbind Tag from Host", false).Error())))
 		}
 
 		return clitools.SuccessResponse(nil)
@@ -1102,7 +1102,7 @@ var hostLabelListCommand = cli.Command{
 	Aliases:   []string{"ls", "show"},
 	Usage:     "list Labels bound to Host",
 	ArgsUsage: "HOSTNAME",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostLabelCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -1113,7 +1113,7 @@ var hostLabelListCommand = cli.Command{
 		result, err := ClientSession.Host.ListLabels(c.Args().First(), false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list Labels bound to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list Labels bound to Host", false).Error())))
 		}
 
 		var output []map[string]interface{}
@@ -1137,7 +1137,7 @@ var hostLabelInspectCommand = cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "insect Label bound to Host",
 	ArgsUsage: "HOSTREF LABELREF",
-	Action: func(c *cli.Context) (ferr error) {
+	RunE: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostLabelCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
@@ -1150,7 +1150,7 @@ var hostLabelInspectCommand = cli.Command{
 		result, err := ClientSession.Host.InspectLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspect Host Label", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspect Host Label", false).Error())))
 		}
 
 		if !result.GetHasDefault() {
@@ -1191,7 +1191,7 @@ var hostLabelBindCommand = cli.Command{
 		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
 
 		if !label.GetHasDefault() {
@@ -1201,7 +1201,7 @@ var hostLabelBindCommand = cli.Command{
 		err = ClientSession.Host.BindLabel(hostRef, labelRef, c.String("value"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1225,7 +1225,7 @@ var hostLabelUnbindCommand = cli.Command{
 		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Label from Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unbind Label from Host", false).Error())))
 		}
 
 		if !label.GetHasDefault() {
@@ -1235,7 +1235,7 @@ var hostLabelUnbindCommand = cli.Command{
 		err = ClientSession.Host.UnbindLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind Label from Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unbind Label from Host", false).Error())))
 		}
 
 		return clitools.SuccessResponse(nil)
@@ -1266,7 +1266,7 @@ var hostLabelUpdateCommand = cli.Command{
 		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
 
 		if !label.GetHasDefault() {
@@ -1276,7 +1276,7 @@ var hostLabelUpdateCommand = cli.Command{
 		err = ClientSession.Host.UpdateLabel(hostRef, labelRef, c.String("value"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
 
 		return clitools.SuccessResponse(nil)
@@ -1300,7 +1300,7 @@ var hostLabelResetCommand = cli.Command{
 		label, err := ClientSession.Label.Inspect(labelRef, false, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
 
 		if !label.GetHasDefault() {
@@ -1310,7 +1310,7 @@ var hostLabelResetCommand = cli.Command{
 		err = ClientSession.Host.ResetLabel(hostRef, labelRef, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bind Label to Host", false).Error())))
 		}
 
 		return clitools.SuccessResponse(nil)
