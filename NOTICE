@@ -21,7 +21,7 @@ The MIT License
 The following components are provided under the  MIT License  (http://www.opensource.org/licenses/mit-license.php). See project link for details.
 
 github.com/spf13/viper
-github.com/urfave/cli
+github.com/spf13/cobra
 github.com/pengux/check
 github.com/satori/go.uuid
 github.com/stretchr/testify

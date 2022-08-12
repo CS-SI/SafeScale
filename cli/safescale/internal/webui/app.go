@@ -19,7 +19,6 @@ package webui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
@@ -33,43 +32,24 @@ func SetCommands(rootCmd *cobra.Command) *cobra.Command {
 	out := &cobra.Command{
 		Use:   common.WebUICmdLabel,
 		Short: "Handles SafeScale web UI",
-		RunE: func(cmd *cobra.Command, args []string) (ferr error) {
-			logrus.Tracef("SafeScale command: %s with args '%s'", cmd.Name(), strings.Join(args, ", "))
-
-			run()
-
-			return nil
-		},
 	}
-	addFlags(out)
+	out.AddCommand(
+		runCommand(),
+		stopCommand(),
+	)
 	addPreRunE(out)
+
 	if rootCmd != nil {
 		rootCmd.AddCommand(out)
 		return rootCmd
 	}
+
 	return out
 }
 
 func Cleanup() {
 	var crash error
 	defer fail.SilentOnPanic(&crash) // nolint
-}
-
-// func SetCommands(app *cobra.Command) {
-// 	addFlags(&WebUICommand)
-// 	app.Commands = append(app.Commands, WebUICommand)
-// }
-
-func addFlags(cmd *cobra.Command) {
-	common.AddFlags(cmd)
-	cmd.Flags().String("listen", "localhost:50080", "Defines the backend server (default: localhost:50080)")
-	cmd.Flags().String("backend, B", "localhost:50051", "Defines the backend server (default: localhost:50051)")
-	cmd.Flags().String("config, c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
-	cmd.Flags().String("root-dir, R", "/opt/safescale", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
-	cmd.Flags().String("etc-dir, E", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: <root-dir>/etc)")
-	cmd.Flags().String("var-dir, V", "", "Defines the logs folder of safescale; will overload content of configuration file (default: <root-dir>/var)")
-	cmd.Flags().String("log-dir, L", "", "Defines the logs folder of safescale; will overload content of configuration file (default: <var-dir>/log)")
-	cmd.Flags().String("tmp-dir, T", "", "Defines the tmp folder of safescale; will overload content of configuration file (default: <var-dir>/tmp)")
 }
 
 // addPreRunE completes PreRunE of the command with the necessary for webui
@@ -94,7 +74,7 @@ func addPreRunE(cmd *cobra.Command) error {
 
 		xerr := appwide.LoadSettings(cmd, args)
 		if xerr != nil {
-			return fmt.Errorf(xerr.Error() + ". Halted.")
+			return fmt.Errorf(xerr.Error())
 		}
 
 		// Define trace settings of the application (what to trace if trace is wanted)

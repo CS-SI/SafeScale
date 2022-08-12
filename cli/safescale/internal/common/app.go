@@ -17,18 +17,24 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
 	"strings"
+	"syscall"
 
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
+
+var ValidConfigFilenameExts = []string{"json", "js", "yaml", "yml", "toml", "tml"}
 
 func NewApp() (*cobra.Command, error) {
 	app := &cobra.Command{
@@ -37,7 +43,7 @@ func NewApp() (*cobra.Command, error) {
 		Version:          Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")",
 		TraverseChildren: true,
 	}
-	if Tags != "" {
+	if len(Tags) > 0 { // nolint
 		app.Version += fmt.Sprintf(", with Build Tags: (%s)", Tags)
 	}
 
@@ -55,7 +61,12 @@ func NewApp() (*cobra.Command, error) {
 	// 	Usage: "Print program version",
 	// }
 
-	app.PreRun = func(cmd *cobra.Command, args []string) {
+	app.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		xerr := appwide.LoadSettings(cmd, args)
+		if xerr != nil {
+			return fmt.Errorf(xerr.Error())
+		}
+
 		// Sets profiling
 		flag := cmd.Flags().Lookup("profile")
 		if flag != nil {
@@ -79,46 +90,42 @@ func NewApp() (*cobra.Command, error) {
 			appwide.Config.Verbose = true
 			appwide.Config.Debug = true
 		}
+
+		return nil
 	}
 
 	return app, nil
 }
 
-func RunApp(app *cobra.Command, signalCh chan os.Signal, cleanup func(*cobra.Command)) error {
+func RunApp(ctx context.Context, app *cobra.Command, cleanup func(*cobra.Command)) error {
 	if app == nil {
 		return fail.InvalidParameterCannotBeNilError("app")
 	}
 
-	// Adding code to react to external signals app.Before
-	previousPreRun := app.PreRun
-	app.PreRun = func(cmd *cobra.Command, args []string) {
-		if previousPreRun != nil {
-			previousPreRun(cmd, args)
-		}
+	signalCh := make(chan os.Signal, 1)
+	// Starts ctrl+c handler before app.RunContext()
+	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 
-		go func() {
-			var crash error
-			defer fail.SilentOnPanic(&crash)
+	go func() {
+		var crash error
+		defer fail.SilentOnPanic(&crash)
 
-			for {
-				<-signalCh
+		for {
+			sig := <-signalCh
+			_ = sig
 
-				if ProfileCloseFunc != nil {
-					ProfileCloseFunc()
-					ProfileCloseFunc = nil
-				}
-
-				if cleanup != nil {
-					cleanup(cmd)
-				}
-				// cancelfunc()
+			if cleanup != nil {
+				cleanup(app)
 			}
-		}()
-	}
 
-	// VPL: there is no RunContext in urfave/cli/v1
-	// err := app.RunContext(mainCtx, os.Args)
-	err := app.Execute()
+			if ProfileCloseFunc != nil {
+				ProfileCloseFunc()
+				ProfileCloseFunc = nil
+			}
+		}
+	}()
+
+	err := app.ExecuteContext(ctx)
 	if err != nil {
 		fmt.Println("Error Running safescale: " + err.Error())
 	}
@@ -137,10 +144,9 @@ func VersionString() string {
 
 // AddFlags adds flags useable in every command
 func AddFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("verbose", false, "Increase verbosity")
-
+	flags := cmd.Flags()
 	if cmd.Name() == BackendCmdLabel || cmd.Name() == WebUICmdLabel {
-		cmd.Flags().String("profile", "", `Profiles binary
+		flags.String("profile", "", `Profiles binary
             value is a comma-separated list of <keyword> (ie '<keyword>[:<params>][,<keyword>[:<params>]...]) where <keyword>
             can be 'cpu', 'ram', 'trace', and 'web'.
             <params> may contain :
@@ -148,6 +154,7 @@ func AddFlags(cmd *cobra.Command) {
                 for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
 		)
 	}
-	// cmd.Flags().Bool("verbose", false, "")
-	// cmd.Flags().Bool("debug", false, "")
+
+	flags.BoolP("debug", "d", false, "")
+	flags.BoolP("verbose", "v", false, "Increase verbosity")
 }

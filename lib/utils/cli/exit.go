@@ -17,14 +17,34 @@
 package cli
 
 import (
-	"github.com/urfave/cli"
-
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 )
 
+type ExitError interface {
+	error
+	Code() int
+}
+
+type exitError struct {
+	msg  string
+	code int
+}
+
+func (e exitError) Error() string {
+	return e.msg
+}
+
+func (e exitError) Code() int {
+	return e.code
+}
+
+func NewExitError(msg string, errorcode int) *exitError {
+	return &exitError{msg: msg, code: errorcode}
+}
+
 // ExitOnErrorWithMessage informs cli to exit with message and error code
 func ExitOnErrorWithMessage(exitcode exitcode.Enum, msg string) error {
-	return cli.NewExitError(msg, int(exitcode))
+	return NewExitError(msg, int(exitcode))
 }
 
 // ExitOnInvalidArgument ...

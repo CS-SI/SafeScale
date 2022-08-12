@@ -26,7 +26,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
@@ -144,29 +143,18 @@ func run() error {
 	// }
 
 	serveMux := http.NewServeMux()
-	// Wrapped gRPC calls to backend:
-	wrappedGrpc := grpcweb.WrapServer(grpcBackend, options...)
-	serveMux.Handle("/", wrappedGrpc)
 	// Serving SafeScale Frontend:
 	var fsHandler http.Handler
-	if appwide.Config.Debug {
-		e, err := os.Executable()
-		if err != nil {
-			return err
+	if appwide.Config.WebUI.WebRoot != "" {
+		st, err := os.Stat(appwide.Config.WebUI.WebRoot)
+		if err != nil || !st.IsDir() {
+			return fail.NotFoundError("failed to find webroot '%s'", appwide.Config.WebUI.WebRoot)
 		}
-
-		webrootDir := filepath.Dir(e) + "/lib/frontend/web/webroot"
-		st, err := os.Stat(webrootDir)
-		if err == nil && st.IsDir() {
-			fsHandler = http.FileServer(http.Dir(webrootDir))
-		}
+		fsHandler = http.FileServer(http.Dir(appwide.Config.WebUI.WebRoot))
 	} else {
 		fsHandler = http.FileServer(http.FS(web.Webroot))
 	}
-	if fsHandler == nil {
-		return fail.NotFoundError("failed to find webroot")
-	}
-	serveMux.Handle("/ui", http.StripPrefix("/ui", fsHandler))
+	serveMux.Handle("/ui/", http.StripPrefix("/ui", fsHandler))
 
 	// Serving debugging helpers:
 	if appwide.Config.Debug {
@@ -178,6 +166,10 @@ func run() error {
 			trace.Events(resp, req)
 		})
 	}
+
+	// Wrapped gRPC calls to backend:
+	wrappedGrpc := grpcweb.WrapServer(grpcBackend, options...)
+	serveMux.Handle("/", wrappedGrpc)
 
 	// Starting everything
 	server := buildFrontendServer(serveMux)
@@ -230,8 +222,9 @@ func buildGrpcProxyServer(backendConn *grpc.ClientConn) *grpc.Server {
 	}
 
 	// Server with logging and monitoring enabled.
+	pgrpc := grpc.UnknownServiceHandler(proxy.TransparentHandler(director))
 	out := grpc.NewServer(
-		grpc.UnknownServiceHandler(proxy.TransparentHandler(director)),
+		pgrpc,
 		grpc.MaxRecvMsgSize(maxCallRecvMsgSize),
 		grpcmiddleware.WithUnaryServerChain(
 			grpclogrus.UnaryServerInterceptor(logger),

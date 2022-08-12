@@ -17,11 +17,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,10 +37,6 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// mainCtx, cancelfunc := context.WithCancel(context.Background())
-
-	signalCh := make(chan os.Signal, 1)
-	// Starts ctrl+c handler before app.RunContext()
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 
 	// app.Flags = append(app.Flags, []cli.Flag{
 	// 	&cli.StringFlag{
@@ -81,7 +76,7 @@ func main() {
 		}
 	*/
 
-	err = common.RunApp(app, signalCh, cleanup)
+	err = common.RunApp(context.Background(), app, cleanup)
 	if err != nil {
 		logrus.Error("Error running cli: " + err.Error())
 		os.Exit(1)
@@ -90,7 +85,13 @@ func main() {
 }
 
 func cleanup(cmd *cobra.Command) {
-	switch cmd.Name() {
+	last, _, _ := cmd.Find(os.Args[1:])
+	prev := last
+	for ; prev.HasParent() && prev.Parent() != cmd; prev = prev.Parent() {
+	}
+
+	fmt.Printf("cleanup(): cmd.Name() = %s, prev.Name() = %s\n", cmd.Name(), prev.Name())
+	switch prev.Name() {
 	case common.BackendCmdLabel:
 		backend.Cleanup()
 	case common.WebUICmdLabel:

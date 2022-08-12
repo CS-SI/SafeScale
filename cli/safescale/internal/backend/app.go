@@ -19,12 +19,15 @@ package backend
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/oscarpicas/covertool/pkg/exit"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -32,19 +35,25 @@ var cleanupOnce sync.Once
 
 // SetCommands initializes
 func SetCommands(rootCmd *cobra.Command) *cobra.Command {
-	backendCmd := &cobra.Command{
+	out := &cobra.Command{
 		Use:     common.BackendCmdLabel,
 		Aliases: []string{"daemon"},
 		Short:   "Start SafeScale backend",
 	}
-	addFlags(backendCmd)
-	addPreRunE(backendCmd)
-	backendCmd.AddCommand(backendInitCommand, backendRunCommand, backendStopCommand)
+
+	out.AddCommand(
+		runCommand(),
+		stopCommand(),
+	)
+
+	addPersistentPreRunE(out)
+
 	if rootCmd != nil {
-		rootCmd.AddCommand(backendCmd)
+		rootCmd.AddCommand(out)
 		return rootCmd
 	}
-	return backendCmd
+
+	return out
 }
 
 func Cleanup() {
@@ -56,34 +65,26 @@ func Cleanup() {
 }
 
 // AddPreRunE completes command PreRun with the necessary for backend
-func addPreRunE(cmd *cobra.Command) error {
-	previousPreRunE := cmd.PreRunE
-	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
-		if previousPreRunE != nil {
-			err := previousPreRunE(cmd, args)
+func addPersistentPreRunE(cmd *cobra.Command) error {
+	previousCB := cmd.PersistentPreRunE
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) (err error) {
+		if previousCB != nil {
+			err := previousCB(cmd, args)
 			if err != nil {
 				return err
 			}
 		}
 
-		// If --help is used, fail to fallback to cli
-		// if c.Bool("help") {
-		// 	return fail.NotAvailableError()
-		// }
+		if appwide.Config.ReadConfigFile != "" && appwide.Config.Folders.EtcDir != "" {
+			if filepath.Dir(appwide.Config.ReadConfigFile) != appwide.Config.Folders.EtcDir {
+				logrus.Infof("For consistency, you should move '%s' file in folder '%s'", appwide.Config.ReadConfigFile+"."+appwide.Config.ReadConfigFileExt, appwide.Config.Folders.EtcDir)
+			}
+		} else {
+			_, err := os.Stat(appwide.Config.Folders.EtcDir + "/settings.yml")
+			if err != nil {
+				// create settings files from current Config
 
-		// configFile, err := cmd.Flags().GetString("conf")
-		// if err != nil {
-		// 	return err
-		// }
-		//
-		// rootDir, err := cmd.Flags().GetString("root-dir")
-		// if err != nil {
-		// 	return err
-		// }
-
-		xerr := appwide.LoadSettings(cmd, args)
-		if xerr != nil {
-			return fmt.Errorf(xerr.Error() + ". Halted.")
+			}
 		}
 
 		// Define trace settings of the application (what to trace if trace is wanted)
@@ -98,17 +99,4 @@ func addPreRunE(cmd *cobra.Command) error {
 		return nil
 	}
 	return nil
-}
-
-func addFlags(cmd *cobra.Command) {
-	common.AddFlags(cmd)
-	cmd.Flags().String("listen, l", "localhost:50051", "Listen on specified port `IP:PORT` (default: localhost:50051)")
-	cmd.Flags().String("config, c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
-	cmd.Flags().String("root-dir, R", "/opt/safescale", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
-	cmd.Flags().String("etc-dir, E", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: <root-dir>/etc)")
-	cmd.Flags().String("var-dir, V", "", "Defines the logs folder of safescale; will overload content of configuration file (default: <root-dir>/var)")
-	cmd.Flags().String("log-dir, L", "", "Defines the logs folder of safescale; will overload content of configuration file (default: <var-dir>/log)")
-	cmd.Flags().String("tmp-dir, T", "", "Defines the tmp folder of safescale; will overload content of configuration file (default: <var-dir>/tmp)")
-	cmd.Flags().String("owner, O", "safescale", "Defines the user used on SafeScale folder tree; will overload content of configuration file (default: safescale)")
-	cmd.Flags().String("group, G", "safescale", "Defines the user used on SafeScale folder tree; will overload content of configuration file (default: safescale)")
 }

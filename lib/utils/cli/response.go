@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	urfcli "github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/cmdstatus"
 )
@@ -31,7 +30,7 @@ import (
 // response define a standard response for most safescale commands
 type response struct {
 	Status cmdstatus.Enum
-	Error  urfcli.ExitCoder
+	Error  ExitError
 	Result interface{}
 }
 
@@ -74,8 +73,8 @@ func (r *response) Success(result interface{}) error {
 func (r *response) Failure(err error) error {
 	if err != nil {
 		r.Status = cmdstatus.FAILURE
-		if exitCoder, ok := err.(urfcli.ExitCoder); ok {
-			r.Error = exitCoder
+		if exitErr, ok := err.(ExitError); ok {
+			r.Error = exitErr
 			r.Display()
 			return r.GetError()
 		}
@@ -134,7 +133,7 @@ func (r *response) getDisplayResponse() responseDisplay {
 	if r.Error != nil {
 		output.Error = &jsonError{
 			r.Error.Error(),
-			r.Error.ExitCode(),
+			r.Error.Code(),
 		}
 	}
 	return output
@@ -145,7 +144,7 @@ func FailureResponse(err error) error {
 	r := newResponse()
 	_ = r.Failure(err)
 	if r.Error != nil {
-		return urfcli.NewExitError("", r.Error.ExitCode())
+		return NewExitError("", r.Error.Code())
 	}
 	return nil
 }

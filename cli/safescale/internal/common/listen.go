@@ -17,18 +17,23 @@
 package common
 
 import (
+	"log"
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
 )
 
 // AssembleListenString constructs the listen string we will use in net.Listen()
 func AssembleListenString(c *cobra.Command, defaultHost, defaultPort string) string {
 	// Value listen from parameters
-	listen := c.String("listen")
+	listen, err := c.Flags().GetString("listen")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 	if listen == "" {
 		listen, _, _ = env.FirstValue("SAFESCALED_LISTEN", "SAFESCALE_LISTEN", "SAFESCALE_SERVER")
 	}

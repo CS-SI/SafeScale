@@ -1,3 +1,6 @@
+//go:build fixme
+// +build fixme
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -21,239 +24,239 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
-var volumeCmdName = "volume"
+const volumeCmdLabel = "volume"
 
-// VolumeCommand volume command
-var VolumeCommand = &cobra.Command{
-	Name:  "volume",
-	Usage: "volume COMMAND",
-	Subcommands: cli.Commands{
-		volumeList,
-		volumeInspect,
-		volumeDelete,
-		volumeCreate,
-		volumeAttach,
-		volumeDetach,
-	},
+// VolumeCommands volume commands
+func VolumeCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:   "volume",
+		Short: "volume COMMAND",
+	}
+	out.AddCommand(
+		volumeListCommand(),
+		volumeInspectCommand(),
+		volumeDeleteCommand(),
+		volumeCreateCommand(),
+		volumeAttachCommand(),
+		volumeDetachCommand(),
+	)
+	addPersistentPreRunE(out)
+	addCommonFlags(out)
+	return out
 }
 
-var volumeList = &cobra.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "List available volumes",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
+func volumeListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List available volumes",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			}
+
+			volumes, err := ClientSession.Volume.List(c.Flags().GetBool("all"), 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of volumes", false).Error())))
+			}
+			return clitools.SuccessResponse(volumes.Volumes)
 		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
+	}
 
-		defer interactiveFeedback("Listing volumes")()
+	out.Flags().BoolP("all", "a", "List all Volumes on tenant (not only those created by SafeScale)")
 
-		volumes, err := ClientSession.Volume.List(c.Bool("all"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of volumes", false).Error())))
-		}
-		return clitools.SuccessResponse(volumes.Volumes)
-	},
+	return out
 }
 
-var volumeInspect = &cobra.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Inspect volume",
-	ArgsUsage: "<Volume_name|Volume_ID>",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
-		}
+func volumeInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Inspect volume",
+		// ArgsUsage: "<Volume_name|Volume_ID>",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
+			}
 
-		defer interactiveFeedback("Inspect volume")()
-
-		volumeInfo, err := ClientSession.Volume.Inspect(c.Args().First(), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of volume", false).Error())))
-		}
-		return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
-	},
+			volumeInfo, err := ClientSession.Volume.Inspect(args[0], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of volume", false).Error())))
+			}
+			return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
+		},
+	}
+	return out
 }
 
-var volumeDelete = &cobra.Command{
-	Name:      "delete",
-	Aliases:   []string{"rm", "remove"},
-	Usage:     "Remove volume",
-	ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
-		if c.NArg() < 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
-		}
+func volumeDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "delete",
+		Aliases: []string{"rm", "remove"},
+		Short:   "Remove volume",
+		// ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) < 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
+			}
 
-		var volumeList []string
-		volumeList = append(volumeList, c.Args().First())
-		volumeList = append(volumeList, c.Args().Tail()...)
+			var volumeList []string
+			volumeList = append(volumeList, args[0])
+			volumeList = append(volumeList, args[1:]...)
 
-		defer interactiveFeedback("Deleting volumes")()
-
-		err := ClientSession.Volume.Delete(volumeList, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of volume", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.Volume.Delete(volumeList, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of volume", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }
 
-var volumeCreate = &cobra.Command{
-	Name:      "create",
-	Aliases:   []string{"new"},
-	Usage:     "Create a volume",
-	ArgsUsage: "<Volume_name>",
-	Flags: []cli.Flag{
-		cli.IntFlag{
-			Name:  "size",
-			Value: 10,
-			Usage: "Size of the volume (in Go)",
+func volumeCreateCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"new"},
+		Short:   "Create a volume",
+		// ArgsUsage: "<Volume_name>",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name>. "))
+			}
+
+			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			}
+
+			speed := c.Flags().GetString("speed")
+			volSpeed, ok := protocol.VolumeSpeed_value["VS_"+speed]
+			if !ok {
+				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
+			}
+			volSize := int32(c.Flags().GetInt("size"))
+			if volSize <= 0 {
+				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
+			}
+			def := protocol.VolumeCreateRequest{
+				Name:  args[0],
+				Size:  volSize,
+				Speed: protocol.VolumeSpeed(volSpeed),
+			}
+
+			volume, err := ClientSession.Volume.Create(&def, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of volume", true).Error())))
+			}
+			return clitools.SuccessResponse(toDisplayableVolume(volume))
 		},
-		cli.StringFlag{
-			Name:  "speed",
-			Value: "HDD",
-			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
-		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name>. "))
-		}
+	}
 
-		speed := c.String("speed")
-		volSpeed, ok := protocol.VolumeSpeed_value["VS_"+speed]
-		if !ok {
-			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
-		}
+	flags := out.Flags()
+	flags.Uint("size", 10, "Size of the volume (in GB)")
+	flags.String("speed", "HDD", fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()))
 
-		volSize := int32(c.Int("size"))
-		if volSize <= 0 {
-			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
-		}
-
-		def := protocol.VolumeCreateRequest{
-			Name:  c.Args().First(),
-			Size:  volSize,
-			Speed: protocol.VolumeSpeed(volSpeed),
-		}
-
-		defer interactiveFeedback("Creating volumes")()
-
-		volume, err := ClientSession.Volume.Create(&def, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of volume", true).Error())))
-		}
-		return clitools.SuccessResponse(toDisplayableVolume(volume))
-	},
+	return out
 }
 
-var volumeAttach = &cobra.Command{
-	Name:      "attach",
-	Aliases:   []string{"bind"},
-	Usage:     "Attach a volume to a host",
-	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "path",
-			Value: abstract.DefaultVolumeMountPoint,
-			Usage: "Mount point of the volume",
-		},
-		cli.StringFlag{
-			Name:  "format",
-			Value: "ext4",
-			Usage: "Filesystem format",
-		},
-		cli.BoolFlag{
-			Name:  "do-not-format",
-			Usage: "Prevent the volume to be formatted (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so would not be mounted with this option)",
-		},
-		cli.BoolFlag{
-			Name:  "do-not-mount",
-			Usage: "Prevent the volume to be mounted",
-		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
-		if c.NArg() != 2 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
-		}
+func volumeAttachCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "attach",
+		Aliases: []string{"bind"},
+		Short:   "Attach a volume to a host",
+		// ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 2 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
+			}
 
-		def := protocol.VolumeAttachmentRequest{
-			Format:      c.String("format"),
-			DoNotFormat: c.Bool("do-not-format"),
-			DoNotMount:  c.Bool("do-not-mount"),
-			MountPath:   c.String("path"),
-			Host:        &protocol.Reference{Name: c.Args().Get(1)},
-			Volume:      &protocol.Reference{Name: c.Args().Get(0)},
-		}
+			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			}
 
-		defer interactiveFeedback("Attaching volumes")()
+			def := protocol.VolumeAttachmentRequest{
+				Format:      c.Flags().GetString("format"),
+				DoNotFormat: c.Flags().GetBool("do-not-format"),
+				DoNotMount:  c.Flags().GetBool("do-not-mount"),
+				MountPath:   c.Flags().GetString("path"),
+				Host:        &protocol.Reference{Name: c.Args().Get(1)},
+				Volume:      &protocol.Reference{Name: c.Args().Get(0)},
+			}
+			err := ClientSession.Volume.Attach(&def, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "attach of volume", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
 
-		err := ClientSession.Volume.Attach(&def, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "attach of volume", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	flags := out.Flags()
+	flags.String("path", abstract.DefaultVolumeMountPoint, "Mount point of the volume")
+	flags.String("format", "ext4", "Filesystem format")
+	flags.Bool("do-not-format", false, "Prevent the volume to be formatted (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so would not be mounted with this option)")
+	flags.Bool("do-not-mount", false, "Prevent the volume to be mounted")
+
+	return out
 }
 
-var volumeDetach = &cobra.Command{
-	Name:      "detach",
-	Aliases:   []string{"unbind"},
-	Usage:     "Detach a volume from a host",
-	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
-		if c.NArg() != 2 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
-		}
+func volumeDetachCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "detach",
+		Aliases: []string{"unbind"},
+		Short:   "Detach a volume from a host",
+		// ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 2 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
+			}
 
-		defer interactiveFeedback("Detaching volumes")()
-
-		err := ClientSession.Volume.Detach(c.Args().Get(0), c.Args().Get(1), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unattach of volume", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.Volume.Detach(args[0], args[1], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unattach of volume", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }
 
 type attachmentInfoDisplayable struct {
@@ -330,7 +333,7 @@ func getAllowedSpeeds() string {
 		// this message is intended for final users, showing allowed values that didn't match allowed inputs wasn't a good idea
 		k = strings.TrimPrefix(k, "VS_")
 		speeds += k
-		i++
+		i = i + 1 // nolint
 	}
 	return speeds
 }

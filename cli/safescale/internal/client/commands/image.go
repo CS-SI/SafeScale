@@ -17,46 +17,52 @@
 package commands
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var imageCmdName = "image"
 
-// ImageCommand command
-var ImageCommand = &cobra.Command{
-	Name:  "image",
-	Usage: "image COMMAND",
-	Subcommands: cli.Commands{
-		imageList,
-	},
+// ImageCommands command
+func ImageCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:   "image",
+		Short: "image COMMAND",
+	}
+	out.AddCommand(imageListCommand())
+	addPersistentPreRunE(out)
+	addCommonFlags(out)
+	return out
 }
 
-var imageList = &cobra.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "List available images",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all",
-			Usage: "List all available images in tenant (without any filter)",
-		}},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
+func imageListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List available images",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Name(), strings.Join(args, ", "))
 
-		defer interactiveFeedback("Listing images")()
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return err
+			}
 
-		images, err := ClientSession.Image.List(c.Bool("all"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of images", false).Error())))
-		}
-		return clitools.SuccessResponse(images.GetImages())
-	},
+			images, err := ClientSession.Image.List(all, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of images", false).Error())))
+			}
+			return clitools.SuccessResponse(images.GetImages())
+		},
+	}
+	out.Flags().BoolP("all", "a", false, "List all available images in tenant (without any filter)")
+	return out
 }

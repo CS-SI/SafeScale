@@ -22,12 +22,15 @@ import (
 	"time"
 
 	"github.com/schollz/progressbar/v3"
-	"github.com/urfave/cli"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 
-	libclient "github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 )
 
 const (
@@ -35,16 +38,16 @@ const (
 	DoInstanciate    = true
 )
 
-var ClientSession *libclient.Session
+var ClientSession *cmdline.Session
 
 // extractFeatureArgument returns the name of the feature from the command arguments
 func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
-	if c.NArg() < 2 {
-		_ = cli.ShowSubcommandHelp(c)
+	if len(args) < 2 {
+		_ = c.Usage()
 		return "", clitools.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
 	}
 
-	featureName := c.Args().Get(1)
+	featureName := args[1]
 	if featureName == "" {
 		return "", clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME")
 	}
@@ -53,8 +56,8 @@ func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
 }
 
 // Use the 'hostnamePos'th argument of the command as a host name and use it to get the host instance
-func extractHostArgument(c *cobra.Command, hostnamePos int, instanciate bool) (string, *protocol.Host, error) {
-	hostName := c.Args().Get(hostnamePos)
+func extractHostArgument(args []string, hostnamePos int, instanciate bool) (string, *protocol.Host, error) {
+	hostName := args[hostnamePos]
 	if hostName == "" {
 		return "", nil, clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
@@ -76,8 +79,8 @@ func extractHostArgument(c *cobra.Command, hostnamePos int, instanciate bool) (s
 }
 
 // Use the 'nodePos'th argument of the command as a node reference and init hostName with it
-func extractNodeArgument(c *cobra.Command, nodePos int) (string, error) {
-	hostName := c.Args().Get(nodePos)
+func extractNodeArgument(args []string) (string, error) {
+	hostName := args[1]
 	if hostName == "" {
 		return "", clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
@@ -107,4 +110,52 @@ func interactiveFeedback(description string) func() {
 	}
 
 	return func() {}
+}
+
+func addPersistentPreRunE(in *cobra.Command) {
+	var previousCB = in.PersistentPreRunE
+	in.PersistentPreRunE = func(c *cobra.Command, args []string) (err error) {
+		common.LogSetup("", "cli")
+
+		// Define trace settings of the application (what to trace if trace is wanted)
+		// TODO: is it the good behavior ? Shouldn't we fail ?
+		// If trace settings cannot be registered, report it but do not fail
+		// TODO: introduce use of configuration file with autoreload on change
+		err = tracing.RegisterTraceSettings(traceSettings())
+		if err != nil {
+			logrus.Errorf(err.Error())
+		}
+
+		// Create client session
+		server, err := c.Flags().GetString("server")
+		if err != nil {
+			return err
+		}
+
+		tenant, err := c.Flags().GetString("tenant")
+		if err != nil {
+			return err
+		}
+
+		ClientSession, err = cmdline.New(server, tenant)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		if previousCB != nil {
+			err := previousCB(c, args)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+}
+
+func addCommonFlags(cmd *cobra.Command) {
+	flags := cmd.PersistentFlags()
+	flags.StringP("server", "S", "localhost:50051", "Connect to daemon on server SERVER (default: localhost:50051)")
+	flags.StringP("tenant", "T", "", "Use tenant TENANT (default: none)")
+
 }

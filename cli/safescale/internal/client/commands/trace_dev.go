@@ -1,3 +1,6 @@
+//go:build !release
+// +build !release
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -10,21 +13,23 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
-package backend
+package commands
 
-import (
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	"github.com/spf13/cobra"
-)
-
-// initFolderTree starts the gRPC server of SafeScale (the daemon)
-func initFolderTree(cmd *cobra.Command) error {
-	_, _ = checkConfiguration(cmd)
-
-	return appwide.BuildFolderTree()
+// traceSettings contains the default parts that we want to trace
+func traceSettings() string {
+	return `
+{
+    "concurrency": {
+        "lock": false,
+        "task": false
+    },
+    "ssh": {},
+    "resources": {
+        "cluster": true
+    }
+}`
 }

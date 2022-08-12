@@ -1,3 +1,6 @@
+//go:build fixme
+// +build fixme
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -19,11 +22,9 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"net"
 	"strings"
-	"time"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/urfave/cli"
@@ -38,14 +39,15 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 const networkCmdLabel = "network"
 
-// NetworkCommand command
-func NetworkCommand() *cobra.Command {
-	out := &cobra.Command{
-		Use:     "network",
+// NetworkCommands command
+func NetworkCommands() *cobra.Command {
+	out :=&cobra.Command{
+		Use:    "network",
 		Aliases: []string{"net"},
 		Short:   "network COMMAND",
 	}
@@ -53,180 +55,170 @@ func NetworkCommand() *cobra.Command {
 		networkCreateCommand(),
 		networkDeleteCommand(),
 		networkInspectCommand(),
-		networkListCommand()),
+		networkListCommand(),
 		networkSecurityCommands(),
 		subnetCommands(),
 	)
+	addPersistentPreRunE()
+	addCommonFlags(out)
 	return out
 }
 
-func networkListCommand() *cobra.Command{
+func networkListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:     "list",
+		Use:    "list",
 		Aliases: []string{"ls"},
 		Short:   "List existing Networks (created by SafeScale)",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
+
+
+			networks, err := ClientSession.Network.List(c.Flags().GetBool("all"), 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(
+					clitools.ExitOnRPC(
+						strprocess.Capitalize(
+							cmdline.DecorateTimeoutError(
+								err, "list of networks", false,
+							).Error(),
+						),
+					),
+				)
+			}
+			return clitools.SuccessResponse(networks.GetNetworks())
+		},
 	}
-	out.RunE = func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		all, err := c.Flags().GetBool("all")
-		if err != nil {
-			return err
-		}
-
-		defer interactiveFeedback("Listing networks")()
-
-		networks, err := ClientSession.Network.List(all, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of networks", false).Error())))
-		}
-		return clitools.SuccessResponse(networks.GetNetworks())
-	}
-
-	out.Flags().Bool("provider, all, a", false, "Lists all Networks available on tenant (not only those created by SafeScale)")
+	flags := out.Flags()
+	flags.Bool("provider", false,  "Lists all Networks available on tenant (not only those created by SafeScale)")
+	flags.BoolP("all", "a", false, "Lists all Networks available on tenant (not only those created by SafeScale)")
 
 	return out
 }
 
 func networkDeleteCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:     "delete",
-		Aliases: []string{"rm", "remove"},
-		Short:   "delete NETWORKREF",
+		Use:      "delete",
+		Aliases:   []string{"rm", "remove"},
+		Short:     "delete NETWORKREF",
+		// ArgsUsage: "NETWORKREF [NETWORKREF ...]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			}
+
+			var networkList []string
+			networkList = append(networkList, args[0])
+			networkList = append(networkList, args[1:]...)
+
+			err := ClientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), c.Flags().GetBool("force"))
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of network", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
 	}
-	// ArgsUsage: "NETWORKREF [NETWORKREF ...]",
-	out.Flags().Bool("force, f", false, "If set, force node deletion no matter what (ie. metadata inconsistency)")
-	out.RunE = func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch len(args) {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		}
+	out.Flags().BoolP("force", "f", false, "If set, force node deletion no matter what (ie. metadata inconsistency)")
 
-		var networkList []string
-		networkList = append(networkList, args...)
-
-		force, err := c.Flags().GetBool("force")
-		if err != nil {
-			return err
-		}
-
-		defer interactiveFeedback("Deleting networks")()
-
-		err = ClientSession.Network.Delete(networkList, 0, force)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of network", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	return out
 }
 
-var networkInspect = &cobra.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Show details of a network",
-	ArgsUsage: "NETWORKREF",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
-		}
-
-		defer interactiveFeedback("Inspecting network")()
-
-		network, err := ClientSession.Network.Inspect(c.Args().First(), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
-		}
-
-		// Convert struct to map using struct to json then json to map
-		mapped := map[string]interface{}{}
-		jsoned, err := json.Marshal(network)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(jsoned, &mapped)
-		if err != nil {
-			return err
-		}
-
-		if len(network.Subnets) == 1 {
-			if network.Subnets[0] == network.Name {
-				if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-					description := "Inspecting subnetworks"
-					pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-					go func() {
-						for {
-							if pb.IsFinished() {
-								return
-							}
-							err := pb.Add(1)
-							if err != nil {
-								return
-							}
-							time.Sleep(100 * time.Millisecond)
-						}
-					}()
-
-					defer func() {
-						_ = pb.Finish()
-					}()
-				}
-
-				subnet, err := ClientSession.Subnet.Inspect(network.Id, network.Name, 0)
-				if err != nil {
-					err = fail.FromGRPCStatus(err)
-					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
-				}
-
-				subnetMapped := map[string]interface{}{}
-				jsoned, err := json.Marshal(subnet)
-				if err != nil {
-					return err
-				}
-				err = json.Unmarshal(jsoned, &subnetMapped)
-				if err != nil {
-					return err
-				}
-
-				for k, v := range subnetMapped {
-					switch k {
-					case "name":
-						k = "subnet_name"
-					case "id":
-						k = "subnet_id"
-					case "cidr":
-						k = "subnet_cidr"
-					case "state":
-						k = "subnet_state"
-					}
-					mapped[k] = v
-				}
-
-				staltnum, ok := mapped["subnet_state"].(float64)
-				if ok {
-					mapped["subnet_state_label"] = subnetstate.Enum(int32(staltnum)).String()
-				}
-
-				if err = queryGatewaysInformation(subnet, mapped, false); err != nil {
-					return err
-				}
-
-				delete(mapped, "subnets")
+func networkInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "inspect",
+		Aliases:   []string{"show"},
+		Short:     "Show details of a network",
+		// ArgsUsage: "NETWORKREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 			}
-		}
 
-		return clitools.SuccessResponse(mapped)
-	},
+
+			network, err := ClientSession.Network.Inspect(args[0], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
+			}
+
+			// Convert struct to map using struct to json then json to map
+			mapped := map[string]interface{}{}
+			jsoned, err := json.Marshal(network)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(jsoned, &mapped)
+			if err != nil {
+				return err
+			}
+
+			if len(network.Subnets) == 1 {
+				if network.Subnets[0] == network.Name {
+					subnet, err := ClientSession.Subnet.Inspect(network.Id, network.Name, 0)
+					if err != nil {
+						err = fail.FromGRPCStatus(err)
+						return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
+					}
+
+					subnetMapped := map[string]interface{}{}
+					jsoned, err := json.Marshal(subnet)
+					if err != nil {
+						return err
+					}
+					err = json.Unmarshal(jsoned, &subnetMapped)
+					if err != nil {
+						return err
+					}
+
+					for k, v := range subnetMapped {
+						switch k {
+						case "name":
+							k = "subnet_name"
+						case "id":
+							k = "subnet_id"
+						case "cidr":
+							k = "subnet_cidr"
+						case "state":
+							k = "subnet_state"
+						}
+						mapped[k] = v
+					}
+
+					// Deprecated
+					// stnum, ok := mapped["state"].(float64)
+					// if ok {
+					// 	mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
+					// }
+
+					staltnum, ok := mapped["subnet_state"].(float64)
+					if ok {
+						mapped["subnet_state_label"] = subnetstate.Enum(int32(staltnum)).String()
+					}
+
+					if err = queryGatewaysInformation(subnet, mapped, false); err != nil {
+						return err
+					}
+
+					delete(mapped, "subnets")
+				}
+			}
+
+			return clitools.SuccessResponse(mapped)
+		},
+	}
+	return out
 }
 
 // Get gateway(s) information
@@ -275,48 +267,62 @@ func queryGatewaysInformation(subnet *protocol.Subnet, mapped map[string]interfa
 	return nil
 }
 
-var networkCreate = &cobra.Command{
-	Name:      "create",
-	Aliases:   []string{"new"},
-	Usage:     "Create a network",
-	ArgsUsage: "NETWORKREF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "cidr, N",
-			Value: "",
-			Usage: "CIDR of the Network (default: 192.168.0.0/23)",
+func networkCreateCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "create",
+		Aliases:   []string{"new"},
+		Short:     "Create a network",
+		// ArgsUsage: "NETWORKREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			}
+
+			var (
+				sizing string
+				err    error
+			)
+			if !c.Flags().GetBool("empty") {
+				sizing, err = constructHostDefinitionStringFromCLI(c, "sizing")
+				if err != nil {
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+				}
+			}
+
+			gatewaySSHPort := uint32(c.Flags().GetInt("gwport"))
+			network, err := ClientSession.Network.Create(
+				args[0], c.Flags().GetString("cidr"), c.Flags().GetBool("empty"),
+				c.Flags().GetString("gwname"), gatewaySSHPort, c.Flags().GetString("os"), sizing,
+				c.Flags().GetBool("keep-on-failure"),
+				temporal.ExecutionTimeout(),
+			)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of network", true).Error())))
+			}
+
+			return clitools.SuccessResponse(network)
 		},
-		cli.BoolFlag{
-			Name:  "empty, no-default-subnet",
-			Usage: "Do not create a default Subnet with the same name than the Network",
-		},
-		cli.BoolFlag{
-			Name:  "keep-on-failure, k",
-			Usage: "If used, the resource(s) is(are) not deleted on failure (default: not set)",
-		},
-		cli.StringFlag{
-			Name:  "os",
-			Usage: `Image name for the gateway`,
-		},
-		cli.StringFlag{
-			Name:  "gwname",
-			Value: "",
-			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
-		},
-		cli.IntFlag{
-			Name:  "gwport, default-ssh-port",
-			Value: 22,
-			Usage: `Define the port to use for SSH (default: 22) in default subnet;
-			Meaningful only if --empty is not used`,
-		},
-		cli.BoolFlag{
-			Name: "failover",
-			Usage: `creates 2 gateways for the network with a VIP used as internal default route;
-			Meaningful only if --empty is not used`,
-		},
-		cli.StringFlag{
-			Name: "sizing, S",
-			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
+	}
+
+	flags := out.Flags()
+	flags.IPNetP("cidr", "N", net.IPNet{}, "CIDR of the Network (default: 192.168.0.0/23)")
+	flags.Bool("empty", false, "Do not create a default Subnet with the same name than the Network")
+	flags.Bool("no-default-subnet", false, "alias of --empty")
+	flags.BoolP("keep-on-failure", "k", false,"If used, the resource(s) is(are) not deleted on failure (default: not set)")
+	flags.String("os", "", "Image name for the gateway")
+	flags.String("gwname", "", "Name for the gateway. Default to 'gw-<network_name>'")
+	flags.Int("gwport", 22, `Define the port to use for SSH (default: 22) in default subnet;
+			Meaningful only if --empty is not used`)
+	flags.Int("default-ssh-port", 22, "alias to --gwport")
+	flags.Bool("failover", false, `creates 2 gateways for the network with a VIP used as internal default route;
+			Meaningful only if --empty is not used`)
+	flags.StringP("sizing","S", "", `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 					<component> can be cpu, cpufreq, gpu, ram, disk
 					<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
 						- = means exactly <value>
@@ -335,146 +341,110 @@ var networkCreate = &cobra.Command{
 						--sizing "cpu <= 4, ram <= 10, disk >= 100"
 						--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
 						--sizing "cpu <= 8, ram ~ 16"
-			Meaningful only if --empty is not used`,
+			Meaningful only if --empty is not used`)
+
+	return out
+}
+
+// networkSecurityGroupCommand command
+func networkSecurityCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:   hostSecurityCmdLabel,
+		Short: "manages security of networks",
+	}
+	out.AddCommand(
+		networkSecurityGroupCommands(),
+	)
+}
+
+// networkSecurityGroupCommand command
+func networkSecurityGroupCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:    groupCmdLabel,
+		Aliases: []string{"sg"},
+		Short:   groupCmdLabel + " COMMAND",
+	}
+	out.AddCommand(
+		networkSecurityGroupListCommand(),
+		networkSecurityGroupCreateCommand(),
+		networkSecurityGroupDeleteCommand(),
+		networkSecurityGroupInspectCommand(),
+		networkSecurityGroupClearCommand(),
+		networkSecurityGroupBondsCommand(),
+		networkSecurityGroupRuleCommands(),
+	)
+	return out
+}
+
+func networkSecurityGroupListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "list",
+		Aliases:   []string{"ls"},
+		Short:     "List available Security Groups (created by SafeScale)",
+		// ArgsUsage: "[NETWORKREF]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			list, err := ClientSession.SecurityGroup.List(c.Flags().GetBool("all"), 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+			}
+
+			if len(list.SecurityGroups) > 0 {
+				var resp []interface{}
+				for _, v := range list.SecurityGroups {
+					item, xerr := reformatSecurityGroup(v, false)
+					if xerr != nil {
+						return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+					}
+
+					resp = append(resp, item)
+				}
+				return clitools.SuccessResponse(resp)
+			}
+			return clitools.SuccessResponse(nil)
 		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		}
+	out.Flags().BoolP("all", "a", false, "List all Security Groups on tenant (not only those created by SafeScale)")
 
-		var (
-			sizing string
-			err    error
-		)
-		if !c.Bool("empty") {
-			sizing, err = constructHostDefinitionStringFromCLI(c, "sizing")
+	return out
+}
+
+func networkSecurityGroupInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "inspect",
+		Aliases:   []string{"show"},
+		Short:     "Shows details of Security Group",
+		// ArgsUsage: "NETWORKREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			resp, err := ClientSession.SecurityGroup.Inspect(args[1], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+			}
+			formatted, err := reformatSecurityGroup(resp, true)
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
-		}
-
-		gatewaySSHPort := uint32(c.Int("gwport"))
-
-		defer interactiveFeedback("Creating network")()
-
-		network, err := ClientSession.Network.Create(
-			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
-			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
-			c.Bool("keep-on-failure"),
-			0,
-		)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of network", true).Error())))
-		}
-		return clitools.SuccessResponse(network)
-	},
-}
-
-// networkSecurityGroupCommand command
-var networkSecurityCommands = &cobra.Command{
-	Name:  securityCmdLabel,
-	Usage: "manages security of networks",
-	Subcommands: cli.Commands{
-		networkSecurityGroupCommands,
-	},
-}
-
-// networkSecurityGroupCommand command
-var networkSecurityGroupCommands = &cobra.Command{
-	Name:    groupCmdLabel,
-	Aliases: []string{"sg"},
-	Usage:   groupCmdLabel + " COMMAND",
-	Subcommands: cli.Commands{
-		networkSecurityGroupList,
-		networkSecurityGroupCreate,
-		networkSecurityGroupDelete,
-		networkSecurityGroupInspect,
-		networkSecurityGroupClear,
-		networkSecurityGroupBonds,
-		networkSecurityGroupRuleCommand,
-	},
-}
-
-var networkSecurityGroupList = &cobra.Command{
-	Name:      "list",
-	Aliases:   []string{"ls"},
-	Usage:     "List available Security Groups (created by SafeScale)",
-	ArgsUsage: "[NETWORKREF]",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "List all Security Groups on tenant (not only those created by SafeScale)",
+			return clitools.SuccessResponse(formatted)
 		},
-	},
-	RunE: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
-
-		// networkRef := c.Args().First()
-
-		defer interactiveFeedback("Listing security groups")()
-
-		list, err := ClientSession.SecurityGroup.List(c.Bool("all"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
-		}
-		if len(list.SecurityGroups) > 0 {
-			var resp []interface{}
-			for _, v := range list.SecurityGroups {
-				item, xerr := reformatSecurityGroup(v, false)
-				if xerr != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
-				}
-				resp = append(resp, item)
-			}
-			return clitools.SuccessResponse(resp)
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
-
-var networkSecurityGroupInspect = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Shows details of Security Group",
-	ArgsUsage: "NETWORKREF GROUPREF",
-	RunE: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
-
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-
-		defer interactiveFeedback("Inspecting security groups")()
-
-		resp, err := ClientSession.SecurityGroup.Inspect(c.Args().Get(1), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-		}
-		formatted, err := reformatSecurityGroup(resp, true)
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-		return clitools.SuccessResponse(formatted)
-	},
+	}
+	return out
 }
 
 func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (map[string]interface{}, error) {
@@ -522,594 +492,544 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 	return out, nil
 }
 
-var networkSecurityGroupCreate = cli.Command{
-	Name:      "create",
-	Aliases:   []string{"new"},
-	Usage:     "create a new Security Group",
-	ArgsUsage: "NETWORKREF GROUPREF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "description, comment, d",
-			Usage: "Describe the Security Group",
+func networkSecurityGroupCreateCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "create",
+		Aliases:   []string{"new"},
+		Short:     "create a new Security Group",
+		// ArgsUsage: "NETWORKREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			req := abstract.SecurityGroup{
+				Name:        args[1],
+				Description: c.Flags().GetString("description"),
+			}
+			resp, err := ClientSession.SecurityGroup.Create(args[0], req, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true, ).Error())))
+			}
+
+			return clitools.SuccessResponse(resp)
 		},
-	},
-	RunE: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
+	flags := out.Flags()
+	flags.StringP("description", "d", "", "Describe the group")
+	flags.String("comment", "","alias for --description")
 
-		req := abstract.SecurityGroup{
-			Name:        c.Args().Get(1),
-			Description: c.String("description"),
-		}
-
-		defer interactiveFeedback("Creating security groups")()
-
-		resp, err := ClientSession.SecurityGroup.Create(c.Args().First(), req, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true).Error())))
-		}
-		return clitools.SuccessResponse(resp)
-	},
+	return out
 }
 
 // networkSecurityGroupClear ...
-var networkSecurityGroupClear = cli.Command{
-	Name:      "clear",
-	Aliases:   []string{"reset"},
-	Usage:     "deletes all rules of a Security Group",
-	ArgsUsage: "NETWORKREF GROUPREF",
-	RunE: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+func networkSecurityGroupClearCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "clear",
+		Aliases:   []string{"reset"},
+		Short:     "deletes all rules of a Security Group",
+		// ArgsUsage: "NETWORKREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
 
-		defer interactiveFeedback("Clearing security groups")()
-
-		err := ClientSession.SecurityGroup.Clear(c.Args().Get(1), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.SecurityGroup.Clear(args[1], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(
+					clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }
 
-var networkSecurityGroupDelete = cli.Command{
-	Name:      "delete",
-	Aliases:   []string{"rm", "remove"},
-	Usage:     "Remove Security Group",
-	ArgsUsage: "NETWORKREF GROUPREF [GROUPREF ...]",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "force",
-			Usage: "Force deletion, removing from hosts and networks if needed",
+func networkSecurityGroupDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "delete",
+		Aliases:   []string{"rm", "remove"},
+		Short:     "Remove Security Group",
+		// ArgsUsage: "NETWORKREF GROUPREF [GROUPREF ...]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%v'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			err := ClientSession.SecurityGroup.Delete(args[1:], c.Flags().GetBool("force"), 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
+			}
+
+			return clitools.SuccessResponse(nil)
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%v'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
+	out.Flags().BoolP("force", "f", false, "Force deletion, removing from hosts and networks if needed")
 
-		defer interactiveFeedback("Deleting security groups")()
-
-		err := ClientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	return out
 }
 
-var networkSecurityGroupBonds = cli.Command{
-	Name:      "bonds",
-	Aliases:   []string{"links", "attachments"},
-	Usage:     "List resources Security Group is bound to",
-	ArgsUsage: "NETWORKREF GROUPREF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "kind",
-			Value: "all",
-			Usage: "Narrow to the kind of resource specified; can be 'hosts', 'subnets' or 'all' (default: 'all')",
+func networkSecurityGroupBondsCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "bonds",
+		Aliases:   []string{"links", "attachments"},
+		Short:     "List resources Security Group is bound to",
+		// ArgsUsage: "NETWORKREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef(
+				"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel,
+				c.Name(), strings.Join(args, ", "),
+			)
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			kind := strings.ToLower(c.Flags().GetString("kind"))
+
+			list, err := ClientSession.SecurityGroup.Bonds(args[1], kind, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
+			}
+
+			result := map[string]interface{}{}
+			if len(list.Hosts) > 0 {
+				hosts := make([]map[string]interface{}, len(list.Hosts))
+				jsoned, err := json.Marshal(list.Hosts)
+				if err != nil {
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+				}
+
+				err = json.Unmarshal(jsoned, &hosts)
+				if err != nil {
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+				}
+
+				result["hosts"] = hosts
+			}
+			if len(list.Subnets) > 0 {
+				subnets := make([]map[string]interface{}, len(list.Subnets))
+				jsoned, err := json.Marshal(list.Subnets)
+				if err != nil {
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+				}
+
+				err = json.Unmarshal(jsoned, &subnets)
+				if err != nil {
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+				}
+
+				result["subnets"] = subnets
+			}
+			if len(result) > 0 {
+				return clitools.SuccessResponse(result)
+			}
+			return clitools.SuccessResponse(nil)
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
+	out.Flags().String("kind", "all", "Narrow to the kind of resource specified; can be 'hosts', 'subnets' or 'all' (default: 'all')")
 
-		kind := strings.ToLower(c.String("kind"))
-
-		defer interactiveFeedback("Binding security groups")()
-
-		list, err := ClientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
-		}
-		result := map[string]interface{}{}
-		if len(list.Hosts) > 0 {
-			hosts := make([]map[string]interface{}, len(list.Hosts))
-			jsoned, err := json.Marshal(list.Hosts)
-			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
-			}
-
-			err = json.Unmarshal(jsoned, &hosts)
-			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
-			}
-			result["hosts"] = hosts
-		}
-		if len(list.Subnets) > 0 {
-			subnets := make([]map[string]interface{}, len(list.Subnets))
-			jsoned, err := json.Marshal(list.Subnets)
-			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
-			}
-
-			err = json.Unmarshal(jsoned, &subnets)
-			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of security-groups", false).Error())))
-			}
-			result["subnets"] = subnets
-		}
-		if len(result) > 0 {
-			return clitools.SuccessResponse(result)
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	return out
 }
 
 const ruleCmdLabel = "rule"
 
 // networkSecurityGroupRuleCommand command
-var networkSecurityGroupRuleCommand = cli.Command{
-	Name:      ruleCmdLabel,
-	Usage:     "manages rules in Security Groups of Networks",
-	ArgsUsage: "NETWORKREF|- GROUPREF",
-	Subcommands: cli.Commands{
-		networkSecurityGroupRuleAdd,
-		networkSecurityGroupRuleDelete,
-	},
+func networkSecurityGroupRuleCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:      ruleCmdLabel,
+		Short:     "manages rules in Security Groups of Networks",
+		// ArgsUsage: "NETWORKREF|- GROUPREF",
+	}
+	out.AddCommand(
+		networkSecurityGroupRuleAddCommand(),
+		networkSecurityGroupRuleDeleteCommand(),
+	)
+	return out
 }
 
 // networkSecurityGroupRuleAdd ...
 // NETWORKREF is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
-var networkSecurityGroupRuleAdd = cli.Command{
-	Name:      "add",
-	Aliases:   []string{"new"},
-	Usage:     "add a new rule to a Security Group",
-	ArgsUsage: "NETWORKREF|- GROUPREF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "description",
-			Value: "",
+func networkSecurityGroupRuleAddCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "add",
+		Aliases:   []string{"new"},
+		Short:     "add a new rule to a Security Group",
+		// ArgsUsage: "NETWORKREF|- GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			etherType, xerr := ipversion.Parse(c.Flags().GetString("type"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+			}
+
+			direction, xerr := securitygroupruledirection.Parse(c.Flags().GetString("direction"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+			}
+
+			rule := abstract.NewSecurityGroupRule()
+			rule.Description = c.Flags().GetString("description")
+			rule.EtherType = etherType
+			rule.Direction = direction
+			rule.Protocol = c.Flags().GetString("protocol")
+			rule.PortFrom = int32(c.Flags().GetUint16("port-from"))
+			rule.PortTo = int32(c.Flags().GetUint16("port-to"))
+			rule.Targets = c.Flags().GetStringSlice("cidr")
+
+			switch rule.Direction {
+			case securitygroupruledirection.Ingress:
+				rule.Sources = c.Flags().GetStringSlice("cidr")
+			case securitygroupruledirection.Egress:
+				rule.Targets = c.Flags().GetStringSlice("cidr")
+			}
+
+			err := ClientSession.SecurityGroup.AddRule(args[1], rule, temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
 		},
-		cli.StringFlag{
-			Name:  "direction, D",
-			Value: "",
-			Usage: "ingress or egress",
-		},
-		cli.StringFlag{
-			Name:  "protocol, P",
-			Value: "tcp",
-			Usage: "Protocol",
-		},
-		cli.StringFlag{
-			Name:  "type, T",
-			Value: "ipv4",
-			Usage: "ipv4 or ipv6",
-		},
-		cli.IntFlag{
-			Name:  "port-from",
-			Value: 0,
-			Usage: "first port of the rule",
-		},
-		cli.IntFlag{
-			Name:  "port-to",
-			Value: 0,
-			Usage: "last port of the rule",
-		},
-		cli.StringSliceFlag{
-			Name:  "cidr, N",
-			Usage: "source/target of the rule; may be used multiple times",
-		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
+	flags := out.Flags()
+	flags.String("description", "", "")
+	flags.StringP("direction", "D", "", "ingress or egress")
+	flags.StringP("protocol", "P", "tcp", "Protocol (tcp, udp or icmp")
+	flags.StringP("type", "T", "ipv4", "ipv4 or ipv6")
+	flags.Uint16("port-from", 0, "first port of the rule")
+	flags.Uint16("port-to", 0, "last port of the rule")
+	flags.StringSliceP("cidr", "C", nil, "source/target of the rule; may be used multiple times")
 
-		etherType, xerr := ipversion.Parse(c.String("type"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
-		}
-
-		direction, xerr := securitygroupruledirection.Parse(c.String("direction"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
-		}
-
-		rule := abstract.NewSecurityGroupRule()
-		rule.Description = c.String("description")
-		rule.EtherType = etherType
-		rule.Direction = direction
-		rule.Protocol = c.String("protocol")
-		rule.PortFrom = int32(c.Int("port-from"))
-		rule.PortTo = int32(c.Int("port-to"))
-		rule.Targets = c.StringSlice("cidr")
-
-		switch rule.Direction {
-		case securitygroupruledirection.Ingress:
-			rule.Sources = c.StringSlice("cidr")
-		case securitygroupruledirection.Egress:
-			rule.Targets = c.StringSlice("cidr")
-		}
-
-		defer interactiveFeedback("Adding rules to security groups")()
-
-		if err := ClientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, 0); err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
-		}
-
-		return clitools.SuccessResponse(nil)
-	},
+	return out
 }
 
 // networkSecurityGroupRuleDelete ...
 // NETWORKREF is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
-var networkSecurityGroupRuleDelete = cli.Command{
-	Name:      "delete",
-	Aliases:   []string{"rm", "remove", "destroy"},
-	Usage:     "delete a rule from a Security Group",
-	ArgsUsage: "NETWORKREF|- GROUPREF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "direction, D",
-			Value: "",
-			Usage: "ingress or egress",
+func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "delete",
+		Aliases:   []string{"rm", "remove", "destroy"},
+		Short:     "delete a rule from a Security Group",
+		// ArgsUsage: "NETWORKREF|- GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			etherType, xerr := ipversion.Parse(c.Flags().GetString("type"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+			}
+
+			direction, xerr := securitygroupruledirection.Parse(c.Flags().GetString("direction"))
+			if xerr != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+			}
+
+			rule := abstract.NewSecurityGroupRule()
+			rule.EtherType = etherType
+			rule.Direction = direction
+			rule.Protocol = c.Flags().GetString("protocol")
+			rule.PortFrom = int32(c.Flags().GetInt("port-from"))
+			rule.PortTo = int32(c.Flags().GetInt("port-to"))
+
+			switch rule.Direction {
+			case securitygroupruledirection.Ingress:
+				rule.Sources = c.Flags().GetStringSlice("cidr")
+			case securitygroupruledirection.Egress:
+				rule.Targets = c.Flags().GetStringSlice("cidr")
+			}
+
+			err := ClientSession.SecurityGroup.DeleteRule(args[1], rule, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
 		},
-		cli.StringFlag{
-			Name:  "protocol, P",
-			Value: "tcp",
-			Usage: "Protocol",
-		},
-		cli.StringFlag{
-			Name:  "type, T",
-			Value: "ipv4",
-			Usage: "ipv4 or ipv6",
-		},
-		cli.IntFlag{
-			Name:  "port-from",
-			Value: 0,
-			Usage: "first port of the rule",
-		},
-		cli.IntFlag{
-			Name:  "port-to",
-			Value: 0,
-			Usage: "last port of the rule",
-		},
-		cli.StringSliceFlag{
-			Name:  "cidr, N",
-			Usage: "source/target of the rule",
-		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
+	flags := out.Flags()
+	flags.StringP("direction", "D", "", "'ingress' (incoming) or 'egress' (outgoing)")
+	flags.StringP("protocol", "P", "tcp", "Protocol")
+	flags.StringP("type", "T", "ipv4", "ipv4 or ipv6")
+	flags.Uint16("port-from",  0, "first port of the rule")
+	flags.Uint16("port-to", 0, "last port of the rule")
+	flags.StringSliceP("cidr", "C", nil, "source/target of the rule")
 
-		etherType, xerr := ipversion.Parse(c.String("type"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
-		}
-
-		direction, xerr := securitygroupruledirection.Parse(c.String("direction"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
-		}
-
-		rule := abstract.NewSecurityGroupRule()
-		rule.EtherType = etherType
-		rule.Direction = direction
-		rule.Protocol = c.String("protocol")
-		rule.PortFrom = int32(c.Int("port-from"))
-		rule.PortTo = int32(c.Int("port-to"))
-
-		switch rule.Direction {
-		case securitygroupruledirection.Ingress:
-			rule.Sources = c.StringSlice("cidr")
-		case securitygroupruledirection.Egress:
-			rule.Targets = c.StringSlice("cidr")
-		}
-
-		defer interactiveFeedback("Deleting rule from security group")()
-
-		err := ClientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	return out
 }
 
 const subnetCmdLabel = "subnet"
 
 // SubnetCommands command
-var subnetCommands = cli.Command{
-	Name:  subnetCmdLabel,
-	Usage: "manages Subnets of Networks",
-	Subcommands: cli.Commands{
-		subnetCreate,
-		subnetDelete,
-		subnetInspect,
-		subnetList,
-		subnetVIPCommands,
-		subnetSecurityCommands,
-	},
+func subnetCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:  subnetCmdLabel,
+		Short: "manages Subnets of Networks",
+	}
+	out.AddCommand(
+		subnetCreateCommand(),
+		subnetDeleteCommand(),
+		subnetInspectCommand(),
+		subnetListCommand(),
+		subnetVIPCommands(),
+		subnetSecurityCommands(),
+	)
+	return out
 }
 
-var subnetList = cli.Command{
-	Name:      "list",
-	Aliases:   []string{"ls"},
-	Usage:     "List existing Subnets (created by SafeScale)",
-	ArgsUsage: "NETWORKREF",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "List all Subnets on tenant (not only those created by SafeScale)",
-		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+func subnetListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List existing Subnets (created by SafeScale)",
+		// ArgsUsage: "NETWORKREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			}
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
 
-		defer interactiveFeedback("Listing subnets")()
-
-		resp, err := ClientSession.Subnet.List(networkRef, c.Bool("all"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
-		}
-		var result []map[string]interface{}
-		subnets := resp.GetSubnets()
-		if len(subnets) > 0 {
-			jsoned, err := json.Marshal(subnets)
+			resp, err := ClientSession.Subnet.List(networkRef, c.Flags().GetBool("all"), 0)
 			if err != nil {
+				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
 			}
-			if err := json.Unmarshal(jsoned, &result); err != nil {
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
+
+			var result []map[string]interface{}
+			subnets := resp.GetSubnets()
+			if len(subnets) > 0 {
+				jsoned, err := json.Marshal(subnets)
+				if err != nil {
+					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
+				}
+				if err := json.Unmarshal(jsoned, &result); err != nil {
+					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
+				}
+				for _, v := range result {
+					delete(v, "gateway_ids")
+					delete(v, "state")
+				}
 			}
-			for _, v := range result {
-				delete(v, "gateway_ids")
-				delete(v, "state")
+			return clitools.SuccessResponse(result)
+		},
+	}
+
+	out.Flags().BoolP("all","a", false, "List all Subnets on tenant (not only those created by SafeScale)")
+
+	return out
+}
+
+func subnetDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "delete",
+		Aliases:   []string{"rm", "remove"},
+		Short:     "delete SUBNETREF",
+		// ArgsUsage: "NETWORKREF SUBNETREF [SUBNETREF ...]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			}
-		}
-		return clitools.SuccessResponse(result)
-	},
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
+
+			err := ClientSession.Subnet.Delete(networkRef, args[1:], temporal.ExecutionTimeout(), c.Flags().GetBool("force"))
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
+			}
+
+			return clitools.SuccessResponse(nil)
+		},
+	}
+
+	flags := out.Flags()
+	flags.String("network", "", "defines the network where to search for the subnet, when a same subnet name is used in several networks")
+	flags.BoolP("force", "f", false, "If set, force node deletion no matter what (ie. metadata inconsistency)")
+
+	return out
 }
 
-var subnetDelete = cli.Command{
-	Name:      "delete",
-	Aliases:   []string{"rm", "remove"},
-	Usage:     "delete SUBNETREF",
-	ArgsUsage: "NETWORKREF SUBNETREF [SUBNETREF ...]",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "network, net",
-			Value: "",
-			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
+func subnetInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "inspect",
+		Aliases:   []string{"show"},
+		Short:     "Show details of a subnet",
+		// ArgsUsage: "NETWORKREF SUBNETREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			}
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
+
+			subnet, err := ClientSession.Subnet.Inspect(networkRef, args[1], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
+			}
+
+			// Convert struct to map using struct to json then json to map
+			mapped := map[string]interface{}{}
+			jsoned, err := json.Marshal(subnet)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(jsoned, &mapped)
+			if err != nil {
+				return err
+			}
+
+			if err = queryGatewaysInformation(subnet, mapped, true); err != nil {
+				return err
+			}
+
+			mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
+			mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
+			return clitools.SuccessResponse(mapped)
 		},
-		cli.BoolFlag{
-			Name:  "force, f",
-			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
-		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
-		)
-
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
-
-		var list []string
-		list = append(list, c.Args().Tail()...)
-
-		defer interactiveFeedback("Deleting subnets")()
-
-		err := ClientSession.Subnet.Delete(networkRef, list, 0, c.Bool("force"))
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	}
+	return out
 }
 
-var subnetInspect = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Show details of a subnet",
-	ArgsUsage: "NETWORKREF SUBNETREF",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
-		)
+func subnetCreateCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "create",
+		Aliases:   []string{"new"},
+		Short:     "Create a subnet",
+		// ArgsUsage: "NETWORKREF SUBNETREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			}
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
 
-		defer interactiveFeedback("Inspecting subnet")()
+			sizing, err := constructHostDefinitionStringFromCLI(c, "sizing")
+			if err != nil {
+				return err
+			}
 
-		subnet, err := ClientSession.Subnet.Inspect(networkRef, c.Args().Get(1), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
-		}
+			network, err := ClientSession.Subnet.Create(
+				networkRef, args[1], c.Flags().GetString("cidr"), c.Flags().GetBool("failover"),
+				c.Flags().GetString("gwname"), uint32(c.Flags().GetInt("gwport")), c.Flags().GetString("os"), sizing,
+				c.Flags().GetBool("keep-on-failure"),
+				temporal.ExecutionTimeout(),
+			)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of subnet", true).Error())))
+			}
 
-		// Convert struct to map using struct to json then json to map
-		mapped := map[string]interface{}{}
-		jsoned, err := json.Marshal(subnet)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(jsoned, &mapped)
-		if err != nil {
-			return err
-		}
-
-		if err = queryGatewaysInformation(subnet, mapped, true); err != nil {
-			return err
-		}
-
-		mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
-		mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
-		return clitools.SuccessResponse(mapped)
-	},
-}
-
-var subnetCreate = cli.Command{
-	Name:      "create",
-	Aliases:   []string{"new"},
-	Usage:     "Create a subnet",
-	ArgsUsage: "NETWORKREF SUBNETREF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "cidr, N",
-			Value: "",
-			Usage: "cidr of the network",
+			return clitools.SuccessResponse(network)
 		},
-		cli.StringFlag{
-			Name:  "os",
-			Value: "",
-			Usage: `Image name for the gateway`,
-		},
-		cli.StringFlag{
-			Name:  "gwname",
-			Value: "",
-			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
-		},
-		cli.IntFlag{
-			Name:  "gwport",
-			Value: 22,
-			Usage: "port to use for SSH on the gateway",
-		},
-		cli.BoolFlag{
-			Name:  "failover",
-			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
-		},
-		cli.BoolFlag{
-			Name:  "keep-on-failure, k",
-			Usage: "If used, the resource(s) is(are) not deleted on failure (default: not set)",
-		},
-		cli.StringFlag{
-			Name: "sizing, S",
-			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
+	}
+
+	flags := out.Flags()
+	flags.StringP("cidr", "N", "", "cidr of the network")
+	flags.String("os", "", "Image name for the gateway")
+	flags.String("gwname", "", "Name for the gateway. Default to 'gw-<network_name>'")
+	flags.Uint16("gwport", 22, "port to use for SSH on the gateway")
+	flags.Bool("failover", false, "creates 2 gateways for the network with a VIP used as internal default route")
+	flags.BoolP("keep-on-failure", "k", false, "If used, the resource(s) is(are) not deleted on failure (default: not set)")
+	flags.StringP("sizing", "S", "", `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
 				- = means exactly <value>
@@ -1128,462 +1048,432 @@ var subnetCreate = cli.Command{
 				--sizing "cpu <= 4, ram <= 10, disk >= 100"
 				--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
 				--sizing "cpu <= 8, ram ~ 16"
-`,
-		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+`)
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
-
-		sizing, err := constructHostDefinitionStringFromCLI(c, "sizing")
-		if err != nil {
-			return err
-		}
-
-		defer interactiveFeedback("Creating subnet")()
-
-		network, err := ClientSession.Subnet.Create(
-			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
-			c.String("gwname"), uint32(c.Int("gwport")), c.String("os"), sizing,
-			c.Bool("keep-on-failure"),
-			0,
-		)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of subnet", true).Error())))
-		}
-		return clitools.SuccessResponse(network)
-	},
+	return out
 }
 
 const vipCmdLabel = "vip"
 
 // subnetVIPCommands handles 'network vip' commands
-var subnetVIPCommands = cli.Command{
-	Name:      vipCmdLabel,
-	Aliases:   []string{"virtualip"},
-	Usage:     "manage subnet virtual IP",
-	ArgsUsage: "COMMAND",
+func subnetVIPCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:      vipCmdLabel,
+		Aliases:   []string{"virtualip"},
+		Short:     "manage subnet virtual IP",
+		// ArgsUsage: "COMMAND",
+	}
 
-	Subcommands: cli.Commands{
-		subnetVIPCreateCommand,
-		subnetVIPInspectCommand,
-		subnetVIPDeleteCommand,
-		subnetVIPBindCommand,
-		subnetVIPUnbindCommand,
-	},
+	out.AddCommand(
+		subnetVIPCreateCommand(),
+		subnetVIPInspectCommand(),
+		subnetVIPDeleteCommand(),
+		subnetVIPBindCommand(),
+		subnetVIPUnbindCommand(),
+	)
+	return out
 }
 
-var subnetVIPCreateCommand = cli.Command{
-	Name:    "create",
-	Aliases: []string{"new"},
-	Usage: `creates a VIP in a Subnet of a Network.
+func subnetVIPCreateCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:    "create",
+		Aliases: []string{"new"},
+		Short: `creates a VIP in a Subnet of a Network.
 		If NETWORKREF == -, SUBNETREF must be a Subnet ID`,
-	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+		// ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Name(), strings.Join(args, ", ")
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
-		}
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+			}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
-	},
-}
-
-var subnetVIPInspectCommand = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Show details of a VIP of a Subnet in a Network",
-	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "network, net",
-			Value: "",
-			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
-
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
-		}
-
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
-	},
+	}
+	return out
 }
 
-var subnetVIPDeleteCommand = cli.Command{
-	Name:      "delete",
-	Aliases:   []string{"rm", "destroy"},
-	Usage:     "Deletes a VIP from a Subnet in a Network",
-	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "network, net",
-			Value: "",
-			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
+func subnetVIPInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "inspect",
+		Aliases:   []string{"show"},
+		Short:     "Show details of a VIP of a Subnet in a Network",
+		// ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+			}
+
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
-		}
+	out.Flags().String("network", "", "defines the network where to search for the subnet, when a same subnet name is used in several networks")
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
-	},
+	return out
 }
 
-var subnetVIPBindCommand = cli.Command{
-	Name:      "bind",
-	Aliases:   []string{"attach"},
-	Usage:     "Attach a VIP to a host",
-	ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "network, net",
-			Value: "",
-			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
+func subnetVIPDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "delete",
+		Aliases:   []string{"rm", "destroy"},
+		Short:     "Deletes a VIP from a Subnet in a Network",
+		// ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
+
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef(
+				"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+				c.Name(), strings.Join(args, ", "),
+			)
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+			}
+
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
-			c.Command.Name, c.Args(),
-		)
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
-		case 3:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
-		}
+	out.Flags().String("network", "", "defines the network where to search for the subnet, when a same subnet name is used in several networks")
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
-	},
+	return out
 }
 
-var subnetVIPUnbindCommand = cli.Command{
-	Name:      "unbind",
-	Aliases:   []string{"detach"},
-	Usage:     "unbind NETWORKREF SUBNETREF VIPNAME HOSTNAME",
-	ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "network, net",
-			Value: "",
-			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
+func subnetVIPBindCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "bind",
+		Aliases:   []string{"attach"},
+		Short:     "Attach a VIP to a host",
+		// ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
+
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+			case 3:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
+			}
+
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
-			c.Command.Name, c.Args())
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
-		case 3:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
-		}
+	out.Flags().String("network", "", "defines the network where to search for the subnet, when a same subnet name is used in several networks")
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
-	},
+	return out
 }
 
-const securityCmdLabel = "security"
+func subnetVIPUnbindCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "unbind",
+		Aliases:   []string{"detach"},
+		Short:     "unbind NETWORKREF SUBNETREF VIPNAME HOSTNAME",
+		//ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
+
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+			case 3:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
+			}
+
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
+		},
+	}
+
+	out.Flags().String("network", "", "defines the network where to search for the subnet, when a same subnet name is used in several networks")
+
+	return out
+}
+
+const hostSecurityCmdLabel = "security"
 
 // subnetSecurityGroupCommand command
-var subnetSecurityCommands = cli.Command{
-	Name:      securityCmdLabel,
-	Usage:     "manages security of subnets",
-	ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
-	Subcommands: cli.Commands{
-		subnetSecurityGroupCommands,
-	},
+func subnetSecurityCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:      hostSecurityCmdLabel,
+		Short:     "manages security of subnets",
+		// ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
+	}
+	out.AddCommand(
+		subnetSecurityGroupCommands(),
+	)
+	return out
 }
 
 const groupCmdLabel = "group"
 
 // subnetSecurityGroupCommand command
-var subnetSecurityGroupCommands = cli.Command{
-	Name:  groupCmdLabel,
-	Usage: "manages security group of subnets",
-	Subcommands: cli.Commands{
-		subnetSecurityGroupAddCommand,
-		subnetSecurityGroupRemoveCommand,
-		subnetSecurityGroupEnableCommand,
-		subnetSecurityGroupListCommand,
-		subnetSecurityGroupDisableCommand,
-	},
+func subnetSecurityGroupCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:  groupCmdLabel,
+		Short: "manages security group of subnets",
+	}
+	out.AddCommand(
+		subnetSecurityGroupAddCommand(),
+		subnetSecurityGroupRemoveCommand(),
+		subnetSecurityGroupEnableCommand(),
+		subnetSecurityGroupListCommand(),
+		subnetSecurityGroupDisableCommand(),
+	)
+	return out
 }
 
-var subnetSecurityGroupAddCommand = cli.Command{
-	Name:      "add",
-	Aliases:   []string{"attach", "bind"},
-	Usage:     "Add a security group to a subnet",
-	ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "disabled",
-			Usage: "adds the security group to the network without applying its rules",
+func subnetSecurityGroupAddCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "add",
+		Aliases:   []string{"attach", "bind"},
+		Short:     "Add a security group to a subnet",
+		// ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
+
+			err := ClientSession.Subnet.BindSecurityGroup(networkRef, args[1], args[2], !c.Flags().GetBool("disabled"), temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "adding security group to network", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+	out.Flags().Bool("disabled", false, "adds the security group to the network without applying its rules")
 
-		defer interactiveFeedback("Binding security group to subnet")()
-
-		err := ClientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "adding security group to network", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	return out
 }
 
-var subnetSecurityGroupRemoveCommand = cli.Command{
-	Name:      "remove",
-	Aliases:   []string{"rm", "detach", "unbind"},
-	Usage:     "removes a security group from a subnet",
-	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+func subnetSecurityGroupRemoveCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "remove",
+		Aliases:   []string{"rm", "detach", "unbind"},
+		Short:     "removes a security group from a subnet",
+		// ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
 
-		defer interactiveFeedback("Unbinding security group")()
-
-		err := ClientSession.Subnet.UnbindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "removing security group from network", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
-
-var subnetSecurityGroupListCommand = cli.Command{
-	Name:      "list",
-	Aliases:   []string{"show", "ls"},
-	Usage:     "lists security groups bound to subnet",
-	ArgsUsage: "NETWORKREF SUBNETREF",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "List all security groups no matter what is the status (enabled or disabled)",
+			err := ClientSession.Subnet.UnbindSecurityGroup(networkRef, args[1], args[2], temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "removing security group from network", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
 		},
-		cli.StringFlag{
-			Name:  "state",
-			Value: "all",
-			Usage: "Narrows to the security groups in defined state; can be 'enabled', 'disabled' or 'all' (default: 'all')",
+	}
+	return out
+}
+
+func subnetSecurityGroupListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "list",
+		Aliases:   []string{"show", "ls"},
+		Short:     "lists security groups bound to subnet",
+		// ArgsUsage: "NETWORKREF SUBNETREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", ")))
+
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			}
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
+
+			var state string
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return err
+			}
+			if all {
+				state = "all"
+			} else {
+				state, err = c.Flags().GetString("state")
+				if err != nil {
+					return err
+				}
+			}
+
+			list, err := ClientSession.Subnet.ListSecurityGroups(networkRef, args[1], state, temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
+			}
+			return clitools.SuccessResponse(list.Subnets)
 		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+	}
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+	flags := out.Flags()
+	flags.BoolP("all", "a", true, "List all security groups no matter what is the status (enabled or disabled)")
+	flags.String("state", "all", "Narrows to the security groups in defined state; can be 'enabled', 'disabled' or 'all' (default: 'all')")
 
-		var state string
-		if c.Bool("all") {
-			state = "all"
-		} else {
-			state = c.String("state")
-		}
-
-		defer interactiveFeedback("Listing security group of subnet")()
-
-		list, err := ClientSession.Subnet.ListSecurityGroups(networkRef, c.Args().Get(1), state, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
-		}
-		return clitools.SuccessResponse(list.Subnets)
-	},
+	return out
 }
 
-var subnetSecurityGroupEnableCommand = cli.Command{
-	Name:      "enable",
-	Aliases:   []string{"activate"},
-	Usage:     "Enables a security group on a subnet",
-	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+func subnetSecurityGroupEnableCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "enable",
+		Aliases:   []string{"activate"},
+		Short:     "Enables a security group on a subnet",
+		// ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
 
-		defer interactiveFeedback("Enabling subnet security group")()
-
-		err := ClientSession.Subnet.EnableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.Subnet.EnableSecurityGroup(networkRef, args[1], args[2], temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }
 
-var subnetSecurityGroupDisableCommand = cli.Command{
-	Name:      "disable",
-	Aliases:   []string{"deactivate"},
-	Usage:     "disable SUBNETREF GROUPREF",
-	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s %s with args '%s'", hostCmdLabel, subnetCmdLabel, securityCmdLabel,
-			groupCmdLabel, c.Command.Name, c.Args(),
-		)
+func subnetSecurityGroupDisableCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:      "disable",
+		Aliases:   []string{"deactivate"},
+		Short:     "disable SUBNETREF GROUPREF",
+		// ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", hostCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
+			switch len(args) {
+			case 0:
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			case 1:
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+			case 2:
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+			}
 
-		defer interactiveFeedback("Disabling subnet security group")()
+			networkRef := args[0]
+			if networkRef == "-" {
+				networkRef = ""
+			}
 
-		err := ClientSession.Subnet.DisableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.Subnet.DisableSecurityGroup(networkRef, args[1], args[2], temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }

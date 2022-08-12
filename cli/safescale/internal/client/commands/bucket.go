@@ -17,241 +17,205 @@
 package commands
 
 import (
-	"io/ioutil"
 	"strings"
-
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 const bucketCmdLabel = "bucket"
 
-// BucketCommand bucket command
-var BucketCommand = &cobra.Command{
-	Name:  "bucket",
-	Usage: "bucket COMMAND",
-	Subcommands: cli.Commands{
-		bucketList,
-		bucketCreate,
-		bucketDelete,
-		bucketInspect,
-		bucketMount,
-		bucketUnmount,
-		bucketDownload,
-	},
+func BucketCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:   "bucket",
+		Short: "bucket COMMAND",
+	}
+	out.AddCommand(
+		bucketListCommand(),
+		bucketCreateCommand(),
+		bucketDeleteCommand(),
+		bucketInspectCommand(),
+		bucketMountCommand(),
+		bucketUnmountCommand(),
+	)
+	addPersistentPreRunE(out)
+	addCommonFlags(out)
+	return out
 }
 
-var bucketList = &cobra.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "List buckets",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "List all Buckets on tenant (not only those created by SafeScale)",
+func bucketListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List buckets",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return err
+			}
+
+			resp, err := ClientSession.Bucket.List(all, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of buckets", false).Error())))
+			}
+			return clitools.SuccessResponse(resp)
 		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-
-		defer interactiveFeedback("Listing buckets")()
-
-		resp, err := ClientSession.Bucket.List(c.Bool("all"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of buckets", false).Error())))
-		}
-		return clitools.SuccessResponse(resp)
-	},
+	}
+	out.Flags().Bool("all", false, "List all Buckets on tenant (not only those created by SafeScale)")
+	return out
 }
 
-var bucketDownload = &cobra.Command{
-	Name:    "download",
-	Aliases: []string{"download"},
-	Usage:   "Downloads a bucket",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:     "output",
-			Value:    "",
-			Required: true,
-			Usage:    "filename where the zipped bucket is stored",
+func bucketCreateCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "create",
+		Aliases: []string{"new"},
+		Short:   "Creates a bucket",
+		// ArgsUsage: "BUCKET_NAME",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+			}
+
+			err := ClientSession.Bucket.Create(args[0], temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of bucket", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
 		},
-	},
-	ArgsUsage: "BUCKET_NAME",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
-		}
-
-		filename := c.String("output")
-		if !strings.HasSuffix(strings.ToLower(filename), ".zip") {
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("output file should have .zip suffix"))
-		}
-
-		defer interactiveFeedback("Downloading bucket")()
-
-		dr, err := ClientSession.Bucket.Download(c.Args().Get(0), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bucket download", true).Error())))
-		}
-
-		err = ioutil.WriteFile(filename, dr.Content, 0644)
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
-		}
-
-		return clitools.SuccessResponse(nil)
-	},
+	}
+	return out
 }
 
-var bucketCreate = &cobra.Command{
-	Name:      "create",
-	Aliases:   []string{"new"},
-	Usage:     "Creates a bucket",
-	ArgsUsage: "BUCKET_NAME",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
-		}
+func bucketDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "delete",
+		Aliases: []string{"remove", "rm"},
+		Short:   "Remove a bucket",
+		// ArgsUsage: "BUCKET_NAME [BUCKET_NAME...]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) < 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+			}
 
-		defer interactiveFeedback("Creating bucket")()
+			var bucketList []string
+			bucketList = append(bucketList, args[0])
+			bucketList = append(bucketList, args[1:]...)
 
-		err := ClientSession.Bucket.Create(c.Args().Get(0), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of bucket", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
-
-var bucketDelete = &cobra.Command{
-	Name:      "delete",
-	Aliases:   []string{"remove", "rm"},
-	Usage:     "Remove a bucket",
-	ArgsUsage: "BUCKET_NAME [BUCKET_NAME...]",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() < 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
-		}
-
-		var bucketList []string
-		bucketList = append(bucketList, c.Args().First())
-		bucketList = append(bucketList, c.Args().Tail()...)
-
-		defer interactiveFeedback("Deleting bucket")()
-
-		err := ClientSession.Bucket.Delete(bucketList, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
-
-var bucketInspect = &cobra.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show", "detail"},
-	Usage:     "Inspect a bucket",
-	ArgsUsage: "BUCKET_NAME",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
-		}
-
-		defer interactiveFeedback("Inspecting bucket")()
-
-		resp, err := ClientSession.Bucket.Inspect(c.Args().Get(0), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
-		}
-		return clitools.SuccessResponse(resp)
-	},
-}
-
-var bucketMount = &cobra.Command{
-	Name:      "mount",
-	Usage:     "Mount a bucket on the filesystem of a host",
-	ArgsUsage: "BUCKET_NAME HOST_REF",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "path",
-			Value: abstract.DefaultBucketMountPoint,
-			Usage: "Mount point of the bucket",
+			err := ClientSession.Bucket.Delete(bucketList, temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
 		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
-		default:
-		}
-
-		defer interactiveFeedback("Mounting bucket")()
-
-		err := ClientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "mount of bucket", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+	}
+	return out
 }
 
-var bucketUnmount = &cobra.Command{
-	Name:      "umount",
-	Aliases:   []string{"unmount"},
-	Usage:     "Unmount a Bucket from the filesystem of a host",
-	ArgsUsage: "BUCKET_NAME HOST_REF",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
-		default:
-		}
+func bucketInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "inspect",
+		Aliases: []string{"show", "detail"},
+		Short:   "Inspect a bucket",
+		// ArgsUsage: "BUCKET_NAME",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+			}
 
-		defer interactiveFeedback("Unmounting bucket")()
+			resp, err := ClientSession.Bucket.Inspect(args[0], temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
+			}
+			return clitools.SuccessResponse(resp)
+		},
+	}
+	return out
+}
 
-		err := ClientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+func bucketMountCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:   "mount",
+		Short: "Mount a bucket on the filesystem of a host",
+		// ArgsUsage: "BUCKET_NAME HOST_REF",
+
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
+			default:
+			}
+
+			path, err := c.Flags().GetString("path")
+			if err != nil {
+				return err
+			}
+
+			err = ClientSession.Bucket.Mount(args[0], args[1], path, temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "mount of bucket", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	out.Flags().String("path", abstract.DefaultBucketMountPoint, "Mount point of the bucket")
+	return out
+}
+
+func bucketUnmountCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "umount",
+		Aliases: []string{"unmount"},
+		Short:   "Unmount a Bucket from the filesystem of a host",
+		// ArgsUsage: "BUCKET_NAME HOST_REF",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
+			switch len(args) {
+			case 0:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
+			case 1:
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
+			default:
+			}
+
+			err := ClientSession.Bucket.Unmount(args[0], args[1], temporal.ExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }

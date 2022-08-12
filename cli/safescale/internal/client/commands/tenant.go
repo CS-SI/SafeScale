@@ -1,3 +1,6 @@
+//go:build fixme
+// +build fixme
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -17,8 +20,10 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/spf13/cobra"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
@@ -28,207 +33,224 @@ import (
 
 var tenantCmdLabel = "tenant"
 
-// TenantCommand command
-var TenantCommand = &cobra.Command{
-	Name:  tenantCmdLabel,
-	Usage: "manages tenants",
-	Subcommands: cli.Commands{
-		tenantListCommand,
-		tenantGetCommand,
-		tenantSetCommand,
-		tenantInspectCommand,
-		tenantScanCommand,
-		tenantMetadataCommands,
-	},
+// TenantCommands command
+func TenantCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:   tenantCmdLabel,
+		Short: "manages tenants",
+	}
+	out.AddCommand(
+		tenantListCommand(),
+		tenantGetCommand(),
+		tenantSetCommand(),
+		tenantInspectCommand(),
+		tenantScanCommand(),
+		tenantMetadataCommands(),
+	)
+	addPersistentPreRunE(out)
+	addCommonFlags(out)
+	return out
 }
 
 // tenantListCommand handles 'safescale tenant list'
-var tenantListCommand = &cobra.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "List available tenants",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+func tenantListCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List available tenants",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		defer interactiveFeedback("Listing tenants")()
-
-		tenants, err := ClientSession.Tenant.List(0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of tenants", false).Error())))
-		}
-		return clitools.SuccessResponse(tenants.GetTenants())
-	},
+			tenants, err := ClientSession.Tenant.List(0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of tenants", false).Error())))
+			}
+			return clitools.SuccessResponse(tenants.GetTenants())
+		},
+	}
+	return out
 }
 
 // tenantGetCommand handles 'safescale tenant get'
-var tenantGetCommand = &cobra.Command{
-	Name:    "get",
-	Aliases: []string{"current"},
-	Usage:   "Get current tenant",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+func tenantGetCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "get",
+		Aliases: []string{"current"},
+		Short:   "Get current tenant",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		defer interactiveFeedback("Getting current tenant")()
-
-		tenant, err := ClientSession.Tenant.Get(0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "get tenant", false).Error())))
-		}
-		return clitools.SuccessResponse(tenant)
-	},
+			tenant, err := ClientSession.Tenant.Get(0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "get tenant", false).Error())))
+			}
+			return clitools.SuccessResponse(tenant)
+		},
+	}
+	return out
 }
 
 // tenantSetCommand handles 'safescale tenant set'
-var tenantSetCommand = &cobra.Command{
-	Name:  "set",
-	Usage: "Set tenant to work with",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
+func tenantSetCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:   "set",
+		Short: "Set tenant to work with",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+			}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		defer interactiveFeedback("Setting tenant")()
-
-		err := ClientSession.Tenant.Set(c.Args().First(), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.Tenant.Set(args[0], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }
 
 // tenantInspectCommand handles 'safescale tenant inspect'
-var tenantInspectCommand = &cobra.Command{
-	Name:    "inspect",
-	Aliases: []string{"show"},
-	Usage:   "Inspect tenant",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
+func tenantInspectCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Inspect tenant",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+			}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		resp, err := ClientSession.Tenant.Inspect(c.Args().First(), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-		}
-
-		return clitools.SuccessResponse(resp)
-	},
+			resp, err := ClientSession.Tenant.Inspect(args[0], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+			}
+			return clitools.SuccessResponse(resp)
+		},
+	}
+	return out
 }
 
 // tenantScanCommand handles 'safescale tenant scan' command
-var tenantScanCommand = &cobra.Command{
-	Name:  "scan",
-	Usage: "Scan tenant's templates [--dry-run] [--template <template name>]",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name: "dry-run, n",
+func tenantScanCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:   "scan",
+		Short: "Scan tenant's templates [--dry-run] [--template <template name>]",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+			}
+
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			results, err := ClientSession.Tenant.Scan(args[0], c.Flags().GetBool("dry-run"), c.Flags().GetStringSlice("template"), 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "scan tenant", false).Error())))
+			}
+			return clitools.SuccessResponse(results.GetResults())
 		},
-		cli.StringSliceFlag{
-			Name: "template, t",
-		},
-	},
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
+	}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+	flags := out.Flags()
+	flags.BoolP("dry-run", "n", false, "do not apply")
+	flags.StringSliceP("template", "t", nil, "")
 
-		results, err := ClientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "scan tenant", false).Error())))
-		}
-
-		return clitools.SuccessResponse(results.GetResults())
-	},
+	return out
 }
 
 const tenantMetadataCmdLabel = "metadata"
 
 // tenantMetadataCommands handles 'safescale tenant metadata' commands
-var tenantMetadataCommands = &cobra.Command{
-	Name:      tenantMetadataCmdLabel,
-	Usage:     "manage tenant metadata",
-	ArgsUsage: "COMMAND",
-
-	Subcommands: cli.Commands{
-		tenantMetadataUpgradeCommand,
-		// tenantMetadataBackupCommand,
-		// tenantMetadataRestoreCommand,
-		tenantMetadataDeleteCommand,
-	},
+func tenantMetadataCommands() *cobra.Command {
+	out := &cobra.Command{
+		Use:   tenantMetadataCmdLabel,
+		Short: "manage tenant metadata",
+		// ArgsUsage: "COMMAND",
+	}
+	out.AddCommand(
+		tenantMetadataUpgradeCommand(),
+		// tenantMetadataBackupCommand(),
+		// tenantMetadataRestoreCommand(),
+		tenantMetadataDeleteCommand(),
+	)
+	return out
 }
 
 const tenantMetadataUpgradeLabel = "upgrade"
 
-var tenantMetadataUpgradeCommand = &cobra.Command{
-	Name:  tenantMetadataUpgradeLabel,
-	Usage: "Upgrade tenant metadata if needed",
+func tenantMetadataUpgradeCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:   tenantMetadataUpgradeLabel,
+		Short: "Upgrade tenant metadata if needed",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+			}
+
+			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Name(), strings.Join(args, ", "))
+
+			// dryRun := c.Flags().GetBool("dry-run")
+			results, err := ClientSession.Tenant.Upgrade(args[0], false /*dryRun*/, 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
+			}
+			return clitools.SuccessResponse(results)
+		},
+	}
+
 	// Flags: []cli.Flag{
-	// 	cli.BoolFlag{
+	// 	&cli.BoolFlag{
 	// 		Name: "dry-run",
 	// 		Aliases: []string{"n"},
 	// 	},
 	// },
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
 
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Command.Name, c.Args())
-
-		// dryRun := c.Bool("dry-run")
-		results, err := ClientSession.Tenant.Upgrade(c.Args().First(), false /*dryRun*/, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
-		}
-
-		return clitools.SuccessResponse(results)
-	},
+	return out
 }
 
 const tenantMetadataDeleteCmdLabel = "delete"
 
-var tenantMetadataDeleteCommand = &cobra.Command{
-	Name:    tenantMetadataDeleteCmdLabel,
-	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
-	Usage:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
-	RunE: func(c *cobra.Command, args []string) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
+func tenantMetadataDeleteCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:     tenantMetadataDeleteCmdLabel,
+		Aliases: []string{"remove", "rm", "destroy", "cleanup"},
+		Short:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
+		RunE: func(c *cobra.Command, args []string) (ferr error) {
+			defer fail.OnPanic(&ferr)
+			if len(args) != 1 {
+				_ = c.Usage()
+				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+			}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-		err := ClientSession.Tenant.Cleanup(c.Args().First(), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
-		}
-
-		return clitools.SuccessResponse(nil)
-	},
+			err := ClientSession.Tenant.Cleanup(args[0], 0)
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
+			}
+			return clitools.SuccessResponse(nil)
+		},
+	}
+	return out
 }

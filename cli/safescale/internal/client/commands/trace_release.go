@@ -1,5 +1,5 @@
-//go:build !release
-// +build !release
+//go:build release
+// +build release
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package client
+package commands
 
 // traceSettings contains the default parts that we want to trace
 func traceSettings() string {

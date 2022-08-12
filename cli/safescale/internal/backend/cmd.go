@@ -28,34 +28,53 @@ import (
 
 const initCmdLabel = "init"
 
-var backendInitCommand = &cobra.Command{
-	Use:   initCmdLabel,
-	Short: "init SafeScale backend folder tree",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, initCmdLabel, strings.Join(args, ", "))
-
-		return initFolderTree(cmd)
-	},
-}
-
 const runCmdLabel = "run"
 
-var backendRunCommand = &cobra.Command{
-	Use:   runCmdLabel,
-	Short: "Start SafeScale backend",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, runCmdLabel, strings.Join(args, ", "))
-		return startBackend(cmd)
-	},
+func runCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:   runCmdLabel,
+		Short: "Start SafeScale backend",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, runCmdLabel, strings.Join(args, ", "))
+			return startBackend(cmd)
+		},
+	}
+
+	addCommonFlags(out)
+	flags := out.Flags()
+	flags.StringP("listen", "L", "localhost:50051", "Defines host and port where backend server must listen (default: localhost:50080)")
+	flags.String("bin-dir", "", "Defines the bin folder of safescale; will overload content of configuration file (default: <root-dir>/var)")
+	flags.String("var-dir", "", "Defines the var folder of safescale; will overload content of configuration file (default: <root-dir>/var)")
+	flags.String("log-dir", "", "Defines the logs folder of safescale; will overload content of configuration file (default: <var-dir>/log)")
+	flags.String("tmp-dir", "", "Defines the tmp folder of safescale; will overload content of configuration file (default: <var-dir>/tmp)")
+	flags.StringP("owner", "O", "safescale", "Defines the user used on SafeScale folder tree; will overload content of configuration file (default: safescale)")
+	flags.StringP("group", "G", "safescale", "Defines the user used on SafeScale folder tree; will overload content of configuration file (default: safescale)")
+
+	return out
 }
 
 const stopCmdLabel = "start"
 
-var backendStopCommand = &cobra.Command{
-	Use:   stopCmdLabel,
-	Short: "stop SafeScale backend",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, stopCmdLabel, strings.Join(args, ", "))
-		return stopBackend(cmd)
-	},
+func stopCommand() *cobra.Command {
+	out := &cobra.Command{
+		Use:   stopCmdLabel,
+		Short: "stop SafeScale backend",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, stopCmdLabel, strings.Join(args, ", "))
+			return stopBackend(cmd)
+		},
+	}
+
+	addCommonFlags(out)
+
+	return out
+}
+
+func addCommonFlags(cmd *cobra.Command) {
+	common.AddFlags(cmd)
+	flags := cmd.Flags()
+	flags.StringP("config", "c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
+	flags.SetAnnotation("config", cobra.BashCompFilenameExt, common.ValidConfigFilenameExts)
+	flags.StringP("root-dir", "R", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
+	flags.StringP("etc-dir", "E", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: <root-dir>/etc)")
 }
