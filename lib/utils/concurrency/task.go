@@ -55,20 +55,23 @@ type TaskResult interface{}
 
 // TaskAction defines the type of the function that can be started by a Task.
 // NOTE: you have to check if task is aborted inside this function using method t.ErrAborted(),
-//       to be able to stop the process when task is aborted (no matter what
-//       the abort reason is), and permit ending properly. Otherwise, this may lead to goroutine leak
-//       (there is no good way to stop forcibly a goroutine).
+//
+//	to be able to stop the process when task is aborted (no matter what
+//	the abort reason is), and permit ending properly. Otherwise, this may lead to goroutine leak
+//	(there is no good way to stop forcibly a goroutine).
+//
 // Example:
 // task.Start(func(task concurrency.Task, p TaskParameters) (concurrency.TaskResult, fail.Error) {
 // ...
-//    for {
-//        if task.ErrAborted() {
-//            break // or return
-//        }
-//        ...
-//    }
-//    return nil
-// }, nil)
+//
+//	   for {
+//	       if task.ErrAborted() {
+//	           break // or return
+//	       }
+//	       ...
+//	   }
+//	   return nil
+//	}, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, fail.Error)
 
 //go:generate minimock -o mocks/mock_taskguard.go -i github.com/CS-SI/SafeScale/v22/lib/utils/concurrency.TaskGuard
@@ -197,10 +200,10 @@ const (
 
 // TaskFromContext extracts the task instance from context
 // returns:
-//    - Task, nil: Task found in 'ctx'
-//    - nil, *fail.ErrNotAvailable: there is no Task value in 'ctx'
-//    - nil, *fail.ErrInconsistent: value stored as Task in "ctx' is not of type Task
-//    - nil, *ErrInvalidParameter: 'ctx' is nil
+//   - Task, nil: Task found in 'ctx'
+//   - nil, *fail.ErrNotAvailable: there is no Task value in 'ctx'
+//   - nil, *fail.ErrInconsistent: value stored as Task in "ctx' is not of type Task
+//   - nil, *ErrInvalidParameter: 'ctx' is nil
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
 		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
@@ -218,7 +221,7 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 // TaskFromContextOrVoid extracts the task instance from context.
 // If there is no task in the context, returns a VoidTask()
 // returns:
-//    - Task, nil: Task found in 'ctx' or VoidTask() is returned
+//   - Task, nil: Task found in 'ctx' or VoidTask() is returned
 func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
@@ -1217,10 +1220,10 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 
 // WaitFor waits for the task to end, for 'duration' duration.
 // Note: if timeout occurred, the task is not aborted. You have to abort then wait for it explicitly if needed.
-// - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
-// - true, TaskResult, *failErrAborted: Task terminates on Abort
-// - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
-//                                 abort signal has been received would be attached to the error as consequence)
+//   - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
+//   - true, TaskResult, *failErrAborted: Task terminates on Abort
+//   - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
+//     abort signal has been received would be attached to the error as consequence)
 func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()

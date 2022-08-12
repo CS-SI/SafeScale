@@ -670,6 +670,11 @@ message BucketMountRequest {
 	string path = 3;
 }
 
+message BucketUploadRequest {
+	string bucket = 1;
+	string path = 2;
+}
+
 service BucketService {
 	rpc Create(BucketRequest) returns (google.protobuf.Empty){}
 	rpc Mount(BucketMountRequest) returns (google.protobuf.Empty){}
@@ -678,6 +683,8 @@ service BucketService {
 	rpc List(BucketListRequest) returns (BucketListResponse){}
 	rpc Inspect(BucketRequest) returns (BucketResponse){}
 	rpc Download(BucketRequest) returns (BucketDownloadResponse){}
+	rpc Clear(BucketRequest) returns (google.protobuf.Empty){}
+	rpc Upload(BucketUploadRequest) returns (google.protobuf.Empty){}
 }
 
 // SSH requests

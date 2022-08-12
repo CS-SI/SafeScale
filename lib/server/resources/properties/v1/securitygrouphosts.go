@@ -28,7 +28,8 @@ import (
 // SecurityGroupHosts contains information about attached hosts to a security group
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type SecurityGroupHosts struct {
 	DefaultFor string                        `json:"default_for,omitempty"` // contains the ID of the host for which the SecurityGroup is a default
 	ByID       map[string]*SecurityGroupBond `json:"by_id,omitempty"`       // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host ID

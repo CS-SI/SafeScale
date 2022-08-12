@@ -29,7 +29,8 @@ import (
 // HostSizingRequirements describes host sizing requirements to fulfill
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostSizingRequirements struct {
 	MinCores    int     `json:"min_cores,omitempty"`
 	MaxCores    int     `json:"max_cores,omitempty"`
@@ -54,7 +55,8 @@ func (hsr *HostSizingRequirements) IsNull() bool {
 // HostEffectiveSizing represent sizing elements of a host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostEffectiveSizing struct {
 	Cores     int     `json:"cores,omitempty"`
 	RAMSize   float32 `json:"ram_size,omitempty"`
@@ -77,7 +79,8 @@ func (hes *HostEffectiveSizing) IsNull() bool {
 // HostSizing contains sizing information about the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostSizing struct {
 	RequestedSize *HostSizingRequirements `json:"requested_size,omitempty"`
 	Template      string                  `json:"template,omitempty"`

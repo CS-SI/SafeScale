@@ -1569,13 +1569,13 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}
 				}()
 
-				pubId, err := pubipsg.GetID()
+				pubID, err := pubipsg.GetID()
 				if err != nil {
 					return fail.ConvertError(err)
 				}
 
 				item := &propertiesv1.SecurityGroupBond{
-					ID:         pubId,
+					ID:         pubID,
 					Name:       pubipsg.GetName(),
 					Disabled:   false,
 					FromSubnet: true,
@@ -1675,14 +1675,14 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
 					}
 
-					langId, err := lansg.GetID()
+					langID, err := lansg.GetID()
 					if err != nil {
 						return fail.ConvertError(err)
 					}
 
 					// register security group in properties
 					item := &propertiesv1.SecurityGroupBond{
-						ID:         langId,
+						ID:         langID,
 						Name:       lansg.GetName(),
 						Disabled:   false,
 						FromSubnet: true,
@@ -1763,7 +1763,7 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, networkID string) fail.Error {
 	svc := instance.Service()
 
-	hostId, err := instance.GetID()
+	hostID, err := instance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
@@ -1782,7 +1782,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ne
 			default:
 				return innerXErr
 			}
-		} else if innerXErr = svc.UnbindSecurityGroupFromHost(ctx, adsg, hostId); innerXErr != nil {
+		} else if innerXErr = svc.UnbindSecurityGroupFromHost(ctx, adsg, hostID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// Consider a security group not found as a successful unbind
@@ -2220,12 +2220,12 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
 
-	hostId, err := instance.GetID()
+	hostID, err := instance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 
-	xerr := svc.ClearHostStartupScript(ctx, hostId)
+	xerr := svc.ClearHostStartupScript(ctx, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -4310,7 +4310,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	}
 
 	sgName := sgInstance.GetName()
-	sgId, err := sgInstance.GetID()
+	sgID, err := sgInstance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
@@ -4354,7 +4354,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgId)
+				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgID)
 			}
 
 			caps, xerr := svc.GetCapabilities(ctx)

@@ -28,7 +28,8 @@ import (
 // LabelHosts contains the values associated with Host bound to the Label
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type LabelHosts struct {
 	ByID   map[string]string `json:"by_id"`   // map of Label value indexed on Host ID
 	ByName map[string]string `json:"by_name"` // map of Label values indexed on Host Name

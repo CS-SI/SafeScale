@@ -176,7 +176,21 @@ func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr f
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	rc, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	exists, xerr := rc.Exists(handler.job.Context())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if !exists {
+		return nil, abstract.ResourceNotFoundError("cluster", name)
+	}
+
+	return rc, nil
 }
 
 // Start boots an entire cluster

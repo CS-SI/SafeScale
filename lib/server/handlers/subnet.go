@@ -214,7 +214,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	newCtx := context.WithValue(handler.job.Context(), "force", force)
+	newCtx := context.WithValue(handler.job.Context(), "force", force) // nolint
 
 	var (
 		networkInstance resources.Network

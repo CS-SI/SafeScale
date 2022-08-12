@@ -23,7 +23,7 @@ import (
 )
 
 // GetReference return a reference from the name or id given in the protocol.Reference
-// returns value and its display representation (without '' if id, with '' if name)
+// returns value and its display representation (without ” if id, with ” if name)
 func GetReference(in *protocol.Reference) (string, string) {
 	var ref, refLabel string
 	name := in.GetName()

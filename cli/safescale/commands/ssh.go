@@ -94,12 +94,16 @@ var sshRun = cli.Command{
 	},
 }
 
-func normalizeFileName(fileName string) string { // FIXME: OPP Don't ignore errors
-	absPath, _ := filepath.Abs(fileName)
-	if _, err := os.Stat(absPath); err != nil {
-		return fileName
+func normalizeFileName(fileName string) (string, error) {
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
+		return "", err
 	}
-	return absPath
+	if _, err := os.Stat(absPath); err != nil {
+		return "", err
+	}
+
+	return absPath, nil
 }
 
 var sshCopy = cli.Command{
@@ -148,7 +152,19 @@ var sshCopy = cli.Command{
 			}()
 		}
 
-		retcode, _, _, err := ClientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
+		first, err := normalizeFileName(c.Args().Get(0))
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
+		}
+
+		second, err := normalizeFileName(c.Args().Get(1))
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
+		}
+
+		retcode, _, _, err := ClientSession.SSH.Copy(first, second, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))

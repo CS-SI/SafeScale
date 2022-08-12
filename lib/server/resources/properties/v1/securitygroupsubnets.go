@@ -28,7 +28,8 @@ import (
 // SecurityGroupSubnets contains information about attached subnets to a security group
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type SecurityGroupSubnets struct {
 	DefaultFor string                        `json:"default_for,omitempty"` // contains the ID of the subnet for which the Security Group is default
 	ByID       map[string]*SecurityGroupBond `json:"by_id,omitempty"`       // contains the bonds of a Security Group with Subnets using it, indexed on Subnets' ID

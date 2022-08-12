@@ -2903,7 +2903,7 @@ func (e *ServiceTest) GetTenantParameters() (map[string]interface{}, fail.Error)
 	return map[string]interface{}{}, nil
 }
 
-//	objectstorage.Location
+// objectstorage.Location
 func (e *ServiceTest) Protocol() (string, fail.Error) {
 	if e.options.protocolErr != nil {
 		e._logf("ServiceTest::Protocol forced error \"%s\"\n", e.options.protocolErr.Error())

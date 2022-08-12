@@ -28,7 +28,8 @@ import (
 // BucketMounts contains information about hosts that have mounted the bucket
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type BucketMounts struct {
 	ByHostID   map[string]string `json:"by_host_id"`
 	ByHostName map[string]string `json:"by_host_name"`

@@ -307,9 +307,9 @@ func (ud Content) AddInTag(phase Phase, tagname string, content string) {
 
 // checkScriptFilePresents ...
 // returns:
-//  - nil: files found
-//  - *fail.ErrNotFound: at least one file with suffix != "" is not found
-//  - *fail.ErrInconsistent: at least one mandatory file is missing
+//   - nil: files found
+//   - *fail.ErrNotFound: at least one file with suffix != "" is not found
+//   - *fail.ErrInconsistent: at least one mandatory file is missing
 func checkScriptFilePresents(suffix string) fail.Error {
 	var (
 		missing Phase

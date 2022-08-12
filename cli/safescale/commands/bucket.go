@@ -48,6 +48,8 @@ var BucketCommand = cli.Command{
 		bucketMount,
 		bucketUnmount,
 		bucketDownload,
+		bucketUpload,
+		bucketClear,
 	},
 }
 
@@ -156,6 +158,111 @@ var bucketDownload = cli.Command{
 		err = ioutil.WriteFile(filename, dr.Content, 0644)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var bucketClear = cli.Command{
+	Name:      "clear",
+	Aliases:   []string{"clear"},
+	Usage:     "Clears a bucket",
+	Flags:     []cli.Flag{},
+	ArgsUsage: "BUCKET_NAME",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+		}
+
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Cleaning bucket"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
+		err := clientSession.Bucket.Clear(c.Args().Get(0), 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bucket download", true).Error())))
+		}
+
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var bucketUpload = cli.Command{
+	Name:      "upload",
+	Aliases:   []string{"upload"},
+	Usage:     "Uploads a bucket",
+	Flags:     []cli.Flag{},
+	ArgsUsage: "BUCKET_NAME LOCAL_BUCKET_DIR",
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and LOCAL_BUCKET_DIR."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument LOCAL_BUCKET_DIR."))
+		default:
+		}
+
+		clientSession, xerr := client.New(c.String("server"), c.String("tenant"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+			description := "Uploading bucket"
+			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
+			go func() {
+				for {
+					if pb.IsFinished() {
+						return
+					}
+					err := pb.Add(1)
+					if err != nil {
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+
+			defer func() {
+				_ = pb.Finish()
+			}()
+		}
+
+		err := clientSession.Bucket.Upload(c.Args().Get(0), c.Args().Get(1), 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bucket download", true).Error())))
 		}
 
 		return clitools.SuccessResponse(nil)

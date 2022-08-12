@@ -28,7 +28,8 @@ import (
 // HostNetwork contains network information related to Host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostNetwork struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
 	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the Default getGateway

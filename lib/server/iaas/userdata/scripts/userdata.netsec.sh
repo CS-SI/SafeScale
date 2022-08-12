@@ -1433,13 +1433,13 @@ EOF
 function install_packages() {
   case $LINUX_KIND in
   ubuntu | debian)
-    sfApt install -y -qq --no-install-recommends wget curl jq zip unzip time at &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
+    sfApt install -y -qq --no-install-recommends wget curl jq zip unzip time at sshpass &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
     ;;
   redhat | centos)
     if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
-      sfYum install -y -q wget curl jq zip unzip time at &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+      sfYum install -y -q wget curl jq zip unzip time at sshpass &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
     else
-      sfYum install --enablerepo=epel -y -q wget curl jq zip unzip time at &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+      sfYum install --enablerepo=epel -y -q wget curl jq zip unzip time at sshpass &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
     fi
     ;;
   *)
