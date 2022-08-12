@@ -1,0 +1,170 @@
+#
+# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    dpkg -l | grep ntp &>/dev/null || sfFail 192
+                                    ;;
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        rpm -qa | grep chrony &>/dev/null || sfFail 192
+                                    else
+                                        rpm -qa | grep ntp &>/dev/null || sfFail 192
+                                    fi
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 193
+                                    ;;
+                            esac
+                            sfExit
+
+            add:
+                pace: ntp-server,firewall,ready
+                steps:
+                    ntp-server:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    sfRetry "sfApt update && sfApt install -y ntp" || sfFail 192
+                                    ;;
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf install -y chrony || sfFail 192
+                                    else
+                                        yum install -y ntp || sfFail 192
+                                    fi
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 193
+                                    ;;
+                            esac
+                            sfExit
+
+                    firewall:
+                        targets:
+                            gateways: no
+                            hosts: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            # Makes sure firewalld is running, starting first its dependency dbus...
+                            sfService start dbus
+                            # then firewalld  itself
+                            sfService restart firewalld
+                            sfFirewallAdd --zone=trusted --add-port=123/udp --permanent
+                            sfFirewallReload || sfFail 194 "Firewall problem"
+
+                    ready:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfService enable ntp || sfFail 195
+                                    sfService restart ntp || sfFail 196
+                                    op=-1
+                                    sfRetry sfService status ntp &>/dev/null && op=$? || true
+                                    [ $op -ne 0 ] && sfFail 197
+                                    ;;
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfService enable chronyd || sfFail 195
+                                        sfService restart chronyd || sfFail 196
+                                    else
+                                        sfService enable ntpd || sfFail 195
+                                        sfService restart ntpd || sfFail 196
+                                    fi
+
+                                    if [[ -n $(which dnf) ]]; then
+                                        op=-1
+                                        sfRetry sfService status chronyd &>/dev/null && op=$? || true
+                                        [ $op -ne 0 ] && sfFail 197
+                                    else
+                                        op=-1
+                                        sfRetry sfService status ntpd &>/dev/null && op=$? || true
+                                        [ $op -ne 0 ] && sfFail 197
+                                    fi
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 1
+                                    ;;
+                            esac
+                            sfExit
+
+            remove:
+                pace: ntp-server
+                steps:
+                    ntp-server:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfService disable ntp
+                                    sfService stop ntp
+                                    sfWaitForApt && apt-get purge -y ntp*
+                                    apt-get autoremove -y
+                                    ;;
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfService disable chronyd
+                                        sfService stop chronyd
+                                    else
+                                        sfService disable ntpd
+                                        sfService stop ntpd
+                                        yum remove -y ntp*
+                                    fi
+                                    yum autoremove -y
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 1
+                                    ;;
+                            esac
+
+...
