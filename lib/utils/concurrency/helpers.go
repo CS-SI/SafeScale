@@ -63,7 +63,10 @@ func randomIntWithReseed(min, max int) int { // nolint
 	return mrand.Intn(max-min) + min // nolint
 }
 
-func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func(chan string) error) TaskAction {
+func taskgenWithCustomFunc(
+	low int, high int, latency int, cleanfactor int, probError float32, probPanic float32,
+	actionHandlesPanicByItself bool, custom func(chan string) error,
+) TaskAction {
 	return func(t Task, parameters TaskParameters) (_ TaskResult, ferr fail.Error) {
 		traceR := newTracer(t, false) // change to true to display traces
 
@@ -164,7 +167,6 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 				ir:  "Ahhhh",
 				err: fail.ConvertError(iErr),
 			}
-			return // nolint
 		}()
 
 		select {
@@ -178,6 +180,9 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 	}
 }
 
-func taskgen(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool) TaskAction {
+func taskgen(
+	low int, high int, latency int, cleanfactor int, probError float32, probPanic float32,
+	actionHandlesPanicByItself bool,
+) TaskAction {
 	return taskgenWithCustomFunc(low, high, latency, cleanfactor, probError, probPanic, actionHandlesPanicByItself, nil)
 }

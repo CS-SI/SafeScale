@@ -29,7 +29,8 @@ import (
 // VolumeDescription contains additional information describing the volume, in V1
 // !!!FROZEN!!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type VolumeDescription struct {
 	// Purpose contains the reason of the existence of the volume
 	Purpose string `json:"purpose,omitempty"`
@@ -70,7 +71,8 @@ func (vd *VolumeDescription) Replace(p data.Clonable) (data.Clonable, error) {
 // VolumeAttachments contains host ids where the volume is attached
 // !!!FROZEN!!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type VolumeAttachments struct {
 	Shareable bool              `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
 	Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by host ID

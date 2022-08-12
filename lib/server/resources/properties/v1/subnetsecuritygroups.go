@@ -28,7 +28,8 @@ import (
 // SubnetSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type SubnetSecurityGroups struct {
 	DefaultID string                        `json:"default_id,omitempty"` // Contains the ID of the default security group
 	ByID      map[string]*SecurityGroupBond `json:"by_id,omitempty"`      // map of security groups by IDs; if value is true, security group is currently applied

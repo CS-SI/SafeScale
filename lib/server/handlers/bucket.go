@@ -37,6 +37,8 @@ type BucketHandler interface {
 	Delete(string) fail.Error
 	Inspect(string) (resources.Bucket, fail.Error)
 	Download(string) ([]byte, fail.Error)
+	Clear(string) fail.Error
+	Upload(string, string) fail.Error
 	Mount(string, string, string) fail.Error
 	Unmount(string, string) fail.Error
 }
@@ -153,6 +155,37 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	return rb.Delete(task.Context())
 }
 
+// Uploads a bucket
+func (handler *bucketHandler) Upload(bucketName, directoryName string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
+	defer fail.OnPanic(&ferr)
+	if handler == nil {
+		return fail.InvalidInstanceError()
+	}
+	if bucketName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+	}
+	if directoryName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("directoryName")
+	}
+
+	task := handler.job.Task()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+directoryName+"')").WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+
+	// -- upload bucket
+	xerr := handler.job.Service().UploadBucket(task.Context(), bucketName, directoryName)
+	if xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
 // Download a bucket
 func (handler *bucketHandler) Download(name string) (bytes []byte, ferr fail.Error) {
 	defer func() {
@@ -181,6 +214,34 @@ func (handler *bucketHandler) Download(name string) (bytes []byte, ferr fail.Err
 	return ct, nil
 }
 
+// Clear a bucket
+func (handler *bucketHandler) Clear(name string) (ferr fail.Error) {
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
+	defer fail.OnPanic(&ferr)
+	if handler == nil {
+		return fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	task := handler.job.Task()
+	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+
+	// clear bucket
+	xerr := handler.job.Service().ClearBucket(task.Context(), name, "", "")
+	if xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
 // Inspect a bucket
 func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fail.Error) {
 	defer func() {
@@ -206,6 +267,16 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	exists, xerr := rb.Exists(handler.job.Context())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if !exists {
+		return nil, abstract.ResourceNotFoundError("bucket", name)
+	}
+
 	return rb, nil
 }
 

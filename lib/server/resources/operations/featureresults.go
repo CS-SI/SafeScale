@@ -61,7 +61,7 @@ func (urs unitResults) Uncompleted() []string {
 
 // Successful tells if all the steps have been successful
 func (urs unitResults) Successful() bool {
-	if urs == nil || len(urs) == 0 {
+	if len(urs) == 0 {
 		return false
 	}
 	for _, v := range urs {

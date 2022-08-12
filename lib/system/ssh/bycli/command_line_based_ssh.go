@@ -49,9 +49,10 @@ import (
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
-//      To make profit of this multiplexing functionality, we have to change the way we manage ports for tunnels: we have to always
-//      use the same port for all access to a same host (not the case currently)
-//      May not be used for interactive ssh connection...
+//
+//	To make profit of this multiplexing functionality, we have to change the way we manage ports for tunnels: we have to always
+//	use the same port for all access to a same host (not the case currently)
+//	May not be used for interactive ssh connection...
 const (
 	sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 )
@@ -628,14 +629,16 @@ func (scmd *CliCommand) Start() fail.Error {
 
 // RunWithTimeout ...
 // returns:
-// - retcode int
-// - stdout string
-// - stderr string
-// - xerr fail.Error
-//   . *fail.ErrNotAvailable if remote SSH is not available
-//   . *fail.ErrTimeout if 'timeout' is reached
+//   - retcode int
+//   - stdout string
+//   - stderr string
+//   - xerr fail.Error
+//     . *fail.ErrNotAvailable if remote SSH is not available
+//     . *fail.ErrTimeout if 'timeout' is reached
+//
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
-//       you risk to call twice os/exec.Wait, which may panic
+//
+//	you risk to call twice os/exec.Wait, which may panic
 func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

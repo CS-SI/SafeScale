@@ -433,7 +433,9 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) *abstract.HostTemplate {
 
 // WaitHostReady waits until a host achieves ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s stack) WaitHostReady(
+	ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration,
+) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -499,7 +501,9 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 }
 
 // CreateHost creates a host
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
+	ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error,
+) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -814,7 +818,9 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 }
 
 // InspectHost loads information of a host from AWS
-func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (
+	ahf *abstract.HostFull, ferr fail.Error,
+) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -846,7 +852,9 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 	return ahf, xerr
 }
 
-func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance) (ferr fail.Error) {
+func (s stack) inspectInstance(
+	ctx context.Context, ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance,
+) (ferr fail.Error) {
 	instanceName := ""
 	instanceType := ""
 
@@ -938,7 +946,9 @@ func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, host
 	return nil
 }
 
-func (s stack) fromMachineTypeToHostEffectiveSizing(ctx context.Context, machineType string) (abstract.HostEffectiveSizing, fail.Error) {
+func (s stack) fromMachineTypeToHostEffectiveSizing(
+	ctx context.Context, machineType string,
+) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
 	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(machineType))
 	if xerr != nil {
@@ -1339,7 +1349,9 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 }
 
 // ResizeHost changes the sizing of an existing host
-func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(
+	ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
+) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1350,7 +1362,9 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, r
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) BindSecurityGroupToHost(
+	ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1409,7 +1423,9 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(
+	ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

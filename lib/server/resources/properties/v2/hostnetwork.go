@@ -28,7 +28,8 @@ import (
 // HostNetworking contains network information related to Host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostNetworking struct {
 	DefaultSubnetID string            `json:"default_subnet_id,omitempty"` // contains the ID of the default subnet
 	PublicIPv4      string            `json:"public_ip_v4,omitempty"`

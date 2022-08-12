@@ -248,7 +248,9 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
+func (instance *Cluster) RegisterFeature(
+	ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -361,17 +363,16 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []resources.Feature
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	list, xerr := instance.InstalledFeatures(ctx) // FIXME: OPP should we return xerr ?
+	list, xerr := instance.InstalledFeatures(ctx)
 	if xerr != nil {
-		logrus.Warningf("something happened: %v", xerr)
+		return nil, xerr
 	}
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
 	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -395,7 +396,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 		item, xerr := NewFeature(ctx, instance.Service(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return emptySlice, xerr
+			return nil, xerr
 		}
 
 		out = append(out, item)
@@ -404,7 +405,9 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 }
 
 // AddFeature installs a feature on the Cluster
-func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *Cluster) AddFeature(
+	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
+) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -425,7 +428,9 @@ func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.
 }
 
 // CheckFeature tells if a feature is installed on the Cluster
-func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *Cluster) CheckFeature(
+	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
+) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -446,7 +451,9 @@ func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars dat
 }
 
 // RemoveFeature uninstalls a feature from the Cluster
-func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *Cluster) RemoveFeature(
+	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
+) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -470,7 +477,9 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 var clusterFlavorScripts embed.FS
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Cluster) ExecuteScript(
+	inctx context.Context, tmplName string, variables data.Map, host resources.Host,
+) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -615,7 +624,9 @@ func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, v
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
+func (instance *Cluster) installNodeRequirements(
+	inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -632,6 +643,11 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
+			return
+		}
+
+		if netCfg == nil {
+			chRes <- result{fail.InconsistentError("network cfg for cluster is nil")}
 			return
 		}
 
@@ -1126,7 +1142,9 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 }
 
 // installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(inctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installDocker(
+	inctx context.Context, host resources.Host, hostLabel string, params data.Map,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)

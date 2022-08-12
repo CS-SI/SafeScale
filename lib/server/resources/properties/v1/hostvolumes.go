@@ -28,7 +28,8 @@ import (
 // HostVolume contains information about attached volume
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostVolume struct {
 	AttachID string `json:"attach_id"` // contains the ID of the volume attachment
 	Device   string `json:"device"`    // contains the device on the host
@@ -42,7 +43,8 @@ func NewHostVolume() *HostVolume {
 // HostVolumes contains information about attached volumes
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostVolumes struct {
 	VolumesByID     map[string]*HostVolume `json:"volumes_by_id,omitempty"`     // contains the information of the attached volume, indexed by volume ID
 	VolumesByName   map[string]string      `json:"volumes_by_name,omitempty"`   // contains the ID of attached volume, indexed by volume name

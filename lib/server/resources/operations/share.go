@@ -139,9 +139,10 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 
 // LoadShare returns the name of the host owing the Share 'ref', read from Object Storage
 // logic: try to read until success.
-//        If error is fail.ErrNotFound return this error
-//        In case of any other error, abort the retry to propagate the error
-//        If retry times out, return fail.ErrTimeout
+//
+//	If error is fail.ErrNotFound return this error
+//	In case of any other error, abort the retry to propagate the error
+//	If retry times out, return fail.ErrTimeout
 func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Share, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

@@ -118,6 +118,92 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Requires iteration of quite a few members...
+
+	// begin by inspecting all hosts...
+	svc := instance.Service()
+
+	ci, xerr := instance.unsafeGetIdentity(ctx)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	gws, xerr := instance.unsafeGetGwIDs(ctx)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	rh, xerr := LoadHost(ctx, svc, fmt.Sprintf("gw-%s", ci.Name))
+	if xerr != nil {
+		return false, xerr
+	}
+
+	exists, xerr := rh.Exists(ctx)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	if !exists {
+		return false, abstract.ResourceNotFoundError("host", fmt.Sprintf("gw-%s", ci.Name))
+	}
+
+	if len(gws) == 2 {
+		rh, xerr := LoadHost(ctx, svc, fmt.Sprintf("gw2-%s", ci.Name))
+		if xerr != nil {
+			return false, xerr
+		}
+
+		exists, xerr := rh.Exists(ctx)
+		if xerr != nil {
+			return false, xerr
+		}
+
+		if !exists {
+			return false, abstract.ResourceNotFoundError("host", fmt.Sprintf("gw2-%s", ci.Name))
+		}
+	}
+
+	mids, xerr := instance.unsafeListMasters(ctx)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	for _, mid := range mids {
+		rh, xerr := LoadHost(ctx, svc, mid.Name)
+		if xerr != nil {
+			return false, xerr
+		}
+
+		exists, xerr := rh.Exists(ctx)
+		if xerr != nil {
+			return false, xerr
+		}
+
+		if !exists {
+			return false, abstract.ResourceNotFoundError("host", mid.Name)
+		}
+	}
+
+	nids, xerr := instance.unsafeListNodes(ctx)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	for _, nid := range nids {
+		rh, xerr := LoadHost(ctx, svc, nid.Name)
+		if xerr != nil {
+			return false, xerr
+		}
+
+		exists, xerr := rh.Exists(ctx)
+		if xerr != nil {
+			return false, xerr
+		}
+
+		if !exists {
+			return false, abstract.ResourceNotFoundError("host", nid.Name)
+		}
+	}
+
 	return true, nil
 }
 
@@ -1140,10 +1226,6 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 		return state, fail.InvalidInstanceError()
 	}
 
-	// make sure no other parallel actions interferes
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	return instance.unsafeGetState(ctx)
 }
 
@@ -1168,10 +1250,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
 	defer tracer.Entering().Exiting()
-
-	// make sure no other parallel actions interferes
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3470,4 +3548,43 @@ func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) 
 		<-chRes
 		return false, fail.ConvertError(inctx.Err())
 	}
+}
+
+func (instance *Cluster) unsafeGetGwIDs(ctx context.Context) ([]string, fail.Error) {
+	var gateways []string
+
+	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// Collect get network config
+		var networkCfg *propertiesv3.ClusterNetwork
+		innerXErr := props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			if networkV3 == nil {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", "nil")
+			}
+			networkCfg = networkV3
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		if networkCfg.GatewayID != "" {
+			gateways = append(gateways, networkCfg.GatewayID)
+		}
+
+		if networkCfg.SecondaryGatewayID != "" {
+			gateways = append(gateways, networkCfg.SecondaryGatewayID)
+		}
+
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return gateways, nil
 }

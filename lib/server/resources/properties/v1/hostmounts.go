@@ -28,7 +28,8 @@ import (
 // HostLocalMount stores information about a device (as an attached volume) mount
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type HostLocalMount struct {
 	Device     string `json:"device"`            // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
 	Path       string `json:"mountpoint"`        // Path is the mount point of the device
@@ -71,7 +72,8 @@ func (hlm *HostLocalMount) Replace(p data.Clonable) (data.Clonable, error) {
 // HostRemoteMount stores information about a remote filesystem mount
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type HostRemoteMount struct {
 	ShareID    string `json:"share_id"`          // contains the ID of the share mounted
 	Export     string `json:"export"`            // contains the path of the export (ie: <host>:/data/shared)
@@ -112,7 +114,8 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) (data.Clonable, error) {
 // HostMounts contains information about mounts on the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type HostMounts struct {
 	LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device,omitempty"`  // contains local mount path, indexed by devices
 	LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path,omitempty"`    // contains HostLocalMount structs, indexed by path

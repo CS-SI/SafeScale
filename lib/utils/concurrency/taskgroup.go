@@ -357,17 +357,18 @@ func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 
 // WaitGroup waits for the task to end, and returns the error (or nil) of the execution
 // Returns:
-//  - nil, *fail.InconsistentError: if TaskGroup has not started anything
-//  - nil, *fail.Error: if anything wrong occurred during the waiting process
-//  - TaskGroupResult|nil, *fail.ErrorList: if TaskGroup ended properly but some sub-Tasks fail
-//  - TaskGroupResult|nil, *fail.ErrAborted: if TaskGroup has been aborted; ErrAborted Consequences() may contain an ErrorList corresponding to the errors of sub-Tasks (if such errors occurred)
-//  - TaskGroupResult|nil, *fail.ErrTimeout: if TaskGroup has reached context deadline
-//  - TaskGroupResult|nil, nil: if TaskGroup finished without error
+//   - nil, *fail.InconsistentError: if TaskGroup has not started anything
+//   - nil, *fail.Error: if anything wrong occurred during the waiting process
+//   - TaskGroupResult|nil, *fail.ErrorList: if TaskGroup ended properly but some sub-Tasks fail
+//   - TaskGroupResult|nil, *fail.ErrAborted: if TaskGroup has been aborted; ErrAborted Consequences() may contain an ErrorList corresponding to the errors of sub-Tasks (if such errors occurred)
+//   - TaskGroupResult|nil, *fail.ErrTimeout: if TaskGroup has reached context deadline
+//   - TaskGroupResult|nil, nil: if TaskGroup finished without error
 //
 // Note: this function may lead to go routine leaks, because we do not want a TaskGroup to be locked due to
-//       a sub-Task not responding; if a sub-Task is designed to run forever, it will never end.
-//       It's highly recommended to use Task.Aborted() in the body of a TaskAction to check
-//       for abortion signal and quit the go routine accordingly to reduce the risk.
+//
+//	a sub-Task not responding; if a sub-Task is designed to run forever, it will never end.
+//	It's highly recommended to use Task.Aborted() in the body of a TaskAction to check
+//	for abortion signal and quit the go routine accordingly to reduce the risk.
 func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -666,12 +667,12 @@ func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fa
 // WaitGroupFor waits for the task to end, for 'timeout' duration
 // Note: if 'timeout' is reached, the TaskGroup IS NOT ABORTED. You have to abort then wait for it explicitly if needed.
 // Returns:
-// - true, TaskGroupResult, nil: Wait worked and TaskGroup generated no error
-// - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error, after
-//                                            abort signal has been received, would be attached to the error as consequence)
-// - true, TaskGroupResult, fail.Error: TaskGroup terminated, but generated an error
-// - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
-// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out
+//   - true, TaskGroupResult, nil: Wait worked and TaskGroup generated no error
+//   - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error, after
+//     abort signal has been received, would be attached to the error as consequence)
+//   - true, TaskGroupResult, fail.Error: TaskGroup terminated, but generated an error
+//   - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
+//   - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out
 func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupResult, fail.Error) {
 	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()

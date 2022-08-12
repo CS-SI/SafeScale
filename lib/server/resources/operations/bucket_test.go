@@ -30,8 +30,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-/*	TODO: unexported type operation.bucket = no acces to test it / break in.
-	Solve it or give up for cover.  */
+/*
+TODO: unexported type operation.bucket = no acces to test it / break in.
+Solve it or give up for cover.
+*/
 func Test_NewBucket(t *testing.T) {
 
 	var svc iaas.Service
