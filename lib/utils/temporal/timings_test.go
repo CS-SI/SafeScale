@@ -30,13 +30,6 @@ func Test_NewTimings(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*temporal.MutableTimings")
 }
 
-func Test_NewTimingsToml(t *testing.T) {
-	result := NewTimings()
-	ct, err := result.ToToml()
-	require.Nil(t, err)
-	t.Logf(ct)
-}
-
 func TestMutableTimings_Update(t *testing.T) {
 
 	a := NewTimings()
@@ -109,27 +102,6 @@ func TestMutableTimings_ContextTimeout(t *testing.T) {
 	mt = NewTimings()
 	mt.Timeouts.Context = 42 * time.Second
 	require.EqualValues(t, mt.ContextTimeout(), 42*time.Second)
-
-}
-
-func TestMutableTimings_ToToml(t *testing.T) {
-
-	mt := NewTimings()
-	result, err := mt.ToToml()
-	require.Nil(t, err)
-	require.Contains(t, result, "Big")
-	require.Contains(t, result, "Communication")
-	require.Contains(t, result, "Connection")
-	require.Contains(t, result, "Context")
-	require.Contains(t, result, "HostCleanup")
-	require.Contains(t, result, "HostCreation")
-	require.Contains(t, result, "HostLongOperation")
-	require.Contains(t, result, "Metadata")
-	require.Contains(t, result, "MetadataReadAfterWrite")
-	require.Contains(t, result, "Operation")
-	require.Contains(t, result, "Small")
-	require.Contains(t, result, "Normal")
-	require.Contains(t, result, "Big")
 
 }
 

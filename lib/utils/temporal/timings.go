@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/pelletier/go-toml/v2"
 )
 
 const (
@@ -207,14 +206,6 @@ func (t *MutableTimings) ContextTimeout() time.Duration {
 	}
 
 	return t.Timeouts.Context
-}
-
-func (t MutableTimings) ToToml() (string, error) {
-	barr, err := toml.Marshal(t)
-	if err != nil {
-		return "", err
-	}
-	return string(barr), nil
 }
 
 // ConnectionTimeout returns the configured timeout for connection
