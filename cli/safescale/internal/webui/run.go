@@ -142,37 +142,13 @@ func run() error {
 	// 	options = append(options, grpcweb.WithAllowedRequestHeaders(*flagAllowedHeaders))
 	// }
 
-	serveMux := http.NewServeMux()
-	// Serving SafeScale Frontend:
-	var fsHandler http.Handler
-	if appwide.Config.WebUI.WebRoot != "" {
-		st, err := os.Stat(appwide.Config.WebUI.WebRoot)
-		if err != nil || !st.IsDir() {
-			return fail.NotFoundError("failed to find webroot '%s'", appwide.Config.WebUI.WebRoot)
-		}
-		fsHandler = http.FileServer(http.Dir(appwide.Config.WebUI.WebRoot))
-	} else {
-		fsHandler = http.FileServer(http.FS(web.Webroot))
+	mux, xerr := buildHttpRouter(grpcweb.WrapServer(grpcBackend, options...))
+	if xerr != nil {
+		return xerr
 	}
-	serveMux.Handle("/ui/", http.StripPrefix("/ui", fsHandler))
-
-	// Serving debugging helpers:
-	if appwide.Config.Debug {
-		serveMux.Handle("/metrics", promhttp.Handler())
-		serveMux.HandleFunc("/debug/requests", func(resp http.ResponseWriter, req *http.Request) {
-			trace.Traces(resp, req)
-		})
-		serveMux.HandleFunc("/debug/events", func(resp http.ResponseWriter, req *http.Request) {
-			trace.Events(resp, req)
-		})
-	}
-
-	// Wrapped gRPC calls to backend:
-	wrappedGrpc := grpcweb.WrapServer(grpcBackend, options...)
-	serveMux.Handle("/", wrappedGrpc)
 
 	// Starting everything
-	server := buildFrontendServer(serveMux)
+	server := buildFrontendServer(mux)
 	switch appwide.Config.WebUI.UseTls {
 	case false:
 		listener, err := buildListener("http")
@@ -199,6 +175,72 @@ func run() error {
 
 	fmt.Printf("safescale webui version: %s\nReady to run on '%s' :-)\n", common.VersionString(), appwide.Config.WebUI.Listen)
 	return <-errChan
+}
+
+type grpcMux struct {
+	*grpcweb.WrappedGrpcServer
+}
+
+func (m *grpcMux) Handler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if m.IsGrpcWebRequest(r) {
+			m.ServeHTTP(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func buildHttpRouter(grpcWrapper *grpcweb.WrappedGrpcServer) (*http.ServeMux, fail.Error) {
+	mux := http.NewServeMux()
+
+	frontendHandler, xerr := buildFrontendHttpHandler()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	m := &grpcMux{grpcWrapper}
+	mux.Handle("/", m.Handler(frontendHandler))
+
+	xerr = buildDebugHttpHandler(mux)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return mux, nil
+}
+
+// buildFrontendHttpHandler Serving SafeScale Frontend
+func buildFrontendHttpHandler() (http.Handler, fail.Error) {
+	var fsHandler http.Handler
+	if appwide.Config.WebUI.WebRoot != "" {
+		st, err := os.Stat(appwide.Config.WebUI.WebRoot)
+		if err != nil || !st.IsDir() {
+			return nil, fail.NotFoundError("failed to find webroot '%s'", appwide.Config.WebUI.WebRoot)
+		}
+
+		fsHandler = http.FileServer(http.Dir(appwide.Config.WebUI.WebRoot))
+	} else {
+		fsHandler = http.FileServer(http.FS(web.Webroot))
+	}
+
+	return fsHandler, nil
+}
+
+func buildDebugHttpHandler(mux *http.ServeMux) fail.Error {
+	// Serving debugging helpers:
+	if appwide.Config.Debug {
+		mux.Handle("/metrics", promhttp.Handler())
+		mux.HandleFunc("/debug/requests", func(resp http.ResponseWriter, req *http.Request) {
+			trace.Traces(resp, req)
+		})
+		mux.HandleFunc("/debug/events", func(resp http.ResponseWriter, req *http.Request) {
+			trace.Events(resp, req)
+		})
+	}
+
+	return nil
 }
 
 func buildGrpcProxyServer(backendConn *grpc.ClientConn) *grpc.Server {
@@ -249,7 +291,8 @@ func buildFrontendServer(handler http.Handler) *http.Server {
 func serveFrontend(server *http.Server, listener net.Listener, name string, errChan chan error) {
 	go func() {
 		logrus.Infof("listening for %s on: %v", name, listener.Addr().String())
-		if err := server.Serve(listener); err != nil {
+		err := server.Serve(listener)
+		if err != nil {
 			errChan <- fmt.Errorf("%s server error: %v", name, err)
 		}
 	}()

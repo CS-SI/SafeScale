@@ -55,9 +55,9 @@ lib/Pipfile.lock
 *_results.log
 
 # ignore version files
-cli/safescale/version.go
-cli/safescaled/version.go
-cli/scanner/version.go
+cli/safescale/internal/version.go
+#cli/safescaled/version.go
+#cli/scanner/version.go
 lib/backend/resources/operations/iaas/userdata/version.go
 
 vendor

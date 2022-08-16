@@ -76,7 +76,10 @@ func main() {
 		}
 	*/
 
-	err = common.RunApp(context.Background(), app, cleanup)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = common.RunApp(ctx, app, cleanup)
 	if err != nil {
 		logrus.Error("Error running cli: " + err.Error())
 		os.Exit(1)

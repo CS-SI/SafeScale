@@ -5,11 +5,16 @@
 
 - [SafeScale usage](#content)
   - [Introduction](#intro)
-  - [safescaled](#safescaled)
-      - [Configuration](#safescaled_config)
-      - [Usage](#safescaled_usage)
-      - [Options](#safescaled_options)
-      - [Environment variables](#safescaled_env)
+  - [safescale backend](#safescale_backend)
+    - [Introduction](#safescale_backend_intro)
+    - [First launch](#safescale_bakend_1st_launch)
+      - [Configuration](#safescale_backend_config)
+        - [Command-line parameters](#safescale_backend_cli_params)
+        - [Environment variables](#safescale_backend_env_vars)
+        - [Configuration files](#safescale_backend_config_files)
+      - [Usage](#safescale_backend_usage)
+      - [Options](#safescale_backend_options)
+      - [Environment variables](#safescale_backend_env)
   - [safescale](#safescale)
       - [Host sizing definition](#safescale_sizing)
       - [Global options](#safescale_globals)
@@ -24,28 +29,106 @@
          - [ssh](#ssh)
          - [cluster](#cluster)
       - [Environnement variables](#safescale_env)
+  - [safescale WebUI](#safescale_webui)
+      - [Configuration](#safescale_webui_config)
+      - [Usage](#safescale_webui_usage)
+      - [Options](#safescale_webui_options)
+      - [Environment variables](#safescale_webui_env)
 
 ___
 
 ## <a name="intro">Introduction</a>
-SafeScale is composed of 2 parts:
+In previous releases, SafeScale was composed by 2 binaries, `safescale` and `safescaled`.
 
- - a daemon working in background, called [`safescaled`](#safescaled)
- - a client interacting with the daemon, called [`safescale`](#safescale)
+Everything is now contained in a single binary, `safescale`, and a Web UI has been introduced. This binary allows to:
+
+ - control the SafeScale backend/daemon, with [`safescaled backend`](#safescale_backend)
+ - control the SafeScale embedded Web UI, with [`safescale web`](#safescale_webui)
+ - interact with the backend, with [`safescale <other command>`](#safescale_cli)
 <br>
 
-## <a name="safescaled">safescaled</a>
+## <a name="safescale_backend">safescale backend</a>
 
-`safescaled` is the daemon you need to launch on your own computer.
-The purpose of this daemon is to execute requests ordered by `safescale` client on the providers.
+### <a name="safescale_backend_intro">Introduction</a>
+To start SafeScale backend, you need to run `safescale backend run`, which launch an instance of safescale binary exposing a gRPC API, allowing to execute requests ordered by clients on the providers.
 <br>
 It is composed internally of 2 layers:
 - `Infra` which manages Cloud Provider resources with an abstraction layer
 - `Platform` which allows creating and managing clusters
 
-#### <a name="safescaled_config">Configuration</a>
+### <a name="safescale_bakend_1st_launch">First launch</a>
 
-To dialog with the different providers, the daemon needs authentication parameters to be able to connect to the underlying provider's API.
+On first launch, `safescale backend` will create a filesystem tree needed for its usage. By default, this tree is located in `/opt/safescale`. This location could be changed using command-line parameters or configuration file.
+
+Please read the following chapter to learn how configuration may impact the backend, if it's the first time you use SafeScale (or if you come from previous release providing `safescaled`).
+
+### <a name="safescale_bakend_config">Configuration</a>
+
+There are 3 ways to configure `safescale backend`:
+- using command-line parameters
+- using environment variables
+- using configuration file
+
+The order of priority of these configuration methods is :
+1. command-line parameters
+2. environment variables
+3. configuration files
+4. defaults
+
+#### <a name="safescale_backend_cli_params">Command-line parameters</a>
+
+It's possible to start SafeScale backend using only command-line parameters.
+
+Here is the list:
+- `--listen [<hostname or ip][:<port>]`
+- `--owner <username>`
+- `--group <groupname>`
+- `--debug`: display debug logs and messages; with `--verbose` display trace logs and messages 
+- `--verbose`: increase verbosity
+- `--root-dir <path>`: By default, path==/opt/safescale
+- `--bin-dir <path>`: By default, path==<root-dir>/bin
+- `--etc-dir <path>`: By default, path==<root-dir>/etc 
+- `--var-dir <path>`: By default, path==<root-dir>/var
+- `--tmp-dir <path>`: By default, path==<var-dir>/tmp
+- `--log-dir <path>`: By default, path==<var-dir>/log
+- ...
+
+#### <a name="safescale-backend_env_vars">Environment variables</a>
+
+Some of the configuration parameters can be set using environment variables, which are:
+- SAFESCALE_BACKEND_LISTEN -> safescale.backend.listen
+- SAFESCALE_BACKEND_... -> safescale.backend. ...
+- >>> complete the list of environment variables
+  
+#### <a name="safescale_backend_config_files">Configuration files</a>
+
+The configuration files allows to configure behaviour of `safescale backend` and `safescale web`.
+
+They can be formatted in `yaml`, `json`, or `toml`.
+
+SafeScale looks out for 2 configuration files :
+- Settings file
+- Tenants file
+
+##### Settings file
+
+Here is an example in `yaml` :
+```
+$ cat settings.yml
+```
+>>> Insert example of yaml file
+
+By default, the tenants file is searched in this order:
+1. $HOME/.safescale/settings.{json,yml,toml} ($HOME being the home-dir of the user that launched `safescale backend run`)
+2. <root-dir>/etc/settings.{json,yml,toml}
+
+There are no overloading mechanism if the files exist in the 2 places; if the first is found, the second will not be parsed.
+
+It's possible to define a custom file using `--config|-c` parameter in `safescale backend run`.
+
+##### Tenants file
+
+To dialog with the different providers, the backend needs authentication parameters to be able to connect to the underlying provider's API.
 These credentials are given in the file `tenants.toml` (may also be `tenants.json` or `tenants.yaml`, in their respective corresponding format).
 This file is searched in order (first file found is used) in the following directories:
 
@@ -57,17 +140,16 @@ This file is searched in order (first file found is used) in the following direc
 The content of this configuration file is explained in [TENANTS.md](TENANTS.md).
 
 Each `tenants` section contains specific authentication parameters for each Cloud Provider.
-> - `client` can be one of the available provider drivers in:
->    - aws
->    - cloudferro
->    - flexibleengine
->    - gcp
->    - local (currently broken, not compiled by default, cf this [documentation](LIBVIRT_PROVIDER.md))
->    - openstack (pure OpenStack support)
->    - outscale
->    - opentelekom
->    - outscale
->    - ovh
+>- `client` can be one of the available provider drivers in:
+>  - aws
+>  - cloudferro
+>  - flexibleengine
+>  - gcp
+>  - openstack (pure OpenStack support)
+>  - outscale
+>  - opentelekom
+>  - outscale
+>  - ovh
 > - `name` is a logical name representing the tenant
 >
 
