@@ -1,5 +1,5 @@
-//go:build !debug
-// +build !debug
+//go:build debug
+// +build debug
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -59,8 +59,8 @@ func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uin
 		privateNodeCount = 3
 		masterNodeCount = 2
 	case clustercomplexity.Large:
-		privateNodeCount = 7
-		masterNodeCount = 3
+		privateNodeCount = 42
+		masterNodeCount = 18
 	}
 	return masterNodeCount, privateNodeCount, 0, nil
 }

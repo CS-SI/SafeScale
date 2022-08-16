@@ -45,7 +45,7 @@ import (
 )
 
 // unsafeInspectGateway returns the gateway related to Subnet
-// Note: a write lock of the instance (instance.lock.Lock() ) must have been called before calling this method
+// Note: you must take a lock (instance.lock.Lock() ) before calling this method
 func (instance *Subnet) unsafeInspectGateway(ctx context.Context, primary bool) (_ resources.Host, ferr fail.Error) {
 	gwIdx := 0
 	if !primary {
@@ -198,7 +198,9 @@ func (instance *Subnet) unsafeHasVirtualIP(ctx context.Context) (bool, fail.Erro
 // UnsafeCreateSecurityGroups creates the 3 Security Groups needed by a Subnet
 // 'ctx' may contain values "CurrentNetworkAbstractContextKey" and "CurrentNetworkPropertiesContextKey", corresponding respectively
 // to Network abstract and Network properties; these values may be used by SecurityGroup.Create() not to try to Alter networkInstance directly (might be inside a code already altering it)
-func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (sa, sb, sc resources.SecurityGroup, gerr fail.Error) {
+func (instance *Subnet) unsafeCreateSecurityGroups(
+	inctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32,
+) (sa, sb, sc resources.SecurityGroup, gerr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -296,7 +298,9 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 }
 
 // createGWSecurityGroup creates a Security Group that will be applied to gateways of the Subnet
-func (instance *Subnet) createGWSecurityGroup(ctx context.Context, networkID, networkName string, keepOnFailure bool, defaultSSHPort int32) (_ resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) createGWSecurityGroup(
+	ctx context.Context, networkID, networkName string, keepOnFailure bool, defaultSSHPort int32,
+) (_ resources.SecurityGroup, ferr fail.Error) {
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, instance.GetName(), networkName)
 
@@ -463,7 +467,9 @@ func (instance *Subnet) createPublicIPSecurityGroup(
 }
 
 // Starting from here, delete the Security Group if exiting with error
-func (instance *Subnet) undoCreateSecurityGroup(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) fail.Error {
+func (instance *Subnet) undoCreateSecurityGroup(
+	ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup,
+) fail.Error {
 	if errorPtr == nil {
 		return fail.NewError("trying to undo an action based on the content of a nil fail.Error; undo cannot be run")
 	}
@@ -802,7 +808,9 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				derr := networkInstance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				derr := networkInstance.Alter(context.Background(), func(
+					_ data.Clonable, props *serialize.JSONProperties,
+				) fail.Error {
 					return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 						nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 						if !ok {
@@ -927,7 +935,10 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail
 	}
 }
 
-func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (_ fail.Error) {
+func (instance *Subnet) unsafeCreateGateways(
+	inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements,
+	sgs map[string]struct{},
+) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1438,7 +1449,9 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 }
 
 // unsafeUnbindSecurityGroup unbinds a security group from the host
-func (instance *Subnet) unsafeUnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
+func (instance *Subnet) unsafeUnbindSecurityGroup(
+	ctx context.Context, sgInstance resources.SecurityGroup,
+) (ferr fail.Error) {
 	snid, err := instance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
