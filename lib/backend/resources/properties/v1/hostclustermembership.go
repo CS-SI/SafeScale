@@ -28,7 +28,8 @@ import (
 // HostClusterMembership ...
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostClusterMembership struct {
 	Cluster string `json:"cluster,omitempty"`   // Cluster is the name of the cluster the host is member of
 	Type    string `json:"node_type,omitempty"` // Tells if host is "node", "master" or "gateway"

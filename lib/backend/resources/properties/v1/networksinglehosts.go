@@ -45,7 +45,8 @@ type FreeCIDRSlot struct {
 // NetworkSingleHosts contains additional information describing the CIDR used for single Hosts
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type NetworkSingleHosts struct {
 	FreeSlots []FreeCIDRSlot `json:"free_slots,omitempty"` // contains a list of free CIDR in Network for single Hosts
 }

@@ -42,23 +42,23 @@ import (
 
 // Object interface
 type Object interface {
-	Stored() (bool, fail.Error)
+	Stored(context.Context) (bool, fail.Error)
 
-	Read(io.Writer, int64, int64) fail.Error
-	Write(io.Reader, int64) fail.Error
-	WriteMultiPart(io.Reader, int64, int) fail.Error
-	Reload() fail.Error
-	Delete() fail.Error
-	AddMetadata(abstract.ObjectStorageItemMetadata) fail.Error
-	ForceAddMetadata(abstract.ObjectStorageItemMetadata) fail.Error
-	ReplaceMetadata(abstract.ObjectStorageItemMetadata) fail.Error
+	Read(context.Context, io.Writer, int64, int64) fail.Error
+	Write(context.Context, io.Reader, int64) fail.Error
+	WriteMultiPart(context.Context, io.Reader, int64, int) fail.Error
+	Reload(context.Context) fail.Error
+	Delete(context.Context) fail.Error
+	AddMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
+	ForceAddMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
+	ReplaceMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
 
-	GetID() (string, fail.Error)
-	GetName() (string, fail.Error)
-	GetLastUpdate() (time.Time, fail.Error)
-	GetSize() (int64, fail.Error)
-	GetETag() (string, fail.Error)
-	GetMetadata() (abstract.ObjectStorageItemMetadata, fail.Error)
+	GetID(context.Context) (string, fail.Error)
+	GetName(context.Context) (string, fail.Error)
+	GetLastUpdate(context.Context) (time.Time, fail.Error)
+	GetSize(context.Context) (int64, fail.Error)
+	GetETag(context.Context) (string, fail.Error)
+	GetMetadata(context.Context) (abstract.ObjectStorageItemMetadata, fail.Error)
 }
 
 // object is an implementation of Object interface
@@ -121,7 +121,7 @@ func newObjectFromStow(b *bucket, item stow.Item) object {
 }
 
 // Stored return true if the object exists in Object Storage
-func (instance object) Stored() (bool, fail.Error) {
+func (instance object) Stored(ctx context.Context) (bool, fail.Error) {
 	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -129,12 +129,12 @@ func (instance object) Stored() (bool, fail.Error) {
 }
 
 // Reload reloads the data of the Object from the Object Storage
-func (instance *object) Reload() fail.Error {
+func (instance *object) Reload(ctx context.Context) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Item(instance.name)
 	if err != nil {
@@ -161,7 +161,7 @@ func (instance *object) reloadFromItem(item stow.Item) fail.Error {
 }
 
 // Read reads the content of the object from Object Storage and writes it in 'target'
-func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
+func (instance *object) Read(ctx context.Context, target io.Writer, from int64, to int64) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -174,17 +174,17 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
 
 	var seekTo int64
 	var length int64
 
 	// 1st reload information about object, to be sure to have the last
-	if err := instance.Reload(); err != nil {
+	if err := instance.Reload(ctx); err != nil {
 		return err
 	}
 
-	size, err := instance.GetSize()
+	size, err := instance.GetSize(ctx)
 	if err != nil {
 		return fail.Wrap(err, "failed to get bucket size")
 	}
@@ -250,7 +250,7 @@ func (instance *object) Read(target io.Writer, from, to int64) (ferr fail.Error)
 }
 
 // Write the source to the object in Object Storage
-func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
+func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize int64) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -261,7 +261,7 @@ func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
 		return fail.InvalidInstanceContentError("instance.bucket", "cannot be nil")
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Put(instance.name, source, sourceSize, instance.metadata)
 	if err != nil {
@@ -272,7 +272,9 @@ func (instance *object) Write(source io.Reader, sourceSize int64) fail.Error {
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (instance *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
+func (instance *object) WriteMultiPart(
+	ctx context.Context, source io.Reader, sourceSize int64, chunkSize int,
+) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -280,7 +282,7 @@ func (instance *object) WriteMultiPart(source io.Reader, sourceSize int64, chunk
 		return nil
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
 
 	metadataCopy := instance.metadata.Clone()
 
@@ -323,7 +325,7 @@ func writeChunk(container stow.Container, objectName string, source io.Reader, n
 }
 
 // Delete deletes the object from Object Storage
-func (instance *object) Delete() fail.Error {
+func (instance *object) Delete(ctx context.Context) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -331,7 +333,7 @@ func (instance *object) Delete() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	err := instance.bucket.stowContainer.RemoveItem(instance.name)
 	if err != nil {
@@ -342,12 +344,14 @@ func (instance *object) Delete() fail.Error {
 }
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
-func (instance *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
+func (instance *object) ForceAddMetadata(
+	ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata,
+) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		instance.metadata[k] = v
@@ -356,12 +360,12 @@ func (instance *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemM
 }
 
 // AddMetadata adds missing entries in object metadata
-func (instance *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
+func (instance *object) AddMetadata(ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		_, found := instance.metadata[k]
@@ -373,19 +377,21 @@ func (instance *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetada
 }
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
-func (instance *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
+func (instance *object) ReplaceMetadata(
+	ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata,
+) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	instance.metadata = newMetadata
 	return nil
 }
 
 // GetLastUpdate returns the date of last update
-func (instance object) GetLastUpdate() (time.Time, fail.Error) {
+func (instance object) GetLastUpdate(ctx context.Context) (time.Time, fail.Error) {
 	if valid.IsNil(instance) {
 		return time.Time{}, fail.InvalidInstanceError()
 	}
@@ -400,7 +406,7 @@ func (instance object) GetLastUpdate() (time.Time, fail.Error) {
 }
 
 // GetMetadata returns the metadata of the object in Object Storage
-func (instance object) GetMetadata() (abstract.ObjectStorageItemMetadata, fail.Error) {
+func (instance object) GetMetadata(ctx context.Context) (abstract.ObjectStorageItemMetadata, fail.Error) {
 	if valid.IsNil(instance) {
 		return abstract.ObjectStorageItemMetadata{}, fail.InvalidInstanceError()
 	}
@@ -408,7 +414,7 @@ func (instance object) GetMetadata() (abstract.ObjectStorageItemMetadata, fail.E
 }
 
 // GetSize returns the size of the content of the object
-func (instance object) GetSize() (int64, fail.Error) {
+func (instance object) GetSize(ctx context.Context) (int64, fail.Error) {
 	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -423,7 +429,7 @@ func (instance object) GetSize() (int64, fail.Error) {
 }
 
 // GetETag returns the value of the ETag (+/- md5sum of the content...)
-func (instance object) GetETag() (string, fail.Error) {
+func (instance object) GetETag(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -438,7 +444,7 @@ func (instance object) GetETag() (string, fail.Error) {
 }
 
 // GetID returns the ID of the object
-func (instance object) GetID() (string, fail.Error) {
+func (instance object) GetID(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -449,7 +455,7 @@ func (instance object) GetID() (string, fail.Error) {
 }
 
 // GetName returns the name of the object
-func (instance object) GetName() (string, fail.Error) {
+func (instance object) GetName(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}

@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
@@ -29,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale share create --path="/shared/data" share1 host1
@@ -94,12 +93,12 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 }
 
 // Delete call share service deletion
-func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (empty *emptypb.Empty, err error) {
+func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete share")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -207,11 +206,11 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 }
 
 // Unmount unmounts share from the given host
-func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDefinition) (empty *emptypb.Empty, err error) {
+func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unmount share")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

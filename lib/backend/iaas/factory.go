@@ -21,6 +21,7 @@ import (
 	"context"
 	"expvar"
 	"fmt"
+	"os"
 	"regexp"
 	"time"
 
@@ -165,7 +166,9 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
 		}
 
-		logrus.WithContext(ctx).Infof("Created a cache in: %p", newS.cacheManager)
+		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "" {
+			logrus.WithContext(ctx).Infof("Created a cache in: %p", newS.cacheManager)
+		}
 
 		// allRegions, xerr := newS.ListRegions()
 		// if xerr != nil {
@@ -398,7 +401,9 @@ func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regex
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
+func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (
+	objectstorage.Config, fail.Error,
+) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -555,7 +560,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 // }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
+func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (
+	objectstorage.Config, fail.Error,
+) {
 	var (
 		config objectstorage.Config
 		ok     bool

@@ -46,7 +46,6 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
-			break // nolint
 		default:
 			return nil, xerr
 		}
@@ -281,7 +280,9 @@ func (s stack) getFirstFreeDeviceName(ctx context.Context, serverID string) (str
 }
 
 // CreateVolumeAttachment attaches a volume to a host
-func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (
+	_ string, ferr fail.Error,
+) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -308,7 +309,9 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
-func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID string) (
+	_ *abstract.VolumeAttachment, ferr fail.Error,
+) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -345,7 +348,9 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID s
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (
+	_ []*abstract.VolumeAttachment, ferr fail.Error,
+) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}

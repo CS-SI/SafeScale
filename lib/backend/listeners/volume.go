@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
@@ -29,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
@@ -132,11 +131,11 @@ func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreate
 }
 
 // Attach a volume to a host and create a mount point
-func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *emptypb.Empty, err error) {
+func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot attach volume")
 
-	empty := &emptypb.Empty{}
+	empty := &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -188,11 +187,11 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 }
 
 // Detach a volume from a host. It umount associated mountpoint
-func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *emptypb.Empty, err error) {
+func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot detach volume")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -233,11 +232,11 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (empty *emptypb.Empty, err error) {
+func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete volume")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

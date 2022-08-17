@@ -28,7 +28,8 @@ import (
 // HostSecurityGroups contains a list of security groups bound to the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostSecurityGroups struct {
 	// DefaultID string                        `json:"default_id,omitempty"` // contains the ID of the Security Group considered as default
 	ByID   map[string]*SecurityGroupBond `json:"by_id,omitempty"`   // map of security groups by IDs

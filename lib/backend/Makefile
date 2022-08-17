@@ -2,7 +2,7 @@ include ../../common.mk
 
 .PHONY:	lib/backend/resources lib/backend/iaas clean vet
 
-all:	lib/backend/iaas lib/backend/resources 
+all:	lib/backend/iaas lib/backend/resources
 
 generate: clean
 	@(mkdir -p mocks) || true

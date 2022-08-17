@@ -84,6 +84,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and return interface stack
+//
 //goland:noinspection GoExportedFuncWithUnexportedType
 func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	ctx := context.Background()

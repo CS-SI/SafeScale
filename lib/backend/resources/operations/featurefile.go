@@ -170,9 +170,9 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 // LoadFeatureFile searches for a spec file named 'name' and initializes a new FeatureFile object
 // with its content
 // 'xerr' may contain:
-//    - nil: everything worked as expected
-//    - fail.ErrNotFound: no FeatureFile is found with the name
-//    - fail.ErrSyntax: FeatureFile contains syntax error
+//   - nil: everything worked as expected
+//   - fail.ErrNotFound: no FeatureFile is found with the name
+//   - fail.ErrSyntax: FeatureFile contains syntax error
 func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

@@ -57,8 +57,8 @@ type Feature struct {
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 // error contains :
-//    - fail.ErrNotFound if no Feature is found by its name
-//    - fail.ErrSyntax if Feature found contains syntax error
+//   - fail.ErrNotFound if no Feature is found by its name
+//   - fail.ErrSyntax if Feature found contains syntax error
 func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -375,8 +375,8 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 
 // prepareConditionedParameters builds a map of strings with final value set, picking it from externals if provided (otherwise, default value is set)
 // Returned error may be:
-//  - nil: everything went well
-//  - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
+//   - nil: everything went well
+//   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
 func (instance Feature) prepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
 	xerr := instance.conditionParameters(ctx, externals, target)
 	if xerr != nil {
@@ -396,8 +396,8 @@ func (instance Feature) prepareParameters(ctx context.Context, externals data.Ma
 
 // conditionParameters inits if needed the Feature parameters conditioned for final use
 // Returned error may be:
-//  - nil: everything went well
-//  - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
+//   - nil: everything went well
+//   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
 func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
 	if instance.conditionedParameters == nil {
 		var xerr fail.Error
@@ -620,6 +620,7 @@ func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fa
 //   - nil, nil: no sizing requirements defined for the flavor
 //   - map[string]interface{}, nil: sizing requirements defined for the flavor
 //   - nil, *fail.ErrInvalidInstance: called from a null valued instance
+//
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirementsForFlavor(flavor string) (map[string]interface{}, fail.Error) {
 	emptyMap := map[string]interface{}{}

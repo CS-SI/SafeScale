@@ -105,6 +105,55 @@ func (c bucketConsumer) Download(name string, timeout time.Duration) (*protocol.
 	return dr, err
 }
 
+// Clear ...
+func (c bucketConsumer) Clear(name string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	service := protocol.NewBucketServiceClient(c.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Clear(newCtx, &protocol.BucketRequest{Name: name})
+	return err
+}
+
+// Download ...
+func (c bucketConsumer) Upload(name string, dirct string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	service := protocol.NewBucketServiceClient(c.session.connection)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	// finally, using context
+	newCtx := ctx
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
+
+	_, err := service.Upload(newCtx, &protocol.BucketUploadRequest{
+		Bucket: name,
+		Path:   dirct,
+	})
+	return err
+}
+
 // Delete ...
 func (c bucketConsumer) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()

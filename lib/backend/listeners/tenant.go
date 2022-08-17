@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -30,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // TenantListener server is used to implement SafeScale.safescale.
@@ -40,7 +39,7 @@ type TenantListener struct {
 // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // List lists registered tenants
-func (s *TenantListener) List(inctx context.Context, in *emptypb.Empty) (_ *protocol.TenantList, err error) {
+func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot list tenants")
 
@@ -70,7 +69,7 @@ func (s *TenantListener) List(inctx context.Context, in *emptypb.Empty) (_ *prot
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantListener) Get(inctx context.Context, in *emptypb.Empty) (_ *protocol.TenantName, err error) {
+func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 
 	if s == nil {
@@ -100,12 +99,12 @@ func (s *TenantListener) Get(inctx context.Context, in *emptypb.Empty) (_ *proto
 }
 
 // Set sets the tenant to use for each command
-func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (empty *emptypb.Empty, err error) {
+func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot set tenant")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -127,11 +126,11 @@ func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (em
 }
 
 // Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
-func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *emptypb.Empty, err error) {
+func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot cleanup tenant")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

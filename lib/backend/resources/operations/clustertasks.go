@@ -1179,10 +1179,10 @@ func (instance *Cluster) createHostResources(
 
 				for _, invol := range hosts {
 					theName := invol.GetName()
-					theId, _ := invol.GetID()
+					theID, _ := invol.GetID()
 					if strings.Contains(theName, "master") {
 						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: theId, Name: invol.GetName()})
+							list = append(list, machineID{ID: theID, Name: invol.GetName()})
 						}
 					}
 				}
@@ -1278,10 +1278,10 @@ func (instance *Cluster) createHostResources(
 
 				for _, invol := range hosts {
 					theName := invol.GetName()
-					theId, _ := invol.GetID()
+					theID, _ := invol.GetID()
 					if strings.Contains(theName, "node") {
 						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: theId, Name: invol.GetName()})
+							list = append(list, machineID{ID: theID, Name: invol.GetName()})
 						}
 					}
 				}

@@ -129,7 +129,9 @@ func (t iterationTrigger) Why() string {
 // and saves a list of originalCrash sites and their probabilities of crashing, and then
 // makes the crash() function crash with appropriate trigger when called from one of
 // the specified crash sites. An example spec:
-//   client.go:53:p:.003,server.go:18:p:.02,validate.go:25:i:3
+//
+//	client.go:53:p:.003,server.go:18:p:.02,validate.go:25:i:3
+//
 // That will cause a originalCrash .003 of the time at client.go line 53, and .02 of the time
 // at server.go line 18.
 func setup(spec string) error {

@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -70,12 +70,12 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (empty *emptypb.Empty, err error) {
+func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot start host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -103,11 +103,11 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 }
 
 // Stop shutdowns a host.
-func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empty *emptypb.Empty, err error) {
+func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot stop host")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -138,12 +138,12 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 }
 
 // Reboot reboots a host.
-func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (empty *emptypb.Empty, err error) {
+func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot reboot host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -467,12 +467,12 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 }
 
 // Delete a host
-func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (empty *emptypb.Empty, err error) {
+func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -551,12 +551,12 @@ func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *pr
 }
 
 // BindSecurityGroup attaches a Security Group to a host
-func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot bind Security Group to Host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -603,12 +603,12 @@ func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.Sec
 }
 
 // UnbindSecurityGroup detaches a Security Group from a host
-func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Security Group from Host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -647,12 +647,12 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 }
 
 // EnableSecurityGroup applies a Security Group already attached (if not already applied)
-func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot enable Security Group on Host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -689,12 +689,12 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 }
 
 // DisableSecurityGroup applies a Security Group already attached (if not already applied)
-func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot disable security group on host")
 	defer fail.OnPanic(&err)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -882,11 +882,11 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 }
 
 // BindLabel binds a Label to a Host
-func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot bind Label to Host")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -929,11 +929,11 @@ func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRe
 }
 
 // UnbindLabel unbinds a Label from a Host
-func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Label from Host")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -976,11 +976,11 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 }
 
 // UpdateLabel updates Label value for the Host
-func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot bind Label to Host")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -1023,11 +1023,11 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 }
 
 // ResetLabel restores default value of Label to the Host
-func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *emptypb.Empty, err error) {
+func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Label from Host")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

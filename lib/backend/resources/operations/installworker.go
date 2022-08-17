@@ -87,9 +87,13 @@ set -x
 
 date
 
+# BashLib
 {{ .reserved_BashLibrary }}
 
+# Reserved
 {{ .reserved_Content }}
+
+# End
 `
 )
 
@@ -133,7 +137,10 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(ctx context.Context, f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
+func newWorker(
+	ctx context.Context, f resources.Feature, target resources.Targetable, method installmethod.Enum,
+	action installaction.Enum, cb alterCommandCB,
+) (*worker, fail.Error) {
 	w := worker{
 		feature:   f.(*Feature),
 		target:    target,
@@ -607,7 +614,9 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(inctx context.Context, params data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (w *worker) Proceed(
+	inctx context.Context, params data.Map, settings resources.FeatureSettings,
+) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -823,7 +832,9 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (
+	_ concurrency.TaskResult, ferr fail.Error,
+) {
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1436,7 +1447,9 @@ type taskApplyProxyRuleParameters struct {
 	variables  *data.Map
 }
 
-func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (
+	_ concurrency.TaskResult, ferr fail.Error,
+) {
 	defer fail.OnPanic(&ferr)
 
 	if task == nil {
@@ -1670,6 +1683,14 @@ func normalizeScript(timings temporal.Timings, params *data.Map, reserved data.M
 		return "", fail.ConvertError(err)
 	}
 
+	// Templates are badly generated again...
+	suspectContent := dataBuffer.String()
+	fragments := strings.Split(suspectContent, "\n")
+	if strings.Contains(fragments[len(fragments)-1], "!(EXTRA") {
+		corrected := strings.Join(fragments[0:len(fragments)-2], "\n")
+		return corrected, nil
+	}
+
 	return dataBuffer.String(), nil
 }
 
@@ -1758,7 +1779,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 					return
 				}
 
-				gwId, err := gwSG.GetID()
+				gwID, err := gwSG.GetID()
 				if err != nil {
 					chRes <- result{fail.ConvertError(err)}
 					return
@@ -1769,7 +1790,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 				sgRule.EtherType = ipversion.IPv4
 				sgRule.Protocol, _ = r["protocol"].(string) // nolint
 				sgRule.Sources = []string{"0.0.0.0/0"}
-				sgRule.Targets = []string{gwId}
+				sgRule.Targets = []string{gwID}
 
 				var commaSplitted []string
 				if ports, ok := r["ports"].(int); ok {

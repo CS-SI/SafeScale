@@ -79,7 +79,9 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (*SecurityGroup, fail.Error) {
+func LoadSecurityGroup(
+	inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue,
+) (*SecurityGroup, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -212,6 +214,20 @@ func (instance *SecurityGroup) IsNull() bool {
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Not so easy, securitygroups are in some cases a metadata-only construct -> we need to turn those into tags (provider ones) 1st
+	theID, err := instance.GetID()
+	if err != nil {
+		return false, fail.ConvertError(err)
+	}
+	_, xerr := instance.Service().InspectSecurityGroup(ctx, theID)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return false, nil
+		default:
+			return false, xerr
+		}
+	}
+
 	return true, nil
 }
 
@@ -238,7 +254,9 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 }
 
 // Browse walks through SecurityGroup MetadataFolder and executes a callback for each entry
-func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) (ferr fail.Error) {
+func (instance *SecurityGroup) Browse(
+	ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with IsNull here, as Browse may be used from null value
@@ -267,7 +285,9 @@ func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstra
 // Create creates a new SecurityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
-func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (gerr fail.Error) {
+func (instance *SecurityGroup) Create(
+	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
+) (gerr fail.Error) {
 	defer fail.OnPanic(&gerr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
@@ -596,8 +616,11 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 }
 
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
+//
 //goland:noinspection GoDeferInLoop
-func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
+func (instance *SecurityGroup) unbindFromSubnets(
+	ctx context.Context, in *propertiesv1.SecurityGroupSubnets,
+) fail.Error {
 	if len(in.ByID) > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/unbind"))
 		xerr = debug.InjectPlannedFail(xerr)
@@ -857,7 +880,9 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 }
 
 // GetBoundHosts returns the list of ID of hosts bound to the security group
-func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (
+	_ []*propertiesv1.SecurityGroupBond, ferr fail.Error,
+) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -886,7 +911,9 @@ func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 }
 
 // GetBoundSubnets returns the subnet bound to the security group
-func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
+func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (
+	list []*propertiesv1.SecurityGroupBond, ferr fail.Error,
+) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -945,7 +972,10 @@ func (instance *SecurityGroup) ToProtocol(ctx context.Context) (_ *protocol.Secu
 }
 
 // BindToHost binds the security group to a host.
-func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+func (instance *SecurityGroup) BindToHost(
+	ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation,
+	mark resources.SecurityGroupMark,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1072,7 +1102,10 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 
 // BindToSubnet binds the security group to a host
 // This method assumes the Subnet is not called while the Subnet is currently locked (otherwise will deadlock...)
-func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance resources.Subnet, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
+func (instance *SecurityGroup) BindToSubnet(
+	ctx context.Context, subnetInstance resources.Subnet, enable resources.SecurityGroupActivation,
+	mark resources.SecurityGroupMark,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1162,7 +1195,9 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 }
 
 // enableOnHostsAttachedToSubnet enables the security group on hosts attached to the network
-func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
+func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(
+	ctx context.Context, subnetHosts *propertiesv1.SubnetHosts,
+) fail.Error {
 	if len(subnetHosts.ByID) > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1187,7 +1222,9 @@ func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(ctx context.Context
 }
 
 // disableSecurityGroupOnHosts disables (ie remove) the security group from bound hosts
-func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
+func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(
+	ctx context.Context, subnetHosts *propertiesv1.SubnetHosts,
+) fail.Error {
 	if len(subnetHosts.ByID) > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1213,7 +1250,9 @@ func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(ctx context.Contex
 }
 
 // unbindFromHostsAttachedToSubnet unbinds (ie remove) the security group from Hosts in a Subnet
-func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
+func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(
+	ctx context.Context, subnetHosts *propertiesv1.SubnetHosts,
+) fail.Error {
 	if len(subnetHosts.ByID) > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1239,7 +1278,9 @@ func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(ctx context.Conte
 }
 
 // UnbindFromSubnet unbinds the security group from a subnet
-func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInstance resources.Subnet) (ferr fail.Error) {
+func (instance *SecurityGroup) UnbindFromSubnet(
+	ctx context.Context, subnetInstance resources.Subnet,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1277,7 +1318,9 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 }
 
 // unbindFromSubnetHosts unbinds the security group from Hosts attached to a Subnet
-func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (_ fail.Error) {
+func (instance *SecurityGroup) unbindFromSubnetHosts(
+	ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams,
+) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1404,7 +1447,9 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	})
 }
 
-func FilterBondsByKind(bonds map[string]*propertiesv1.SecurityGroupBond, state securitygroupstate.Enum) []*propertiesv1.SecurityGroupBond {
+func FilterBondsByKind(
+	bonds map[string]*propertiesv1.SecurityGroupBond, state securitygroupstate.Enum,
+) []*propertiesv1.SecurityGroupBond {
 	list := make([]*propertiesv1.SecurityGroupBond, 0, len(bonds))
 	switch state {
 	case securitygroupstate.All:

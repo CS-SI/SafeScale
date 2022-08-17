@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -204,12 +204,12 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 }
 
 // Delete a/many subnet/s
-func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDeleteRequest) (empty *emptypb.Empty, err error) {
+func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitLogError(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete Subnet")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -248,12 +248,12 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 }
 
 // BindSecurityGroup attaches a Security Group to a hostnetwork
-func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *emptypb.Empty, err error) {
+func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitLogError(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot bind Security Group to Subnet")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -299,12 +299,12 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 }
 
 // UnbindSecurityGroup detaches a Security Group from a subnet
-func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *emptypb.Empty, err error) {
+func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitLogError(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unbind Security Group from Subnet")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -342,12 +342,12 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 }
 
 // EnableSecurityGroup applies the rules of a bound security group on a network
-func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *emptypb.Empty, err error) {
+func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitLogError(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot enable Security Group of Subnet")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -385,12 +385,12 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 }
 
 // DisableSecurityGroup detaches a Security Group from a subnet
-func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *emptypb.Empty, err error) {
+func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitLogError(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot disable Security Group of Subnet")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

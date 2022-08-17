@@ -28,7 +28,8 @@ import (
 // HostLabels contains the list of labels on the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostLabels struct {
 	ByID   map[string]string `json:"by_id,omitempty"`   // map of Label value for the Host indexed on Label ID
 	ByName map[string]string `json:"by_name,omitempty"` // map of Label value for the Host indexed on Label Name

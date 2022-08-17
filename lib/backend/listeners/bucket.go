@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"google.golang.org/protobuf/types/known/emptypb"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale bucket create c1
@@ -43,7 +43,9 @@ type BucketListener struct {
 }
 
 // List available buckets
-func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequest) (bl *protocol.BucketListResponse, err error) {
+func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequest) (
+	bl *protocol.BucketListResponse, err error,
+) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot list Buckets")
 
@@ -75,11 +77,13 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 }
 
 // Create a new bucket
-func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketRequest) (empty *emptypb.Empty, err error) {
+func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketRequest) (
+	empty *googleprotobuf.Empty, err error,
+) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot create bucket")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -111,11 +115,13 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (empty *emptypb.Empty, err error) {
+func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (
+	empty *googleprotobuf.Empty, err error,
+) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete bucket")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -142,7 +148,9 @@ func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketReques
 }
 
 // Download a bucket
-func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketDownloadResponse, err error) {
+func (s *BucketListener) Download(
+	inctx context.Context, in *protocol.BucketRequest,
+) (_ *protocol.BucketDownloadResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot download bucket")
 
@@ -183,8 +191,54 @@ func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequ
 	return empty, nil
 }
 
+// Download a bucket
+func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest) (
+	empty *googleprotobuf.Empty, err error,
+) {
+	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+	defer fail.OnExitWrapError(inctx, &err, "cannot download bucket")
+
+	empty = &googleprotobuf.Empty{}
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "can't be nil")
+	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+	}
+
+	bucketName := in.GetName()
+	if bucketName == "" {
+		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
+	}
+
+	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/upload", bucketName))
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+
+	ctx := job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
+
+	handler := handlers.NewBucketHandler(job)
+	xerr = handler.Clear(bucketName)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	return empty, nil
+}
+
 // Inspect a bucket
-func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketResponse, err error) {
+func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketRequest) (
+	_ *protocol.BucketResponse, err error,
+) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot inspect bucket")
 
@@ -225,11 +279,13 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRequest) (empty *emptypb.Empty, err error) {
+func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRequest) (
+	empty *googleprotobuf.Empty, err error,
+) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot mount bucket")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError().ToGRPCStatus()
 	}
@@ -257,11 +313,13 @@ func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRe
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMountRequest) (empty *emptypb.Empty, err error) {
+func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMountRequest) (
+	empty *googleprotobuf.Empty, err error,
+) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unmount bucket")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

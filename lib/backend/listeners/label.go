@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
@@ -29,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // LabelHandler ...
@@ -125,11 +124,11 @@ func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRe
 }
 
 // Delete a Label
-func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectRequest) (empty *emptypb.Empty, err error) {
+func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete Label")
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

@@ -29,7 +29,8 @@ import (
 // NetworkDescription contains additional information describing the network, in V1
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type NetworkDescription struct {
 	Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
 	Created time.Time `json:"created,omitempty"` // Contains the date of creation of the network

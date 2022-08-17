@@ -102,6 +102,14 @@ func (l locationcache) DownloadBucket(ctx context.Context, bucketName, decryptio
 	return l.inner.DownloadBucket(ctx, bucketName, decryptionKey)
 }
 
+func (l locationcache) UploadBucket(ctx context.Context, bucketName, localDirectory string) (ferr fail.Error) {
+	mu := l.getLock(bucketName, "upload")
+	mu.Lock()
+	defer mu.Unlock()
+
+	return l.inner.UploadBucket(ctx, bucketName, localDirectory)
+}
+
 func (l locationcache) InspectObject(ctx context.Context, s string, s2 string) (abstract.ObjectStorageItem, fail.Error) {
 	mu := l.getLock(s, s2)
 	mu.RLock()

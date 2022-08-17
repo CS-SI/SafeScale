@@ -57,7 +57,11 @@ func (l locationtransparent) ListObjects(ctx context.Context, s string, s2 strin
 }
 
 func (l locationtransparent) InvalidateObject(ctx context.Context, bucketName string, objectName string) fail.Error {
-	return nil
+	return l.inner.InvalidateObject(ctx, bucketName, objectName)
+}
+
+func (l locationtransparent) UploadBucket(ctx context.Context, bucketName, localDirectory string) (ferr fail.Error) {
+	return l.inner.UploadBucket(ctx, bucketName, localDirectory)
 }
 
 func (l locationtransparent) DownloadBucket(ctx context.Context, bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {

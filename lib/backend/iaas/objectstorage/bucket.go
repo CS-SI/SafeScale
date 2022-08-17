@@ -61,7 +61,9 @@ type Bucket interface {
 	// WriteObject writes into an object
 	WriteObject(context.Context, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
 	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
-	WriteMultiPartObject(context.Context, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
+	WriteMultiPartObject(context.Context, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (
+		Object, fail.Error,
+	)
 	// // CopyObject copies an object
 	// CopyObject(string, string) fail.Error
 
@@ -204,7 +206,10 @@ func (instance bucket) ListObjects(ctx context.Context, path string, prefix stri
 }
 
 // Browse walks through the objects in the GetBucket and executes callback on each Object found
-func (instance bucket) Browse(ctx context.Context, path string, prefix string, callback func(Object) fail.Error) (ferr fail.Error) {
+func (instance bucket) Browse(
+	ctx context.Context, path string, prefix string, callback func(Object) fail.Error,
+) (ferr fail.Error) {
+	// FIXME: Make this ctx sensitive
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -283,11 +288,13 @@ func (instance bucket) DeleteObject(ctx context.Context, objectName string) (fer
 	if err != nil {
 		return err
 	}
-	return o.Delete()
+	return o.Delete(ctx)
 }
 
 // ReadObject ...
-func (instance bucket) ReadObject(ctx context.Context, objectName string, target io.Writer, from int64, to int64) (_ Object, ferr fail.Error) {
+func (instance bucket) ReadObject(
+	ctx context.Context, objectName string, target io.Writer, from int64, to int64,
+) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -299,7 +306,7 @@ func (instance bucket) ReadObject(ctx context.Context, objectName string, target
 	if err != nil {
 		return nil, err
 	}
-	err = o.Read(target, from, to)
+	err = o.Read(ctx, target, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +314,10 @@ func (instance bucket) ReadObject(ctx context.Context, objectName string, target
 }
 
 // WriteObject ...
-func (instance bucket) WriteObject(ctx context.Context, objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
+func (instance bucket) WriteObject(
+	ctx context.Context, objectName string, source io.Reader, sourceSize int64,
+	metadata abstract.ObjectStorageItemMetadata,
+) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -320,12 +330,12 @@ func (instance bucket) WriteObject(ctx context.Context, objectName string, sourc
 		return nil, err
 	}
 
-	err = o.AddMetadata(metadata)
+	err = o.AddMetadata(ctx, metadata)
 	if err != nil {
 		return nil, err
 	}
 
-	err = o.Write(source, sourceSize)
+	err = o.Write(ctx, source, sourceSize)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +344,10 @@ func (instance bucket) WriteObject(ctx context.Context, objectName string, sourc
 }
 
 // WriteMultiPartObject ...
-func (instance bucket) WriteMultiPartObject(ctx context.Context, objectName string, source io.Reader, sourceSize int64, chunkSize int, metadata abstract.ObjectStorageItemMetadata) (_ Object, ferr fail.Error) {
+func (instance bucket) WriteMultiPartObject(
+	ctx context.Context, objectName string, source io.Reader, sourceSize int64, chunkSize int,
+	metadata abstract.ObjectStorageItemMetadata,
+) (_ Object, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -346,11 +359,11 @@ func (instance bucket) WriteMultiPartObject(ctx context.Context, objectName stri
 	if err != nil {
 		return nil, err
 	}
-	err = o.AddMetadata(metadata)
+	err = o.AddMetadata(ctx, metadata)
 	if err != nil {
 		return nil, err
 	}
-	err = o.WriteMultiPart(source, sourceSize, chunkSize)
+	err = o.WriteMultiPart(ctx, source, sourceSize, chunkSize)
 	if err != nil {
 		return nil, err
 	}

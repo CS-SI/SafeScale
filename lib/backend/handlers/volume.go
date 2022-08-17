@@ -198,6 +198,16 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 		}
 		return nil, xerr
 	}
+
+	exists, xerr := volumeInstance.Exists(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if !exists {
+		return nil, abstract.ResourceNotFoundError("volume", ref)
+	}
+
 	return volumeInstance, nil
 }
 

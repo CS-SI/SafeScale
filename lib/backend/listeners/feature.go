@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
@@ -32,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // FeatureListener feature service server grpc
@@ -189,7 +188,7 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 }
 
 // Check checks if a feature installed on target
-func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActionRequest) (empty *emptypb.Empty, ferr error) {
+func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
 	defer func() {
 		ferr = debug.InjectPlannedError(ferr)
@@ -207,7 +206,7 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 	}()
 	defer fail.OnPanic(&ferr)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -282,12 +281,12 @@ func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
 }
 
 // Add ...
-func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionRequest) (empty *emptypb.Empty, ferr error) {
+func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
 	defer fail.OnExitWrapError(inctx, &ferr, "cannot add Feature")
 	defer fail.OnPanic(&ferr)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -333,12 +332,12 @@ func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionR
 }
 
 // Remove uninstalls a Feature
-func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActionRequest) (empty *emptypb.Empty, ferr error) {
+func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
 	defer fail.OnExitWrapError(inctx, &ferr, "cannot remove Feature")
 	defer fail.OnPanic(&ferr)
 
-	empty = &emptypb.Empty{}
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}

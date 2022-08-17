@@ -149,7 +149,9 @@ func (tunnel *SSHTunnel) GetLogger() Printfer {
 	return tunnel.log
 }
 
-func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn, end chan interface{}) (ferr error) {
+func (tunnel *SSHTunnel) newConnectionWaiter(
+	listener net.Listener, c chan net.Conn, end chan interface{},
+) (ferr error) {
 	defer OnPanic(&ferr)
 
 	type result struct {
@@ -303,7 +305,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				cwErr = convertErrorToTunnelError(cwErr)
 				errCh <- cwErr
 			}
-			return // nolint
 		}()
 
 		tunnel.logf("listening for new ssh connections...")
@@ -353,7 +354,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
 					tunnel.quit()
 				}
-				return // nolint
 			}()
 		}
 	}
@@ -614,7 +614,6 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 				updown <- true
 			}
 			tunnel.logf("quitting copy routine")
-			return // nolint
 		}()
 		select {
 		case <-endCopy:
@@ -677,7 +676,6 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 
 func (tunnel *SSHTunnel) Close() { // kept for compatibility issues
 	tunnel.quit()
-	return // nolint
 }
 
 func (tunnel *SSHTunnel) quit() {
@@ -692,8 +690,6 @@ func (tunnel *SSHTunnel) quit() {
 
 	tunnel.closer <- struct{}{}
 	close(tunnel.closer)
-
-	return // nolint
 }
 
 func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options ...Option) (_ *SSHTunnel, err error) {
@@ -709,7 +705,9 @@ func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options 
 }
 
 // NewSSHTunnel creates a SSH tunnel through localhost:0
-func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (_ *SSHTunnel, err error) { // nolint
+func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (
+	_ *SSHTunnel, err error,
+) { // nolint
 	return NewSSHTunnelWithLocalBinding(tunnel, auth, destination, "localhost:0", options...)
 }
 

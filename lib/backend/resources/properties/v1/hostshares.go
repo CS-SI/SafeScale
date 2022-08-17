@@ -28,7 +28,8 @@ import (
 // HostShare describes a filesystem exported from the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type HostShare struct {
 	ID            string            `json:"id"`                        // ID ...
 	Name          string            `json:"name"`                      // the name of the share
@@ -84,7 +85,8 @@ func (hs *HostShare) Replace(p data.Clonable) (data.Clonable, error) {
 // HostShares contains information about the shares of the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type HostShares struct {
 	ByID   map[string]*HostShare `json:"by_id,omitempty"`
 	ByName map[string]string     `json:"by_name,omitempty"`

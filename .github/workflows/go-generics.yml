@@ -22,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ 1.18.4 ]
+        go: [ 1.18.4, 1.19 ]
         tags: [ releasetags, debug, tunnel, generics ]
 
     runs-on: ubuntu-latest

@@ -28,7 +28,8 @@ import (
 // NetworkSubnets contains additional information describing the subnets in a network, in V1
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type NetworkSubnets struct {
 	ByID   map[string]string `json:"by_id,omitempty"`   // contains a list of subnet names indexed by id
 	ByName map[string]string `json:"by_name,omitempty"` // contains a list of subnet ids index by name

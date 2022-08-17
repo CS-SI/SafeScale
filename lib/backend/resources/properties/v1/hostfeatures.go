@@ -28,7 +28,8 @@ import (
 // HostInstalledFeature ...
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental/overriding fields
+//
+//	Create a new version instead with needed supplemental/overriding fields
 type HostInstalledFeature struct {
 	HostContext bool                `json:"host_context,omitempty"` // tells if the feature has been explicitly installed for host (opposed to for cluster)
 	RequiredBy  map[string]struct{} `json:"required_by,omitempty"`  // tells what feature(s) needs this one
@@ -82,7 +83,8 @@ func (hif *HostInstalledFeature) Replace(p data.Clonable) (data.Clonable, error)
 // HostFeatures ...
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostFeatures struct {
 	Installed map[string]*HostInstalledFeature `json:"installed,omitempty"` // list of installed features, indexed on feature name
 }

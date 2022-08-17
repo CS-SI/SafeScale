@@ -29,7 +29,8 @@ import (
 // HostDescription contains description information for the host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type HostDescription struct {
 	Created time.Time `json:"created,omitempty"`  // tells when the host has been created
 	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of the host

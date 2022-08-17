@@ -184,7 +184,8 @@ func SharePartialError(t *testing.T) {
 }
 
 // FIXME: same tests than other previous ones about shares, volume is not the target in these tests, at least in this workflow
-//        should test volume used as source of share, maybe?
+//
+//	should test volume used as source of share, maybe?
 func ShareError(t *testing.T) {
 	names := helpers.GetNames("ShareError", 0, 1, 1, 1, 1, 0, 0, 0)
 	names.TearDown()

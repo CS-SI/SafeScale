@@ -28,7 +28,8 @@ import (
 // NetworkSecurityGroups contains a list of security groups owned by the Network
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
+//
+//	Create a new version instead with needed supplemental fields
 type NetworkSecurityGroups struct {
 	ByID   map[string]string `json:"by_id,omitempty"`   // map of security group names indexed by IDs
 	ByName map[string]string `json:"by_name,omitempty"` // map of security group IDs indexed by names
