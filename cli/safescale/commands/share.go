@@ -25,9 +25,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"

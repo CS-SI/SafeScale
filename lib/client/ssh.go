@@ -30,10 +30,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"

@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"

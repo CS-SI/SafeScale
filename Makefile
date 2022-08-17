@@ -501,7 +501,7 @@ mintest: begin
 	@$(RM) ./test_results.log || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -512,7 +512,7 @@ precommittest: begin
 	@$(RM) ./test_results.log || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -524,7 +524,7 @@ test: begin coverdeps # Run unit tests
 	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
@@ -624,7 +624,7 @@ ctxcheck: begin
 	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) ctxcheck_results.log || true
-	@contextcheck ./lib/server/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
+	@contextcheck ./lib/backend/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
 	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

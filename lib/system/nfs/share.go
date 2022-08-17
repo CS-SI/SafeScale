@@ -20,7 +20,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )

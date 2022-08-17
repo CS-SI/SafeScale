@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"

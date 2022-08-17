@@ -472,41 +472,41 @@ func wrongerrcall(m dsl.Matcher) {
 }
 
 func BucketDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.bucket")).Report(`panic danger`)
 }
 
 func ClusterDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.cluster")).Report(`panic danger`)
 }
 
 func HostDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.host")).Report(`panic danger`)
 }
 
 func NetworkDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.network")).Report(`panic danger`)
 }
 
 func SGDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.securitygroup")).Report(`panic danger`)
 }
 
 func ShareDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.share")).Report(`panic danger`)
 }
 
 func SubnetDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.subnet")).Report(`panic danger`)
 }
 
 func VolumeDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.Service($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.volume")).Report(`panic danger`)
 }
