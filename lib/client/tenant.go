@@ -23,8 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
 // tenantConsumer is the part of safescale client handling tenants

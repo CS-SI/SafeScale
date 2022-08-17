@@ -1,6 +1,6 @@
 include ../common.mk
 
-.PHONY:	sdk client server utils system clean vet
+.PHONY:	sdk client backend utils system clean vet
 
 # Handling multiple gopath: use $(HOME)/go by default
 ifeq ($(findstring :,$(GOPATH)),:)
@@ -19,7 +19,7 @@ ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
 endif
 
-all:	lib/protocol lib/system lib/utils lib/server lib/client sdk
+all:	lib/protocol lib/system lib/utils lib/backend lib/client sdk
 
 vet:
 	@$(GO) vet ./...
@@ -33,13 +33,13 @@ bashtest:
 
 gensrc:
 	@(mkdir -p mocks) || true
-	@(cd server/iaas/userdata && $(MAKE) $(@))
+	@(cd backend/iaas/userdata && $(MAKE) $(@))
 	@(cd system && $(MAKE) $(@))
 
 generate: gensrc sdk
 	@(cd protocol && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
-	@(cd server && $(MAKE) $@)
+	@(cd backend && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 
 sdk: gensrc
@@ -59,9 +59,9 @@ lib/client:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library client, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd utils && $(MAKE) all)
 
-lib/server:
-	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library server, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd server && $(MAKE) all)
+lib/backend:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library backend, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd backend && $(MAKE) all)
 
 lib/system:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -73,6 +73,6 @@ lib/utils:
 
 clean:
 	@(cd protocol && $(MAKE) clean)
-	@(cd server && $(MAKE) clean)
+	@(cd backend && $(MAKE) clean)
 	@(cd system && $(MAKE) clean)
 	@(cd utils && $(MAKE) clean)
