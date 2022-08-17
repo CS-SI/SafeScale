@@ -19,15 +19,15 @@ package listeners
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // PrepareJob creates a new job
