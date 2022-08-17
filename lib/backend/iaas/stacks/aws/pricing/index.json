@@ -1,0 +1,811 @@
+{
+  "formatVersion" : "v1.0",
+  "disclaimer" : "This pricing list is for informational purposes only. All prices are subject to the additional terms included in the pricing pages on http://aws.amazon.com. All Free Tier prices are also subject to the terms included at https://aws.amazon.com/free/",
+  "publicationDate" : "2019-07-10T01:51:24Z",
+  "offers" : {
+    "comprehend" : {
+      "offerCode" : "comprehend",
+      "versionIndexUrl" : "/offers/v1.0/aws/comprehend/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/comprehend/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/comprehend/current/region_index.json"
+    },
+    "mobileanalytics" : {
+      "offerCode" : "mobileanalytics",
+      "versionIndexUrl" : "/offers/v1.0/aws/mobileanalytics/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/mobileanalytics/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/mobileanalytics/current/region_index.json"
+    },
+    "AWSCertificateManager" : {
+      "offerCode" : "AWSCertificateManager",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCertificateManager/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCertificateManager/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCertificateManager/current/region_index.json"
+    },
+    "AWSIoT" : {
+      "offerCode" : "AWSIoT",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSIoT/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSIoT/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSIoT/current/region_index.json"
+    },
+    "AWSStorageGatewayDeepArchive" : {
+      "offerCode" : "AWSStorageGatewayDeepArchive",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSStorageGatewayDeepArchive/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSStorageGatewayDeepArchive/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSStorageGatewayDeepArchive/current/region_index.json"
+    },
+    "transcribe" : {
+      "offerCode" : "transcribe",
+      "versionIndexUrl" : "/offers/v1.0/aws/transcribe/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/transcribe/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/transcribe/current/region_index.json"
+    },
+    "IngestionServiceSnowball" : {
+      "offerCode" : "IngestionServiceSnowball",
+      "versionIndexUrl" : "/offers/v1.0/aws/IngestionServiceSnowball/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/IngestionServiceSnowball/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/IngestionServiceSnowball/current/region_index.json"
+    },
+    "IoTDeviceDefender" : {
+      "offerCode" : "IoTDeviceDefender",
+      "versionIndexUrl" : "/offers/v1.0/aws/IoTDeviceDefender/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/IoTDeviceDefender/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/IoTDeviceDefender/current/region_index.json"
+    },
+    "AmazonRedshift" : {
+      "offerCode" : "AmazonRedshift",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonRedshift/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonRedshift/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonRedshift/current/region_index.json"
+    },
+    "AmazonCloudWatch" : {
+      "offerCode" : "AmazonCloudWatch",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonCloudWatch/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonCloudWatch/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonCloudWatch/current/region_index.json"
+    },
+    "AWSElementalMediaPackage" : {
+      "offerCode" : "AWSElementalMediaPackage",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaPackage/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSElementalMediaPackage/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaPackage/current/region_index.json"
+    },
+    "AWSElementalMediaStore" : {
+      "offerCode" : "AWSElementalMediaStore",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaStore/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSElementalMediaStore/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaStore/current/region_index.json"
+    },
+    "AmazonETS" : {
+      "offerCode" : "AmazonETS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonETS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonETS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonETS/current/region_index.json"
+    },
+    "AWSDatabaseMigrationSvc" : {
+      "offerCode" : "AWSDatabaseMigrationSvc",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDatabaseMigrationSvc/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDatabaseMigrationSvc/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDatabaseMigrationSvc/current/region_index.json"
+    },
+    "AmazonGuardDuty" : {
+      "offerCode" : "AmazonGuardDuty",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonGuardDuty/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonGuardDuty/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonGuardDuty/current/region_index.json"
+    },
+    "AmazonSageMaker" : {
+      "offerCode" : "AmazonSageMaker",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonSageMaker/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonSageMaker/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonSageMaker/current/region_index.json"
+    },
+    "AWSDirectoryService" : {
+      "offerCode" : "AWSDirectoryService",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDirectoryService/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDirectoryService/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDirectoryService/current/region_index.json"
+    },
+    "AmazonCognito" : {
+      "offerCode" : "AmazonCognito",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonCognito/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonCognito/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonCognito/current/region_index.json"
+    },
+    "AmazonECS" : {
+      "offerCode" : "AmazonECS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonECS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonECS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonECS/current/region_index.json"
+    },
+    "AmazonECR" : {
+      "offerCode" : "AmazonECR",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonECR/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonECR/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonECR/current/region_index.json"
+    },
+    "AmazonDAX" : {
+      "offerCode" : "AmazonDAX",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonDAX/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonDAX/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonDAX/current/region_index.json"
+    },
+    "AWSGlue" : {
+      "offerCode" : "AWSGlue",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSGlue/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSGlue/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSGlue/current/region_index.json"
+    },
+    "AWSGlobalAccelerator" : {
+      "offerCode" : "AWSGlobalAccelerator",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSGlobalAccelerator/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSGlobalAccelerator/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSGlobalAccelerator/current/region_index.json"
+    },
+    "AmazonApiGateway" : {
+      "offerCode" : "AmazonApiGateway",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonApiGateway/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonApiGateway/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonApiGateway/current/region_index.json"
+    },
+    "AmazonRoute53" : {
+      "offerCode" : "AmazonRoute53",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonRoute53/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonRoute53/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonRoute53/current/region_index.json"
+    },
+    "AmazonCognitoSync" : {
+      "offerCode" : "AmazonCognitoSync",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonCognitoSync/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonCognitoSync/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonCognitoSync/current/region_index.json"
+    },
+    "AmazonKinesisAnalytics" : {
+      "offerCode" : "AmazonKinesisAnalytics",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonKinesisAnalytics/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonKinesisAnalytics/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonKinesisAnalytics/current/region_index.json"
+    },
+    "AmazonEKS" : {
+      "offerCode" : "AmazonEKS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonEKS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonEKS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonEKS/current/region_index.json"
+    },
+    "AmazonMSK" : {
+      "offerCode" : "AmazonMSK",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonMSK/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonMSK/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonMSK/current/region_index.json"
+    },
+    "AmazonWorkMail" : {
+      "offerCode" : "AmazonWorkMail",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonWorkMail/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonWorkMail/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonWorkMail/current/region_index.json"
+    },
+    "AWSIoT1Click" : {
+      "offerCode" : "AWSIoT1Click",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSIoT1Click/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSIoT1Click/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSIoT1Click/current/region_index.json"
+    },
+    "AmazonManagedBlockchain" : {
+      "offerCode" : "AmazonManagedBlockchain",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonManagedBlockchain/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonManagedBlockchain/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonManagedBlockchain/current/region_index.json"
+    },
+    "AWSQueueService" : {
+      "offerCode" : "AWSQueueService",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSQueueService/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSQueueService/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSQueueService/current/region_index.json"
+    },
+    "AmazonAppStream" : {
+      "offerCode" : "AmazonAppStream",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonAppStream/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonAppStream/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonAppStream/current/region_index.json"
+    },
+    "AmazonGlacier" : {
+      "offerCode" : "AmazonGlacier",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonGlacier/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonGlacier/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonGlacier/current/region_index.json"
+    },
+    "AmazonSWF" : {
+      "offerCode" : "AmazonSWF",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonSWF/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonSWF/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonSWF/current/region_index.json"
+    },
+    "AmazonRDS" : {
+      "offerCode" : "AmazonRDS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonRDS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonRDS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonRDS/current/region_index.json"
+    },
+    "AWSSystemsManager" : {
+      "offerCode" : "AWSSystemsManager",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSSystemsManager/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSSystemsManager/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSSystemsManager/current/region_index.json"
+    },
+    "AmazonEC2" : {
+      "offerCode" : "AmazonEC2",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonEC2/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonEC2/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonEC2/current/region_index.json"
+    },
+    "AWSDeviceFarm" : {
+      "offerCode" : "AWSDeviceFarm",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDeviceFarm/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDeviceFarm/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDeviceFarm/current/region_index.json"
+    },
+    "AWSBackup" : {
+      "offerCode" : "AWSBackup",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSBackup/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSBackup/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSBackup/current/region_index.json"
+    },
+    "AWSConfig" : {
+      "offerCode" : "AWSConfig",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSConfig/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSConfig/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSConfig/current/region_index.json"
+    },
+    "AmazonSNS" : {
+      "offerCode" : "AmazonSNS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonSNS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonSNS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonSNS/current/region_index.json"
+    },
+    "IngestionService" : {
+      "offerCode" : "IngestionService",
+      "versionIndexUrl" : "/offers/v1.0/aws/IngestionService/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/IngestionService/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/IngestionService/current/region_index.json"
+    },
+    "datapipeline" : {
+      "offerCode" : "datapipeline",
+      "versionIndexUrl" : "/offers/v1.0/aws/datapipeline/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/datapipeline/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/datapipeline/current/region_index.json"
+    },
+    "AmazonElastiCache" : {
+      "offerCode" : "AmazonElastiCache",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonElastiCache/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonElastiCache/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonElastiCache/current/region_index.json"
+    },
+    "AWSCodeCommit" : {
+      "offerCode" : "AWSCodeCommit",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCodeCommit/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCodeCommit/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCodeCommit/current/region_index.json"
+    },
+    "AmazonFSx" : {
+      "offerCode" : "AmazonFSx",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonFSx/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonFSx/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonFSx/current/region_index.json"
+    },
+    "AWSServiceCatalog" : {
+      "offerCode" : "AWSServiceCatalog",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSServiceCatalog/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSServiceCatalog/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSServiceCatalog/current/region_index.json"
+    },
+    "AmazonMacie" : {
+      "offerCode" : "AmazonMacie",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonMacie/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonMacie/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonMacie/current/region_index.json"
+    },
+    "OpsWorks" : {
+      "offerCode" : "OpsWorks",
+      "versionIndexUrl" : "/offers/v1.0/aws/OpsWorks/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/OpsWorks/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/OpsWorks/current/region_index.json"
+    },
+    "AmazonSES" : {
+      "offerCode" : "AmazonSES",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonSES/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonSES/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonSES/current/region_index.json"
+    },
+    "AmazonML" : {
+      "offerCode" : "AmazonML",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonML/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonML/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonML/current/region_index.json"
+    },
+    "AlexaWebInfoService" : {
+      "offerCode" : "AlexaWebInfoService",
+      "versionIndexUrl" : "/offers/v1.0/aws/AlexaWebInfoService/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AlexaWebInfoService/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AlexaWebInfoService/current/region_index.json"
+    },
+    "ElasticMapReduce" : {
+      "offerCode" : "ElasticMapReduce",
+      "versionIndexUrl" : "/offers/v1.0/aws/ElasticMapReduce/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/ElasticMapReduce/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/ElasticMapReduce/current/region_index.json"
+    },
+    "AmazonDynamoDB" : {
+      "offerCode" : "AmazonDynamoDB",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonDynamoDB/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonDynamoDB/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonDynamoDB/current/region_index.json"
+    },
+    "AmazonGameLift" : {
+      "offerCode" : "AmazonGameLift",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonGameLift/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonGameLift/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonGameLift/current/region_index.json"
+    },
+    "AmazonMQ" : {
+      "offerCode" : "AmazonMQ",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonMQ/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonMQ/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonMQ/current/region_index.json"
+    },
+    "AmazonEI" : {
+      "offerCode" : "AmazonEI",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonEI/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonEI/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonEI/current/region_index.json"
+    },
+    "AmazonTextract" : {
+      "offerCode" : "AmazonTextract",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonTextract/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonTextract/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonTextract/current/region_index.json"
+    },
+    "AmazonPolly" : {
+      "offerCode" : "AmazonPolly",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonPolly/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonPolly/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonPolly/current/region_index.json"
+    },
+    "AWSAppSync" : {
+      "offerCode" : "AWSAppSync",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSAppSync/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSAppSync/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSAppSync/current/region_index.json"
+    },
+    "AmazonS3GlacierDeepArchive" : {
+      "offerCode" : "AmazonS3GlacierDeepArchive",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonS3GlacierDeepArchive/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonS3GlacierDeepArchive/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonS3GlacierDeepArchive/current/region_index.json"
+    },
+    "CloudHSM" : {
+      "offerCode" : "CloudHSM",
+      "versionIndexUrl" : "/offers/v1.0/aws/CloudHSM/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/CloudHSM/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/CloudHSM/current/region_index.json"
+    },
+    "IoTDeviceManagement" : {
+      "offerCode" : "IoTDeviceManagement",
+      "versionIndexUrl" : "/offers/v1.0/aws/IoTDeviceManagement/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/IoTDeviceManagement/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/IoTDeviceManagement/current/region_index.json"
+    },
+    "AmazonES" : {
+      "offerCode" : "AmazonES",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonES/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonES/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonES/current/region_index.json"
+    },
+    "awskms" : {
+      "offerCode" : "awskms",
+      "versionIndexUrl" : "/offers/v1.0/aws/awskms/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/awskms/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/awskms/current/region_index.json"
+    },
+    "AmazonWorkLink" : {
+      "offerCode" : "AmazonWorkLink",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonWorkLink/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonWorkLink/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonWorkLink/current/region_index.json"
+    },
+    "AmazonChimeDialin" : {
+      "offerCode" : "AmazonChimeDialin",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonChimeDialin/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonChimeDialin/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonChimeDialin/current/region_index.json"
+    },
+    "AWSTransfer" : {
+      "offerCode" : "AWSTransfer",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSTransfer/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSTransfer/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSTransfer/current/region_index.json"
+    },
+    "AmazonChime" : {
+      "offerCode" : "AmazonChime",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonChime/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonChime/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonChime/current/region_index.json"
+    },
+    "AmazonSimpleDB" : {
+      "offerCode" : "AmazonSimpleDB",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonSimpleDB/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonSimpleDB/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonSimpleDB/current/region_index.json"
+    },
+    "AWSSecretsManager" : {
+      "offerCode" : "AWSSecretsManager",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSSecretsManager/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSSecretsManager/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSSecretsManager/current/region_index.json"
+    },
+    "AmazonCloudSearch" : {
+      "offerCode" : "AmazonCloudSearch",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonCloudSearch/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonCloudSearch/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonCloudSearch/current/region_index.json"
+    },
+    "AmazonQuickSight" : {
+      "offerCode" : "AmazonQuickSight",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonQuickSight/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonQuickSight/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonQuickSight/current/region_index.json"
+    },
+    "AmazonInspector" : {
+      "offerCode" : "AmazonInspector",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonInspector/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonInspector/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonInspector/current/region_index.json"
+    },
+    "AWSAmplify" : {
+      "offerCode" : "AWSAmplify",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSAmplify/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSAmplify/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSAmplify/current/region_index.json"
+    },
+    "AWSDirectConnect" : {
+      "offerCode" : "AWSDirectConnect",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDirectConnect/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDirectConnect/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDirectConnect/current/region_index.json"
+    },
+    "translate" : {
+      "offerCode" : "translate",
+      "versionIndexUrl" : "/offers/v1.0/aws/translate/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/translate/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/translate/current/region_index.json"
+    },
+    "AmazonNeptune" : {
+      "offerCode" : "AmazonNeptune",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonNeptune/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonNeptune/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonNeptune/current/region_index.json"
+    },
+    "AWSRoboMaker" : {
+      "offerCode" : "AWSRoboMaker",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSRoboMaker/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSRoboMaker/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSRoboMaker/current/region_index.json"
+    },
+    "AWSElementalMediaConvert" : {
+      "offerCode" : "AWSElementalMediaConvert",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaConvert/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSElementalMediaConvert/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaConvert/current/region_index.json"
+    },
+    "AWSIoTThingsGraph" : {
+      "offerCode" : "AWSIoTThingsGraph",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSIoTThingsGraph/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSIoTThingsGraph/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSIoTThingsGraph/current/region_index.json"
+    },
+    "AmazonAthena" : {
+      "offerCode" : "AmazonAthena",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonAthena/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonAthena/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonAthena/current/region_index.json"
+    },
+    "AmazonLex" : {
+      "offerCode" : "AmazonLex",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonLex/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonLex/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonLex/current/region_index.json"
+    },
+    "AmazonChimeCallMe" : {
+      "offerCode" : "AmazonChimeCallMe",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonChimeCallMe/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonChimeCallMe/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonChimeCallMe/current/region_index.json"
+    },
+    "AWSStorageGateway" : {
+      "offerCode" : "AWSStorageGateway",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSStorageGateway/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSStorageGateway/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSStorageGateway/current/region_index.json"
+    },
+    "AmazonKinesisVideo" : {
+      "offerCode" : "AmazonKinesisVideo",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonKinesisVideo/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonKinesisVideo/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonKinesisVideo/current/region_index.json"
+    },
+    "AWSSupportEnterprise" : {
+      "offerCode" : "AWSSupportEnterprise",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSSupportEnterprise/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSSupportEnterprise/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSSupportEnterprise/current/region_index.json"
+    },
+    "AWSXRay" : {
+      "offerCode" : "AWSXRay",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSXRay/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSXRay/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSXRay/current/region_index.json"
+    },
+    "AWSCloudMap" : {
+      "offerCode" : "AWSCloudMap",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCloudMap/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCloudMap/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCloudMap/current/region_index.json"
+    },
+    "AWSBudgets" : {
+      "offerCode" : "AWSBudgets",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSBudgets/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSBudgets/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSBudgets/current/region_index.json"
+    },
+    "AWSEvents" : {
+      "offerCode" : "AWSEvents",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSEvents/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSEvents/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSEvents/current/region_index.json"
+    },
+    "AWSIoTAnalytics" : {
+      "offerCode" : "AWSIoTAnalytics",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSIoTAnalytics/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSIoTAnalytics/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSIoTAnalytics/current/region_index.json"
+    },
+    "AWSGreengrass" : {
+      "offerCode" : "AWSGreengrass",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSGreengrass/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSGreengrass/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSGreengrass/current/region_index.json"
+    },
+    "AWSCostExplorer" : {
+      "offerCode" : "AWSCostExplorer",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCostExplorer/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCostExplorer/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCostExplorer/current/region_index.json"
+    },
+    "AWSFMS" : {
+      "offerCode" : "AWSFMS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSFMS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSFMS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSFMS/current/region_index.json"
+    },
+    "AWSCodeDeploy" : {
+      "offerCode" : "AWSCodeDeploy",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCodeDeploy/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCodeDeploy/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCodeDeploy/current/region_index.json"
+    },
+    "AWSCloudTrail" : {
+      "offerCode" : "AWSCloudTrail",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCloudTrail/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCloudTrail/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCloudTrail/current/region_index.json"
+    },
+    "SnowballExtraDays" : {
+      "offerCode" : "SnowballExtraDays",
+      "versionIndexUrl" : "/offers/v1.0/aws/SnowballExtraDays/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/SnowballExtraDays/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/SnowballExtraDays/current/region_index.json"
+    },
+    "AWSCodePipeline" : {
+      "offerCode" : "AWSCodePipeline",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSCodePipeline/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSCodePipeline/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSCodePipeline/current/region_index.json"
+    },
+    "AmazonWorkSpaces" : {
+      "offerCode" : "AmazonWorkSpaces",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonWorkSpaces/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonWorkSpaces/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonWorkSpaces/current/region_index.json"
+    },
+    "AmazonWorkDocs" : {
+      "offerCode" : "AmazonWorkDocs",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonWorkDocs/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonWorkDocs/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonWorkDocs/current/region_index.json"
+    },
+    "AWSElementalMediaLive" : {
+      "offerCode" : "AWSElementalMediaLive",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaLive/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSElementalMediaLive/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaLive/current/region_index.json"
+    },
+    "AWSShield" : {
+      "offerCode" : "AWSShield",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSShield/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSShield/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSShield/current/region_index.json"
+    },
+    "AmazonKinesis" : {
+      "offerCode" : "AmazonKinesis",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonKinesis/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonKinesis/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonKinesis/current/region_index.json"
+    },
+    "AmazonS3" : {
+      "offerCode" : "AmazonS3",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonS3/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonS3/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonS3/current/region_index.json"
+    },
+    "AWSLambda" : {
+      "offerCode" : "AWSLambda",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSLambda/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSLambda/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSLambda/current/region_index.json"
+    },
+    "AmazonSumerian" : {
+      "offerCode" : "AmazonSumerian",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonSumerian/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonSumerian/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonSumerian/current/region_index.json"
+    },
+    "AmazonLightsail" : {
+      "offerCode" : "AmazonLightsail",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonLightsail/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonLightsail/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonLightsail/current/region_index.json"
+    },
+    "AmazonConnect" : {
+      "offerCode" : "AmazonConnect",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonConnect/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonConnect/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonConnect/current/region_index.json"
+    },
+    "CodeBuild" : {
+      "offerCode" : "CodeBuild",
+      "versionIndexUrl" : "/offers/v1.0/aws/CodeBuild/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/CodeBuild/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/CodeBuild/current/region_index.json"
+    },
+    "AWSDataSync" : {
+      "offerCode" : "AWSDataSync",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDataSync/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDataSync/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDataSync/current/region_index.json"
+    },
+    "AmazonEFS" : {
+      "offerCode" : "AmazonEFS",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonEFS/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonEFS/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonEFS/current/region_index.json"
+    },
+    "ContactCenterTelecomm" : {
+      "offerCode" : "ContactCenterTelecomm",
+      "versionIndexUrl" : "/offers/v1.0/aws/ContactCenterTelecomm/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/ContactCenterTelecomm/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/ContactCenterTelecomm/current/region_index.json"
+    },
+    "AmazonPinpoint" : {
+      "offerCode" : "AmazonPinpoint",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonPinpoint/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonPinpoint/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonPinpoint/current/region_index.json"
+    },
+    "AWSMediaConnect" : {
+      "offerCode" : "AWSMediaConnect",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSMediaConnect/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSMediaConnect/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSMediaConnect/current/region_index.json"
+    },
+    "comprehendmedical" : {
+      "offerCode" : "comprehendmedical",
+      "versionIndexUrl" : "/offers/v1.0/aws/comprehendmedical/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/comprehendmedical/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/comprehendmedical/current/region_index.json"
+    },
+    "AmazonChimeVoiceConnector" : {
+      "offerCode" : "AmazonChimeVoiceConnector",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonChimeVoiceConnector/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonChimeVoiceConnector/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonChimeVoiceConnector/current/region_index.json"
+    },
+    "AmazonCloudFront" : {
+      "offerCode" : "AmazonCloudFront",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonCloudFront/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonCloudFront/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonCloudFront/current/region_index.json"
+    },
+    "AmazonVPC" : {
+      "offerCode" : "AmazonVPC",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonVPC/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonVPC/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonVPC/current/region_index.json"
+    },
+    "AlexaTopSites" : {
+      "offerCode" : "AlexaTopSites",
+      "versionIndexUrl" : "/offers/v1.0/aws/AlexaTopSites/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AlexaTopSites/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AlexaTopSites/current/region_index.json"
+    },
+    "AWSDataTransfer" : {
+      "offerCode" : "AWSDataTransfer",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDataTransfer/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDataTransfer/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDataTransfer/current/region_index.json"
+    },
+    "AmazonChimeBusinessCalling" : {
+      "offerCode" : "AmazonChimeBusinessCalling",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonChimeBusinessCalling/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonChimeBusinessCalling/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonChimeBusinessCalling/current/region_index.json"
+    },
+    "AmazonWAM" : {
+      "offerCode" : "AmazonWAM",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonWAM/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonWAM/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonWAM/current/region_index.json"
+    },
+    "AWSSupportBusiness" : {
+      "offerCode" : "AWSSupportBusiness",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSSupportBusiness/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSSupportBusiness/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSSupportBusiness/current/region_index.json"
+    },
+    "AmazonStates" : {
+      "offerCode" : "AmazonStates",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonStates/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonStates/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonStates/current/region_index.json"
+    },
+    "AWSElementalMediaTailor" : {
+      "offerCode" : "AWSElementalMediaTailor",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaTailor/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSElementalMediaTailor/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSElementalMediaTailor/current/region_index.json"
+    },
+    "AWSDeveloperSupport" : {
+      "offerCode" : "AWSDeveloperSupport",
+      "versionIndexUrl" : "/offers/v1.0/aws/AWSDeveloperSupport/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AWSDeveloperSupport/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AWSDeveloperSupport/current/region_index.json"
+    },
+    "awswaf" : {
+      "offerCode" : "awswaf",
+      "versionIndexUrl" : "/offers/v1.0/aws/awswaf/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/awswaf/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/awswaf/current/region_index.json"
+    },
+    "AmazonRekognition" : {
+      "offerCode" : "AmazonRekognition",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonRekognition/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonRekognition/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonRekognition/current/region_index.json"
+    },
+    "AmazonCloudDirectory" : {
+      "offerCode" : "AmazonCloudDirectory",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonCloudDirectory/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonCloudDirectory/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonCloudDirectory/current/region_index.json"
+    },
+    "AmazonDocDB" : {
+      "offerCode" : "AmazonDocDB",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonDocDB/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonDocDB/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonDocDB/current/region_index.json"
+    },
+    "AmazonKinesisFirehose" : {
+      "offerCode" : "AmazonKinesisFirehose",
+      "versionIndexUrl" : "/offers/v1.0/aws/AmazonKinesisFirehose/index.json",
+      "currentVersionUrl" : "/offers/v1.0/aws/AmazonKinesisFirehose/current/index.json",
+      "currentRegionIndexUrl" : "/offers/v1.0/aws/AmazonKinesisFirehose/current/region_index.json"
+    }
+  }
+}
