@@ -392,7 +392,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 
 					return nil
 				},
-				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout), retry.Max(3)),
+				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout), retry.Max(15)),
 				retry.Linear(timings.SmallDelay()),
 				nil,
 				nil,
@@ -415,7 +415,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 			}
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Max(3)),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Max(15)),
 		retry.Constant(0),
 		nil,
 		nil,
@@ -441,7 +441,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 	if iterations > 1 {
 		logrus.WithContext(ctx).Warnf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	} else {
-		logrus.WithContext(ctx).Debugf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+		logrus.WithContext(ctx).Tracef("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	}
 
 	return nil
