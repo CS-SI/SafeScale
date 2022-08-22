@@ -737,6 +737,10 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 		return nil, xerr
 	}
 
+	if config == nil {
+		return nil, fail.InconsistentError("config should NOT be nil")
+	}
+
 	return config, nil
 }
 

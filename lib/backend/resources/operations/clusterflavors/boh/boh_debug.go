@@ -51,16 +51,17 @@ func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uin
 		masterNodeCount  uint
 	)
 
+	// custom
 	switch clusterIdentity.Complexity {
 	case clustercomplexity.Small:
-		privateNodeCount = 1
-		masterNodeCount = 1
-	case clustercomplexity.Normal:
 		privateNodeCount = 3
 		masterNodeCount = 2
+	case clustercomplexity.Normal:
+		privateNodeCount = 11
+		masterNodeCount = 7
 	case clustercomplexity.Large:
-		privateNodeCount = 42
-		masterNodeCount = 18
+		privateNodeCount = 39
+		masterNodeCount = 25
 	}
 	return masterNodeCount, privateNodeCount, 0, nil
 }
