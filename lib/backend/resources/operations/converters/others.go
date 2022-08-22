@@ -467,12 +467,12 @@ func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 		parsed = append(parsed, apa)
 	}
 
-	valid_keys := []string{"cpu", "count", "cpufreq", "gpu", "ram", "disk", "template"}
+	validKeys := []string{"cpu", "count", "cpufreq", "gpu", "ram", "disk", "template"}
 
 	tokenmap := merge(parsed...)
-	for k, _ := range tokenmap {
+	for k := range tokenmap {
 		found := false
-		for _, v := range valid_keys {
+		for _, v := range validKeys {
 			if k == v {
 				found = true
 				break
