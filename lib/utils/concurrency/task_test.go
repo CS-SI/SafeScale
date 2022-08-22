@@ -1202,7 +1202,7 @@ func TestStartWithTimeoutTask(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1228,7 +1228,7 @@ func TestStartWithTimeoutTaskAndPanic(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1254,7 +1254,7 @@ func TestStartWithTimeoutTaskAndHandledPanic(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1313,7 +1313,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		}
 
 		if stat != TIMEOUT { // FIXME: CI Failed with macos build, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
-			t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+			t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 		}
 
 		xerr = single.SetID("small changes")
@@ -1376,7 +1376,7 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 			t.Errorf("Problem retrieving status ?")
 		}
 		if stat != TIMEOUT {
-			t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+			t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 		}
 
 		// We are in timeout state, so this should return false, nil, *fail.ErrTimeout
