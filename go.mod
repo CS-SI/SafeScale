@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.77
+	github.com/aws/aws-sdk-go v1.44.81
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
