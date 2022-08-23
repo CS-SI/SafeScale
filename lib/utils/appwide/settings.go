@@ -62,6 +62,14 @@ type settings struct {
 		Terraform struct {
 			ExecPath string
 		}
+		Consul struct { // Consul is used to store terraform states, and in the future SafeScale metadata
+			ExecPath string // Contains the path of the internal consul binary
+			Peers    []string
+			Internal bool
+		}
+		Metadata struct {
+			Method string // can be objectstorage or consul
+		}
 	}
 	Folders struct {
 		RootDir  string
