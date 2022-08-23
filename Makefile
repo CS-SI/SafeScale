@@ -48,7 +48,7 @@ export BUILD_TAGS
 TEST_COVERAGE_ARGS =
 export TEST_COVERAGE_ARGS
 
-all: logclean ground getdevdeps modclean sdk generate lib cli minimock err vet semgrep style metalint #mintest
+all: logclean ground getdevdeps modclean sdk generate lib cli minimock err vet semgrep metalint #mintest
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
@@ -280,12 +280,12 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \
-		$(GO) install google.golang.org/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
+		$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@latest &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n"; \
-		$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
+        $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
