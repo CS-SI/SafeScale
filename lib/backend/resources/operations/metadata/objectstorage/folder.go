@@ -114,8 +114,8 @@ func (instance folder) Path() string {
 	return instance.path
 }
 
-// absolutePath returns the full path to reach the 'path'+'name' starting from the folder path
-func (instance folder) absolutePath(path ...string) string {
+// AbsolutePath returns the full path to reach the 'path'+'name' starting from the folder path
+func (instance folder) AbsolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
@@ -138,33 +138,32 @@ func (instance folder) absolutePath(path ...string) string {
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage folder
-func (instance folder) Lookup(ctx context.Context, path string, name string) fail.Error {
+func (instance folder) Lookup(ctx context.Context, path, name string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	absPath := strings.Trim(instance.absolutePath(path), "/")
-	bucket, xerr := instance.getBucket(ctx)
+	bu, xerr := instance.getBucket(ctx)
 	if xerr != nil {
 		return xerr
 	}
 
-	list, xerr := instance.service.ListObjects(ctx, bucket.Name, absPath, objectstorage.NoPrefix)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
+	absPath := strings.Trim(instance.AbsolutePath(path), "/")
 	if absPath != "" {
 		absPath += "/"
 	}
 	fullPath := absPath + name
-	for _, item := range list {
-		if item == fullPath {
-			return nil
-		}
+
+	found, xerr := instance.Service().HasObject(ctx, bu.GetName(), instance.AbsolutePath(path, name))
+	if xerr != nil {
+		return xerr
 	}
-	return fail.NotFoundError("failed to find metadata '%s'", fullPath)
+
+	if !found {
+		return fail.NotFoundError("failed to find metadata '%s'", fullPath)
+	}
+
+	return nil
 }
 
 // Delete removes metadata passed as parameter
@@ -178,7 +177,7 @@ func (instance folder) Delete(ctx context.Context, path string, name string) fai
 		return xerr
 	}
 
-	has, xerr := instance.service.HasObject(ctx, bucket.Name, instance.absolutePath(path, name))
+	has, xerr := instance.service.HasObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
@@ -187,7 +186,7 @@ func (instance folder) Delete(ctx context.Context, path string, name string) fai
 		return nil
 	}
 
-	xerr = instance.service.DeleteObject(ctx, bucket.Name, instance.absolutePath(path, name))
+	xerr = instance.service.DeleteObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
@@ -229,13 +228,13 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 			if iErr != nil {
 				return iErr
 			}
-			iErr = instance.service.ReadObject(ctx, bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
+			iErr = instance.service.ReadObject(ctx, bucket.Name, instance.AbsolutePath(path, name), &buffer, 0, 0)
 			if iErr != nil {
 				switch iErr.(type) {
 				case *fail.ErrNotFound:
 					return retry.StopRetryError(iErr, "does NOT exist")
 				default:
-					_ = instance.service.InvalidateObject(ctx, bucket.Name, instance.absolutePath(path, name))
+					_ = instance.service.InvalidateObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
 					return iErr
 				}
 			}
@@ -340,7 +339,7 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 	}
 
 	bucketName := bucket.Name
-	absolutePath := instance.absolutePath(path, name)
+	absolutePath := instance.AbsolutePath(path, name)
 	timeout := timings.MetadataReadAfterWriteTimeout()
 
 	readAfterWrite := time.Now()
@@ -451,7 +450,7 @@ func (instance folder) Browse(ctx context.Context, path string, callback func([]
 		return fail.InvalidInstanceError()
 	}
 
-	absPath := instance.absolutePath(path)
+	absPath := instance.AbsolutePath(path)
 	metadataBucket, xerr := instance.getBucket(ctx)
 	if xerr != nil {
 		return xerr

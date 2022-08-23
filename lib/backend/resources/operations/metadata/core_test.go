@@ -73,11 +73,11 @@ func Test_NewCore(t *testing.T) {
 
 		mc, err := NewCore(svc, "network", "networks", &abstract.Network{})
 		require.Nil(t, err)
-		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.MetadataCore")
+		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.Core")
 
 		mc, err = NewCore(svc, clusterKind, "clusters", &abstract.ClusterIdentity{})
 		require.Nil(t, err)
-		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.MetadataCore")
+		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.Core")
 
 		svc._reset()
 		svc._updateOption("metadatakey", "")
@@ -93,7 +93,7 @@ func Test_NewCore(t *testing.T) {
 
 func TestMetadataCore_IsNull(t *testing.T) {
 
-	var m *MetadataCore = nil
+	var m *Core = nil
 	require.EqualValues(t, m.IsNull(), true)
 
 	network := abstract.NewNetwork()
@@ -123,7 +123,7 @@ func TestMetadataCore_Service(t *testing.T) {
 		}
 	}()
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	require.EqualValues(t, amc.Service(), nil)
 
 	serr := NewServiceTest(t, func(svc *ServiceTest) {
@@ -152,7 +152,7 @@ func TestMetadataCore_GetID(t *testing.T) {
 		}
 	}()
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	ctx := context.Background()
 
 	require.EqualValues(t, skip(amc.GetID()), "")
@@ -188,7 +188,7 @@ func TestMetadataCore_GetName(t *testing.T) {
 
 	ctx := context.Background()
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	require.EqualValues(t, amc.GetName(), "")
 
 	network := abstract.NewNetwork()
@@ -234,7 +234,7 @@ func TestMetadataCore_Inspect(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
@@ -282,7 +282,7 @@ func TestMetadataCore_Review(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
@@ -330,7 +330,7 @@ func TestMetadataCore_Alter(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
@@ -407,10 +407,10 @@ func TestMetadataCore_Carry(t *testing.T) {
 	network.ID = "Network_ID"
 	network.Name = "Network Name"
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr := amc.Carry(ctx, network)
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
-	amc = &MetadataCore{}
+	amc = &Core{}
 	xerr = amc.Carry(ctx, network)
 	require.Contains(t, xerr.Error(), "invalid instance content")
 
@@ -444,7 +444,7 @@ func TestMetadataCore_Read(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.Read(ctx, "networks/byID/Network_ID")
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
@@ -487,7 +487,7 @@ func TestMetadataCore_ReadByID(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.ReadByID(ctx, "networks/byID/Network_ID")
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
@@ -536,7 +536,7 @@ func TestMetadataCore_Reload(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.Reload(ctx)
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
@@ -597,7 +597,7 @@ func TestMetadataCore_BrowseFolder(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.BrowseFolder(ctx, func(data []byte) fail.Error {
 		return nil
 	})
@@ -638,7 +638,7 @@ func TestMetadataCore_Delete(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	xerr = amc.Delete(ctx)
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
@@ -678,7 +678,7 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 	require.Nil(t, xerr)
 	ctx = context.WithValue(ctx, "task", task)
 
-	var amc *MetadataCore = nil
+	var amc *Core = nil
 	_, xerr = amc.unsafeSerialize(ctx)
 	// require.Contains(t, xerr.Error(), "calling method from a nil pointer"), true)
 	require.Contains(t, xerr.Error(), "runtime error: invalid memory address or nil pointer dereference") // FIXME: aw, runtime error -__-
@@ -742,7 +742,7 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 		require.Contains(t, str, "\"id\":\"Network_ID\"")
 		require.Contains(t, str, "\"name\":\"Network Name\"")
 
-		var amc *MetadataCore = nil
+		var amc *Core = nil
 		xerr = amc.Deserialize(ctx, []byte(str))
 		require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 

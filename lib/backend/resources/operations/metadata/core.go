@@ -44,8 +44,8 @@ const (
 	byNameFolderName = "byName"
 )
 
-// MetadataCore contains the core functions of a persistent object
-type MetadataCore struct {
+// Core contains the core functions of a persistent object
+type Core struct {
 	id    atomic.Value
 	name  atomic.Value
 	taken atomic.Value
@@ -62,8 +62,8 @@ type MetadataCore struct {
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
-// NewCore creates an instance of MetadataCore
-func NewCore(svc iaas.Service, method string, kind string, path string, instance data.Clonable) (_ *MetadataCore, ferr fail.Error) {
+// NewCore creates an instance of Core
+func NewCore(svc iaas.Service, method string, kind string, path string, instance data.Clonable) (_ *Core, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -76,7 +76,7 @@ func NewCore(svc iaas.Service, method string, kind string, path string, instance
 		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	fld, xerr := NewFolder(svc, method, path)
+	fld, xerr := NewFolder(method, svc, path)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -93,7 +93,7 @@ func NewCore(svc iaas.Service, method string, kind string, path string, instance
 		return nil, fail.Wrap(cerr)
 	}
 
-	c := MetadataCore{
+	c := Core{
 		kind:       kind,
 		folder:     fld,
 		properties: props,
@@ -110,19 +110,19 @@ func NewCore(svc iaas.Service, method string, kind string, path string, instance
 	return &c, nil
 }
 
-// IsNull returns true if the MetadataCore instance represents the null value for MetadataCore
-func (myself *MetadataCore) IsNull() bool {
+// IsNull returns true if the Core instance represents the null value for Core
+func (myself *Core) IsNull() bool {
 	return myself == nil || myself.kind == ""
 }
 
 // Service returns the iaas.Service used to create/load the persistent object
-func (myself *MetadataCore) Service() iaas.Service {
+func (myself *Core) Service() iaas.Service {
 	return myself.folder.Service()
 }
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (myself *MetadataCore) GetID() (string, error) {
+func (myself *Core) GetID() (string, error) {
 	val, err := myself.getID()
 	if err != nil {
 		panic(err)
@@ -130,7 +130,7 @@ func (myself *MetadataCore) GetID() (string, error) {
 	return val, nil
 }
 
-func (myself *MetadataCore) getID() (string, fail.Error) {
+func (myself *Core) getID() (string, fail.Error) {
 	if myself == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -144,7 +144,7 @@ func (myself *MetadataCore) getID() (string, fail.Error) {
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (myself *MetadataCore) GetName() string {
+func (myself *Core) GetName() string {
 	name, err := myself.getName()
 	if err != nil {
 		panic(err)
@@ -152,7 +152,7 @@ func (myself *MetadataCore) GetName() string {
 	return name
 }
 
-func (myself *MetadataCore) getName() (string, fail.Error) {
+func (myself *Core) getName() (string, fail.Error) {
 	if myself == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -164,7 +164,7 @@ func (myself *MetadataCore) getName() (string, fail.Error) {
 	return name, nil
 }
 
-func (myself *MetadataCore) IsTaken() bool {
+func (myself *Core) IsTaken() bool {
 	taken, ok := myself.taken.Load().(bool)
 	if !ok {
 		return false
@@ -173,12 +173,12 @@ func (myself *MetadataCore) IsTaken() bool {
 }
 
 // GetKind returns the kind of object served
-func (myself *MetadataCore) GetKind() string {
+func (myself *Core) GetKind() string {
 	return myself.kind
 }
 
 // Inspect protects the data for shared read
-func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Callback) (_ fail.Error) {
+func (myself *Core) Inspect(inctx context.Context, callback resources.Callback) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -268,7 +268,7 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (_ fail.Error) {
+func (myself *Core) Review(inctx context.Context, callback resources.Callback) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -314,7 +314,7 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (_ fail.Error) {
+func (myself *Core) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -425,8 +425,8 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 // errors returned :
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
-// - fail.ErrNotAvailable if the MetadataCore instance already carries a data
-func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable) (_ fail.Error) {
+// - fail.ErrNotAvailable if the Core instance already carries a data
+func (myself *Core) Carry(inctx context.Context, clonable data.Clonable) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -446,10 +446,8 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 			if myself == nil {
 				return fail.InvalidInstanceError()
 			}
-			if !valid.IsNil(myself) {
-				if myself.IsTaken() {
-					return fail.InvalidRequestError("cannot carry, already carries something")
-				}
+			if !valid.IsNil(myself) && myself.IsTaken() {
+				return fail.InvalidRequestError("cannot carry, already carries something")
 			}
 			if clonable == nil {
 				return fail.InvalidParameterCannotBeNilError("clonable")
@@ -497,7 +495,7 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 }
 
 // updateIdentity updates instance cached identity
-func (myself *MetadataCore) updateIdentity() fail.Error {
+func (myself *Core) updateIdentity() fail.Error {
 	if myself.loaded {
 		issue := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 			ident, ok := clonable.(data.Identifiable)
@@ -537,7 +535,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Error) {
+func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -564,63 +562,65 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 				return fail.NotAvailableError("metadata is already carrying a value")
 			}
 
-			bu, xerr := myself.folder.getBucket(ctx)
-			if xerr != nil {
-				return xerr
-			}
-
 			if !myself.kindSplittedStore {
-				isName, xerr := myself.Service().HasObject(ctx, bu.GetName(), myself.folder.absolutePath("", ref))
+				xerr = myself.folder.Lookup(ctx, "", ref)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.AbsolutePath("", ref))
+					default:
+						return xerr
+					}
+				}
+
+				xerr = myself.readByName(ctx, ref)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 
-				if isName {
-					xerr := myself.readByName(ctx, ref)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
-					}
-
-					myself.loaded = true
-					myself.committed = true
-
-					return myself.updateIdentity()
-				}
-
-				return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.absolutePath("", ref))
+				goto commit
 			}
 
-			isName, xerr := myself.Service().HasObject(ctx, bu.GetName(), myself.folder.absolutePath(byNameFolderName, ref))
+			xerr = myself.folder.Lookup(ctx, byNameFolderName, ref)
 			if xerr != nil {
-				return xerr
-			}
-
-			if isName {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.AbsolutePath("", ref))
+				default:
+					return xerr
+				}
+			} else {
 				xerr := myself.readByName(ctx, ref)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
+
+				goto commit
 			}
 
-			isID, xerr := myself.Service().HasObject(ctx, bu.GetName(), myself.folder.absolutePath(byIDFolderName, ref))
+			xerr = myself.folder.Lookup(ctx, byIDFolderName, ref)
 			if xerr != nil {
-				return xerr
-			}
-
-			if isID {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.AbsolutePath("", ref))
+				default:
+					return xerr
+				}
+			} else {
 				xerr := myself.readByID(ctx, ref)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
+
+				goto commit
 			}
 
-			if !isID && !isName {
-				return fail.NotFoundError("neither %s nor %s were found in the bucket", myself.folder.absolutePath(byNameFolderName, ref), myself.folder.absolutePath(byIDFolderName, ref))
-			}
+			return fail.NotFoundError("neither %s nor %s were found in the bucket", myself.folder.AbsolutePath(byNameFolderName, ref), myself.folder.AbsolutePath(byIDFolderName, ref))
 
+		commit:
 			myself.loaded = true
 			myself.committed = true
 
@@ -640,7 +640,7 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.Error) {
+func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -750,7 +750,7 @@ func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.E
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (myself *MetadataCore) readByID(inctx context.Context, id string) fail.Error {
+func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -833,7 +833,7 @@ func (myself *MetadataCore) readByID(inctx context.Context, id string) fail.Erro
 }
 
 // readByName reads a metadata identified by name
-func (myself *MetadataCore) readByName(inctx context.Context, name string) fail.Error {
+func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -906,7 +906,7 @@ func (myself *MetadataCore) readByName(inctx context.Context, name string) fail.
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (myself *MetadataCore) write(inctx context.Context) fail.Error {
+func (myself *Core) write(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -974,7 +974,7 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
+func (myself *Core) Reload(inctx context.Context) (ferr fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1010,7 +1010,7 @@ func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
 
 // unsafeReload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
+func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1139,7 +1139,7 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 }
 
 // BrowseFolder walks through folder and executes a callback for each entry
-func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
+func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1185,7 +1185,7 @@ func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(bu
 }
 
 // Delete deletes the metadata
-func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
+func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1319,7 +1319,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 	}
 }
 
-func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
+func (myself *Core) Sdump(inctx context.Context) (string, fail.Error) {
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1366,7 +1366,7 @@ func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
 
 // unsafeSerialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
+func (myself *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1396,7 +1396,7 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 			err := json.Unmarshal(shieldedJSONed, &shieldedMapped)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return nil, fail.NewErrorWithCause(err, "*MetadataCore.Serialize(): Unmarshalling JSONed shielded into map failed!")
+				return nil, fail.NewErrorWithCause(err, "*Core.Serialize(): Unmarshalling JSONed shielded into map failed!")
 			}
 
 			if myself.properties.Count() > 0 {
@@ -1436,7 +1436,7 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 }
 
 // Deserialize reads json code and reinstantiates
-func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.Error {
+func (myself *Core) Deserialize(inctx context.Context, buf []byte) fail.Error {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1470,9 +1470,9 @@ func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.
 	}
 }
 
-// unsafeDeserialize reads json code and instantiates a MetadataCore
+// unsafeDeserialize reads json code and instantiates a Core
 // Note: must be called after locking the instance
-func (myself *MetadataCore) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
+func (myself *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1517,13 +1517,13 @@ func (myself *MetadataCore) unsafeDeserialize(inctx context.Context, buf []byte)
 			jsoned, err := json.Marshal(mapped)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return fail.SyntaxErrorWithCause(err, nil, "failed to marshal MetadataCore to JSON")
+				return fail.SyntaxErrorWithCause(err, nil, "failed to marshal Core to JSON")
 			}
 
 			xerr := myself.shielded.Deserialize(jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return fail.Wrap(xerr, "deserializing MetadataCore failed")
+				return fail.Wrap(xerr, "deserializing Core failed")
 			}
 
 			if len(props) > 0 {

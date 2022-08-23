@@ -28,12 +28,13 @@ type (
 	FolderCallback func([]byte) fail.Error
 
 	Folder interface {
+		AbsolutePath(path ...string) string                                                                                        // returns the full path to reach the 'path'+'name' starting from the folder path
 		Browse(ctx context.Context, path string, callback FolderCallback) fail.Error                                               // browses the content of a specific path in Metadata and executes 'callback' on each entry
 		Path() string                                                                                                              // returns the path of the Folder
-		Lookup(ctx context.Context, path string, name string) fail.Error                                                           // tells if the object named 'name' is inside the ObjectStorage MetadataFolder
+		Lookup(ctx context.Context, path string, name string) fail.Error                                                           // tells if the object named 'name' is inside the metadata Folder
 		Delete(ctx context.Context, path string, name string) fail.Error                                                           // removes metadata passed as parameter
-		Read(ctx context.Context, path string, name string, callback FolderCallback, options ...data.ImmutableKeyValue) fail.Error // loads the content of the object stored in metadata bucket
+		Read(ctx context.Context, path string, name string, callback FolderCallback, options ...data.ImmutableKeyValue) fail.Error // loads the content of the object stored in metadata folder
 		Service() iaas.Service                                                                                                     // returns the current provider driver to use
-		Write(ctx context.Context, path string, name string, content []byte, options ...data.ImmutableKeyValue) fail.Error         // writes the content in Object Storage, and check the write operation is committed.
+		Write(ctx context.Context, path string, name string, content []byte, options ...data.ImmutableKeyValue) fail.Error         // writes the content in storage, and check the write operation is committed
 	}
 )
