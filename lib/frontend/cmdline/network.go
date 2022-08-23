@@ -135,7 +135,7 @@ func (n networkConsumer) Inspect(name string, timeout time.Duration) (*protocol.
 
 }
 
-// Create calls the gRPC server to create a network
+// Create calls the gRPC currentServer to create a network
 func (n networkConsumer) Create(
 	name, cidr string,
 	noSubnet bool,

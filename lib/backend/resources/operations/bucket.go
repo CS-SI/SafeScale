@@ -46,7 +46,7 @@ import (
 
 const (
 	bucketKind = "bucket"
-	// bucketsFolderName is the name of the object storage MetadataFolder used to store buckets info
+	// bucketsFolderName is the name of the object storage folder used to store buckets info
 	bucketsFolderName = "buckets"
 )
 

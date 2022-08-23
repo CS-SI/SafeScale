@@ -52,7 +52,7 @@ func (t labelConsumer) List(selectTags bool, timeout time.Duration) (*protocol.L
 	}
 
 	service := protocol.NewLabelServiceClient(t.session.connection)
-	return service.List(newCtx, &protocol.LabelListRequest{TenantId: t.session.tenant, Tags: selectTags})
+	return service.List(newCtx, &protocol.LabelListRequest{TenantId: t.session.currentTenant, Tags: selectTags})
 }
 
 // Inspect ...
@@ -75,7 +75,7 @@ func (t labelConsumer) Inspect(name string, selectTag bool, timeout time.Duratio
 	service := protocol.NewLabelServiceClient(t.session.connection)
 	req := &protocol.LabelInspectRequest{
 		Label: &protocol.Reference{
-			TenantId: t.session.tenant,
+			TenantId: t.session.currentTenant,
 			Name:     name,
 		},
 		IsTag: selectTag,
@@ -115,7 +115,7 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 		defer wg.Done()
 
 		req := &protocol.LabelInspectRequest{
-			Label: &protocol.Reference{TenantId: t.session.tenant, Name: aname},
+			Label: &protocol.Reference{TenantId: t.session.currentTenant, Name: aname},
 			IsTag: selectTags,
 		}
 		_, err := service.Delete(newCtx, req)

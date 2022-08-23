@@ -49,10 +49,15 @@ type Session struct {
 	Tenant        tenantConsumer
 	Label         labelConsumer
 	Volume        volumeConsumer
+	User          userConsumer
+	Organization  organizationConsumer
+	Project       projectConsumer
 
-	server     string
-	tenant     string // contains the tenant to use (flag --tenantConsumer); if not set, server will use current default tenant (safescale tenant set)
-	connection *grpc.ClientConn
+	currentServer       string
+	currentOrganization string // contains the Organization to use
+	currentProject      string // contains the Project to use
+	currentTenant       string // contains the currentTenant to use (flag --currentTenant); if not set, currentServer will use current default currentTenant (safescale currentTenant set)
+	connection          *grpc.ClientConn
 
 	task concurrency.Task
 }
@@ -71,15 +76,15 @@ const (
 // New returns an instance of safescale Client
 func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 	var xerr fail.Error
-	// Validate server parameter (can be empty string...)
+	// Validate currentServer parameter (can be empty string...)
 	if server != "" {
 		server, xerr = validateServerString(server)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "server is invalid")
+			return nil, fail.Wrap(xerr, "currentServer is invalid")
 		}
 	}
 
-	// if server is empty, try to see if env SAFESCALED_LISTEN is set...
+	// if currentServer is empty, try to see if env SAFESCALED_LISTEN is set...
 	if server == "" {
 		server = os.Getenv("SAFESCALED_LISTEN")
 		if server != "" {
@@ -102,13 +107,13 @@ func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 			}
 
 			if server == "" {
-				// empty string, so default value to server
+				// empty string, so default value to currentServer
 				server = defaultServerHost + ":" + defaultServerPort
 			}
 		}
 	}
 
-	s := &Session{server: server, tenant: tenantID}
+	s := &Session{currentServer: server, currentTenant: tenantID}
 	s.task, xerr = concurrency.VoidTask()
 	if xerr != nil {
 		return nil, xerr
@@ -128,6 +133,9 @@ func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 	s.Tenant = tenantConsumer{session: s}
 	s.Volume = volumeConsumer{session: s}
 	s.Label = labelConsumer{session: s}
+	s.User = userConsumer{session: s}
+	s.Organization = organizationConsumer{session: s}
+	s.Project = projectConsumer{session: s}
 
 	return s, nil
 }
@@ -161,13 +169,13 @@ func validateServerString(server string) (string, fail.Error) {
 // Connect establishes connection with safescaled
 func (s *Session) Connect() {
 	if s.connection == nil {
-		s.connection = dial(s.server)
+		s.connection = dial(s.currentServer)
 	}
 }
 
-// dial returns a connection to GRPC server
+// dial returns a connection to GRPC currentServer
 func dial(server string) *grpc.ClientConn {
-	// Set up a connection to the server.
+	// Set up a connection to the currentServer.
 	conn, err := grpc.Dial(server, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logrus.Fatalf("failed to connect to safescaled (%s): %v", server, err)

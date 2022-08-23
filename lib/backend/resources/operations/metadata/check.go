@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package operations
+package metadata
 
 import (
 	"context"
@@ -40,11 +40,11 @@ const (
 	MustUpgradeBinaries = "the current version of SafeScale binaries requires the use of at least release %s to work correctly. Please upgrade your binaries"
 )
 
-// CheckMetadataVersion checks if the content of /version in metadata bucket is equal to MetadataVersion
-func CheckMetadataVersion(ctx context.Context, svc iaas.Service) (string, fail.Error) {
+// CheckVersion checks if the content of /version in metadata bucket is equal to MetadataVersion
+func CheckVersion(ctx context.Context, svc iaas.Service, method string) (string, fail.Error) {
 	// Read file /version in metadata
 	var currentMetadataVersion string
-	folder, xerr := NewMetadataFolder(svc, "")
+	folder, xerr := NewFolder(method, svc, "")
 	if xerr != nil {
 		return "", xerr
 	}

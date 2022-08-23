@@ -54,7 +54,7 @@ func (c jobConsumer) List(timeout time.Duration) (*protocol.JobList, error) {
 	return service.List(newCtx, &emptypb.Empty{})
 }
 
-// Stop sends a signal to the server to stop a running job
+// Stop sends a signal to the currentServer to stop a running job
 func (c jobConsumer) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()

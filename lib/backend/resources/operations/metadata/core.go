@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package operations
+package metadata
 
 import (
 	"context"
@@ -38,9 +38,9 @@ import (
 )
 
 const (
-	// byIDFolderName tells in what MetadataFolder to put 'byID' information
+	// byIDFolderName tells in what folder to put 'byID' information
 	byIDFolderName = "byID"
-	// byNameFolderName tells in what MetadataFolder to store 'byName' information
+	// byNameFolderName tells in what folder to store 'byName' information
 	byNameFolderName = "byName"
 )
 
@@ -55,7 +55,7 @@ type MetadataCore struct {
 	sync.RWMutex
 
 	kind   string
-	folder MetadataFolder
+	folder Folder
 
 	loaded            bool
 	committed         bool
@@ -63,7 +63,7 @@ type MetadataCore struct {
 }
 
 // NewCore creates an instance of MetadataCore
-func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, ferr fail.Error) {
+func NewCore(svc iaas.Service, method string, kind string, path string, instance data.Clonable) (_ *MetadataCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -76,7 +76,7 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	fld, xerr := NewMetadataFolder(svc, path)
+	fld, xerr := NewFolder(svc, method, path)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1138,7 +1138,7 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 	}
 }
 
-// BrowseFolder walks through MetadataFolder and executes a callback for each entry
+// BrowseFolder walks through folder and executes a callback for each entry
 func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
@@ -1224,7 +1224,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If entry not found, consider operation not an error
-						logrus.WithContext(ctx).Tracef("MetadataFolder not found by id, maybe not an error")
+						logrus.WithContext(ctx).Tracef("folder not found by id, maybe not an error")
 					default:
 						errors = append(errors, xerr)
 					}
@@ -1246,7 +1246,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If entry not found, consider operation not an error
-						logrus.WithContext(ctx).Tracef("MetadataFolder not found by name, maybe not an error")
+						logrus.WithContext(ctx).Tracef("folder not found by name, maybe not an error")
 					default:
 						errors = append(errors, xerr)
 					}
@@ -1282,7 +1282,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If entry not found, consider operation not an error
-						logrus.WithContext(ctx).Tracef("MetadataFolder not found by name, maybe not an error")
+						logrus.WithContext(ctx).Tracef("folder not found by name, maybe not an error")
 					default:
 						errors = append(errors, xerr)
 					}

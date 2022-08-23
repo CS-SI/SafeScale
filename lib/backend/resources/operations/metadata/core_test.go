@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package operations
+package metadata
 
 import (
 	"context"

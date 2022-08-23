@@ -57,7 +57,7 @@ func (c clusterConsumer) List(timeout time.Duration) (*protocol.ClusterListRespo
 		newCtx = aCtx
 	}
 
-	result, err := service.List(newCtx, &protocol.Reference{TenantId: c.session.tenant})
+	result, err := service.List(newCtx, &protocol.Reference{TenantId: c.session.currentTenant})
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (c clusterConsumer) Inspect(clusterName string, timeout time.Duration) (*pr
 		newCtx = aCtx
 	}
 
-	result, err := service.Inspect(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
+	result, err := service.Inspect(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (c clusterConsumer) GetState(clusteName string, timeout time.Duration) (*pr
 		newCtx = aCtx
 	}
 
-	return service.State(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusteName})
+	return service.State(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusteName})
 }
 
 // Start starts all the hosts of the cluster
@@ -137,7 +137,7 @@ func (c clusterConsumer) Start(clusterName string, timeout time.Duration) error 
 		newCtx = aCtx
 	}
 
-	_, err := service.Start(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
+	_, err := service.Start(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName})
 	return err
 }
 
@@ -159,7 +159,7 @@ func (c clusterConsumer) Stop(clusterName string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Stop(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
+	_, err := service.Stop(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName})
 	return err
 }
 
@@ -185,7 +185,7 @@ func (c clusterConsumer) Create(def *protocol.ClusterCreateRequest, timeout time
 		newCtx = aCtx
 	}
 
-	def.TenantId = c.session.tenant
+	def.TenantId = c.session.currentTenant
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	cr, zerr := service.Create(newCtx, def)
 	if zerr != nil {
@@ -220,7 +220,7 @@ func (c clusterConsumer) Delete(clusterName string, force bool, timeout time.Dur
 	req := &protocol.ClusterDeleteRequest{
 		Name:     clusterName,
 		Force:    force,
-		TenantId: c.session.tenant,
+		TenantId: c.session.currentTenant,
 	}
 	_, err := service.Delete(newCtx, req)
 	return err
@@ -248,7 +248,7 @@ func (c clusterConsumer) Expand(req *protocol.ClusterResizeRequest, timeout time
 		newCtx = aCtx
 	}
 
-	req.TenantId = c.session.tenant
+	req.TenantId = c.session.currentTenant
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	return service.Expand(newCtx, req)
 }
@@ -276,7 +276,7 @@ func (c clusterConsumer) Shrink(req *protocol.ClusterResizeRequest, timeout time
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	req.TenantId = c.session.tenant
+	req.TenantId = c.session.currentTenant
 	return service.Shrink(newCtx, req)
 }
 
@@ -300,7 +300,7 @@ func (c clusterConsumer) CheckFeature(clusterName, featureName string, params ma
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -337,7 +337,7 @@ func (c clusterConsumer) AddFeature(clusterName, featureName string, params map[
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -375,7 +375,7 @@ func (c clusterConsumer) RemoveFeature(clusterName, featureName string, params m
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -410,7 +410,7 @@ func (c clusterConsumer) ListFeatures(clusterName string, all bool, timeout time
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:     &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
+		TargetRef:     &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName},
 		InstalledOnly: !all,
 	}
 
@@ -447,7 +447,7 @@ func (c clusterConsumer) InspectFeature(clusterName, featureName string, embedde
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -485,7 +485,7 @@ func (c clusterConsumer) ExportFeature(clusterName, featureName string, embedded
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -529,7 +529,7 @@ func (c clusterConsumer) FindAvailableMaster(clusterName string, timeout time.Du
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	host, err := service.FindAvailableMaster(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
+	host, err := service.FindAvailableMaster(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +559,7 @@ func (c clusterConsumer) ListNodes(clusterName string, timeout time.Duration) (*
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListNodes(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
+	list, err := service.ListNodes(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +595,7 @@ func (c clusterConsumer) InspectNode(clusterName string, nodeRef string, timeout
 	return service.InspectNode(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     nodeRef,
 		},
 	})
@@ -642,7 +642,7 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 
 		_, err := service.DeleteNode(newCtx, &protocol.ClusterNodeRequest{
 			Name: clusterName, Host: &protocol.Reference{
-				TenantId: c.session.tenant,
+				TenantId: c.session.currentTenant,
 				Name:     ref,
 			},
 		})
@@ -654,7 +654,7 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 	}
 
 	if len(nodes) > 1 {
-		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenantConsumer set...
+		// We want to check first if currentTenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenantConsumer set...
 		tenantService := protocol.NewTenantServiceClient(c.session.connection)
 		_, err := tenantService.Get(newCtx, &emptypb.Empty{})
 		if err != nil {
@@ -704,7 +704,7 @@ func (c clusterConsumer) StartNode(clusterName string, nodeRef string, timeout t
 	_, err := service.StartNode(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     nodeRef,
 		},
 	})
@@ -740,7 +740,7 @@ func (c clusterConsumer) StopNode(clusterName string, nodeRef string, timeout ti
 	_, err := service.StopNode(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     nodeRef,
 		},
 	})
@@ -776,7 +776,7 @@ func (c clusterConsumer) StateNode(clusterName string, nodeRef string, timeout t
 	return service.StateNode(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     nodeRef,
 		},
 	})
@@ -805,7 +805,7 @@ func (c clusterConsumer) ListMasters(clusterName string, timeout time.Duration) 
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListMasters(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
+	list, err := service.ListMasters(newCtx, &protocol.Reference{TenantId: c.session.currentTenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -842,7 +842,7 @@ func (c clusterConsumer) InspectMaster(clusterName string, masterRef string, tim
 	return service.InspectMaster(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     masterRef,
 		},
 	})
@@ -877,7 +877,7 @@ func (c clusterConsumer) StartMaster(clusterName string, masterRef string, timeo
 	_, err := service.StartMaster(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     masterRef,
 		},
 	})
@@ -914,7 +914,7 @@ func (c clusterConsumer) StopMaster(clusterName string, masterRef string, timeou
 		Name: clusterName,
 		Host: &protocol.Reference{
 			Name:     masterRef,
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 		},
 	})
 	return err
@@ -949,7 +949,7 @@ func (c clusterConsumer) StateMaster(clusterName string, masterRef string, timeo
 	return service.StateMaster(newCtx, &protocol.ClusterNodeRequest{
 		Name: clusterName,
 		Host: &protocol.Reference{
-			TenantId: c.session.tenant,
+			TenantId: c.session.currentTenant,
 			Name:     masterRef,
 		},
 	})

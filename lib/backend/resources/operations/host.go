@@ -537,7 +537,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	return nil
 }
 
-// Browse walks through Host MetadataFolder and executes a callback for each entry
+// Browse walks through Host folder and executes a callback for each entry
 func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

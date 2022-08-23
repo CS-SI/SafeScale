@@ -30,7 +30,7 @@ type imageConsumer struct {
 	session *Session
 }
 
-// List return the list of available images of tenant
+// List return the list of available images of currentTenant
 func (img imageConsumer) List(all bool, timeout time.Duration) (*protocol.ImageList, error) {
 	img.session.Connect()
 	defer img.session.Disconnect()
