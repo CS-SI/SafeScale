@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadatamaintenance/upgrade"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -263,33 +262,5 @@ func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgra
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	// Not setting metadataVersion prevents to overwrite current version file if it exists...
-	svc, xerr := iaas.UseService(name, "")
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var currentVersion string
-	if !in.Force {
-		currentVersion, xerr = operations.CheckMetadataVersion(ctx, svc)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrForbidden, *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError(xerr)
-			default:
-				return nil, xerr
-			}
-		}
-	}
-
-	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false, false)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &protocol.TenantUpgradeResponse{}, nil
+	return nil, fail.NewError("metadata upgrade no longer supported")
 }
