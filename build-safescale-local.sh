@@ -35,10 +35,6 @@ make sdk
 
 sleep 4
 
-make force_sdk_python
-
-sleep 4
-
 make force_sdk_js
 
 sleep 4
