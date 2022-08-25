@@ -35,7 +35,7 @@ sdk_python: has_python sdk
 	@sed -i 's/github.com\/golang\/protobuf\/ptypes\/empty\/empty.proto/google\/protobuf\/empty.proto/g' safescale.proto
 	@pipenv run python3 -m grpc_tools.protoc -I. -I$(GOMODPATH)/pkg/mod --python_out=python3/ --grpc_python_out=python3/ safescale.proto
 	@mv safescale.proto.backup safescale.proto
-	@protoc -I. -I$(GOMODPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
+	@protoc -I. -I$(GOMODPATH)/pkg/mod --go-grpc_out=. safescale.proto
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Finished creating python3 protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
 
 force_sdk_python: prepare_python sdk_python
