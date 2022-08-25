@@ -15,8 +15,8 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 
 # Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
-PROTOC := github.com/golang/protobuf
-PROTOBUF := github.com/golang/protobuf/protoc-gen-go
+PROTOC := google.golang.org/protobuf
+PROTOBUF := google.golang.org/protobuf/protoc-gen-go
 PROTOVER := v1.28.0
 
 # Build tools
@@ -285,12 +285,12 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \
-		$(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
+		$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@latest &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n"; \
-		$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
+        $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
@@ -366,6 +366,9 @@ sdk: getdevdeps unmerged
 	@(cd lib && $(MAKE) $(@))
 
 force_sdk_python: sdk
+	@(cd lib && $(MAKE) $(@))
+
+force_sdk_js: sdk
 	@(cd lib && $(MAKE) $(@))
 
 lib: common
