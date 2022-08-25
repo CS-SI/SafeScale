@@ -64,5 +64,6 @@ CIBIN=/exported make installci
 
 cp ${WRKDIR}/SafeScale/go.mod /exported
 cp ${WRKDIR}/SafeScale/go.sum /exported
+cp ${WRKDIR}/SafeScale/lib/protocol/javascript/* /exported
 
 exit 0
