@@ -59,11 +59,12 @@ echo "Export"
 export CIBIN=/exported
 mkdir -p /exported
 
-CIBIN=/exported make installci force_sdk_js
+CIBIN=/exported make installci
 [ $? -ne 0 ] && echo "Export failure" && exit 1
 
 cp ${WRKDIR}/SafeScale/go.mod /exported
 cp ${WRKDIR}/SafeScale/go.sum /exported
 cp ${WRKDIR}/SafeScale/lib/protocol/javascript/* /exported
+cp ${WRKDIR}/SafeScale/lib/protocol/python3/* /exported
 
 exit 0
