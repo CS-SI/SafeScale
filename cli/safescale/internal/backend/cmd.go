@@ -20,10 +20,9 @@ package backend
 import (
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 )
 
 const initCmdLabel = "init"
@@ -35,7 +34,7 @@ func runCommand() *cobra.Command {
 		Use:   runCmdLabel,
 		Short: "Start SafeScale backend",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, runCmdLabel, strings.Join(args, ", "))
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", global.BackendCmdLabel, runCmdLabel, strings.Join(args, ", "))
 			return startBackend(cmd)
 		},
 	}
@@ -60,7 +59,7 @@ func stopCommand() *cobra.Command {
 		Use:   stopCmdLabel,
 		Short: "stop SafeScale backend",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logrus.Tracef("SafeScale command: %s %s with args '%s'", common.BackendCmdLabel, stopCmdLabel, strings.Join(args, ", "))
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", global.BackendCmdLabel, stopCmdLabel, strings.Join(args, ", "))
 			return stopBackend(cmd)
 		},
 	}
@@ -71,10 +70,9 @@ func stopCommand() *cobra.Command {
 }
 
 func addCommonFlags(cmd *cobra.Command) {
-	common.AddFlags(cmd)
 	flags := cmd.Flags()
 	flags.StringP("config", "c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
-	flags.SetAnnotation("config", cobra.BashCompFilenameExt, common.ValidConfigFilenameExts)
+	flags.SetAnnotation("config", cobra.BashCompFilenameExt, global.ValidConfigFilenameExts)
 	flags.StringP("root-dir", "R", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
 	flags.StringP("etc-dir", "E", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: <root-dir>/etc)")
 }

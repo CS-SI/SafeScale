@@ -1,6 +1,3 @@
-//go:build fixme
-// +build fixme
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -27,24 +24,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/urfave/cli"
 )
 
 var (
@@ -69,7 +66,7 @@ func ClusterCommands() *cobra.Command {
 			if c.Name() != clusterListCmdLabel {
 				err := extractClusterName(c, args)
 				if err != nil {
-					return clitools.FailureResponse(err)
+					return cli.FailureResponse(err)
 				}
 			}
 			return nil
@@ -115,7 +112,7 @@ func clusterListCommand() *cobra.Command {
 			list, err := ClientSession.Cluster.List(temporal.ExecutionTimeout())
 			if err != nil {
 				err := fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
 			}
 
 			var formatted []interface{}
@@ -123,16 +120,16 @@ func clusterListCommand() *cobra.Command {
 				// c, _ := value.(api.Cluster)
 				converted, err := convertToMap(value)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
 				}
 
 				fconfig, err := formatClusterConfig(converted, false)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
 				}
 				formatted = append(formatted, fconfig)
 			}
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 
@@ -154,15 +151,15 @@ func clusterInspectCommand() *cobra.Command {
 			cluster, err := ClientSession.Cluster.Inspect(clusterName, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
 			}
 
 			clusterConfig, err := outputClusterConfig(cluster)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
-			return clitools.SuccessResponse(clusterConfig)
+			return cli.SuccessResponse(clusterConfig)
 		},
 	}
 	return out
@@ -179,26 +176,62 @@ func clusterCreateCommand() *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			complexityStr := c.Flags().GetString("complexity")
+			complexityStr, err := c.Flags().GetString("complexity")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
 			comp, err := clustercomplexity.Parse(complexityStr)
 			if err != nil {
 				msg := fmt.Sprintf("Invalid option --complexity|-C: %s", err.Error())
-				return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
+				return cli.FailureResponse(cli.ExitOnInvalidOption(msg))
 			}
 
-			flavorStr := c.Flags().GetString("flavor")
+			flavorStr, err := c.Flags().GetString("flavor")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
 			fla, err := clusterflavor.Parse(flavorStr)
 			if err != nil {
 				msg := fmt.Sprintf("Invalid option --flavor|-F: %s", err.Error())
-				return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
+				return cli.FailureResponse(cli.ExitOnInvalidOption(msg))
 			}
 
-			force := c.Flags().GetBool("force")
-			keep := c.Flags().GetBool("keep-on-failure")
-			cidr := c.Flags().GetString("cidr")
-			disable := c.Flags().GetStringSlice("disable")
-			los := c.Flags().GetString("os")
-			gatewaySSHPort := c.Flags().GetUint32("gwport")
+			force, err := c.Flags().GetBool("force")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			keep, err := c.Flags().GetBool("keep-on-failure")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			cidr, err := c.Flags().GetString("cidr")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			disable, err := c.Flags().GetStringSlice("disable")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			los, err := c.Flags().GetString("os")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			gatewaySSHPort, err := c.Flags().GetUint32("gwport")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			parameters, err := c.Flags().GetStringSlice("param")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
 
 			var (
 				globalDef   string
@@ -244,32 +277,32 @@ func clusterCreateCommand() *cobra.Command {
 				MasterSizing:   mastersDef,
 				NodeSizing:     nodesDef,
 				Force:          force,
-				Parameters:     c.Flags().GetStringSlice("param"),
+				Parameters:     parameters,
 				DefaultSshPort: gatewaySSHPort,
 			}
 			res, err := ClientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 			if res == nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, "failed to create cluster: unknown reason"))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "failed to create cluster: unknown reason"))
 			}
 
 			toFormat, cerr := convertToMap(res)
 			if cerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
 			}
 
 			formatted, cerr := formatClusterConfig(toFormat, true)
 			if cerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
 			}
 
-			if !appwide.Config.Debug {
+			if !global.Config.Debug {
 				delete(formatted, "defaults")
 			}
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 
@@ -336,26 +369,33 @@ func clusterDeleteCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			yes := c.Flags().GetBool("assume-yes")
-			force := c.Flags().GetBool("force")
+			yes, err := c.Flags().GetBool("assume-yes")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			force, err := c.Flags().GetBool("force")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
 
 			if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete Cluster '%s'", clusterName)) {
-				return clitools.SuccessResponse("Aborted")
+				return cli.SuccessResponse("Aborted")
 			}
 
-			err := ClientSession.Cluster.Delete(clusterName, force, temporal.HostLongOperationTimeout())
+			err = ClientSession.Cluster.Delete(clusterName, force, temporal.HostLongOperationTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
 	flags := out.Flags()
 	flags.BoolP("yes", "y", false, "do not ask confirmation")
 	flags.Bool("assume-yes", false, "alias of --yes|-y")
-	flags.MarkDeprecated("assume-yes", "DEPRECATED")
+	_ = flags.MarkDeprecated("assume-yes", "DEPRECATED")
 	flags.BoolP("force", "f", false, "force action")
 
 	return out
@@ -376,9 +416,10 @@ func clusterStopCommand() *cobra.Command {
 			err := ClientSession.Cluster.Stop(clusterName, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -398,9 +439,9 @@ func clusterStartCommand() *cobra.Command {
 			err := ClientSession.Cluster.Start(clusterName, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "start of cluster", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "start of cluster", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -421,9 +462,10 @@ func clusterStateCommand() *cobra.Command {
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
-				return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+				return cli.FailureResponse(cli.ExitOnRPC(msg))
 			}
-			return clitools.SuccessResponse(map[string]interface{}{
+
+			return cli.SuccessResponse(map[string]interface{}{
 				"Name":       clusterName,
 				"State":      state.State,
 				"StateLabel": clusterstate.Enum(state.State).String(),
@@ -444,20 +486,37 @@ func clusterExpandCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			count := c.Flags().GetUint("count")
+			count, err := c.Flags().GetUint("count")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
 			if count == 0 {
 				count = 1
 			}
-			los := c.Flags().GetString("os")
-			keepOnFailure := c.Flags().GetBool("keep-on-failure")
+
+			los, err := c.Flags().GetString("os")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			keepOnFailure, err := c.Flags().GetBool("keep-on-failure")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			parameters, err := c.Flags().GetStringSlice("param")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
 
 			var (
 				nodesDef   string
 				nodesCount uint
 			)
-			nodesDef, err := constructHostDefinitionStringFromCLI(c, "node-sizing")
-			if err != nil {
-				return err
+			nodesDef, xerr := constructHostDefinitionStringFromCLI(c, "node-sizing")
+			if xerr != nil {
+				return xerr
 			}
 			if nodesCount > count {
 				count = nodesCount
@@ -469,15 +528,16 @@ func clusterExpandCommand() *cobra.Command {
 				NodeSizing:    nodesDef,
 				ImageId:       los,
 				KeepOnFailure: keepOnFailure,
-				Parameters:    c.Flags().GetStringSlice("param"),
+				Parameters:    parameters,
 			}
 
 			hosts, err := ClientSession.Cluster.Expand(&req, temporal.HostLongOperationTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(hosts)
+
+			return cli.SuccessResponse(hosts)
 		},
 	}
 
@@ -505,8 +565,15 @@ func clusterShrinkCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			count := c.Flags().GetUint("count")
-			yes := c.Flags().GetBool("yes")
+			count, err := c.Flags().GetUint("count")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			yes, err := c.Flags().GetBool("yes")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
 
 			var countS string
 			if count > 1 {
@@ -516,7 +583,7 @@ func clusterShrinkCommand() *cobra.Command {
 			if !yes {
 				msg := fmt.Sprintf("Are you sure you want to delete %d node%s from Cluster %s", count, countS, clusterName)
 				if !utils.UserConfirmed(msg) {
-					return clitools.SuccessResponse("Aborted")
+					return cli.SuccessResponse("Aborted")
 				}
 			}
 
@@ -527,9 +594,10 @@ func clusterShrinkCommand() *cobra.Command {
 
 			if _, err := ClientSession.Cluster.Shrink(&req, temporal.HostLongOperationTimeout()); err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -537,7 +605,7 @@ func clusterShrinkCommand() *cobra.Command {
 	flags.IntP("count", "n", 1, "Define the number of nodes to remove (default: 1)")
 	flags.BoolP("yes", "y", false, "Do not ask confirmation")
 	flags.Bool("assume-yes", false, "Alias of --yes|-y")
-	flags.MarkDeprecated("assume-yes", "DEPRECATED")
+	_ = flags.MarkDeprecated("assume-yes", "DEPRECATED")
 
 	return out
 }
@@ -584,17 +652,18 @@ func clusterKubectlCommand() *cobra.Command {
 							// Check for file
 							st, err := os.Stat(localFile)
 							if err != nil {
-								return cli.Exit(err.Error(), 1)
+								return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 							}
 							// If it's a link, get the target of it
 							if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 								link, err := filepath.EvalSymlinks(localFile)
 								if err != nil {
-									return cli.Exit(err.Error(), 1)
+									return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 								}
+
 								_, err = os.Stat(link)
 								if err != nil {
-									return cli.Exit(err.Error(), 1)
+									return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 								}
 							}
 
@@ -608,7 +677,7 @@ func clusterKubectlCommand() *cobra.Command {
 								filteredArgs = append(filteredArgs, rfi.Remote)
 							} else {
 								// data comes from the standard input
-								return clitools.FailureResponse(fmt.Errorf("'-f -' is not yet supported"))
+								return cli.FailureResponse(fmt.Errorf("'-f -' is not yet supported"))
 							}
 							ignoreNext = true
 						}
@@ -659,7 +728,7 @@ func clusterHelmCommand() *cobra.Command {
 				//	useTLS = ""
 				case "init":
 					if idx == 0 {
-						return cli.Exit("helm init is forbidden", int(exitcode.InvalidArgument))
+						return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidArgument, fmt.Sprintf("helm init is forbidden")))
 					}
 				// case "search", "repo", "help", "install", "uninstall":
 				//	if idx == 0 {
@@ -683,17 +752,19 @@ func clusterHelmCommand() *cobra.Command {
 							// Check for file
 							st, err := os.Stat(localFile)
 							if err != nil {
-								return cli.Exit(err.Error(), 1)
+								return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 							}
+
 							// If it's a link, get the target of it
 							if st.Mode()&os.ModeSymlink == os.ModeSymlink {
 								link, err := filepath.EvalSymlinks(localFile)
 								if err != nil {
-									return cli.Exit(err.Error(), 1)
+									return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 								}
+
 								_, err = os.Stat(link)
 								if err != nil {
-									return cli.Exit(err.Error(), 1)
+									return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 								}
 							}
 
@@ -707,7 +778,7 @@ func clusterHelmCommand() *cobra.Command {
 								filteredArgs = append(filteredArgs, rfc.Remote)
 							} else {
 								// data comes from the standard input
-								return clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "'-f -' is not yet supported")
+								return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "'-f -' is not yet supported"))
 							}
 							ignoreNext = true
 						}
@@ -726,6 +797,8 @@ func clusterHelmCommand() *cobra.Command {
 	return out
 }
 
+// clusterRunCommand handles 'safescale cluster run'
+// FIXME: not implemented
 func clusterRunCommand() *cobra.Command {
 	out := &cobra.Command{
 		Use:     "run",
@@ -737,12 +810,13 @@ func clusterRunCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "runCmd not yet implemented"))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "runCmd not yet implemented"))
 		},
 	}
 	return out
 }
 
+// clusterFeatureCommands handle 'safescale cluster feature'
 func clusterFeatureCommands() *cobra.Command {
 	out := &cobra.Command{
 		Use:   clusterFeatureCmdLabel,
@@ -752,7 +826,7 @@ func clusterFeatureCommands() *cobra.Command {
 			if c.Name() != clusterFeatureListCmdLabel {
 				featureName, err = extractFeatureArgument(c, args)
 				if err != nil {
-					return clitools.FailureResponse(err)
+					return cli.FailureResponse(err)
 				}
 			}
 			return nil
@@ -873,97 +947,133 @@ func clusterFeatureListAction(c *cobra.Command, args []string) (ferr error) {
 
 	all, err := c.Flags().GetBool("all")
 	if err != nil {
-		return err
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
 	}
 
 	features, err := ClientSession.Cluster.ListFeatures(clusterName, all, 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 	}
 
-	return clitools.SuccessResponse(features)
+	return cli.SuccessResponse(features)
 }
 
 func clusterFeatureInspectAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, strings.Join(args, ", "))
 
-	details, err := ClientSession.Cluster.InspectFeature(clusterName, featureName, c.Flags().GetBool("embedded"), 0) // FIXME: set timeout
+	embedded, err := c.Flags().GetBool("all")
 	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
 	}
 
-	return clitools.SuccessResponse(details)
+	details, err := ClientSession.Cluster.InspectFeature(clusterName, featureName, embedded, 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
+	}
+
+	return cli.SuccessResponse(details)
 }
 
 func clusterFeatureExportAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, strings.Join(args, ", "))
 
-	export, err := ClientSession.Cluster.ExportFeature(clusterName, featureName, c.Flags().GetBool("embedded"), 0) // FIXME: set timeout
+	embedded, err := c.Flags().GetBool("embedded")
+	if err != nil {
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+	}
+
+	export, err := ClientSession.Cluster.ExportFeature(clusterName, featureName, embedded, 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 	}
 
-	if c.Flags().GetBool("raw") {
-		return clitools.SuccessResponse(export.Export)
+	raw, err := c.Flags().GetBool("raw")
+	if err != nil {
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
 	}
 
-	return clitools.SuccessResponse(export)
+	if raw {
+		return cli.SuccessResponse(export.Export)
+	}
+
+	return cli.SuccessResponse(export)
 }
 
 func clusterFeatureAddAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-	values := parametersToMap(c.Flags().GetStringSlice("param"))
+	parameters, err := c.Flags().GetStringSlice("param")
+	if err != nil {
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+	}
+
+	values := parametersToMap(parameters)
+
 	settings := protocol.FeatureSettings{}
-	settings.SkipProxy = c.Flags().GetBool("skip-proxy")
+	settings.SkipProxy, err = c.Flags().GetBool("skip-proxy")
+	if err != nil {
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+	}
 
 	if err := ClientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+		return cli.FailureResponse(cli.ExitOnRPC(msg))
 	}
-	return clitools.SuccessResponse(nil)
+	return cli.SuccessResponse(nil)
 }
 
 func clusterFeatureCheckAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-	values := parametersToMap(c.Flags().GetStringSlice("param"))
+	parameters, err := c.Flags().GetStringSlice("param")
+	if err != nil {
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+	}
+
+	values := parametersToMap(parameters)
 	settings := protocol.FeatureSettings{}
 
-	if err := ClientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0); err != nil { // FIXME: define duration
+	err = ClientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0)
+	if err != nil { // FIXME: define duration
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error checking Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+		return cli.FailureResponse(cli.ExitOnRPC(msg))
 	}
 
 	msg := fmt.Sprintf("Feature '%s' found on cluster '%s'", featureName, clusterName)
-	return clitools.SuccessResponse(msg)
+	return cli.SuccessResponse(msg)
 }
 
 func clusterFeatureRemoveAction(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-	values := parametersToMap(c.Flags().GetStringSlice("param"))
+	parameters, err := c.Flags().GetStringSlice("param")
+	if err != nil {
+		return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+	}
+
+	values := parametersToMap(parameters)
 	settings := protocol.FeatureSettings{}
 	// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
-	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
+	//       will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 	settings.SkipProxy = true
 
 	if err := ClientSession.Cluster.RemoveFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to remove Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+		return cli.FailureResponse(cli.ExitOnRPC(msg))
 	}
-	return clitools.SuccessResponse(nil)
+
+	return cli.SuccessResponse(nil)
 }
 
 // clusterNodeCommands handles 'safescale cluster node' commands
@@ -978,7 +1088,7 @@ func clusterNodeCommands() *cobra.Command {
 			if c.Name() != clusterNodeListCmdLabel {
 				nodeName, err = extractNodeArgument(args)
 				if err != nil {
-					return clitools.FailureResponse(err)
+					return cli.FailureResponse(err)
 				}
 			}
 			return nil
@@ -1013,7 +1123,7 @@ func clusterNodeListCommand() *cobra.Command {
 
 			list, err := ClientSession.Cluster.ListNodes(clusterName, 0)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 
 			for _, host := range list.Nodes {
@@ -1022,7 +1132,7 @@ func clusterNodeListCommand() *cobra.Command {
 					"id":   host.GetId(),
 				})
 			}
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 	return out
@@ -1042,9 +1152,9 @@ func clusterNodeInspectCommand() *cobra.Command {
 			host, err := ClientSession.Cluster.InspectNode(clusterName, nodeName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(host)
+			return cli.SuccessResponse(host)
 		},
 	}
 	return out
@@ -1061,21 +1171,28 @@ func clusterNodeDeleteCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Use, strings.Join(args, ", "))
 
 			nodeList := args[1:]
-			yes := c.Flags().GetBool("yes")
-			force := c.Flags().GetBool("force")
+			yes, err := c.Flags().GetBool("yes")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
 
-			_, err := ClientSession.Cluster.Inspect(clusterName, 0)
+			force, err := c.Flags().GetBool("force")
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			_, err = ClientSession.Cluster.Inspect(clusterName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
 			}
 
 			if len(nodeList) == 0 {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, "missing nodes"))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidArgument, "missing nodes"))
 			}
 
 			if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
-				return clitools.SuccessResponse("Aborted")
+				return cli.SuccessResponse("Aborted")
 			}
 			if force {
 				logrus.Println("'-f,--force' does nothing yet")
@@ -1084,9 +1201,10 @@ func clusterNodeDeleteCommand() *cobra.Command {
 			err = ClientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -1111,9 +1229,10 @@ func clusterNodeStopCommand() *cobra.Command {
 			err := ClientSession.Cluster.StopNode(clusterName, nodeName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -1133,9 +1252,10 @@ func clusterNodeStartCommand() *cobra.Command {
 			err := ClientSession.Cluster.StartNode(clusterName, nodeName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -1154,7 +1274,7 @@ func clusterNodeStateCommand() *cobra.Command {
 			resp, err := ClientSession.Cluster.StateNode(clusterName, nodeName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
 
 			formatted := make(map[string]interface{})
@@ -1162,7 +1282,7 @@ func clusterNodeStateCommand() *cobra.Command {
 			converted := converters.HostStateFromProtocolToEnum(resp.Status)
 			formatted["status_code"] = converted
 			formatted["status_label"] = converted.String()
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 	return out
@@ -1180,7 +1300,7 @@ func clusterMasterCommands() *cobra.Command {
 			if c.Name() != clusterMasterListCmdLabel {
 				masterName, err = extractNodeArgument(args)
 				if err != nil {
-					return clitools.FailureResponse(err)
+					return cli.FailureResponse(err)
 				}
 			}
 			return nil
@@ -1215,7 +1335,7 @@ func clusterMasterListCommand() *cobra.Command {
 			list, err := ClientSession.Cluster.ListMasters(clusterName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
 
 			for _, host := range list.Nodes {
@@ -1224,7 +1344,7 @@ func clusterMasterListCommand() *cobra.Command {
 					"id":   host.GetId(),
 				})
 			}
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 	return out
@@ -1244,9 +1364,10 @@ func clusterMasterInspectCommand() *cobra.Command {
 			host, err := ClientSession.Cluster.InspectNode(clusterName, masterName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(host)
+
+			return cli.SuccessResponse(host)
 		},
 	}
 	return out
@@ -1266,9 +1387,10 @@ func clusterMasterStopCommand() *cobra.Command {
 			err := ClientSession.Cluster.StopMaster(clusterName, masterName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -1288,9 +1410,10 @@ func clusterMasterStartCommand() *cobra.Command {
 			err := ClientSession.Cluster.StartMaster(clusterName, masterName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(nil)
+
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -1309,7 +1432,7 @@ func clusterMasterStateCommand() *cobra.Command {
 			resp, err := ClientSession.Cluster.StateMaster(clusterName, masterName, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
 
 			formatted := make(map[string]interface{})
@@ -1317,7 +1440,7 @@ func clusterMasterStateCommand() *cobra.Command {
 			converted := converters.HostStateFromProtocolToEnum(resp.Status)
 			formatted["status_code"] = converted
 			formatted["status_label"] = converted.String()
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 	return out
@@ -1353,7 +1476,7 @@ func clusterAnsibleInventoryCommand() *cobra.Command {
 			master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 			if err != nil {
 				msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+				return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 			}
 
 			// Check for feature
@@ -1362,7 +1485,7 @@ func clusterAnsibleInventoryCommand() *cobra.Command {
 			if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
-				return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+				return cli.FailureResponse(cli.ExitOnRPC(msg))
 			}
 
 			// Format arguments
@@ -1410,10 +1533,10 @@ func clusterAnsibleInventoryCommand() *cobra.Command {
 			retcode, _ /*stdout*/, stderr, xerr := ClientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 			if xerr != nil {
 				msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+				return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 			}
 			if retcode != 0 {
-				return cli.Exit(stderr, retcode)
+				return cli.NewExitError(stderr, retcode)
 			}
 			return nil
 		},
@@ -1436,7 +1559,7 @@ func clusterAnsibleRunCommand() *cobra.Command {
 			master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 			if err != nil {
 				msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+				return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 			}
 
 			// Check for feature
@@ -1445,7 +1568,7 @@ func clusterAnsibleRunCommand() *cobra.Command {
 			if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
-				return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+				return cli.FailureResponse(cli.ExitOnRPC(msg))
 			}
 
 			// Format arguments
@@ -1496,10 +1619,10 @@ func clusterAnsibleRunCommand() *cobra.Command {
 			retcode, _ /*stdout*/, stderr, xerr := ClientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 			if xerr != nil {
 				msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+				return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 			}
 			if retcode != 0 {
-				return cli.Exit(stderr, retcode)
+				return cli.NewExitError(stderr, retcode)
 			}
 			return nil
 		},
@@ -1525,7 +1648,7 @@ func clusterAnsiblePlaybookCommand() *cobra.Command {
 			if err := ClientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
-				return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+				return cli.FailureResponse(cli.ExitOnRPC(msg))
 			}
 
 			// Format arguments
@@ -1592,14 +1715,14 @@ func clusterAnsiblePlaybookCommand() *cobra.Command {
 			// Must set playbook file
 			if playbookFile == "" {
 				msg := fmt.Sprintf("Expect a playbook file for cluster '%s'", clusterName)
-				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+				return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 			}
 
 			// Check local file exists
 			if _, err := os.Stat(playbookFile); err != nil {
 				if os.IsNotExist(err) {
 					msg := fmt.Sprintf("Playbook file not found for cluster '%s'", clusterName)
-					return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+					return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 				}
 			}
 
@@ -1693,26 +1816,26 @@ func executeCommand(command string, files *cmdline.RemoteFilesHandler, outs outp
 	master, err := ClientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 	if err != nil {
 		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
-		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 
 	if files != nil && files.Count() > 0 {
-		if !appwide.Config.Debug {
+		if !global.Config.Debug {
 			defer files.Cleanup(ClientSession, master.GetId())
 		}
 		xerr := files.Upload(ClientSession, master.GetId())
 		if xerr != nil {
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, xerr.Error())
+			return cli.ExitOnErrorWithMessage(exitcode.RPC, xerr.Error())
 		}
 	}
 
 	retcode, _, _, xerr := ClientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), 0)
 	if xerr != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
-		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		return cli.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		return cli.Exit("" /*msg*/, retcode)
+		return cli.NewExitError("", retcode)
 	}
 	return nil
 }
@@ -1733,12 +1856,12 @@ func extractClusterName(c *cobra.Command, args []string) (ferr error) {
 	defer fail.OnPanic(&ferr)
 	if len(args) < 1 {
 		_ = c.Usage()
-		return clitools.ExitOnInvalidArgument("Missing mandatory argument CLUSTERNAME.")
+		return cli.ExitOnInvalidArgument("Missing mandatory argument CLUSTERNAME.")
 	}
 	clusterName = args[0]
 	if clusterName == "" {
 		_ = c.Usage()
-		return clitools.ExitOnInvalidArgument("Invalid argument CLUSTERNAME.")
+		return cli.ExitOnInvalidArgument("Invalid argument CLUSTERNAME.")
 	}
 
 	return nil

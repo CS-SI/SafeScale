@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 )
 
 // AssembleListenString constructs the listen string we will use in net.Listen()

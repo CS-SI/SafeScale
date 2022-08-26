@@ -1,6 +1,3 @@
-//go:build fixme
-// +build fixme
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -32,7 +29,7 @@ import (
 
 var templateCmdName = "template"
 
-// TemplateCommand command
+// TemplateCommands defines the allowed commands and flags of 'safescale template'
 func TemplateCommands() *cobra.Command {
 	out := &cobra.Command{
 		Use:   "template",
@@ -57,11 +54,22 @@ func templateListCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Name(), strings.Join(args, ", "))
 
-			templates, err := ClientSession.Template.List(c.Flags().GetBool("all"), c.Flags().GetBool("scanned-only"), 0)
+			all, xerr := c.Flags().GetBool("all")
+			if xerr != nil {
+				return xerr
+			}
+
+			scannedOnly, xerr := c.Flags().GetBool("scanned-only")
+			if xerr != nil {
+				return xerr
+			}
+
+			templates, err := ClientSession.Template.List(all, scannedOnly, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
 			}
+
 			return clitools.SuccessResponse(templates.GetTemplates())
 		},
 	}
@@ -82,15 +90,13 @@ func templateMatchCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Name(), strings.Join(args, ", "))
 
-			var sizing []string
-			sizing = append(sizing, args[0])
-			sizing = append(sizing, args[1:]...)
-			sizingAsString := strings.Join(sizing, ",")
+			sizingAsString := strings.Join(args, ",")
 			templates, err := ClientSession.Template.Match(sizingAsString, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
 			}
+
 			return clitools.SuccessResponse(templates.GetTemplates())
 		},
 	}
@@ -112,6 +118,7 @@ func templateInspectCommand() *cobra.Command {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of template information", false).Error())))
 			}
+
 			return clitools.SuccessResponse(template)
 		},
 	}

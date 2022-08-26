@@ -9,13 +9,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client/commands"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/spf13/cobra"
 )
 
-// once is used to ensure some code cannot be called multiple times during cleanup
-var once sync.Once
+// cleanupOnce is used to ensure some code cannot be called multiple times during cleanup
+var cleanupOnce sync.Once
 
 func Cleanup() {
 	var crash error
@@ -30,8 +30,7 @@ func Cleanup() {
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		once.Do(func() {
-
+		cleanupOnce.Do(func() {
 			err = commands.ClientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
 			if err != nil {
 				fmt.Printf("failed to stop the process %v\n", err)
@@ -43,18 +42,18 @@ func Cleanup() {
 }
 
 // SetCommands sets the commands to react to
-func SetCommands(app *cobra.Command) {
-	app.AddCommand(
-		// commands.NetworkCommands(),
-		// commands.TenantCommands(),
-		// commands.HostCommands(),
-		// commands.VolumeCommands(),
-		// commands.SSHCommands(),
+func SetCommands() {
+	global.AppCtrl.AddCommand(
+		commands.NetworkCommands(),
+		commands.TenantCommands(),
+		commands.HostCommands(),
+		commands.VolumeCommands(),
+		commands.SSHCommands(),
 		commands.BucketCommands(),
-		// commands.ShareCommands(),
+		commands.ShareCommands(),
 		commands.ImageCommands(),
-		// commands.TemplateCommands(),
-		// commands.ClusterCommands(),
+		commands.TemplateCommands(),
+		commands.ClusterCommands(),
 		commands.LabelCommands(),
 		commands.TagCommands(),
 	)

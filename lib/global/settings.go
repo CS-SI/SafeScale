@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package appwide
+package global
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -60,7 +60,8 @@ type settings struct {
 			NoVerify bool     // Whether to ignore TLS verification checks (cert validity, hostname). *DO NOT USE IN PRODUCTION*.
 		}
 		Terraform struct {
-			ExecPath string
+			ExecPath      string
+			StateInConsul bool
 		}
 		Consul struct { // Consul is used to store terraform states, and in the future SafeScale metadata
 			ExecPath string // Contains the path of the internal consul binary
@@ -96,7 +97,8 @@ type settings struct {
 }
 
 var (
-	Config settings
+	Config                  settings                                               // Store global settings of the app
+	ValidConfigFilenameExts = []string{"json", "js", "yaml", "yml", "toml", "tml"} // contains list of accepted extension for configuration files
 
 	once sync.Once
 )

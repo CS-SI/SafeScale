@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -33,13 +34,12 @@ func runCommand() *cobra.Command {
 		Use:   runCmdLabel,
 		Short: "start SafeScale Web UI",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logrus.Tracef("SafeScale command: %s %s with args '%s'", common.WebUICmdLabel, runCmdLabel, strings.Join(args, ", "))
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", global.WebUICmdLabel, runCmdLabel, strings.Join(args, ", "))
 
 			return run()
 		},
 	}
 
-	common.AddFlags(out)
 	addCommonFlags(out)
 	flags := out.Flags()
 	flags.StringP("listen", "L", "localhost:50080", "Defines the backend server (default: localhost:50080)")
@@ -68,7 +68,6 @@ func stopCommand() *cobra.Command {
 		},
 	}
 
-	common.AddFlags(out)
 	addCommonFlags(out)
 
 	return out

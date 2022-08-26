@@ -18,9 +18,16 @@
 package backend
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
+	"os"
+	"reflect"
+	"sync"
+	"syscall"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/external"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -47,6 +54,22 @@ func startBackend(cmd *cobra.Command) error {
 	suffix, err := config.Check(cmd)
 	if err != nil {
 		return fail.Wrap(err)
+	}
+
+	ctx, cancel := context.WithCancel(cmd.Context())
+	defer cancel()
+
+	// If terraform state has to be stored in consul, check consul is responding
+	if appwide.Config.Backend.Terraform.StateInConsul {
+		// If we use "internal" consul, starts consul
+		if appwide.Config.Backend.Consul.Internal {
+			xerr := external.StartConsulServer(ctx)
+			if xerr != nil {
+				return xerr
+			}
+		}
+
+		// check consul is working
 	}
 
 	logrus.Infof("Starting daemon, listening on '%s', using metadata suffix '%s'", appwide.Config.Backend.Listen, suffix)
@@ -98,4 +121,109 @@ func startBackend(cmd *cobra.Command) error {
 	}
 
 	return nil
+}
+
+var consulLauncher sync.Once
+
+func startConsulAgent(ctx context.Context) (ferr fail.Error) {
+	ferr = nil
+	consulLauncher.Do(func() {
+		// creates configuration if not present
+		consulRootDir := appwide.Config.Folders.ShareDir + "consul"
+		consulEtcDir := consulRootDir + "/etc"
+		consulConfigFile := consulEtcDir + "/config.?"
+		st, err := os.Stat(consulConfigFile)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				content := `
+bootstrap = true
+ui_config {
+  enabled = true
+}
+data_dir = data
+log_level = "INFO"
+addresses {
+  http = "0.0.0.0"
+}
+connect {
+  enabled = false
+}`
+				file, err := os.Create(consulConfigFile)
+				if err != nil {
+					ferr = fail.Wrap(err, "failed to create consul configuration file")
+					return
+				}
+
+				_, err = file.WriteString(content)
+				if err != nil {
+					ferr = fail.Wrap(err, "failed to write content of consul configuration file")
+					return
+				}
+
+				err = file.Close()
+				if err != nil {
+					ferr = fail.Wrap(err, "failed to close consul configuration file")
+					return
+				}
+			} else {
+				ferr = fail.Wrap(err)
+				return
+			}
+		} else if st.IsDir() {
+			ferr = fail.NotAvailableError("'%s' is a directory; should be a file", consulConfigFile)
+			return
+		}
+
+		// Starts consul agent
+		args := []string{"agent", "-config-dir=etc", "-server", "-datacenter=safescale"}
+		attr := &os.ProcAttr{
+			Sys: &syscall.SysProcAttr{
+				Chroot: appwide.Config.Folders.ShareDir + "consul",
+			},
+		}
+		proc, err := os.StartProcess(appwide.Config.Backend.Consul.ExecPath, args, attr)
+		if err != nil {
+			ferr = fail.Wrap(err, "failed to start consul server")
+			return
+		}
+
+		var doneCh chan any
+
+		waitConsulExitFunc := func(process *os.Process) {
+			ps, err := process.Wait()
+			if err != nil {
+				ferr = fail.Wrap(err)
+				doneCh <- ferr
+				return
+			}
+
+			ws, ok := ps.Sys().(syscall.WaitStatus)
+			if ok {
+				doneCh <- ps
+				return
+			}
+
+			doneCh <- ps.Sys()
+		}
+
+		waitConsulExitFunc(proc)
+
+		select {
+		case <-ctx.Done():
+			proc.Signal(os.Interrupt)
+			return
+		case val := <-doneCh:
+			switch casted := val.(type) {
+			case int:
+				logrus.Debugf("consul ends with status '%d'", casted)
+			case *os.ProcessState:
+				ferr = fail.NewError("consul exit with an unhandled state of type '%s': %v", reflect.TypeOf(casted).String(), casted)
+			default:
+				ferr = fail.NewError("consul exit with an unexpected state of type '%s': %v", reflect.TypeOf(val).String(), val)
+			}
+			return
+		}
+	})
+
+	return ferr
 }

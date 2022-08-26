@@ -23,20 +23,17 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
-	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-)
 
-var cleanupOnce sync.Once
+	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+)
 
 // SetCommands initializes
 func SetCommands(rootCmd *cobra.Command) *cobra.Command {
 	out := &cobra.Command{
-		Use:     common.BackendCmdLabel,
+		Use:     global.BackendCmdLabel,
 		Aliases: []string{"daemon"},
 		Short:   "Start SafeScale backend",
 	}
@@ -56,16 +53,17 @@ func SetCommands(rootCmd *cobra.Command) *cobra.Command {
 	return out
 }
 
+var cleanupOnce sync.Once
+
+// Cleanup ensures correct cleaning of backend on exit
 func Cleanup() {
 	cleanupOnce.Do(func() {
 		fmt.Println("Cleaning up...")
-
-		exit.Exit(1)
 	})
 }
 
 // AddPreRunE completes command PreRun with the necessary for backend
-func addPersistentPreRunE(cmd *cobra.Command) error {
+func addPersistentPreRunE(cmd *cobra.Command) {
 	previousCB := cmd.PersistentPreRunE
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if previousCB != nil {
@@ -75,12 +73,12 @@ func addPersistentPreRunE(cmd *cobra.Command) error {
 			}
 		}
 
-		if appwide.Config.ReadConfigFile != "" && appwide.Config.Folders.EtcDir != "" {
-			if filepath.Dir(appwide.Config.ReadConfigFile) != appwide.Config.Folders.EtcDir {
-				logrus.Infof("For consistency, you should move '%s' file in folder '%s'", appwide.Config.ReadConfigFile+"."+appwide.Config.ReadConfigFileExt, appwide.Config.Folders.EtcDir)
+		if global.Config.ReadConfigFile != "" && global.Config.Folders.EtcDir != "" {
+			if filepath.Dir(global.Config.ReadConfigFile) != global.Config.Folders.EtcDir {
+				logrus.Infof("For consistency, you should move '%s' file in folder '%s'", global.Config.ReadConfigFile+"."+global.Config.ReadConfigFileExt, global.Config.Folders.EtcDir)
 			}
 		} else {
-			_, err := os.Stat(appwide.Config.Folders.EtcDir + "/settings.yml")
+			_, err := os.Stat(global.Config.Folders.EtcDir + "/settings.yml")
 			if err != nil {
 				// create settings files from current Config
 
@@ -98,5 +96,4 @@ func addPersistentPreRunE(cmd *cobra.Command) error {
 
 		return nil
 	}
-	return nil
 }

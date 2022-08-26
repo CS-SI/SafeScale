@@ -22,6 +22,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -51,7 +52,7 @@ func main() {
 	// }...)
 
 	// Finally, try the remaining possibilities
-	app, err := common.NewApp()
+	rootCmd, err := global.NewApp()
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

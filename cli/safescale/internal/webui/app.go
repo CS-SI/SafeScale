@@ -18,19 +18,16 @@
 package webui
 
 import (
-	"fmt"
-
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
-func SetCommands(rootCmd *cobra.Command) *cobra.Command {
+func SetCommands() {
 	out := &cobra.Command{
-		Use:   common.WebUICmdLabel,
+		Use:   global.WebUICmdLabel,
 		Short: "Handles SafeScale web UI",
 	}
 	out.AddCommand(
@@ -39,14 +36,10 @@ func SetCommands(rootCmd *cobra.Command) *cobra.Command {
 	)
 	addPreRunE(out)
 
-	if rootCmd != nil {
-		rootCmd.AddCommand(out)
-		return rootCmd
-	}
-
-	return out
+	global.AppCtrl.AddCommand(out)
 }
 
+// Cleanup ensure proper cleaning of WebUI on exit
 func Cleanup() {
 	var crash error
 	defer fail.SilentOnPanic(&crash) // nolint
@@ -70,11 +63,6 @@ func addPreRunE(cmd *cobra.Command) error {
 		}
 		if help {
 			return fail.NotAvailableError()
-		}
-
-		xerr := appwide.LoadSettings(cmd, args)
-		if xerr != nil {
-			return fmt.Errorf(xerr.Error())
 		}
 
 		// Define trace settings of the application (what to trace if trace is wanted)

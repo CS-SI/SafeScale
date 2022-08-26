@@ -1,6 +1,3 @@
-//go:build fixme
-// +build fixme
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -29,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
@@ -66,12 +62,12 @@ func volumeListCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
-			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return err
 			}
 
-			volumes, err := ClientSession.Volume.List(c.Flags().GetBool("all"), 0)
+			volumes, err := ClientSession.Volume.List(all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of volumes", false).Error())))
@@ -80,7 +76,7 @@ func volumeListCommand() *cobra.Command {
 		},
 	}
 
-	out.Flags().BoolP("all", "a", "List all Volumes on tenant (not only those created by SafeScale)")
+	out.Flags().BoolP("all", "a", false, "List all Volumes on tenant (not only those created by SafeScale)")
 
 	return out
 }
@@ -104,6 +100,7 @@ func volumeInspectCommand() *cobra.Command {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of volume", false).Error())))
 			}
+
 			return clitools.SuccessResponse(toDisplayableVolumeInfo(volumeInfo))
 		},
 	}
@@ -124,15 +121,12 @@ func volumeDeleteCommand() *cobra.Command {
 				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
 			}
 
-			var volumeList []string
-			volumeList = append(volumeList, args[0])
-			volumeList = append(volumeList, args[1:]...)
-
-			err := ClientSession.Volume.Delete(volumeList, 0)
+			err := ClientSession.Volume.Delete(args, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of volume", false).Error())))
 			}
+
 			return clitools.SuccessResponse(nil)
 		},
 	}
@@ -153,23 +147,28 @@ func volumeCreateCommand() *cobra.Command {
 				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name>. "))
 			}
 
-			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
-			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			speed, err := c.Flags().GetString("speed")
+			if err != nil {
+				return err
 			}
 
-			speed := c.Flags().GetString("speed")
 			volSpeed, ok := protocol.VolumeSpeed_value["VS_"+speed]
 			if !ok {
 				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
 			}
-			volSize := int32(c.Flags().GetInt("size"))
+
+			volSize, err := c.Flags().GetInt("size")
+			if err != nil {
+				return err
+			}
+
 			if volSize <= 0 {
 				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize)))
 			}
+
 			def := protocol.VolumeCreateRequest{
 				Name:  args[0],
-				Size:  volSize,
+				Size:  int32(volSize),
 				Speed: protocol.VolumeSpeed(volSpeed),
 			}
 
@@ -178,6 +177,7 @@ func volumeCreateCommand() *cobra.Command {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of volume", true).Error())))
 			}
+
 			return clitools.SuccessResponse(toDisplayableVolume(volume))
 		},
 	}
@@ -203,24 +203,39 @@ func volumeAttachCommand() *cobra.Command {
 				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 			}
 
-			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
-			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			def := protocol.VolumeAttachmentRequest{
+				Host:   &protocol.Reference{Name: args[1]},
+				Volume: &protocol.Reference{Name: args[0]},
 			}
 
-			def := protocol.VolumeAttachmentRequest{
-				Format:      c.Flags().GetString("format"),
-				DoNotFormat: c.Flags().GetBool("do-not-format"),
-				DoNotMount:  c.Flags().GetBool("do-not-mount"),
-				MountPath:   c.Flags().GetString("path"),
-				Host:        &protocol.Reference{Name: c.Args().Get(1)},
-				Volume:      &protocol.Reference{Name: c.Args().Get(0)},
+			var err error
+			flags := c.Flags()
+			def.Format, err = flags.GetString("format")
+			if err != nil {
+				return err
 			}
-			err := ClientSession.Volume.Attach(&def, 0)
+
+			def.DoNotFormat, err = flags.GetBool("do-not-format")
+			if err != nil {
+				return err
+			}
+
+			def.DoNotMount, err = flags.GetBool("do-not-mount")
+			if err != nil {
+				return err
+			}
+
+			def.MountPath, err = flags.GetString("path")
+			if err != nil {
+				return err
+			}
+
+			err = ClientSession.Volume.Attach(&def, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "attach of volume", true).Error())))
 			}
+
 			return clitools.SuccessResponse(nil)
 		},
 	}
@@ -253,6 +268,7 @@ func volumeDetachCommand() *cobra.Command {
 				err = fail.FromGRPCStatus(err)
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unattach of volume", true).Error())))
 			}
+
 			return clitools.SuccessResponse(nil)
 		},
 	}
