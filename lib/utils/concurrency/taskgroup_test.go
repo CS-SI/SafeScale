@@ -395,7 +395,7 @@ func TestStatesWF(t *testing.T) {
 	st, xerr := overlord.Status()
 	require.Nil(t, xerr)
 	if st != DONE {
-		t.Errorf("We should be DONE but we are: %s", st)
+		t.Errorf("We should be DONE but we are: %d", st)
 	}
 
 	// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
@@ -453,7 +453,7 @@ func TestTimeoutStateWF(t *testing.T) {
 	require.NotNil(t, st)
 	if st != RUNNING {
 		t.Errorf(
-			"This should be a RUNNING and it's not: %s", st,
+			"This should be a RUNNING and it's not: %d", st,
 		) // VPL: overlord in itself never timed out... expected value is RUNNING
 	} // To make TaskGroup times out, you have to use a Deadline on its parent context
 
@@ -465,7 +465,7 @@ func TestTimeoutStateWF(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 	if st != DONE {
-		t.Errorf("This should be a DONE and it's not: %s", st)
+		t.Errorf("This should be a DONE and it's not: %d", st)
 	}
 }
 

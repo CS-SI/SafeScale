@@ -48,6 +48,14 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		return nil, 0, rerr
 	}
 
+	if len(tokens) == 0 {
+		return nil, 0, fail.SyntaxError("'%s' is invalid", in)
+	}
+
+	if len(tokens) != len(strings.Split(in, ",")) {
+		return nil, 0, fail.SyntaxError("'%s' is invalid", in)
+	}
+
 	var err error
 	out := abstract.HostSizingRequirements{}
 	if t, ok := tokens["cpu"]; ok {
@@ -458,7 +466,24 @@ func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 		}
 		parsed = append(parsed, apa)
 	}
-	return merge(parsed...), nil
+
+	validKeys := []string{"cpu", "count", "cpufreq", "gpu", "ram", "disk", "template"}
+
+	tokenmap := merge(parsed...)
+	for k := range tokenmap {
+		found := false
+		for _, v := range validKeys {
+			if k == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fail.SyntaxError("token not recognized in sizing string: '%s'", k)
+		}
+	}
+
+	return tokenmap, nil
 }
 
 // parseSizingString transforms a string to a list of tokens

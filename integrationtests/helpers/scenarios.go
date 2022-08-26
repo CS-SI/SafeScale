@@ -89,6 +89,7 @@ func definedScenarios() []section {
 		"securitygroups",
 		"ostests",
 		"validprovider",
+		"sshs",
 	}
 }
 
