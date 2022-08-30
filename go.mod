@@ -18,7 +18,7 @@ require (
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gofuzz v1.2.0
-	github.com/gophercloud/gophercloud v0.25.0
+	github.com/gophercloud/gophercloud v1.0.0
 	github.com/itchyny/gojq v0.12.8
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
