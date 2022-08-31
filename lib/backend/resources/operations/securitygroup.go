@@ -1339,11 +1339,6 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 		return xerr
 	}
 
-	sgid, err := instance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
-	}
-
 	// -- Remove Hosts attached to Subnet referenced in Security Group
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
@@ -1372,17 +1367,6 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, sgid, params.subnetID)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					// consider a Security Group not found as a successful unbind, and continue to update metadata
-					debug.IgnoreError(innerXErr)
-				default:
-					return innerXErr
-				}
-			}
-
 			// updates security group metadata
 			delete(sgsV1.ByID, params.subnetID)
 			delete(sgsV1.ByName, params.subnetName)
@@ -1405,11 +1389,6 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 		return fail.InvalidParameterError("rs", "cannot be empty string")
 	}
 
-	sgid, err := instance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
-	}
-
 	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
@@ -1426,17 +1405,6 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 				subnetName = b.Name
 			} else if subnetID, ok = sgsV1.ByName[subnetRef]; ok {
 				subnetName = subnetRef
-			}
-			if subnetID != "" {
-				if innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, sgid, subnetID); innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// consider a Security Group not found as a successful unbind, and continue to update metadata
-						debug.IgnoreError(innerXErr)
-					default:
-						return innerXErr
-					}
-				}
 			}
 
 			// updates security group metadata

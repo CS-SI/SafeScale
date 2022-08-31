@@ -381,12 +381,6 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 			return
 		}
 
-		sgid, err := instance.GetID()
-		if err != nil {
-			chRes <- result{fail.ConvertError(err)}
-			return
-		}
-
 		// Unbind Security Group from Hosts attached to Subnet
 		_, xerr = instance.taskUnbindFromHostsAttachedToSubnet(task, params)
 		if xerr != nil {
@@ -400,17 +394,6 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 				sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 				if !ok {
 					return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, sgid, params.subnetID)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// consider a Security Group not found as a successful unbind, and continue to update metadata
-						debug.IgnoreError(innerXErr)
-					default:
-						return innerXErr
-					}
 				}
 
 				// updates security group metadata
