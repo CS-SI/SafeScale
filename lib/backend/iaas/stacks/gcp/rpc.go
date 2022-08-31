@@ -182,6 +182,7 @@ func (s stack) rpcGetSubnetByID(ctx context.Context, id string) (*compute.Subnet
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -344,6 +345,7 @@ func (s stack) rpcListSubnets(ctx context.Context, filter string) ([]*compute.Su
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -384,6 +386,7 @@ func (s stack) rpcGetFirewallRuleByName(ctx context.Context, name string) (*comp
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -419,6 +422,7 @@ func (s stack) rpcGetFirewallRuleByID(ctx context.Context, id string) (*compute.
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -561,6 +565,7 @@ func (s stack) rpcListFirewallRules(ctx context.Context, networkRef string, ids 
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -728,6 +733,7 @@ func (s stack) rpcGetNetworkByID(ctx context.Context, id string) (*compute.Netwo
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -756,6 +762,7 @@ func (s stack) rpcGetNetworkByName(ctx context.Context, name string) (*compute.N
 				resp = ans
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return nil
@@ -863,6 +870,7 @@ func (s stack) rpcGetRouteByName(ctx context.Context, name string) (*compute.Rou
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -1004,6 +1012,7 @@ func (s stack) rpcListImages(ctx context.Context) ([]*compute.Image, fail.Error)
 					if resp != nil {
 						if resp.HTTPStatusCode != 200 {
 							logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+							return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 						}
 					}
 					return err
@@ -1050,6 +1059,7 @@ func (s stack) rpcGetImageByID(ctx context.Context, id string) (*compute.Image, 
 					if resp != nil {
 						if resp.HTTPStatusCode != 200 {
 							logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+							return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 						}
 					}
 					return err
@@ -1099,6 +1109,7 @@ func (s stack) rpcListMachineTypes(ctx context.Context) ([]*compute.MachineType,
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1139,6 +1150,7 @@ func (s stack) rpcGetMachineType(ctx context.Context, id string) (*compute.Machi
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -1176,6 +1188,7 @@ func (s stack) rpcListInstances(ctx context.Context) ([]*compute.Instance, fail.
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1363,6 +1376,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -1394,6 +1408,7 @@ func (s stack) rpcResetStartupScriptOfInstance(ctx context.Context, id string) f
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -1523,6 +1538,7 @@ func (s stack) rpcCreateExternalAddress(ctx context.Context, name string, global
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1539,6 +1555,7 @@ func (s stack) rpcCreateExternalAddress(ctx context.Context, name string, global
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1576,6 +1593,7 @@ func (s stack) rpcGetInstance(ctx context.Context, ref string) (*compute.Instanc
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -1666,6 +1684,7 @@ func (s stack) rpcGetExternalAddress(ctx context.Context, name string, global bo
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1682,6 +1701,7 @@ func (s stack) rpcGetExternalAddress(ctx context.Context, name string, global bo
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1849,6 +1869,7 @@ func (s stack) rpcListZones(ctx context.Context) ([]*compute.Zone, fail.Error) {
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1889,6 +1910,7 @@ func (s stack) rpcListRegions(ctx context.Context) ([]*compute.Region, fail.Erro
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -1936,6 +1958,7 @@ func (s stack) rpcAddTagsToInstance(ctx context.Context, hostID string, tags []s
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -2018,6 +2041,7 @@ func (s stack) rpcRemoveTagsFromInstance(ctx context.Context, hostID string, tag
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -2095,6 +2119,7 @@ func (s stack) rpcListNetworks(ctx context.Context) (_ []*compute.Network, ferr 
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+						return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 					}
 				}
 				return err
@@ -2141,6 +2166,7 @@ func (s stack) rpcDeleteNetworkByID(ctx context.Context, id string) (ferr fail.E
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
@@ -2226,6 +2252,7 @@ func (s stack) rpcGetDisk(ctx context.Context, ref string) (*compute.Disk, fail.
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+					return fail.NewError("received http error code %d", resp.HTTPStatusCode)
 				}
 			}
 			return err
