@@ -35,8 +35,8 @@ type ClusterDefaults struct {
 	MasterTemplateID  string                              `json:"master_template_id,omitempty"`  // template ID used at creation for masters
 	NodeSizing        propertiesv2.HostSizingRequirements `json:"node_sizing,omitempty"`         // NodeSizing keeps the default node definition
 	NodeTemplateID    string                              `json:"node_template_id,omitempty"`    // template ID used at creation for nodes
-	Image             string                              `json:"image,omitempty"`               // Image keeps the default Linux image name to use
-	ImageID           string                              `json:"image_id,omitempty"`            // contains the ID of the image used at creation
+	Image             string                              `json:"image,omitempty"`               // Image contains the ID of the image used at creation
+	ImageID           string                              `json:"image_id,omitempty"`            // also contains the ID of the image used at creation (previous field was supposed to use Image NAME, but never did)
 	FeatureParameters []string                            `json:"feature_params,omitempty"`      // contains the parameters submitted for automatic installed Features during Cluster creation
 }
 

@@ -27,7 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -715,32 +714,6 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	}
 
 	return s.rpcDeleteSubnet(ctx, aws.String(id))
-}
-
-// BindSecurityGroupToSubnet binds a security group to a network
-// No bind of Security Group to Subnet at AWS; so always succeed
-func (s *stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return nil
-}
-
-// UnbindSecurityGroupFromSubnet unbinds a security group from a host
-// No bind of Security Group to Subnet at AWS; so always succeed
-func (s *stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return nil
 }
 
 // CreateVIP ...

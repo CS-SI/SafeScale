@@ -1684,14 +1684,6 @@ func (e *ServiceTest) DeleteSubnet(ctx context.Context, id string) fail.Error {
 	}
 	return nil
 }
-func (e *ServiceTest) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	e._survey("ServiceTest::BindSecurityGroupToSubnet (not implemented)")
-	return nil
-}
-func (e *ServiceTest) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	e._survey("ServiceTest::UnbindSecurityGroupFromSubnet (not implemented)")
-	return nil
-}
 
 /* VIP */
 

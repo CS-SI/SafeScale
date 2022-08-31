@@ -610,32 +610,6 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	return s.rpcDeleteSubnet(ctx, id)
 }
 
-// BindSecurityGroupToSubnet binds a Security Group to a Subnet
-// Actually does nothing for outscale
-func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID != "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return nil
-}
-
-// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-// Actually does nothing for outscale
-func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return nil
-}
-
 func (s stack) updateDefaultSecurityRules(ctx context.Context, sg osc.SecurityGroup) fail.Error {
 	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
 	rules = append(rules, s.createICMPPermissions()...)

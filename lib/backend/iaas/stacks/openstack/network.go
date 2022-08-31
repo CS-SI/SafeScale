@@ -795,44 +795,6 @@ func (s stack) removeSubnetFromRouter(ctx context.Context, routerID string, subn
 	)
 }
 
-// BindSecurityGroupToSubnet binds a security group to a subnet
-func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID != "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			var innerErr error
-			// FIXME: bind security group to port associated to subnet
-			return innerErr
-		},
-		NormalizeError,
-	)
-}
-
-// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			var innerErr error
-			// FIXME: unbind security group from port associated to subnet
-			return innerErr
-		},
-		NormalizeError,
-	)
-}
-
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
