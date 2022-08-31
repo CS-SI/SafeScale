@@ -479,44 +479,6 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	return nil
 }
 
-// BindSecurityGroupToSubnet binds a security group to a subnet
-func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID != "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			var innerErr error
-			// FIXME: bind security group to port associated to subnet
-			return innerErr
-		},
-		NormalizeError,
-	)
-}
-
-// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			var innerErr error
-			// FIXME: unbind security group from port associated to subnet
-			return innerErr
-		},
-		NormalizeError,
-	)
-}
-
 // AddPublicIPToVIP adds a public IP to VIP
 func (s stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
 	if valid.IsNil(s) {

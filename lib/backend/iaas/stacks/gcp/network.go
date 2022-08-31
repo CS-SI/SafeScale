@@ -291,34 +291,6 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Erro
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
-// ------ SecurityGroup methods ------
-
-// BindSecurityGroupToSubnet binds a security group to a subnet
-// Does actually nothing for GCP
-func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return nil
-}
-
-// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-// Does actually nothing for GCP
-func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if valid.IsNil(s) {
-		return fail.InvalidInstanceError()
-	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	return nil
-}
-
 // ------ Subnet methods ------
 
 // CreateSubnet creates a new subnet

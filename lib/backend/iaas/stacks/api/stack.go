@@ -101,10 +101,6 @@ type Stack interface {
 	ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error)
 	// DeleteSubnet deletes the subnet identified by id
 	DeleteSubnet(ctx context.Context, id string) fail.Error
-	// BindSecurityGroupToSubnet attaches a security group to a network
-	BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error
-	// UnbindSecurityGroupFromSubnet detaches a security group from a network
-	UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error
 
 	// CreateVIP ...
 	CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error)

@@ -452,26 +452,6 @@ func (s ProviderProxy) DeleteSubnet(ctx context.Context, id string) (ferr fail.E
 	return xerr
 }
 
-func (s ProviderProxy) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.Provider.BindSecurityGroupToSubnet(ctx, sgParam, subnetID)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
-func (s ProviderProxy) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.Provider.UnbindSecurityGroupFromSubnet(ctx, sgParam, subnetID)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
 func (s ProviderProxy) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
