@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.88
+	github.com/aws/aws-sdk-go v1.44.90
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -109,7 +109,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
-	github.com/urfave/cli/v2 v2.3.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
 	golang.org/x/text v0.3.7 // indirect
