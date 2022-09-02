@@ -12,7 +12,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/eko/gocache/v2 v2.3.1
 	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
-	github.com/felixge/fgprof v0.9.2
+	github.com/felixge/fgprof v0.9.3
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
@@ -109,7 +109,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
-	github.com/urfave/cli/v2 v2.3.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
 	golang.org/x/text v0.3.7 // indirect
