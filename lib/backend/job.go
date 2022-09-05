@@ -93,12 +93,19 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	} else {
 		u := md.Get("uuid")
 		if len(u) == 0 {
-			return nil, fail.InvalidParameterError("ctx", "does not contain a grpc uuid")
+			logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a grpc uuid").Error())
+		} else {
+			if id = u[0]; id == "" {
+				logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid").Error())
+			}
 		}
 
-		if id = u[0]; id == "" {
-			return nil, fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid")
+		uuid, err := uuidpkg.NewV4()
+		if err != nil {
+			return nil, fail.Wrap(err, "failed to generate uuid for job")
 		}
+
+		id = uuid.String()
 	}
 
 	task, xerr := concurrency.NewTaskWithContext(ctx)

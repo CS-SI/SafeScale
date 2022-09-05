@@ -380,26 +380,6 @@ func (s StackProxy) DeleteSubnet(ctx context.Context, id string) (ferr fail.Erro
 	return xerr
 }
 
-func (s StackProxy) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.BindSecurityGroupToSubnet(ctx, sgParam, subnetID)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
-func (s StackProxy) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.UnbindSecurityGroupFromSubnet(ctx, sgParam, subnetID)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
 func (s StackProxy) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

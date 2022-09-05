@@ -364,6 +364,9 @@ force_sdk_python: sdk
 	@(cd lib && $(MAKE) $(@))
 
 force_sdk_js: sdk
+	@$(WHICH) protoc-gen-grpc-web > /dev/null; if [ $$? -ne 0 ]; then \
+  		printf "%b" "$(ERROR_COLOR)$(INFO_STRING) Cannot run protoc-gen-grpc-web: protoc-gen-grpc-web is not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; \
+	fi
 	@(cd lib && $(MAKE) $(@))
 
 lib: common

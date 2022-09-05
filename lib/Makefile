@@ -49,7 +49,7 @@ force_sdk_python: gensrc
 	@(cd protocol && $(MAKE) force_sdk_python)
 
 force_sdk_js: gensrc
-	@(cd protocol && $(MAKE) sdk_js)
+	@(cd protocol && $(MAKE) force_sdk_js)
 
 lib/protocol:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building protocol, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

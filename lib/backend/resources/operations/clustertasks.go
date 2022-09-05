@@ -437,6 +437,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 				defaultsV3.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
 				defaultsV3.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
 				defaultsV3.Image = req.NodesDef.Image
+				defaultsV3.ImageID = req.NodesDef.Image
 				defaultsV3.GatewayTemplateID = req.GatewaysDef.Template
 				defaultsV3.NodeTemplateID = req.NodesDef.Template
 				defaultsV3.MasterTemplateID = req.MastersDef.Template
