@@ -487,6 +487,10 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	return s.rpcResetStartupScriptOfInstance(ctx, ahfid)
 }
 
+func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	return nil
+}
+
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	if valid.IsNil(s) {

@@ -722,6 +722,24 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			}
 		}
 
+		// FIXME: OPP After Stein, no failover
+		{
+			st, xerr := svc.GetStack()
+			if xerr != nil {
+				chRes <- result{nil, nil, xerr}
+				return xerr
+			}
+			stn, xerr := st.GetStackName()
+			if xerr != nil {
+				chRes <- result{nil, nil, xerr}
+				return xerr
+			}
+
+			if stn == "openstack" {
+				gwFailoverDisabled = true
+			}
+		}
+
 		req.Name = strings.ToLower(strings.TrimSpace(req.Name))
 
 		// Creates Network

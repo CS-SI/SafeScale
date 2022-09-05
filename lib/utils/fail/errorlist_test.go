@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -56,6 +57,14 @@ func TestNewErrorList_ToGRPCStatus(t *testing.T) {
 	require.NotEqual(t, strings.Index(err.Error(), "math: square root of negative number"), -1)
 	require.NotEqual(t, strings.Index(err.Error(), "can't resolve equation"), -1)
 
+}
+
+func TestNewErrorListWithContext(t *testing.T) {
+	errs := NewErrorList([]error{errors.New("math: square root of negative number"), errors.New("can't resolve equation")})
+	errs.WithContext(context.Background())
+
+	errs = NewErrorList([]error{})
+	errs.WithContext(context.Background())
 }
 
 func TestErrorList_AddConsequence(t *testing.T) {

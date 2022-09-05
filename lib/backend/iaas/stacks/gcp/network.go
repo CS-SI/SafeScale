@@ -291,6 +291,8 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Erro
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
+// ------ SecurityGroup methods ------
+
 // ------ Subnet methods ------
 
 // CreateSubnet creates a new subnet

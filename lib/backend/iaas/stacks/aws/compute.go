@@ -817,6 +817,10 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	return nil
 }
 
+func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	return nil
+}
+
 // InspectHost loads information of a host from AWS
 func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (
 	ahf *abstract.HostFull, ferr fail.Error,

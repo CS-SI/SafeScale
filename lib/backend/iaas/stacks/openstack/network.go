@@ -817,19 +817,28 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		NetworkID:      networkID,
 		AdminStateUp:   &asu,
 		Name:           name,
-		SecurityGroups: &securityGroups,
+		SecurityGroups: &[]string{},
 		FixedIPs:       []ports.IP{{SubnetID: subnetID}},
 	}
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			port, innerErr = ports.Create(s.NetworkClient, options).Extract()
-			return innerErr
+			var aport *ports.Port
+			aport, innerErr = ports.Create(s.NetworkClient, options).Extract()
+			if innerErr != nil {
+				return innerErr
+			}
+			port = aport
+			return nil
 		},
 		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	// FIXME: OPP Now, and only for OVH, disable port security
+	// _, _ = s.rpcChangePortSecurity(ctx, port.ID, false)
+
 	vip := abstract.NewVirtualIP()
 	vip.ID = port.ID
 	vip.PrivateIP = port.FixedIPs[0].IPAddress

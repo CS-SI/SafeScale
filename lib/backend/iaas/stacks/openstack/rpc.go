@@ -26,8 +26,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsecurity"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -234,11 +236,127 @@ func (s stack) rpcDeleteServer(ctx context.Context, id string) fail.Error {
 }
 
 // rpcCreatePort creates a port
-func (s stack) rpcCreatePort(ctx context.Context, req ports.CreateOpts) (port *ports.Port, ferr fail.Error) {
+func (s stack) rpcCreatePort(ctx context.Context, req ports.CreateOpts) (_ *ports.Port, ferr fail.Error) {
+	var port *ports.Port
+
 	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
-			return innerErr
+		func() error {
+			aport, innerErr := ports.Create(s.NetworkClient, req).Extract()
+			if innerErr != nil {
+				return innerErr
+			}
+
+			port = aport
+			return nil
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return port, nil
+}
+
+// rpcCreatePort creates a port
+func (s stack) rpcCreateUnsafePort(ctx context.Context, req ports.CreateOpts) (_ *ports.Port, ferr fail.Error) {
+	var port *ports.Port
+
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() error {
+			var portWithPortSecurityExtensions struct {
+				ports.Port
+				portsecurity.PortSecurityExt
+			}
+
+			iFalse := false
+			createOpts := portsecurity.PortCreateOptsExt{
+				CreateOptsBuilder:   req,
+				PortSecurityEnabled: &iFalse,
+			}
+
+			innerErr := ports.Create(s.NetworkClient, createOpts).ExtractInto(&portWithPortSecurityExtensions)
+			if innerErr != nil {
+				return innerErr
+			}
+
+			port = &portWithPortSecurityExtensions.Port
+
+			return nil
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return port, nil
+}
+
+// rpcChangePortSecurity changes port security
+func (s stack) rpcChangePortSecurity(ctx context.Context, portID string, state bool) (_ *ports.Port, ferr fail.Error) {
+	var port *ports.Port
+
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() error {
+			var portWithPortSecurityExtensions struct {
+				ports.Port
+				portsecurity.PortSecurityExt
+			}
+
+			iFalse := state
+			portUpdateOpts := ports.UpdateOpts{}
+			updateOpts := portsecurity.PortUpdateOptsExt{
+				UpdateOptsBuilder:   portUpdateOpts,
+				PortSecurityEnabled: &iFalse,
+			}
+
+			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
+			if innerErr != nil {
+				logrus.Warningf(innerErr.Error())
+				return innerErr
+			}
+
+			port = &portWithPortSecurityExtensions.Port
+
+			return nil
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return port, nil
+}
+
+// rpcCreatePort creates a port
+func (s stack) rpcRemoveSGFromPort(ctx context.Context, portID string) (_ *ports.Port, ferr fail.Error) {
+	var port *ports.Port
+
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() error {
+			var portWithPortSecurityExtensions struct {
+				ports.Port
+				portsecurity.PortSecurityExt
+			}
+
+			portUpdateOpts := ports.UpdateOpts{
+				SecurityGroups: &[]string{},
+			}
+			updateOpts := portsecurity.PortUpdateOptsExt{
+				UpdateOptsBuilder: portUpdateOpts,
+			}
+
+			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
+			if innerErr != nil {
+				logrus.Warningf(innerErr.Error())
+				return innerErr
+			}
+
+			port = &portWithPortSecurityExtensions.Port
+
+			return nil
 		},
 		NormalizeError,
 	)

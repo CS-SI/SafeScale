@@ -384,7 +384,6 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 					}
 				}
 				if strings.Contains(internalErr.Error(), "unexpected packet") {
-					// logrus.Warningf("client seems dead")
 					return retry.StopRetryError(internalErr, "client seems dead")
 				}
 				return internalErr
