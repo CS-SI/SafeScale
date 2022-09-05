@@ -522,6 +522,14 @@ func (s ProviderProxy) ClearHostStartupScript(ctx context.Context, parameter sta
 	return xerr
 }
 
+func (s ProviderProxy) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	xerr := s.Provider.ChangeSecurityGroupSecurity(ctx, b, b2, net, "")
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+	return xerr
+}
+
 func (s ProviderProxy) InspectHost(ctx context.Context, parameter stacks.HostParameter) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

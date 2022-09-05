@@ -905,7 +905,7 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		NetworkID:      openstackAS.Network,
 		AdminStateUp:   &asu,
 		Name:           name,
-		SecurityGroups: &sgs,
+		SecurityGroups: &[]string{},
 		FixedIPs:       []ports.IP{{SubnetID: openstackAS.ID}},
 	}
 	port, err := ports.Create(s.NetworkClient, options).Extract()

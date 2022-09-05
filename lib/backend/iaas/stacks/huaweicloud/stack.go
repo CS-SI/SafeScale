@@ -619,6 +619,10 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	return nil
 }
 
+func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	return nil
+}
+
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
 func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {

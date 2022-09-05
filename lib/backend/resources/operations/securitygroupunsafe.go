@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 // delete effectively remove a Security Group
@@ -529,6 +530,9 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 			chRes <- result{fail.ConvertError(err)}
 			return
 		}
+
+		hn := hostInstance.GetName()
+		logrus.Warningf("Binding security group %s to host %s", sgid, hn)
 
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {

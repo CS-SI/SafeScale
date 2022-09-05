@@ -1106,6 +1106,10 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	return nil
 }
 
+func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	return nil
+}
+
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {

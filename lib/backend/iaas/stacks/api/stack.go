@@ -117,6 +117,9 @@ type Stack interface {
 	CreateHost(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
 	ClearHostStartupScript(context.Context, stacks.HostParameter) fail.Error
+
+	ChangeSecurityGroupSecurity(context.Context, bool, bool, string, string) fail.Error
+
 	// InspectHost returns the information of the Host identified by id
 	InspectHost(context.Context, stacks.HostParameter) (*abstract.HostFull, fail.Error)
 	// GetHostState returns the current state of the host identified by id

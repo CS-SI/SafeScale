@@ -62,7 +62,7 @@ const (
 	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip.%s.%s"
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 
-	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s"
+	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s" // FIXME: OPP The ports of this thing also need disabling
 )
 
 // Subnet links Object Storage MetadataFolder and Subnet
@@ -549,7 +549,7 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 		}
 
 		if innerXErr = sg.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, sg.GetName(), host.GetName())
+			return fail.Wrap(innerXErr, "failed to apply Subnet 2 '%s' internal Security Group '%s' to Host '%s'", as.Name, sg.GetName(), host.GetName())
 		}
 
 		return nil

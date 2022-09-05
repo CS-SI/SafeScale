@@ -480,8 +480,6 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 	}
 	clonedV["HostIsGateway"] = isgw
 
-	// logrus.Warningf("Checking variable substitution for: %s", spew.Sdump(clonedV))
-
 	clonedV, xerr = realizeVariables(clonedV)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
