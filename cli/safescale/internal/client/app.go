@@ -44,17 +44,17 @@ func Cleanup() {
 // SetCommands sets the commands to react to
 func SetCommands() {
 	global.AppCtrl.AddCommand(
-		commands.NetworkCommands(),
-		commands.TenantCommands(),
-		commands.HostCommands(),
-		commands.VolumeCommands(),
-		commands.SSHCommands(),
 		commands.BucketCommands(),
-		commands.ShareCommands(),
-		commands.ImageCommands(),
-		commands.TemplateCommands(),
 		commands.ClusterCommands(),
+		commands.HostCommands(),
+		commands.ImageCommands(),
 		commands.LabelCommands(),
+		commands.NetworkCommands(),
+		commands.ShareCommands(),
+		commands.SSHCommands(),
 		commands.TagCommands(),
+		commands.TemplateCommands(),
+		commands.TenantCommands(),
+		commands.VolumeCommands(),
 	)
 }

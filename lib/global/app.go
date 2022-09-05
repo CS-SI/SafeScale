@@ -118,7 +118,10 @@ func InitApp() (ferr error) {
 }
 
 func AddCommand(cmd *cobra.Command) {
-	AppCtrl.App.AddCommand(cmd)
+	err := AppCtrl.App.AddCommand(cmd)
+	if err != nil {
+		logrus.Fatal(err.Error())
+	}
 }
 
 // RunApp starts the AppCtrl of the app
@@ -142,7 +145,7 @@ func VersionString() string {
 
 // addFlags adds flags useable in every command
 func addFlags(cmd *cobra.Command) {
-	flags := cmd.Flags()
+	flags := cmd.PersistentFlags()
 	if cmd.Name() == BackendCmdLabel || cmd.Name() == WebUICmdLabel {
 		flags.String("profile", "", `Profiles binary
             value is a comma-separated list of <keyword> (ie '<keyword>[:<params>][,<keyword>[:<params>]...]) where <keyword>

@@ -37,17 +37,16 @@ import (
 	"github.com/mwitkow/grpc-proxy/proxy"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/web"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -59,33 +58,22 @@ const (
 )
 
 // run starts the gRPC server of SafeScale (the daemon)
-func run() error {
-	// NOTE: is it the good behavior ? Shouldn't we fail ?
-	// If trace settings cannot be registered, report it but do not fail
-	// TODO: introduce use of configuration file with autoreload on change
-	err := tracing.RegisterTraceSettings(traceSettings())
-	if err != nil {
-		return err
-	}
-
+func run(cmd *cobra.Command) error {
 	logrus.Infoln("Checking configuration")
-	_, err = iaas.GetTenantNames()
-	if err != nil {
-		return err
+
+	safescaleEnv, xerr := env.Keys(env.OptionStartsWithAny("SAFESCALE"))
+	if xerr != nil {
+		return xerr
 	}
 
-	safescaleEnv, err := env.Keys(env.OptionStartsWithAny("SAFESCALE"))
-	if err != nil {
-		return err
-	}
 	for _, v := range safescaleEnv {
 		value, _ := env.Value(v)
 		logrus.Infof("Using %s=%s ", v, value)
 	}
 
-	backendConn, err := dialBackend()
-	if err != nil {
-		logrus.Fatal(err.Error())
+	backendConn, xerr := dialBackend()
+	if xerr != nil {
+		logrus.Fatal(xerr.Error())
 	}
 
 	grpcBackend := buildGrpcProxyServer(backendConn)
@@ -208,13 +196,13 @@ func buildHttpRouter(grpcWrapper *grpcweb.WrappedGrpcServer) (*http.ServeMux, fa
 		return nil, xerr
 	}
 
-	m := &grpcMux{grpcWrapper}
-	mux.Handle("/", m.Handler(frontendHandler))
-
 	xerr = buildDebugHttpHandler(mux)
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	m := &grpcMux{grpcWrapper}
+	mux.Handle("/", m.Handler(frontendHandler))
 
 	return mux, nil
 }
@@ -238,8 +226,8 @@ func buildFrontendHttpHandler() (http.Handler, fail.Error) {
 
 func buildDebugHttpHandler(mux *http.ServeMux) fail.Error {
 	// Serving debugging helpers:
+	mux.Handle("/metrics", promhttp.Handler())
 	if global.Config.Debug {
-		mux.Handle("/metrics", promhttp.Handler())
 		mux.HandleFunc("/debug/requests", func(resp http.ResponseWriter, req *http.Request) {
 			trace.Traces(resp, req)
 		})
@@ -272,9 +260,8 @@ func buildGrpcProxyServer(backendConn *grpc.ClientConn) *grpc.Server {
 	}
 
 	// Server with logging and monitoring enabled.
-	pgrpc := grpc.UnknownServiceHandler(proxy.TransparentHandler(director))
 	out := grpc.NewServer(
-		pgrpc,
+		grpc.UnknownServiceHandler(proxy.TransparentHandler(director)),
 		grpc.MaxRecvMsgSize(maxCallRecvMsgSize),
 		grpcmiddleware.WithUnaryServerChain(
 			grpclogrus.UnaryServerInterceptor(logger),
@@ -341,7 +328,6 @@ func dialBackend() (*grpc.ClientConn, error) {
 
 	opt = append(opt,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize)),
-		// Deprecated: grpc.WithBackoffMaxDelay(common.Config.WebUI.BackendBackoffMaxDelay),
 	)
 
 	cc, err := grpc.Dial(global.Config.Backend.Listen, opt...)

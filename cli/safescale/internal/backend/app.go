@@ -45,7 +45,7 @@ func SetCommands() {
 
 	addPersistentPreRunE(out)
 
-	global.AppCtrl.AddCommand(out)
+	global.AddCommand(out)
 }
 
 var cleanupOnce sync.Once
@@ -59,8 +59,8 @@ func Cleanup() {
 
 // AddPreRunE completes command PreRun with the necessary for backend
 func addPersistentPreRunE(cmd *cobra.Command) {
-	previousCB := cmd.PersistentPreRunE
-	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) (err error) {
+	previousCB := cmd.PreRunE
+	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if previousCB != nil {
 			err := previousCB(cmd, args)
 			if err != nil {

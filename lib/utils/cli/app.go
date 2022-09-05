@@ -71,6 +71,7 @@ func (app *App) AddCommand(cmd ...*cobra.Command) error {
 	if valid.IsNull(app) {
 		return fail.InvalidInstanceError()
 	}
+
 	if cmd == nil {
 		return nil
 	}

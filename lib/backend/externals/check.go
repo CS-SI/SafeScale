@@ -65,12 +65,12 @@ func Check(cmd *cobra.Command) (suffix string, ferr error) {
 	if err != nil {
 		return "", fail.Wrap(err)
 	}
-
+	/* Disabled for now
 	err = checkConsul()
 	if err != nil {
 		return "", fail.Wrap(err)
 	}
-
+	*/
 	return suffix, nil
 }
 

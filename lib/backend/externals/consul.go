@@ -114,7 +114,7 @@ func StartConsulServer(ctx context.Context) (ferr fail.Error) {
 
 		select {
 		case <-ctx.Done():
-			proc.Signal(os.Interrupt)
+			_ = proc.Signal(os.Interrupt)
 			return
 		case val := <-doneCh:
 			switch casted := val.(type) {

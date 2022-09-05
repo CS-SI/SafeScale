@@ -113,7 +113,7 @@ func startBackend(cmd *cobra.Command) error {
 
 	operations.StartFeatureFileWatcher()
 
-	fmt.Printf("safescale daemon version: %s\nReady to start backend on '%s' :-)\n", global.VersionString(), global.Config.Backend.Listen)
+	fmt.Printf("safescale backend version: %s\nReady to start backend on '%s' :-)\n", global.VersionString(), global.Config.Backend.Listen)
 	err = s.Serve(lis)
 	if err != nil {
 		return fail.Wrap(err, "failed to start backend")

@@ -407,13 +407,15 @@ func loadBackendSettings(cmd *cobra.Command, reader *viper.Viper) error {
 const defaultWebUIPort = "50080"
 
 func loadWebUISettings(cmd *cobra.Command, reader *viper.Viper) error {
+	if cmd.Name() != WebUICmdLabel {
+		return nil
+	}
+
 	var err error
 	// FIXME: add validation of listen format (<host|ip>:<port>)
-	if cmd.Name() == "webui" {
-		Config.WebUI.Listen, err = cmd.Flags().GetString("listen")
-		if err != nil {
-			return err
-		}
+	Config.WebUI.Listen, err = cmd.Flags().GetString("listen")
+	if err != nil {
+		return err
 	}
 	if Config.WebUI.Listen == "" && env.Lookup("SAFESCALE_WEBUI_LISTEN") {
 		Config.WebUI.Listen, _ = env.Value("SAFESCALE_WEBUI_LISTEN")
