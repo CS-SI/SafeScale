@@ -28,7 +28,6 @@ import (
 	txttmpl "text/template"
 	"time"
 
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -44,6 +43,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -994,7 +994,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 					if cuk != nil {
 						if !cuk.Successful() && !cuk.Completed() {
 							var msg error
-							if appwide.Config.Verbose && appwide.Config.Debug { // log more details if in trace mode
+							if global.Config.Verbose && global.Config.Debug { // log more details if in trace mode
 								msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with result: [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
 							} else {
 								msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v", w.action.String(), p.stepName, cuk.Error())
@@ -1023,7 +1023,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 				if cuk != nil {
 					if !cuk.Successful() && cuk.Completed() {
 						var msg error
-						if appwide.Config.Verbose && appwide.Config.Debug { // log more details if in trace mode
+						if global.Config.Verbose && global.Config.Debug { // log more details if in trace mode
 							msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with result: [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
 						} else {
 							msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s", w.action.String(), p.stepName, key)

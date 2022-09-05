@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -239,7 +238,7 @@ func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		return cli.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }

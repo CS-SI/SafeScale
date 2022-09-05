@@ -26,7 +26,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 )
 
 // subnetConsumer is the part of safescale client handling Subnets
@@ -103,7 +102,7 @@ func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.D
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		return cli.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 

@@ -27,7 +27,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/external"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -35,10 +35,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/config"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/external"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/heartbeat"
 )
@@ -50,7 +50,7 @@ const (
 
 // startBackend starts the gRPC server of SafeScale (the daemon)
 func startBackend(cmd *cobra.Command) error {
-	appwide.BuildFolderTree()
+	global.BuildFolderTree()
 	suffix, err := config.Check(cmd)
 	if err != nil {
 		return fail.Wrap(err)
@@ -60,9 +60,9 @@ func startBackend(cmd *cobra.Command) error {
 	defer cancel()
 
 	// If terraform state has to be stored in consul, check consul is responding
-	if appwide.Config.Backend.Terraform.StateInConsul {
+	if global.Config.Backend.Terraform.StateInConsul {
 		// If we use "internal" consul, starts consul
-		if appwide.Config.Backend.Consul.Internal {
+		if global.Config.Backend.Consul.Internal {
 			xerr := external.StartConsulServer(ctx)
 			if xerr != nil {
 				return xerr
@@ -72,8 +72,8 @@ func startBackend(cmd *cobra.Command) error {
 		// check consul is working
 	}
 
-	logrus.Infof("Starting daemon, listening on '%s', using metadata suffix '%s'", appwide.Config.Backend.Listen, suffix)
-	lis, err := net.Listen("tcp", appwide.Config.Backend.Listen)
+	logrus.Infof("Starting daemon, listening on '%s', using metadata suffix '%s'", global.Config.Backend.Listen, suffix)
+	lis, err := net.Listen("tcp", global.Config.Backend.Listen)
 	if err != nil {
 		return fail.Wrap(err, "failed to listen")
 	}
@@ -114,7 +114,7 @@ func startBackend(cmd *cobra.Command) error {
 
 	operations.StartFeatureFileWatcher()
 
-	fmt.Printf("safescale daemon version: %s\nReady to start backend on '%s' :-)\n", common.VersionString(), appwide.Config.Backend.Listen)
+	fmt.Printf("safescale daemon version: %s\nReady to start backend on '%s' :-)\n", common.VersionString(), global.Config.Backend.Listen)
 	err = s.Serve(lis)
 	if err != nil {
 		return fail.Wrap(err, "failed to start backend")
@@ -129,7 +129,7 @@ func startConsulAgent(ctx context.Context) (ferr fail.Error) {
 	ferr = nil
 	consulLauncher.Do(func() {
 		// creates configuration if not present
-		consulRootDir := appwide.Config.Folders.ShareDir + "consul"
+		consulRootDir := global.Config.Folders.ShareDir + "consul"
 		consulEtcDir := consulRootDir + "/etc"
 		consulConfigFile := consulEtcDir + "/config.?"
 		st, err := os.Stat(consulConfigFile)
@@ -178,10 +178,10 @@ connect {
 		args := []string{"agent", "-config-dir=etc", "-server", "-datacenter=safescale"}
 		attr := &os.ProcAttr{
 			Sys: &syscall.SysProcAttr{
-				Chroot: appwide.Config.Folders.ShareDir + "consul",
+				Chroot: global.Config.Folders.ShareDir + "consul",
 			},
 		}
-		proc, err := os.StartProcess(appwide.Config.Backend.Consul.ExecPath, args, attr)
+		proc, err := os.StartProcess(global.Config.Backend.Consul.ExecPath, args, attr)
 		if err != nil {
 			ferr = fail.Wrap(err, "failed to start consul server")
 			return

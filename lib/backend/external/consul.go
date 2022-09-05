@@ -25,9 +25,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 const (
@@ -46,7 +47,7 @@ func StartConsulServer(ctx context.Context) (ferr fail.Error) {
 	ferr = nil
 	consulLauncher.Do(func() {
 		// creates configuration if not present
-		consulRootDir := appwide.Config.Folders.ShareDir + "consul"
+		consulRootDir := global.Config.Folders.ShareDir + "consul"
 		consulEtcDir := consulRootDir + "/etc"
 		consulConfigFile := consulEtcDir + "/config.?"
 		st, err := os.Stat(consulConfigFile)
@@ -82,10 +83,10 @@ func StartConsulServer(ctx context.Context) (ferr fail.Error) {
 		args := []string{"agent", "-config-dir=etc", "-server", "-datacenter=safescale"}
 		attr := &os.ProcAttr{
 			Sys: &syscall.SysProcAttr{
-				Chroot: appwide.Config.Folders.ShareDir + "consul",
+				Chroot: global.Config.Folders.ShareDir + "consul",
 			},
 		}
-		proc, err := os.StartProcess(appwide.Config.Backend.Consul.ExecPath, args, attr)
+		proc, err := os.StartProcess(global.Config.Backend.Consul.ExecPath, args, attr)
 		if err != nil {
 			ferr = fail.Wrap(err, "failed to start consul server")
 			return

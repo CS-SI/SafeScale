@@ -28,6 +28,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
+	"github.com/zserge/metric"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusternodetype"
@@ -43,9 +47,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
-	"github.com/zserge/metric"
 )
 
 // TargetType returns the type of the target

@@ -18,8 +18,9 @@
 package backend
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Serve starts the gRPC server of SafeScale (the daemon)

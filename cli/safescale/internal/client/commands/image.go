@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
@@ -58,9 +57,9 @@ func imageListCommand() *cobra.Command {
 			images, err := ClientSession.Image.List(all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of images", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of images", false).Error())))
 			}
-			return clitools.SuccessResponse(images.GetImages())
+			return cli.SuccessResponse(images.GetImages())
 		},
 	}
 	out.Flags().BoolP("all", "a", false, "List all available images in tenant (without any filter)")

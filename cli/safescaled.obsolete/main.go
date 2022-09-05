@@ -32,7 +32,6 @@ import (
 
 	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -40,8 +39,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -252,7 +251,7 @@ func main() {
 
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
 			logrus.SetLevel(logrus.TraceLevel)
-			appwide.Verbose = true
+			global.Verbose = true
 		} else {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
@@ -263,7 +262,7 @@ func main() {
 		// if -d or -v specified -> DEBUG Level
 		if c.Bool("verbose") {
 			logrus.SetLevel(logrus.InfoLevel)
-			appwide.Verbose = true
+			global.Verbose = true
 		}
 
 		if c.Bool("debug") {
@@ -272,14 +271,14 @@ func main() {
 			} else {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
-			appwide.Debug = true
+			global.Debug = true
 		}
 
 		// if -d AND -v specified -> TRACE Level
 		if c.Bool("debug") && c.Bool("verbose") {
 			logrus.SetLevel(logrus.TraceLevel)
-			appwide.Verbose = true
-			appwide.Debug = true
+			global.Verbose = true
+			global.Debug = true
 		}
 		return nil
 	}

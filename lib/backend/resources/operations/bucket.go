@@ -24,6 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/eko/gocache/v2/store"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -39,8 +42,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
 )
 
 const (

@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -66,7 +65,7 @@ func labelListCommand() *cobra.Command {
 			list, err := ClientSession.Label.List(false, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Labels", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Labels", false).Error())))
 			}
 
 			var output []map[string]interface{}
@@ -75,13 +74,13 @@ func labelListCommand() *cobra.Command {
 				xerr = json.Unmarshal(jsoned, &output)
 			}
 			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 			}
 
 			for _, v := range output {
 				delete(v, "has_default")
 			}
-			return clitools.SuccessResponse(output)
+			return cli.SuccessResponse(output)
 		},
 	}
 	return out
@@ -98,13 +97,13 @@ func labelInspectCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument LABELREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument LABELREF."))
 			}
 
 			labelInfo, err := ClientSession.Label.Inspect(args[0], false, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of Label", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of Label", false).Error())))
 			}
 
 			output := map[string]interface{}{
@@ -121,7 +120,7 @@ func labelInspectCommand() *cobra.Command {
 				}
 				output["hosts"] = append(output["hosts"].([]interface{}), item)
 			}
-			return clitools.SuccessResponse(output)
+			return cli.SuccessResponse(output)
 		},
 	}
 	return out
@@ -138,15 +137,15 @@ func labelDeleteCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) < 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument LABELREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument LABELREF."))
 			}
 
 			err := ClientSession.Label.Delete(args, false, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of Label", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of Label", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -166,7 +165,7 @@ func labelCreateCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", labelCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Tag_name>. "))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Tag_name>. "))
 			}
 
 			value, err := c.Flags().GetString("value")
@@ -176,9 +175,9 @@ func labelCreateCommand() *cobra.Command {
 			label, err := ClientSession.Label.Create(args[0], true, value, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of Label", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of Label", true).Error())))
 			}
-			return clitools.SuccessResponse(label)
+			return cli.SuccessResponse(label)
 		},
 	}
 
@@ -214,25 +213,25 @@ func tagListCommand() *cobra.Command {
 			list, err := ClientSession.Label.List(true, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Tags", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Tags", false).Error())))
 			}
 
 			// Remove hosts from list content for this command
 			jsoned, err := json.Marshal(list.Labels)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 			}
 
 			var body []map[string]interface{}
 			err = json.Unmarshal(jsoned, &body)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of hosts", false).Error())))
 			}
 
 			for _, v := range body {
 				delete(v, "hosts")
 			}
-			return clitools.SuccessResponse(body)
+			return cli.SuccessResponse(body)
 		},
 	}
 	return out
@@ -249,17 +248,17 @@ func tagInspectCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument TAGREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument TAGREF."))
 			}
 
 			tagInfo, err := ClientSession.Label.Inspect(args[0], true, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of Tag", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of Tag", false).Error())))
 			}
 
 			if tagInfo.HasDefault {
-				return clitools.FailureResponse(clitools.ExitOnRPC(fmt.Sprintf("inspection of Tag: '%s' is a Label", args[0])))
+				return cli.FailureResponse(cli.ExitOnRPC(fmt.Sprintf("inspection of Tag: '%s' is a Label", args[0])))
 			}
 
 			output := map[string]interface{}{
@@ -274,7 +273,7 @@ func tagInspectCommand() *cobra.Command {
 				}
 				output["hosts"] = append(output["hosts"].([]interface{}), item)
 			}
-			return clitools.SuccessResponse(output)
+			return cli.SuccessResponse(output)
 		},
 	}
 	return out
@@ -291,7 +290,7 @@ func tagDeleteCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) < 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument TAGREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument TAGREF."))
 			}
 
 			var list []string
@@ -301,9 +300,9 @@ func tagDeleteCommand() *cobra.Command {
 			err := ClientSession.Label.Delete(list, true, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of Tag", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of Tag", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -323,16 +322,16 @@ func tagCreateCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tagCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument TAGNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument TAGNAME."))
 			}
 
 			tag, err := ClientSession.Label.Create(args[0], false, "", temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of Tag", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of Tag", true).Error())))
 			}
 
-			return clitools.SuccessResponse(tag)
+			return cli.SuccessResponse(tag)
 		},
 	}
 	return out

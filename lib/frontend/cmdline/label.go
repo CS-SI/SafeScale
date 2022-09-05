@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -134,7 +133,7 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		return cli.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 

@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
@@ -62,9 +61,9 @@ func tenantListCommand() *cobra.Command {
 			tenants, err := ClientSession.Tenant.List(0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of tenants", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of tenants", false).Error())))
 			}
-			return clitools.SuccessResponse(tenants.GetTenants())
+			return cli.SuccessResponse(tenants.GetTenants())
 		},
 	}
 	return out
@@ -83,9 +82,9 @@ func tenantGetCommand() *cobra.Command {
 			tenant, err := ClientSession.Tenant.Get(0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "get tenant", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "get tenant", false).Error())))
 			}
-			return clitools.SuccessResponse(tenant)
+			return cli.SuccessResponse(tenant)
 		},
 	}
 	return out
@@ -100,7 +99,7 @@ func tenantSetCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 			}
 
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -108,9 +107,9 @@ func tenantSetCommand() *cobra.Command {
 			err := ClientSession.Tenant.Set(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -126,7 +125,7 @@ func tenantInspectCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 			}
 
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -134,9 +133,9 @@ func tenantInspectCommand() *cobra.Command {
 			resp, err := ClientSession.Tenant.Inspect(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
-			return clitools.SuccessResponse(resp)
+			return cli.SuccessResponse(resp)
 		},
 	}
 	return out
@@ -151,7 +150,7 @@ func tenantScanCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 			}
 
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -159,9 +158,9 @@ func tenantScanCommand() *cobra.Command {
 			results, err := ClientSession.Tenant.Scan(args[0], c.Flags().GetBool("dry-run"), c.Flags().GetStringSlice("template"), 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "scan tenant", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "scan tenant", false).Error())))
 			}
-			return clitools.SuccessResponse(results.GetResults())
+			return cli.SuccessResponse(results.GetResults())
 		},
 	}
 
@@ -200,7 +199,7 @@ func tenantMetadataUpgradeCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 			}
 
 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -209,9 +208,9 @@ func tenantMetadataUpgradeCommand() *cobra.Command {
 			results, err := ClientSession.Tenant.Upgrade(args[0], false /*dryRun*/, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
 			}
-			return clitools.SuccessResponse(results)
+			return cli.SuccessResponse(results)
 		},
 	}
 
@@ -236,7 +235,7 @@ func tenantMetadataDeleteCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 			}
 
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -244,9 +243,9 @@ func tenantMetadataDeleteCommand() *cobra.Command {
 			err := ClientSession.Tenant.Cleanup(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out

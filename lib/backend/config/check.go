@@ -19,12 +19,10 @@ package config
 
 import (
 	"context"
-	"log"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/hashicorp/go-version"
 	hcinstall "github.com/hashicorp/hc-install"
 	"github.com/hashicorp/hc-install/fs"
 	"github.com/hashicorp/hc-install/product"
@@ -32,8 +30,8 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -43,7 +41,7 @@ var (
 )
 
 // Check makes sure configuration is ok
-// log.Fatal is called if not to stop the program
+// logrus.Fatal is called if not to stop the program
 func Check(cmd *cobra.Command) (suffix string, ferr error) {
 	logrus.Infoln("Checking configuration")
 	_, xerr := iaas.GetTenantNames()
@@ -84,46 +82,46 @@ func Check(cmd *cobra.Command) (suffix string, ferr error) {
 func checkTerraform() error {
 	installer := hcinstall.NewInstaller()
 	source := &fs.AnyVersion{
-		ExactBinPath: appwide.Config.Folders.ShareDir + "/terraform/bin/terraform",
+		ExactBinPath: global.Config.Folders.ShareDir + "/terraform/bin/terraform",
 	}
 	execPath, err := installer.Ensure(context.Background(), []src.Source{source})
 	if err != nil {
 		execPath, err = installTerraform()
 		if err != nil {
-			log.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
 		}
 	} else {
-		tf, err := tfexec.NewTerraform(appwide.Config.Folders.TmpDir, execPath)
+		tf, err := tfexec.NewTerraform(global.Config.Folders.TmpDir, execPath)
 		if err != nil {
-			log.Fatalf("error creating terraform exec instance: %s", err)
+			logrus.Fatalf("error creating terraform exec instance: %s", err)
 		}
 		version, _, err := tf.Version(context.Background(), true)
 		if err != nil {
-			log.Fatalf("error checking terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error checking terraform release '%s': %s", terraformv1_2_6, err)
 		}
 		if !version.Equal(terraformv1_2_6) {
 			execPath, err = installTerraform()
 			if err != nil {
-				log.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+				logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
 			}
 		}
 	}
 
-	appwide.Config.Backend.Terraform.ExecPath = execPath
+	global.Config.Backend.Terraform.ExecPath = execPath
 	// workingDir := settings.Folders.ShareDir+"/terraform/bin"
 	// tf, err := tfexec.NewTerraform(workingDir, execPath)
 	// if err != nil {
-	// 	log.Fatalf("error running NewTerraform: %s", err)
+	// 	logrus.Fatalf("error running NewTerraform: %s", err)
 	// }
 	//
 	// err = tf.Init(context.Background(), tfexec.Upgrade(true))
 	// if err != nil {
-	// 	log.Fatalf("error running Init: %s", err)
+	// 	logrus.Fatalf("error running Init: %s", err)
 	// }
 	//
 	// state, err := tf.Show(context.Background())
 	// if err != nil {
-	// 	log.Fatalf("error running Show: %s", err)
+	// 	logrus.Fatalf("error running Show: %s", err)
 	// }
 	//
 	// fmt.Println(state.FormatVersion) // "0.1"
@@ -134,46 +132,46 @@ func checkConsul() error {
 	installer := hcinstall.NewInstaller()
 	source := &fs.AnyVersion{
 		Product:      &product.Consul,
-		ExactBinPath: appwide.Config.Folders.ShareDir + "/consul/bin/consul",
+		ExactBinPath: global.Config.Folders.ShareDir + "/consul/bin/consul",
 	}
 	execPath, err := installer.Ensure(context.Background(), []src.Source{source})
 	if err != nil {
 		execPath, err = installConsul()
 		if err != nil {
-			log.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
 		}
 	} else {
-		tf, err := tfexec.NewTerraform(appwide.Config.Folders.TmpDir, execPath)
+		tf, err := tfexec.NewTerraform(global.Config.Folders.TmpDir, execPath)
 		if err != nil {
-			log.Fatalf("error creating terraform exec instance: %s", err)
+			logrus.Fatalf("error creating terraform exec instance: %s", err)
 		}
 		version, _, err := tf.Version(context.Background(), true)
 		if err != nil {
-			log.Fatalf("error checking terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error checking terraform release '%s': %s", terraformv1_2_6, err)
 		}
 		if !version.Equal(terraformv1_2_6) {
 			execPath, err = installTerraform()
 			if err != nil {
-				log.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+				logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
 			}
 		}
 	}
 
-	appwide.Config.Backend.Consul.ExecPath = execPath
+	global.Config.Backend.Consul.ExecPath = execPath
 	// workingDir := settings.Folders.ShareDir+"/terraform/bin"
 	// tf, err := tfexec.NewTerraform(workingDir, execPath)
 	// if err != nil {
-	// 	log.Fatalf("error running NewTerraform: %s", err)
+	// 	logrus.Fatalf("error running NewTerraform: %s", err)
 	// }
 	//
 	// err = tf.Init(context.Background(), tfexec.Upgrade(true))
 	// if err != nil {
-	// 	log.Fatalf("error running Init: %s", err)
+	// 	logrus.Fatalf("error running Init: %s", err)
 	// }
 	//
 	// state, err := tf.Show(context.Background())
 	// if err != nil {
-	// 	log.Fatalf("error running Show: %s", err)
+	// 	logrus.Fatalf("error running Show: %s", err)
 	// }
 	//
 	// fmt.Println(state.FormatVersion) // "0.1"

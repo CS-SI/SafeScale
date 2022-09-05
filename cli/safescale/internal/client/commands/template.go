@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
@@ -67,10 +66,10 @@ func templateListCommand() *cobra.Command {
 			templates, err := ClientSession.Template.List(all, scannedOnly, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
 			}
 
-			return clitools.SuccessResponse(templates.GetTemplates())
+			return cli.SuccessResponse(templates.GetTemplates())
 		},
 	}
 
@@ -94,10 +93,10 @@ func templateMatchCommand() *cobra.Command {
 			templates, err := ClientSession.Template.Match(sizingAsString, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of templates", false).Error())))
 			}
 
-			return clitools.SuccessResponse(templates.GetTemplates())
+			return cli.SuccessResponse(templates.GetTemplates())
 		},
 	}
 	return out
@@ -116,10 +115,10 @@ func templateInspectCommand() *cobra.Command {
 			template, err := ClientSession.Template.Inspect(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of template information", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of template information", false).Error())))
 			}
 
-			return clitools.SuccessResponse(template)
+			return cli.SuccessResponse(template)
 		},
 	}
 	return out

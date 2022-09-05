@@ -28,8 +28,6 @@ import (
 	"os"
 	"time"
 
-	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/appwide"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/appwide/env"
 	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpclogrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
@@ -48,6 +46,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/web"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -149,7 +149,7 @@ func run() error {
 
 	// Starting everything
 	server := buildFrontendServer(mux)
-	switch appwide.Config.WebUI.UseTls {
+	switch global.Config.WebUI.UseTls {
 	case false:
 		listener, err := buildListener("http")
 		if err != nil {
@@ -173,7 +173,7 @@ func run() error {
 		serveFrontend(server, listener, "http_tls", errChan)
 	}
 
-	fmt.Printf("safescale webui version: %s\nReady to run on '%s' :-)\n", common.VersionString(), appwide.Config.WebUI.Listen)
+	fmt.Printf("safescale webui version: %s\nReady to run on '%s' :-)\n", common.VersionString(), global.Config.WebUI.Listen)
 	return <-errChan
 }
 
@@ -223,13 +223,13 @@ func buildHttpRouter(grpcWrapper *grpcweb.WrappedGrpcServer) (*http.ServeMux, fa
 // buildFrontendHttpHandler Serving SafeScale Frontend
 func buildFrontendHttpHandler() (http.Handler, fail.Error) {
 	var fsHandler http.Handler
-	if appwide.Config.WebUI.WebRoot != "" {
-		st, err := os.Stat(appwide.Config.WebUI.WebRoot)
+	if global.Config.WebUI.WebRoot != "" {
+		st, err := os.Stat(global.Config.WebUI.WebRoot)
 		if err != nil || !st.IsDir() {
-			return nil, fail.NotFoundError("failed to find webroot '%s'", appwide.Config.WebUI.WebRoot)
+			return nil, fail.NotFoundError("failed to find webroot '%s'", global.Config.WebUI.WebRoot)
 		}
 
-		fsHandler = http.FileServer(http.Dir(appwide.Config.WebUI.WebRoot))
+		fsHandler = http.FileServer(http.Dir(global.Config.WebUI.WebRoot))
 	} else {
 		fsHandler = http.FileServer(http.FS(web.Webroot))
 	}
@@ -239,7 +239,7 @@ func buildFrontendHttpHandler() (http.Handler, fail.Error) {
 
 func buildDebugHttpHandler(mux *http.ServeMux) fail.Error {
 	// Serving debugging helpers:
-	if appwide.Config.Debug {
+	if global.Config.Debug {
 		mux.Handle("/metrics", promhttp.Handler())
 		mux.HandleFunc("/debug/requests", func(resp http.ResponseWriter, req *http.Request) {
 			trace.Traces(resp, req)
@@ -308,9 +308,9 @@ func serveFrontend(server *http.Server, listener net.Listener, name string, errC
 }
 
 func buildListener(name string) (net.Listener, error) {
-	listener, err := net.Listen("tcp", appwide.Config.WebUI.Listen)
+	listener, err := net.Listen("tcp", global.Config.WebUI.Listen)
 	if err != nil {
-		return nil, fail.Wrap(err, "failed listening on %s for '%s'", appwide.Config.WebUI.Listen, name)
+		return nil, fail.Wrap(err, "failed listening on %s for '%s'", global.Config.WebUI.Listen, name)
 	}
 
 	out := conntrack.NewListener(listener,
@@ -326,11 +326,11 @@ func dialBackend() (*grpc.ClientConn, error) {
 	var opt []grpc.DialOption
 	// opt = append(opt, grpc.WithDefaultCallOptions(grpc.ForceCodec(newCodec())))
 
-	if appwide.Config.Backend.DefaultAuthority != "" {
-		opt = append(opt, grpc.WithAuthority(appwide.Config.Backend.DefaultAuthority))
+	if global.Config.Backend.DefaultAuthority != "" {
+		opt = append(opt, grpc.WithAuthority(global.Config.Backend.DefaultAuthority))
 	}
 
-	if appwide.Config.Backend.UseTls {
+	if global.Config.Backend.UseTls {
 		backendTls, err := buildBackendTls()
 		if err != nil {
 			return nil, err
@@ -345,7 +345,7 @@ func dialBackend() (*grpc.ClientConn, error) {
 		// Deprecated: grpc.WithBackoffMaxDelay(common.Config.WebUI.BackendBackoffMaxDelay),
 	)
 
-	cc, err := grpc.Dial(appwide.Config.Backend.Listen, opt...)
+	cc, err := grpc.Dial(global.Config.Backend.Listen, opt...)
 	if err != nil {
 		return nil, fail.InvalidRequestError("failed dialing backend: %v", err)
 	}
@@ -355,11 +355,11 @@ func dialBackend() (*grpc.ClientConn, error) {
 func buildBackendTls() (*tls.Config, error) {
 	tlsConfig := &tls.Config{}
 	tlsConfig.MinVersion = tls.VersionTLS12
-	if appwide.Config.Backend.Tls.NoVerify {
+	if global.Config.Backend.Tls.NoVerify {
 		tlsConfig.InsecureSkipVerify = true
-	} else if len(appwide.Config.Backend.Tls.CAs) > 0 {
+	} else if len(global.Config.Backend.Tls.CAs) > 0 {
 		tlsConfig.RootCAs = x509.NewCertPool()
-		for _, path := range appwide.Config.Backend.Tls.CAs {
+		for _, path := range global.Config.Backend.Tls.CAs {
 			data, err := ioutil.ReadFile(path)
 			if err != nil {
 				return nil, fail.Wrap(err, "failed reading backend CA file %v: %v", path)
@@ -372,8 +372,8 @@ func buildBackendTls() (*tls.Config, error) {
 		}
 	}
 
-	if appwide.Config.WebUI.Tls.BackendClientCertFile != "" && appwide.Config.WebUI.Tls.BackendClientKeyFile != "" {
-		cert, err := tls.LoadX509KeyPair(appwide.Config.WebUI.Tls.BackendClientCertFile, appwide.Config.WebUI.Tls.BackendClientKeyFile)
+	if global.Config.WebUI.Tls.BackendClientCertFile != "" && global.Config.WebUI.Tls.BackendClientKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(global.Config.WebUI.Tls.BackendClientCertFile, global.Config.WebUI.Tls.BackendClientKeyFile)
 		if err != nil {
 			return nil, fail.Wrap(err, "failed reading TLS client keys: %v")
 		}
@@ -384,17 +384,17 @@ func buildBackendTls() (*tls.Config, error) {
 }
 
 func buildServerTls() (*tls.Config, error) {
-	if appwide.Config.WebUI.Tls.CertFile == "" || appwide.Config.WebUI.Tls.KeyFile == "" {
+	if global.Config.WebUI.Tls.CertFile == "" || global.Config.WebUI.Tls.KeyFile == "" {
 		return nil, fail.InvalidRequestError("flags server_tls_cert_file and server_tls_key_file must be set")
 	}
 
-	tlsConfig, err := connhelpers.TlsConfigForServerCerts(appwide.Config.WebUI.Tls.CertFile, appwide.Config.WebUI.Tls.KeyFile)
+	tlsConfig, err := connhelpers.TlsConfigForServerCerts(global.Config.WebUI.Tls.CertFile, global.Config.WebUI.Tls.KeyFile)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed reading TLS server keys")
 	}
 
 	tlsConfig.MinVersion = tls.VersionTLS12
-	switch appwide.Config.WebUI.Tls.CertVerification {
+	switch global.Config.WebUI.Tls.CertVerification {
 	case "none":
 		tlsConfig.ClientAuth = tls.NoClientCert
 	case "verify_if_given":
@@ -402,12 +402,12 @@ func buildServerTls() (*tls.Config, error) {
 	case "require":
 		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	default:
-		return nil, fail.InvalidRequestError("unknown value '%v' for 'safescale.webui.tls.server.client_cert_verification", appwide.Config.WebUI.Tls.CertVerification)
+		return nil, fail.InvalidRequestError("unknown value '%v' for 'safescale.webui.tls.server.client_cert_verification", global.Config.WebUI.Tls.CertVerification)
 	}
 	if tlsConfig.ClientAuth != tls.NoClientCert {
-		if len(appwide.Config.WebUI.Tls.CAs) > 0 {
+		if len(global.Config.WebUI.Tls.CAs) > 0 {
 			tlsConfig.ClientCAs = x509.NewCertPool()
-			for _, path := range appwide.Config.WebUI.Tls.CAs {
+			for _, path := range global.Config.WebUI.Tls.CAs {
 				data, err := ioutil.ReadFile(path)
 				if err != nil {
 					return nil, fail.Wrap(err, "failed reading client CA file %v", path)

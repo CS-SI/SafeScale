@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
@@ -62,6 +61,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (

@@ -33,8 +33,8 @@ func Value(key string) (string, bool) {
 
 // FirstValue returns the value of the first defined variable in the order of keys
 // returns:
-//    - "", "", false if no var has been found
-//    - value, varname, true if a variable has been found
+//   - "", "", false if no var has been found
+//   - value, varname, true if a variable has been found
 func FirstValue(keys ...string) (value string, varname string, ok bool) {
 	for _, v := range keys {
 		value, ok := envVars[v]

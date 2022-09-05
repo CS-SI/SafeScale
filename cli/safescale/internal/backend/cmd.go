@@ -20,9 +20,10 @@ package backend
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 )
 
 const initCmdLabel = "init"

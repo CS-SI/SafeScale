@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -66,9 +65,9 @@ func bucketListCommand() *cobra.Command {
 			resp, err := ClientSession.Bucket.List(all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of buckets", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of buckets", false).Error())))
 			}
-			return clitools.SuccessResponse(resp)
+			return cli.SuccessResponse(resp)
 		},
 	}
 	out.Flags().Bool("all", false, "List all Buckets on tenant (not only those created by SafeScale)")
@@ -86,15 +85,15 @@ func bucketCreateCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 			}
 
 			err := ClientSession.Bucket.Create(args[0], temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of bucket", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of bucket", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -111,7 +110,7 @@ func bucketDeleteCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
 			if len(args) < 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 			}
 
 			var bucketList []string
@@ -121,9 +120,9 @@ func bucketDeleteCommand() *cobra.Command {
 			err := ClientSession.Bucket.Delete(bucketList, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -140,15 +139,15 @@ func bucketInspectCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 			}
 
 			resp, err := ClientSession.Bucket.Inspect(args[0], temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
 			}
-			return clitools.SuccessResponse(resp)
+			return cli.SuccessResponse(resp)
 		},
 	}
 	return out
@@ -166,10 +165,10 @@ func bucketMountCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
 			default:
 			}
 
@@ -181,9 +180,9 @@ func bucketMountCommand() *cobra.Command {
 			err = ClientSession.Bucket.Mount(args[0], args[1], path, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "mount of bucket", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "mount of bucket", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	out.Flags().String("path", abstract.DefaultBucketMountPoint, "Mount point of the bucket")
@@ -202,19 +201,19 @@ func bucketUnmountCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
 			default:
 			}
 
 			err := ClientSession.Bucket.Unmount(args[0], args[1], temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out

@@ -20,16 +20,16 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"github.com/urfave/cli"
 )
 
 var shareCmdName = "share"
@@ -65,18 +65,13 @@ func shareCreateCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 2 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 			}
 
-			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
-			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-			}
-
-			shareName := c.Args().Get(0)
+			shareName := args[0]
 			def := protocol.ShareDefinition{
 				Name: shareName,
-				Host: &protocol.Reference{Name: c.Args().Get(1)},
+				Host: &protocol.Reference{Name: args[1]},
 				Path: c.Flags().GetString("path"),
 				Options: &protocol.NFSExportOptions{
 					ReadOnly:     c.Flags().GetBool("readonly"),
@@ -93,9 +88,9 @@ func shareCreateCommand() *cobra.Command {
 			err := ClientSession.Share.Create(&def, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "creation of share", true).Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(cmdline.DecorateTimeoutError(err, "creation of share", true).Error()))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -124,7 +119,7 @@ func shareDeleteCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) < 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 			}
 
 			var (
@@ -138,14 +133,14 @@ func shareDeleteCommand() *cobra.Command {
 
 			clientSession, xerr := cmdline.New(c.Flags().GetString("server"))
 			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 			}
 
 			if err := ClientSession.Share.Delete(shareList, 0); err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of share", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of share", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -163,9 +158,9 @@ func shareListCommand() *cobra.Command {
 			list, err := ClientSession.Share.List(0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "list of shares", false).Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(cmdline.DecorateTimeoutError(err, "list of shares", false).Error()))
 			}
-			return clitools.SuccessResponse(list.ShareList)
+			return cli.SuccessResponse(list.ShareList)
 		},
 	}
 	return out
@@ -181,7 +176,7 @@ func shareMountCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", shareCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 2 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 			}
 
 			shareName := args[0]
@@ -197,9 +192,9 @@ func shareMountCommand() *cobra.Command {
 			err := ClientSession.Share.Mount(&def, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "mount of nas", true).Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(cmdline.DecorateTimeoutError(err, "mount of nas", true).Error()))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -221,7 +216,7 @@ func shareUnmountCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 2 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments SHARE_REF and/or HOST_REF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory arguments SHARE_REF and/or HOST_REF."))
 			}
 
 			shareName := c.Args().Get(0)
@@ -233,9 +228,9 @@ func shareUnmountCommand() *cobra.Command {
 			err := ClientSession.Share.Unmount(&def, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "unmount of share", true).Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(cmdline.DecorateTimeoutError(err, "unmount of share", true).Error()))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -252,15 +247,15 @@ func shareInspectCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", shareCmdName, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SHARE_REF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SHARE_REF."))
 			}
 
 			list, err := ClientSession.Share.Inspect(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(cmdline.DecorateTimeoutError(err, "inspection of share", false).Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(cmdline.DecorateTimeoutError(err, "inspection of share", false).Error()))
 			}
-			return clitools.SuccessResponse(list)
+			return cli.SuccessResponse(list)
 		},
 	}
 	return out

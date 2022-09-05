@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"

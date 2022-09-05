@@ -24,7 +24,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -32,7 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -74,8 +73,8 @@ func networkListCommand() *cobra.Command {
 			networks, err := ClientSession.Network.List(c.Flags().GetBool("all"), 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(
-					clitools.ExitOnRPC(
+				return cli.FailureResponse(
+					cli.ExitOnRPC(
 						strprocess.Capitalize(
 							cmdline.DecorateTimeoutError(
 								err, "list of networks", false,
@@ -84,7 +83,7 @@ func networkListCommand() *cobra.Command {
 					),
 				)
 			}
-			return clitools.SuccessResponse(networks.GetNetworks())
+			return cli.SuccessResponse(networks.GetNetworks())
 		},
 	}
 
@@ -108,7 +107,7 @@ func networkDeleteCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			}
 
 			var networkList []string
@@ -118,9 +117,9 @@ func networkDeleteCommand() *cobra.Command {
 			err := ClientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), c.Flags().GetBool("force"))
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of network", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of network", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -140,14 +139,14 @@ func networkInspectCommand() *cobra.Command {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
 			if len(args) != 1 {
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 			}
 
 
 			network, err := ClientSession.Network.Inspect(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
 			}
 
 			// Convert struct to map using struct to json then json to map
@@ -166,7 +165,7 @@ func networkInspectCommand() *cobra.Command {
 					subnet, err := ClientSession.Subnet.Inspect(network.Id, network.Name, 0)
 					if err != nil {
 						err = fail.FromGRPCStatus(err)
-						return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
+						return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of network", false).Error())))
 					}
 
 					subnetMapped := map[string]interface{}{}
@@ -212,7 +211,7 @@ func networkInspectCommand() *cobra.Command {
 				}
 			}
 
-			return clitools.SuccessResponse(mapped)
+			return cli.SuccessResponse(mapped)
 		},
 	}
 	return out
@@ -233,7 +232,7 @@ func queryGatewaysInformation(subnet *protocol.Subnet, mapped map[string]interfa
 				what = "primary "
 			}
 			xerr := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
+			return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
 		gateways[pgw.Name] = pgw.Id
 	}
@@ -242,7 +241,7 @@ func queryGatewaysInformation(subnet *protocol.Subnet, mapped map[string]interfa
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
+			return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
 		gateways[sgw.Name] = sgw.Id
 	}
@@ -277,7 +276,7 @@ func networkCreateCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			}
 
 			var (
@@ -287,7 +286,7 @@ func networkCreateCommand() *cobra.Command {
 			if !c.Flags().GetBool("empty") {
 				sizing, err = constructHostDefinitionStringFromCLI(c, "sizing")
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 				}
 			}
 
@@ -300,10 +299,10 @@ func networkCreateCommand() *cobra.Command {
 			)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of network", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of network", true).Error())))
 			}
 
-			return clitools.SuccessResponse(network)
+			return cli.SuccessResponse(network)
 		},
 	}
 
@@ -386,7 +385,7 @@ func networkSecurityGroupListCommand() *cobra.Command {
 			list, err := ClientSession.SecurityGroup.List(c.Flags().GetBool("all"), 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
 			}
 
 			if len(list.SecurityGroups) > 0 {
@@ -394,14 +393,14 @@ func networkSecurityGroupListCommand() *cobra.Command {
 				for _, v := range list.SecurityGroups {
 					item, xerr := reformatSecurityGroup(v, false)
 					if xerr != nil {
-						return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+						return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
 					}
 
 					resp = append(resp, item)
 				}
-				return clitools.SuccessResponse(resp)
+				return cli.SuccessResponse(resp)
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -423,22 +422,22 @@ func networkSecurityGroupInspectCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			resp, err := ClientSession.SecurityGroup.Inspect(args[1], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
 			formatted, err := reformatSecurityGroup(resp, true)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
-			return clitools.SuccessResponse(formatted)
+			return cli.SuccessResponse(formatted)
 		},
 	}
 	return out
@@ -502,10 +501,10 @@ func networkSecurityGroupCreateCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			req := abstract.SecurityGroup{
@@ -515,10 +514,10 @@ func networkSecurityGroupCreateCommand() *cobra.Command {
 			resp, err := ClientSession.SecurityGroup.Create(args[0], req, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true, ).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true, ).Error())))
 			}
 
-			return clitools.SuccessResponse(resp)
+			return cli.SuccessResponse(resp)
 		},
 	}
 
@@ -543,19 +542,19 @@ func networkSecurityGroupClearCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			err := ClientSession.SecurityGroup.Clear(args[1], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(
-					clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
+				return cli.FailureResponse(
+					cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -574,19 +573,19 @@ func networkSecurityGroupDeleteCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			err := ClientSession.SecurityGroup.Delete(args[1:], c.Flags().GetBool("force"), 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
 			}
 
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -611,10 +610,10 @@ func networkSecurityGroupBondsCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			kind := strings.ToLower(c.Flags().GetString("kind"))
@@ -622,7 +621,7 @@ func networkSecurityGroupBondsCommand() *cobra.Command {
 			list, err := ClientSession.SecurityGroup.Bonds(args[1], kind, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
 			}
 
 			result := map[string]interface{}{}
@@ -630,12 +629,12 @@ func networkSecurityGroupBondsCommand() *cobra.Command {
 				hosts := make([]map[string]interface{}, len(list.Hosts))
 				jsoned, err := json.Marshal(list.Hosts)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
 				}
 
 				err = json.Unmarshal(jsoned, &hosts)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
 				}
 
 				result["hosts"] = hosts
@@ -644,20 +643,20 @@ func networkSecurityGroupBondsCommand() *cobra.Command {
 				subnets := make([]map[string]interface{}, len(list.Subnets))
 				jsoned, err := json.Marshal(list.Subnets)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
 				}
 
 				err = json.Unmarshal(jsoned, &subnets)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 				}
 
 				result["subnets"] = subnets
 			}
 			if len(result) > 0 {
-				return clitools.SuccessResponse(result)
+				return cli.SuccessResponse(result)
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -697,20 +696,20 @@ func networkSecurityGroupRuleAddCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			etherType, xerr := ipversion.Parse(c.Flags().GetString("type"))
 			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
 			direction, xerr := securitygroupruledirection.Parse(c.Flags().GetString("direction"))
 			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
 			rule := abstract.NewSecurityGroupRule()
@@ -732,9 +731,9 @@ func networkSecurityGroupRuleAddCommand() *cobra.Command {
 			err := ClientSession.SecurityGroup.AddRule(args[1], rule, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -765,20 +764,20 @@ func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			etherType, xerr := ipversion.Parse(c.Flags().GetString("type"))
 			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
 			direction, xerr := securitygroupruledirection.Parse(c.Flags().GetString("direction"))
 			if xerr != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
 			rule := abstract.NewSecurityGroupRule()
@@ -798,9 +797,9 @@ func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
 			err := ClientSession.SecurityGroup.DeleteRule(args[1], rule, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -847,7 +846,7 @@ func subnetListCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -857,7 +856,7 @@ func subnetListCommand() *cobra.Command {
 			resp, err := ClientSession.Subnet.List(networkRef, c.Flags().GetBool("all"), 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
 			}
 
 			var result []map[string]interface{}
@@ -865,17 +864,17 @@ func subnetListCommand() *cobra.Command {
 			if len(subnets) > 0 {
 				jsoned, err := json.Marshal(subnets)
 				if err != nil {
-					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
+					return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
 				}
 				if err := json.Unmarshal(jsoned, &result); err != nil {
-					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
+					return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
 				}
 				for _, v := range result {
 					delete(v, "gateway_ids")
 					delete(v, "state")
 				}
 			}
-			return clitools.SuccessResponse(result)
+			return cli.SuccessResponse(result)
 		},
 	}
 
@@ -897,10 +896,10 @@ func subnetDeleteCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -910,10 +909,10 @@ func subnetDeleteCommand() *cobra.Command {
 			err := ClientSession.Subnet.Delete(networkRef, args[1:], temporal.ExecutionTimeout(), c.Flags().GetBool("force"))
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
 			}
 
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -937,10 +936,10 @@ func subnetInspectCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -950,7 +949,7 @@ func subnetInspectCommand() *cobra.Command {
 			subnet, err := ClientSession.Subnet.Inspect(networkRef, args[1], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
 			}
 
 			// Convert struct to map using struct to json then json to map
@@ -970,7 +969,7 @@ func subnetInspectCommand() *cobra.Command {
 
 			mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
 			mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
-			return clitools.SuccessResponse(mapped)
+			return cli.SuccessResponse(mapped)
 		},
 	}
 	return out
@@ -989,10 +988,10 @@ func subnetCreateCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -1012,10 +1011,10 @@ func subnetCreateCommand() *cobra.Command {
 			)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of subnet", true).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of subnet", true).Error())))
 			}
 
-			return clitools.SuccessResponse(network)
+			return cli.SuccessResponse(network)
 		},
 	}
 
@@ -1085,16 +1084,16 @@ func subnetVIPCreateCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 			}
 
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
 		},
 	}
 	return out
@@ -1113,16 +1112,16 @@ func subnetVIPInspectCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 			}
 
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
 		},
 	}
 
@@ -1148,16 +1147,16 @@ func subnetVIPDeleteCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 			}
 
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
 		},
 	}
 
@@ -1180,19 +1179,19 @@ func subnetVIPBindCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 			case 3:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 			}
 
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
 		},
 	}
 
@@ -1215,19 +1214,19 @@ func subnetVIPUnbindCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 			case 3:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 			}
 
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
 		},
 	}
 
@@ -1282,13 +1281,13 @@ func subnetSecurityGroupAddCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			networkRef := args[0]
@@ -1299,9 +1298,9 @@ func subnetSecurityGroupAddCommand() *cobra.Command {
 			err := ClientSession.Subnet.BindSecurityGroup(networkRef, args[1], args[2], !c.Flags().GetBool("disabled"), temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "adding security group to network", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "adding security group to network", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 
@@ -1323,13 +1322,13 @@ func subnetSecurityGroupRemoveCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -1339,9 +1338,9 @@ func subnetSecurityGroupRemoveCommand() *cobra.Command {
 			err := ClientSession.Subnet.UnbindSecurityGroup(networkRef, args[1], args[2], temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "removing security group from network", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "removing security group from network", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -1360,10 +1359,10 @@ func subnetSecurityGroupListCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -1387,9 +1386,9 @@ func subnetSecurityGroupListCommand() *cobra.Command {
 			list, err := ClientSession.Subnet.ListSecurityGroups(networkRef, args[1], state, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
 			}
-			return clitools.SuccessResponse(list.Subnets)
+			return cli.SuccessResponse(list.Subnets)
 		},
 	}
 
@@ -1413,13 +1412,13 @@ func subnetSecurityGroupEnableCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = c.Usage()
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = cli.ShowSubcommandHelp(c)
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = cli.ShowSubcommandHelp(c)
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 			networkRef := args[0]
 			if networkRef == "-" {
@@ -1429,9 +1428,9 @@ func subnetSecurityGroupEnableCommand() *cobra.Command {
 			err := ClientSession.Subnet.EnableSecurityGroup(networkRef, args[1], args[2], temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out
@@ -1450,13 +1449,13 @@ func subnetSecurityGroupDisableCommand() *cobra.Command {
 			switch len(args) {
 			case 0:
 				_ = cli.ShowSubcommandHelp(c)
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
 				_ = cli.ShowSubcommandHelp(c)
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
 				_ = cli.ShowSubcommandHelp(c)
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
 			networkRef := args[0]
@@ -1467,9 +1466,9 @@ func subnetSecurityGroupDisableCommand() *cobra.Command {
 			err := ClientSession.Subnet.DisableSecurityGroup(networkRef, args[1], args[2], temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
 			}
-			return clitools.SuccessResponse(nil)
+			return cli.SuccessResponse(nil)
 		},
 	}
 	return out

@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 )
@@ -44,12 +43,12 @@ var ClientSession *cmdline.Session
 func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
 	if len(args) < 2 {
 		_ = c.Usage()
-		return "", clitools.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
+		return "", cli.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
 	}
 
 	featureName := args[1]
 	if featureName == "" {
-		return "", clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME")
+		return "", cli.ExitOnInvalidArgument("Invalid argument FEATURENAME")
 	}
 
 	return featureName, nil
@@ -59,7 +58,7 @@ func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
 func extractHostArgument(args []string, hostnamePos int, instanciate bool) (string, *protocol.Host, error) {
 	hostName := args[hostnamePos]
 	if hostName == "" {
-		return "", nil, clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
+		return "", nil, cli.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
 	var hostInstance *protocol.Host
@@ -67,11 +66,11 @@ func extractHostArgument(args []string, hostnamePos int, instanciate bool) (stri
 		var err error
 		hostInstance, err = ClientSession.Host.Inspect(hostName, 0)
 		if err != nil {
-			return "", nil, clitools.ExitOnRPC(err.Error())
+			return "", nil, cli.ExitOnRPC(err.Error())
 		}
 
 		if hostInstance == nil {
-			return "", nil, clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
+			return "", nil, cli.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
 		}
 	}
 
@@ -82,7 +81,7 @@ func extractHostArgument(args []string, hostnamePos int, instanciate bool) (stri
 func extractNodeArgument(args []string) (string, error) {
 	hostName := args[1]
 	if hostName == "" {
-		return "", clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
+		return "", cli.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
 	return hostName, nil
@@ -139,7 +138,7 @@ func addPersistentPreRunE(in *cobra.Command) {
 
 		ClientSession, err = cmdline.New(server, tenant)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		if previousCB != nil {

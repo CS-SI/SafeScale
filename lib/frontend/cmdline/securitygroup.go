@@ -28,7 +28,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 )
 
 // var sshCfgCache = cache.NewMapCache()
@@ -177,7 +176,7 @@ func (sg securityGroupConsumer) Delete(names []string, force bool, timeout time.
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		return cli.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }
