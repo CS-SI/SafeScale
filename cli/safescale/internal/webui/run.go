@@ -43,7 +43,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/web"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
@@ -173,7 +172,7 @@ func run() error {
 		serveFrontend(server, listener, "http_tls", errChan)
 	}
 
-	fmt.Printf("safescale webui version: %s\nReady to run on '%s' :-)\n", common.VersionString(), global.Config.WebUI.Listen)
+	fmt.Printf("safescale webui version: %s\nReady to run on '%s' :-)\n", global.VersionString(), global.Config.WebUI.Listen)
 	return <-errChan
 }
 

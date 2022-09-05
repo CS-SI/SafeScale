@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package config
+package externals
 
 import (
 	"context"
@@ -33,11 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-)
-
-var (
-	terraformv1_2_6 = version.Must(version.NewVersion("1.2.6"))
-	consulv1_13_1   = version.Must(version.NewVersion("1.13.1"))
 )
 
 // Check makes sure configuration is ok

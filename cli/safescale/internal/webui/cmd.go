@@ -20,7 +20,6 @@ package webui
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
@@ -62,7 +61,7 @@ func stopCommand() *cobra.Command {
 		Use:   stopCmdLabel,
 		Short: "Stop SafeScale Web UI",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			logrus.Tracef("SafeScale command: %s %s with args '%s'", common.WebUICmdLabel, stopCmdLabel, strings.Join(args, ", "))
+			logrus.Tracef("SafeScale command: %s %s with args '%s'", global.WebUICmdLabel, stopCmdLabel, strings.Join(args, ", "))
 
 			return fail.NotImplementedError("WebUI stop not implemented")
 		},
@@ -76,6 +75,6 @@ func stopCommand() *cobra.Command {
 func addCommonFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.StringP("config", "c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
-	flags.SetAnnotation("config", cobra.BashCompFilenameExt, common.ValidConfigFilenameExts)
+	flags.SetAnnotation("config", cobra.BashCompFilenameExt, global.ValidConfigFilenameExts)
 	flags.StringP("root-dir", "R", "/opt/safescale", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
 }

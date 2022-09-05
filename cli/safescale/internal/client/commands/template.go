@@ -19,11 +19,13 @@ package commands
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 var templateCmdName = "template"

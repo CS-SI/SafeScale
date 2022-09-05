@@ -90,8 +90,8 @@ func hostStartCommand() *cobra.Command {
 
 func hostStopCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "stop",
-		Short:     "stop Host",
+		Use:   "stop",
+		Short: "stop Host",
 		//ArgsUsage: "<Host_name|Host_ID>",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -211,9 +211,9 @@ func hostInspectCommand() *cobra.Command {
 
 func hostStatusCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "state",
-		Aliases:   []string{"status"},
-		Short:     "status Host",
+		Use:     "state",
+		Aliases: []string{"status"},
+		Short:   "status Host",
 		// ArgsUsage: "<Host_name|Host_ID>",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -340,7 +340,7 @@ func hostResizeCommand() *cobra.Command {
 			}
 
 			def := protocol.HostDefinition{
-				Name:     args[0],
+				Name: args[0],
 			}
 
 			var err error
@@ -437,8 +437,8 @@ func hostDeleteCommand() *cobra.Command {
 
 func hostSSHCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "ssh",
-		Short:     "Get ssh config to connect to host",
+		Use:   "ssh",
+		Short: "Get ssh config to connect to host",
 		// ArgsUsage: "<Host_name|Host_ID>",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -494,9 +494,9 @@ func hostSecurityGroupCommands() *cobra.Command {
 
 func hostSecurityGroupAddCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "add",
-		Aliases:   []string{"attach", "bind"},
-		Short:     "add HOSTNAME GROUPNAME",
+		Use:     "add",
+		Aliases: []string{"attach", "bind"},
+		Short:   "add HOSTNAME GROUPNAME",
 		// ArgsUsage: "HOSTNAME GROUPNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -506,8 +506,12 @@ func hostSecurityGroupAddCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory arguments."))
 			}
 
+			disabled, err := c.Flags().GetBool("disabled")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
-			err := ClientSession.Host.BindSecurityGroup(args[0], args[1], c.Flags().GetBool("disabled"), 0)
+			err = ClientSession.Host.BindSecurityGroup(args[0], args[1], disabled, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -516,22 +520,16 @@ func hostSecurityGroupAddCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.BoolFlag{
-		Name:  "disabled",
-		Value: false,
-		Usage: "adds the security group to the host but does not activate it",
-	},
-},
+	out.Flags().Bool("disabled", false, "adds the security group to the host but does not activate it")
 
 	return out
 }
 
 func hostSecurityGroupRemoveCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "remove",
-		Aliases:   []string{"rm", "detach", "unbind"},
-		Short:     "remove HOSTNAME GROUPNAME",
+		Use:     "remove",
+		Aliases: []string{"rm", "detach", "unbind"},
+		Short:   "remove HOSTNAME GROUPNAME",
 		// ArgsUsage: "HOSTNAME GROUPNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -549,13 +547,14 @@ func hostSecurityGroupRemoveCommand() *cobra.Command {
 			return cli.SuccessResponse(nil)
 		},
 	}
-	return out}
+	return out
+}
 
 func hostSecurityGroupListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "list",
-		Aliases:   []string{"show", "ls"},
-		Short:     "list HOSTNAME",
+		Use:     "list",
+		Aliases: []string{"show", "ls"},
+		Short:   "list HOSTNAME",
 		// ArgsUsage: "HOSTNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -565,8 +564,18 @@ func hostSecurityGroupListCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory arguments."))
 			}
 
-			state := strings.ToLower(c.Flags().GetString("state"))
-			if c.Flags().GetBool("all") {
+			state, err := c.Flags().GetString("state")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			state = strings.ToLower(state)
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			if all {
 				state = "all"
 			}
 
@@ -584,19 +593,9 @@ func hostSecurityGroupListCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.BoolFlag{
-		Name:    "all",
-		Aliases: []string{"a"},
-		Value:   true,
-		Usage:   "List all security groups no matter what is the status (enabled or disabled)",
-	},
-	&cli.StringFlag{
-		Name:  "state",
-		Value: "all",
-		Usage: "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')",
-	},
-},
+	flags := out.Flags()
+	flags.BoolP("all", "a", true, "List all security groups no matter what is the status (enabled or disabled)")
+	flags.String("state", "all", "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')")
 
 	return out
 }
@@ -618,9 +617,9 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 
 func hostSecurityGroupEnableCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "enable",
-		Aliases:   []string{"activate"},
-		Short:     "enable NETWORKNAME GROUPNAME",
+		Use:     "enable",
+		Aliases: []string{"activate"},
+		Short:   "enable NETWORKNAME GROUPNAME",
 		// ArgsUsage: "NETWORKNAME GROUPNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -643,9 +642,9 @@ func hostSecurityGroupEnableCommand() *cobra.Command {
 
 func hostSecurityGroupDisableCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "disable",
-		Aliases:   []string{"deactivate"},
-		Short:     "disable HOSTNAME GROUPNAME",
+		Use:     "disable",
+		Aliases: []string{"deactivate"},
+		Short:   "disable HOSTNAME GROUPNAME",
 		// ArgsUsage: "HOSTNAME GROUPNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -655,7 +654,7 @@ func hostSecurityGroupDisableCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory arguments."))
 			}
 
-			err := ClientSession.Host.DisableSecurityGroup(args[0], c.Args().Get(1), 0)
+			err := ClientSession.Host.DisableSecurityGroup(args[0], args[1], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "disable security group of host", false).Error())))
@@ -671,7 +670,7 @@ const hostFeatureCmdLabel = "feature"
 // HostFeatureCommands command
 func hostFeatureCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:  hostFeatureCmdLabel,
+		Use:   hostFeatureCmdLabel,
 		Short: hostFeatureCmdLabel + " COMMAND",
 	}
 	out.AddCommand(
@@ -688,35 +687,37 @@ func hostFeatureCommands() *cobra.Command {
 // hostFeatureListCommand handles 'safescale host feature list'
 func hostFeatureListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "list",
-		Aliases:   []string{"ls"},
-		Short:     "List the available features for the host",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List the available features for the host",
 		// ArgsUsage: "HOSTNAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+			hostName, _, err := extractHostArgument(args, 0, DoNotInstanciate)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			list, err := ClientSession.Host.ListFeatures(hostName, c.Flags().GetBool("all"), 0)
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			list, err := ClientSession.Host.ListFeatures(hostName, all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
+
 			return cli.SuccessResponse(list)
 		},
 	}
-Flags: []cli.Flag{
-	&cli.BoolFlag{
-		Name:  "all",
-		Value: false,
-		Usage: "If used, will list all features that are eligible to be installed on the host",
-	},
-},
+
+	out.Flags().BoolP("all", "a", false, "If used, will list all features that are eligible to be installed on the host")
+
 	return out
 }
 
@@ -724,27 +725,31 @@ Flags: []cli.Flag{
 // Displays information about the feature (parameters, if eligible on host, if installed, ...)
 func hostFeatureInspectCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "inspect",
-		Aliases:   []string{"show"},
-		Short:     "Inspects the feature",
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Inspects the feature",
 		// ArgsUsage: "",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+			hostName, _, err := extractHostArgument(args, 0, DoNotInstanciate)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			featureName, err := extractFeatureArgument(c)
+			featureName, err := extractFeatureArgument(c, args)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
+			embedded, err := c.Flags().GetBool("embedded")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
-			details, err := ClientSession.Host.InspectFeature(hostName, featureName, c.Flags().GetBool("embedded"), 0) // FIXME: set timeout
+			details, err := ClientSession.Host.InspectFeature(hostName, featureName, embedded, 0) // FIXME: set timeout
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
@@ -754,13 +759,7 @@ func hostFeatureInspectCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.BoolFlag{
-		Name:  "embedded",
-		Value: false,
-		Usage: "if used, tells to show details of embedded feature (if it exists)",
-	},
-},
+	out.Flags().Bool("embedded", false, "if used, tells to show details of embedded feature (if it exists)")
 
 	return out
 }
@@ -768,33 +767,42 @@ Flags: []cli.Flag{
 // hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
 func hostFeatureExportCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "export",
-		Aliases:   []string{"dump"},
-		Short:     "Export feature file content",
+		Use:     "export",
+		Aliases: []string{"dump"},
+		Short:   "Export feature file content",
 		// ArgsUsage: "",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+			hostName, _, err := extractHostArgument(args, 0, DoNotInstanciate)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			featureName, err := extractFeatureArgument(c)
+			featureName, err := extractFeatureArgument(c, args)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
+			embedded, err := c.Flags().GetBool("embedded")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
-			export, err := ClientSession.Host.ExportFeature(hostName, featureName, c.Flags().GetBool("embedded"), 0) // FIXME: set timeout
+			export, err := ClientSession.Host.ExportFeature(hostName, featureName, embedded, 0) // FIXME: set timeout
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
 
-			if c.Flags().GetBool("raw") {
+			raw, err := c.Flags().GetBool("raw")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			if raw {
 				return cli.SuccessResponse(export.Export)
 			}
 
@@ -802,18 +810,9 @@ func hostFeatureExportCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.BoolFlag{
-		Name:  "embedded",
-		Value: false,
-		Usage: "if used, tells to export embedded feature (if it exists)",
-	},
-	&cli.BoolFlag{
-		Name:  "raw",
-		Value: false,
-		Usage: "outputs only the feature content, without json",
-	},
-},
+	flags := out.Flags()
+	flags.Bool("embedded", false, "if used, tells to export embedded feature (if it exists)")
+	flags.Bool("raw", false, "outputs only the feature content, without json")
 
 	return out
 }
@@ -821,31 +820,38 @@ Flags: []cli.Flag{
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
 func hostFeatureAddCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "add",
-		Aliases:   []string{"install"},
-		Short:     "Installs a feature to a host",
+		Use:     "add",
+		Aliases: []string{"install"},
+		Short:   "Installs a feature to a host",
 		// ArgsUsage: "HOSTNAME FEATURENAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
+			hostName, hostInstance, err := extractHostArgument(args, 0, DoInstanciate)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			featureName, err := extractFeatureArgument(c)
+			featureName, err := extractFeatureArgument(c, args)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			values := parametersToMap(c.Flags().GetStringSlice("param"))
+			params, err := c.Flags().GetStringSlice("param")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			values := parametersToMap(params)
 			settings := protocol.FeatureSettings{}
-			settings.SkipProxy = c.Flags().GetBool("skip-proxy")
+			settings.SkipProxy, err = c.Flags().GetBool("skip-proxy")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
-
-			err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
+			err = ClientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
@@ -856,17 +862,9 @@ func hostFeatureAddCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.StringSliceFlag{
-		Name:    "param",
-		Aliases: []string{"p"},
-		Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-	},
-	&cli.BoolFlag{
-		Name:  "skip-proxy",
-		Usage: "Disable reverse proxy rules",
-	},
-},
+	flags := out.Flags()
+	flags.StringSliceP("param", "p", nil, "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)")
+	flags.Bool("skip-proxy", false, "Disable reverse proxy rules")
 
 	return out
 }
@@ -874,30 +872,34 @@ Flags: []cli.Flag{
 // hostFeatureCheckCommand handles 'host feature check <host name or id> <pkgname>'
 func hostFeatureCheckCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "check",
-		Aliases:   []string{"verify"},
-		Short:     "checks if a feature is installed on Host",
+		Use:     "check",
+		Aliases: []string{"verify"},
+		Short:   "checks if a feature is installed on Host",
 		// ArgsUsage: "HOSTNAME FEATURENAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			_, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
+			_, hostInstance, err := extractHostArgument(args, 0, DoInstanciate)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			featureName, err := extractFeatureArgument(c)
+			featureName, err := extractFeatureArgument(c, args)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			values := parametersToMap(c.Flags().GetStringSlice("param"))
+			params, err := c.Flags().GetStringSlice("param")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			values := parametersToMap(params)
 			settings := protocol.FeatureSettings{}
 
-
-			if err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
+			if err = ClientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
 				switch grpcstatus.Code(err) {
 				case codes.NotFound:
 					return cli.FailureResponse(cli.ExitOnNotFound(fail.FromGRPCStatus(err).Error()))
@@ -910,13 +912,7 @@ func hostFeatureCheckCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.StringSliceFlag{
-		Name:    "param",
-		Aliases: []string{"p"},
-		Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-	},
-},
+	out.Flags().StringSliceP("param", "p", nil, "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)")
 
 	return out
 }
@@ -924,26 +920,31 @@ Flags: []cli.Flag{
 // hostRemoveFeatureCommand handles 'deploy host delete-feature <host name> <feature name>'
 func hostFeatureRemoveCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "remove",
-		Aliases:   []string{"rm", "delete", "uninstall", "remove"},
-		Short:     "Remove a feature from host.",
+		Use:     "remove",
+		Aliases: []string{"rm", "delete", "uninstall", "remove"},
+		Short:   "Remove a feature from host.",
 		// ArgsUsage: "HOSTNAME FEATURENAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
+			hostName, hostInstance, err := extractHostArgument(args, 0, DoInstanciate)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			featureName, err := extractFeatureArgument(c)
+			featureName, err := extractFeatureArgument(c, args)
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			values := parametersToMap(c.Flags().GetStringSlice("param"))
+			params, err := c.Flags().GetStringSlice("param")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			values := parametersToMap(params)
 			settings := protocol.FeatureSettings{}
 
 			err = ClientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)
@@ -957,13 +958,7 @@ func hostFeatureRemoveCommand() *cobra.Command {
 		},
 	}
 
-Flags: []cli.Flag{
-	&cli.StringSliceFlag{
-		Name:    "param",
-		Aliases: []string{"p"},
-		Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
-	},
-},
+	out.Flags().StringSliceP("param", "p", nil, "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)")
 
 	return out
 }

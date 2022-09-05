@@ -42,8 +42,8 @@ const networkCmdLabel = "network"
 
 // NetworkCommands command
 func NetworkCommands() *cobra.Command {
-	out :=&cobra.Command{
-		Use:    "network",
+	out := &cobra.Command{
+		Use:     "network",
 		Aliases: []string{"net"},
 		Short:   "network COMMAND",
 	}
@@ -55,40 +55,37 @@ func NetworkCommands() *cobra.Command {
 		networkSecurityCommands(),
 		subnetCommands(),
 	)
-	addPersistentPreRunE()
+	addPersistentPreRunE(out)
 	addCommonFlags(out)
 	return out
 }
 
 func networkListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:    "list",
+		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List existing Networks (created by SafeScale)",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
 
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
-			networks, err := ClientSession.Network.List(c.Flags().GetBool("all"), 0)
+			networks, err := ClientSession.Network.List(all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return cli.FailureResponse(
-					cli.ExitOnRPC(
-						strprocess.Capitalize(
-							cmdline.DecorateTimeoutError(
-								err, "list of networks", false,
-							).Error(),
-						),
-					),
-				)
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of networks", false).Error())))
 			}
+
 			return cli.SuccessResponse(networks.GetNetworks())
 		},
 	}
 
 	flags := out.Flags()
-	flags.Bool("provider", false,  "Lists all Networks available on tenant (not only those created by SafeScale)")
+	flags.Bool("provider", false, "Lists all Networks available on tenant (not only those created by SafeScale)")
 	flags.BoolP("all", "a", false, "Lists all Networks available on tenant (not only those created by SafeScale)")
 
 	return out
@@ -96,9 +93,9 @@ func networkListCommand() *cobra.Command {
 
 func networkDeleteCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "delete",
-		Aliases:   []string{"rm", "remove"},
-		Short:     "delete NETWORKREF",
+		Use:     "delete",
+		Aliases: []string{"rm", "remove"},
+		Short:   "delete NETWORKREF",
 		// ArgsUsage: "NETWORKREF [NETWORKREF ...]",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -110,15 +107,17 @@ func networkDeleteCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			}
 
-			var networkList []string
-			networkList = append(networkList, args[0])
-			networkList = append(networkList, args[1:]...)
+			force, err := c.Flags().GetBool("force")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
-			err := ClientSession.Network.Delete(networkList, temporal.ExecutionTimeout(), c.Flags().GetBool("force"))
+			err = ClientSession.Network.Delete(args, temporal.ExecutionTimeout(), force)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of network", false).Error())))
 			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}
@@ -130,9 +129,9 @@ func networkDeleteCommand() *cobra.Command {
 
 func networkInspectCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "inspect",
-		Aliases:   []string{"show"},
-		Short:     "Show details of a network",
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Show details of a network",
 		// ArgsUsage: "NETWORKREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -141,7 +140,6 @@ func networkInspectCommand() *cobra.Command {
 				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 			}
-
 
 			network, err := ClientSession.Network.Inspect(args[0], 0)
 			if err != nil {
@@ -265,9 +263,9 @@ func queryGatewaysInformation(subnet *protocol.Subnet, mapped map[string]interfa
 
 func networkCreateCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "create",
-		Aliases:   []string{"new"},
-		Short:     "Create a network",
+		Use:     "create",
+		Aliases: []string{"new"},
+		Short:   "Create a network",
 		// ArgsUsage: "NETWORKREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -283,18 +281,47 @@ func networkCreateCommand() *cobra.Command {
 				sizing string
 				err    error
 			)
-			if !c.Flags().GetBool("empty") {
+			empty, err := c.Flags().GetBool("empty")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			if !empty {
 				sizing, err = constructHostDefinitionStringFromCLI(c, "sizing")
 				if err != nil {
 					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 				}
 			}
 
-			gatewaySSHPort := uint32(c.Flags().GetInt("gwport"))
+			gatewaySSHPort, err := c.Flags().GetUint32("gwport")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			cidr, err := c.Flags().GetString("cidr")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			gwname, err := c.Flags().GetString("gwname")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			os, err := c.Flags().GetString("os")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			keep_on_failure, err := c.Flags().GetBool("keep-on-failure")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
 			network, err := ClientSession.Network.Create(
-				args[0], c.Flags().GetString("cidr"), c.Flags().GetBool("empty"),
-				c.Flags().GetString("gwname"), gatewaySSHPort, c.Flags().GetString("os"), sizing,
-				c.Flags().GetBool("keep-on-failure"),
+				args[0], cidr, empty,
+				gwname, gatewaySSHPort, os, sizing,
+				keep_on_failure,
 				temporal.ExecutionTimeout(),
 			)
 			if err != nil {
@@ -310,7 +337,7 @@ func networkCreateCommand() *cobra.Command {
 	flags.IPNetP("cidr", "N", net.IPNet{}, "CIDR of the Network (default: 192.168.0.0/23)")
 	flags.Bool("empty", false, "Do not create a default Subnet with the same name than the Network")
 	flags.Bool("no-default-subnet", false, "alias of --empty")
-	flags.BoolP("keep-on-failure", "k", false,"If used, the resource(s) is(are) not deleted on failure (default: not set)")
+	flags.BoolP("keep-on-failure", "k", false, "If used, the resource(s) is(are) not deleted on failure (default: not set)")
 	flags.String("os", "", "Image name for the gateway")
 	flags.String("gwname", "", "Name for the gateway. Default to 'gw-<network_name>'")
 	flags.Int("gwport", 22, `Define the port to use for SSH (default: 22) in default subnet;
@@ -318,7 +345,7 @@ func networkCreateCommand() *cobra.Command {
 	flags.Int("default-ssh-port", 22, "alias to --gwport")
 	flags.Bool("failover", false, `creates 2 gateways for the network with a VIP used as internal default route;
 			Meaningful only if --empty is not used`)
-	flags.StringP("sizing","S", "", `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
+	flags.StringP("sizing", "S", "", `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 					<component> can be cpu, cpufreq, gpu, ram, disk
 					<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
 						- = means exactly <value>
@@ -351,12 +378,13 @@ func networkSecurityCommands() *cobra.Command {
 	out.AddCommand(
 		networkSecurityGroupCommands(),
 	)
+	return out
 }
 
 // networkSecurityGroupCommand command
 func networkSecurityGroupCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:    groupCmdLabel,
+		Use:     groupCmdLabel,
 		Aliases: []string{"sg"},
 		Short:   groupCmdLabel + " COMMAND",
 	}
@@ -374,15 +402,20 @@ func networkSecurityGroupCommands() *cobra.Command {
 
 func networkSecurityGroupListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "list",
-		Aliases:   []string{"ls"},
-		Short:     "List available Security Groups (created by SafeScale)",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List available Security Groups (created by SafeScale)",
 		// ArgsUsage: "[NETWORKREF]",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			list, err := ClientSession.SecurityGroup.List(c.Flags().GetBool("all"), 0)
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			list, err := ClientSession.SecurityGroup.List(all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
@@ -411,9 +444,9 @@ func networkSecurityGroupListCommand() *cobra.Command {
 
 func networkSecurityGroupInspectCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "inspect",
-		Aliases:   []string{"show"},
-		Short:     "Shows details of Security Group",
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Shows details of Security Group",
 		// ArgsUsage: "NETWORKREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -490,9 +523,9 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 
 func networkSecurityGroupCreateCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "create",
-		Aliases:   []string{"new"},
-		Short:     "create a new Security Group",
+		Use:     "create",
+		Aliases: []string{"new"},
+		Short:   "create a new Security Group",
 		// ArgsUsage: "NETWORKREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -507,14 +540,19 @@ func networkSecurityGroupCreateCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
+			description, err := c.Flags().GetString("description")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
 			req := abstract.SecurityGroup{
 				Name:        args[1],
-				Description: c.Flags().GetString("description"),
+				Description: description,
 			}
 			resp, err := ClientSession.SecurityGroup.Create(args[0], req, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true, ).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true).Error())))
 			}
 
 			return cli.SuccessResponse(resp)
@@ -523,7 +561,7 @@ func networkSecurityGroupCreateCommand() *cobra.Command {
 
 	flags := out.Flags()
 	flags.StringP("description", "d", "", "Describe the group")
-	flags.String("comment", "","alias for --description")
+	flags.String("comment", "", "alias for --description")
 
 	return out
 }
@@ -531,9 +569,9 @@ func networkSecurityGroupCreateCommand() *cobra.Command {
 // networkSecurityGroupClear ...
 func networkSecurityGroupClearCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "clear",
-		Aliases:   []string{"reset"},
-		Short:     "deletes all rules of a Security Group",
+		Use:     "clear",
+		Aliases: []string{"reset"},
+		Short:   "deletes all rules of a Security Group",
 		// ArgsUsage: "NETWORKREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -562,9 +600,9 @@ func networkSecurityGroupClearCommand() *cobra.Command {
 
 func networkSecurityGroupDeleteCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "delete",
-		Aliases:   []string{"rm", "remove"},
-		Short:     "Remove Security Group",
+		Use:     "delete",
+		Aliases: []string{"rm", "remove"},
+		Short:   "Remove Security Group",
 		// ArgsUsage: "NETWORKREF GROUPREF [GROUPREF ...]",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -579,7 +617,12 @@ func networkSecurityGroupDeleteCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
-			err := ClientSession.SecurityGroup.Delete(args[1:], c.Flags().GetBool("force"), 0)
+			force, err := c.Flags().GetBool("force")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			err = ClientSession.SecurityGroup.Delete(args[1:], force, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
@@ -596,9 +639,9 @@ func networkSecurityGroupDeleteCommand() *cobra.Command {
 
 func networkSecurityGroupBondsCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "bonds",
-		Aliases:   []string{"links", "attachments"},
-		Short:     "List resources Security Group is bound to",
+		Use:     "bonds",
+		Aliases: []string{"links", "attachments"},
+		Short:   "List resources Security Group is bound to",
 		// ArgsUsage: "NETWORKREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -616,7 +659,12 @@ func networkSecurityGroupBondsCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
-			kind := strings.ToLower(c.Flags().GetString("kind"))
+			kind, err := c.Flags().GetString("kind")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			kind = strings.ToLower(kind)
 
 			list, err := ClientSession.SecurityGroup.Bonds(args[1], kind, 0)
 			if err != nil {
@@ -670,8 +718,8 @@ const ruleCmdLabel = "rule"
 // networkSecurityGroupRuleCommand command
 func networkSecurityGroupRuleCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:      ruleCmdLabel,
-		Short:     "manages rules in Security Groups of Networks",
+		Use:   ruleCmdLabel,
+		Short: "manages rules in Security Groups of Networks",
 		// ArgsUsage: "NETWORKREF|- GROUPREF",
 	}
 	out.AddCommand(
@@ -685,9 +733,9 @@ func networkSecurityGroupRuleCommands() *cobra.Command {
 // NETWORKREF is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
 func networkSecurityGroupRuleAddCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "add",
-		Aliases:   []string{"new"},
-		Short:     "add a new rule to a Security Group",
+		Use:     "add",
+		Aliases: []string{"new"},
+		Short:   "add a new rule to a Security Group",
 		// ArgsUsage: "NETWORKREF|- GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -702,33 +750,70 @@ func networkSecurityGroupRuleAddCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
-			etherType, xerr := ipversion.Parse(c.Flags().GetString("type"))
+			typeP, err := c.Flags().GetString("type")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			etherType, xerr := ipversion.Parse(typeP)
 			if xerr != nil {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
-			direction, xerr := securitygroupruledirection.Parse(c.Flags().GetString("direction"))
+			directionP, err := c.Flags().GetString("direction")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			direction, xerr := securitygroupruledirection.Parse(directionP)
 			if xerr != nil {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
 			rule := abstract.NewSecurityGroupRule()
-			rule.Description = c.Flags().GetString("description")
+			rule.Description, err = c.Flags().GetString("description")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
 			rule.EtherType = etherType
 			rule.Direction = direction
-			rule.Protocol = c.Flags().GetString("protocol")
-			rule.PortFrom = int32(c.Flags().GetUint16("port-from"))
-			rule.PortTo = int32(c.Flags().GetUint16("port-to"))
-			rule.Targets = c.Flags().GetStringSlice("cidr")
+			rule.Protocol, err = c.Flags().GetString("protocol")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			portFromP, err := c.Flags().GetUint16("port-from")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			rule.PortFrom = int32(portFromP)
+			portToP, err := c.Flags().GetUint16("port-to")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			rule.PortTo = int32(portToP)
+			rule.Targets, err = c.Flags().GetStringSlice("cidr")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
 
 			switch rule.Direction {
 			case securitygroupruledirection.Ingress:
-				rule.Sources = c.Flags().GetStringSlice("cidr")
+				rule.Sources, err = c.Flags().GetStringSlice("cidr")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
 			case securitygroupruledirection.Egress:
-				rule.Targets = c.Flags().GetStringSlice("cidr")
+				rule.Targets, err = c.Flags().GetStringSlice("cidr")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
 			}
 
-			err := ClientSession.SecurityGroup.AddRule(args[1], rule, temporal.ExecutionTimeout())
+			err = ClientSession.SecurityGroup.AddRule(args[1], rule, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
@@ -753,9 +838,9 @@ func networkSecurityGroupRuleAddCommand() *cobra.Command {
 // NETWORKREF is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
 func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "delete",
-		Aliases:   []string{"rm", "remove", "destroy"},
-		Short:     "delete a rule from a Security Group",
+		Use:     "delete",
+		Aliases: []string{"rm", "remove", "destroy"},
+		Short:   "delete a rule from a Security Group",
 		// ArgsUsage: "NETWORKREF|- GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -770,12 +855,22 @@ func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 
-			etherType, xerr := ipversion.Parse(c.Flags().GetString("type"))
+			typeP, err := c.Flags().GetString("type")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			etherType, xerr := ipversion.Parse(typeP)
 			if xerr != nil {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
 
-			direction, xerr := securitygroupruledirection.Parse(c.Flags().GetString("direction"))
+			directionP, err := c.Flags().GetString("direction")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			direction, xerr := securitygroupruledirection.Parse(directionP)
 			if xerr != nil {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 			}
@@ -783,22 +878,43 @@ func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
 			rule := abstract.NewSecurityGroupRule()
 			rule.EtherType = etherType
 			rule.Direction = direction
-			rule.Protocol = c.Flags().GetString("protocol")
-			rule.PortFrom = int32(c.Flags().GetInt("port-from"))
-			rule.PortTo = int32(c.Flags().GetInt("port-to"))
+			rule.Protocol, err = c.Flags().GetString("protocol")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			portFromP, err := c.Flags().GetUint16("port-from")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			rule.PortFrom = int32(portFromP)
+			portToP, err := c.Flags().GetInt("port-to")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			rule.PortTo = int32(portToP)
 
 			switch rule.Direction {
 			case securitygroupruledirection.Ingress:
-				rule.Sources = c.Flags().GetStringSlice("cidr")
+				rule.Sources, err = c.Flags().GetStringSlice("cidr")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
 			case securitygroupruledirection.Egress:
-				rule.Targets = c.Flags().GetStringSlice("cidr")
+				rule.Targets, err = c.Flags().GetStringSlice("cidr")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
 			}
 
-			err := ClientSession.SecurityGroup.DeleteRule(args[1], rule, 0)
+			err = ClientSession.SecurityGroup.DeleteRule(args[1], rule, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
 			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}
@@ -807,7 +923,7 @@ func networkSecurityGroupRuleDeleteCommand() *cobra.Command {
 	flags.StringP("direction", "D", "", "'ingress' (incoming) or 'egress' (outgoing)")
 	flags.StringP("protocol", "P", "tcp", "Protocol")
 	flags.StringP("type", "T", "ipv4", "ipv4 or ipv6")
-	flags.Uint16("port-from",  0, "first port of the rule")
+	flags.Uint16("port-from", 0, "first port of the rule")
 	flags.Uint16("port-to", 0, "last port of the rule")
 	flags.StringSliceP("cidr", "C", nil, "source/target of the rule")
 
@@ -819,7 +935,7 @@ const subnetCmdLabel = "subnet"
 // SubnetCommands command
 func subnetCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:  subnetCmdLabel,
+		Use:   subnetCmdLabel,
 		Short: "manages Subnets of Networks",
 	}
 	out.AddCommand(
@@ -853,7 +969,12 @@ func subnetListCommand() *cobra.Command {
 				networkRef = ""
 			}
 
-			resp, err := ClientSession.Subnet.List(networkRef, c.Flags().GetBool("all"), 0)
+			all, err := c.Flags().GetBool("all")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			resp, err := ClientSession.Subnet.List(networkRef, all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of subnets", false).Error())))
@@ -878,16 +999,16 @@ func subnetListCommand() *cobra.Command {
 		},
 	}
 
-	out.Flags().BoolP("all","a", false, "List all Subnets on tenant (not only those created by SafeScale)")
+	out.Flags().BoolP("all", "a", false, "List all Subnets on tenant (not only those created by SafeScale)")
 
 	return out
 }
 
 func subnetDeleteCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "delete",
-		Aliases:   []string{"rm", "remove"},
-		Short:     "delete SUBNETREF",
+		Use:     "delete",
+		Aliases: []string{"rm", "remove"},
+		Short:   "delete SUBNETREF",
 		// ArgsUsage: "NETWORKREF SUBNETREF [SUBNETREF ...]",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -906,7 +1027,12 @@ func subnetDeleteCommand() *cobra.Command {
 				networkRef = ""
 			}
 
-			err := ClientSession.Subnet.Delete(networkRef, args[1:], temporal.ExecutionTimeout(), c.Flags().GetBool("force"))
+			force, err := c.Flags().GetBool("force")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			err = ClientSession.Subnet.Delete(networkRef, args[1:], temporal.ExecutionTimeout(), force)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
@@ -925,9 +1051,9 @@ func subnetDeleteCommand() *cobra.Command {
 
 func subnetInspectCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "inspect",
-		Aliases:   []string{"show"},
-		Short:     "Show details of a subnet",
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Show details of a subnet",
 		// ArgsUsage: "NETWORKREF SUBNETREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -977,9 +1103,9 @@ func subnetInspectCommand() *cobra.Command {
 
 func subnetCreateCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "create",
-		Aliases:   []string{"new"},
-		Short:     "Create a subnet",
+		Use:     "create",
+		Aliases: []string{"new"},
+		Short:   "Create a subnet",
 		// ArgsUsage: "NETWORKREF SUBNETREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -1003,10 +1129,40 @@ func subnetCreateCommand() *cobra.Command {
 				return err
 			}
 
+			cidr, err := c.Flags().GetString("cidr")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			failover, err := c.Flags().GetBool("failover")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			gwname, err := c.Flags().GetString("gwname")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			gwport, err := c.Flags().GetUint16("gwport")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			os, err := c.Flags().GetString("os")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			keep_on_failure, err := c.Flags().GetBool("keep-on-failure")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
 			network, err := ClientSession.Subnet.Create(
-				networkRef, args[1], c.Flags().GetString("cidr"), c.Flags().GetBool("failover"),
-				c.Flags().GetString("gwname"), uint32(c.Flags().GetInt("gwport")), c.Flags().GetString("os"), sizing,
-				c.Flags().GetBool("keep-on-failure"),
+				networkRef, args[1], cidr, failover,
+				gwname, uint32(gwport), os, sizing,
+				keep_on_failure,
 				temporal.ExecutionTimeout(),
 			)
 			if err != nil {
@@ -1054,9 +1210,9 @@ const vipCmdLabel = "vip"
 // subnetVIPCommands handles 'network vip' commands
 func subnetVIPCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:      vipCmdLabel,
-		Aliases:   []string{"virtualip"},
-		Short:     "manage subnet virtual IP",
+		Use:     vipCmdLabel,
+		Aliases: []string{"virtualip"},
+		Short:   "manage subnet virtual IP",
 		// ArgsUsage: "COMMAND",
 	}
 
@@ -1072,14 +1228,14 @@ func subnetVIPCommands() *cobra.Command {
 
 func subnetVIPCreateCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:    "create",
+		Use:     "create",
 		Aliases: []string{"new"},
 		Short: `creates a VIP in a Subnet of a Network.
 		If NETWORKREF == -, SUBNETREF must be a Subnet ID`,
 		// ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
-			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Name(), strings.Join(args, ", ")
+			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Name(), strings.Join(args, ", "))
 
 			switch len(args) {
 			case 0:
@@ -1101,9 +1257,9 @@ func subnetVIPCreateCommand() *cobra.Command {
 
 func subnetVIPInspectCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "inspect",
-		Aliases:   []string{"show"},
-		Short:     "Show details of a VIP of a Subnet in a Network",
+		Use:     "inspect",
+		Aliases: []string{"show"},
+		Short:   "Show details of a VIP of a Subnet in a Network",
 		// ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -1132,9 +1288,9 @@ func subnetVIPInspectCommand() *cobra.Command {
 
 func subnetVIPDeleteCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "delete",
-		Aliases:   []string{"rm", "destroy"},
-		Short:     "Deletes a VIP from a Subnet in a Network",
+		Use:     "delete",
+		Aliases: []string{"rm", "destroy"},
+		Short:   "Deletes a VIP from a Subnet in a Network",
 		// ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
@@ -1167,9 +1323,9 @@ func subnetVIPDeleteCommand() *cobra.Command {
 
 func subnetVIPBindCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "bind",
-		Aliases:   []string{"attach"},
-		Short:     "Attach a VIP to a host",
+		Use:     "bind",
+		Aliases: []string{"attach"},
+		Short:   "Attach a VIP to a host",
 		// ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
@@ -1202,9 +1358,9 @@ func subnetVIPBindCommand() *cobra.Command {
 
 func subnetVIPUnbindCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "unbind",
-		Aliases:   []string{"detach"},
-		Short:     "unbind NETWORKREF SUBNETREF VIPNAME HOSTNAME",
+		Use:     "unbind",
+		Aliases: []string{"detach"},
+		Short:   "unbind NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 		//ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
@@ -1240,8 +1396,8 @@ const hostSecurityCmdLabel = "security"
 // subnetSecurityGroupCommand command
 func subnetSecurityCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:      hostSecurityCmdLabel,
-		Short:     "manages security of subnets",
+		Use:   hostSecurityCmdLabel,
+		Short: "manages security of subnets",
 		// ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
 	}
 	out.AddCommand(
@@ -1255,7 +1411,7 @@ const groupCmdLabel = "group"
 // subnetSecurityGroupCommand command
 func subnetSecurityGroupCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:  groupCmdLabel,
+		Use:   groupCmdLabel,
 		Short: "manages security group of subnets",
 	}
 	out.AddCommand(
@@ -1270,9 +1426,9 @@ func subnetSecurityGroupCommands() *cobra.Command {
 
 func subnetSecurityGroupAddCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "add",
-		Aliases:   []string{"attach", "bind"},
-		Short:     "Add a security group to a subnet",
+		Use:     "add",
+		Aliases: []string{"attach", "bind"},
+		Short:   "Add a security group to a subnet",
 		// ArgsUsage: "NETWORKREF|- SUBNETREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -1295,11 +1451,17 @@ func subnetSecurityGroupAddCommand() *cobra.Command {
 				networkRef = ""
 			}
 
-			err := ClientSession.Subnet.BindSecurityGroup(networkRef, args[1], args[2], !c.Flags().GetBool("disabled"), temporal.ExecutionTimeout())
+			disabled, err := c.Flags().GetBool("disabled")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			err = ClientSession.Subnet.BindSecurityGroup(networkRef, args[1], args[2], !disabled, temporal.ExecutionTimeout())
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "adding security group to network", false).Error())))
 			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}
@@ -1311,9 +1473,9 @@ func subnetSecurityGroupAddCommand() *cobra.Command {
 
 func subnetSecurityGroupRemoveCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "remove",
-		Aliases:   []string{"rm", "detach", "unbind"},
-		Short:     "removes a security group from a subnet",
+		Use:     "remove",
+		Aliases: []string{"rm", "detach", "unbind"},
+		Short:   "removes a security group from a subnet",
 		// ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -1348,13 +1510,13 @@ func subnetSecurityGroupRemoveCommand() *cobra.Command {
 
 func subnetSecurityGroupListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "list",
-		Aliases:   []string{"show", "ls"},
-		Short:     "lists security groups bound to subnet",
+		Use:     "list",
+		Aliases: []string{"show", "ls"},
+		Short:   "lists security groups bound to subnet",
 		// ArgsUsage: "NETWORKREF SUBNETREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
-			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", ")))
+			logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
 			switch len(args) {
 			case 0:
@@ -1401,9 +1563,9 @@ func subnetSecurityGroupListCommand() *cobra.Command {
 
 func subnetSecurityGroupEnableCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "enable",
-		Aliases:   []string{"activate"},
-		Short:     "Enables a security group on a subnet",
+		Use:     "enable",
+		Aliases: []string{"activate"},
+		Short:   "Enables a security group on a subnet",
 		// ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -1414,10 +1576,10 @@ func subnetSecurityGroupEnableCommand() *cobra.Command {
 				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
-				_ = cli.ShowSubcommandHelp(c)
+				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
-				_ = cli.ShowSubcommandHelp(c)
+				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 			networkRef := args[0]
@@ -1438,9 +1600,9 @@ func subnetSecurityGroupEnableCommand() *cobra.Command {
 
 func subnetSecurityGroupDisableCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:      "disable",
-		Aliases:   []string{"deactivate"},
-		Short:     "disable SUBNETREF GROUPREF",
+		Use:     "disable",
+		Aliases: []string{"deactivate"},
+		Short:   "disable SUBNETREF GROUPREF",
 		// ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
@@ -1448,13 +1610,13 @@ func subnetSecurityGroupDisableCommand() *cobra.Command {
 
 			switch len(args) {
 			case 0:
-				_ = cli.ShowSubcommandHelp(c)
+				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
 			case 1:
-				_ = cli.ShowSubcommandHelp(c)
+				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
 			case 2:
-				_ = cli.ShowSubcommandHelp(c)
+				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 			}
 

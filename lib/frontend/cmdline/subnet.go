@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // subnetConsumer is the part of safescale client handling Subnets

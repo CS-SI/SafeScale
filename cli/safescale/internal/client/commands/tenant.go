@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
@@ -155,11 +156,22 @@ func tenantScanCommand() *cobra.Command {
 
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			results, err := ClientSession.Tenant.Scan(args[0], c.Flags().GetBool("dry-run"), c.Flags().GetStringSlice("template"), 0)
+			dryRun, err := c.Flags().GetBool("dry-run")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			template, err := c.Flags().GetStringSlice("template")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			results, err := ClientSession.Tenant.Scan(args[0], dryRun, template, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "scan tenant", false).Error())))
 			}
+
 			return cli.SuccessResponse(results.GetResults())
 		},
 	}

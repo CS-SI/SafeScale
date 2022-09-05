@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package external
+package externals
 
 import (
 	"context"
@@ -25,10 +25,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -37,7 +36,7 @@ const (
 )
 
 var (
-	// go:embed consul.config.tmpl
+	// go:embed templates/consul.config.tmpl
 	consulConfigTemplate string
 	consulLauncher       sync.Once
 )

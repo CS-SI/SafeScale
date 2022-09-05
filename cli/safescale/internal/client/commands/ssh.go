@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -72,26 +72,39 @@ func sshRunCommand() *cobra.Command {
 			}
 
 			var timeout time.Duration
-			if c.Flags().Lookup("timeout") {
-				timeout = time.Duration(c.Float64("timeout")) * time.Minute
+			if c.Flags().Lookup("timeout") != nil {
+				timeoutP, err := c.Flags().GetUint("timeout")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
+
+				timeout = time.Duration(timeoutP) * time.Minute
 			} else {
 				timeout = temporal.HostOperationTimeout()
 			}
-			retcode, _, _, err := ClientSession.SSH.Run(c.Args().Get(0), c.Flags().GetString("c"), outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
+
+			cmd, err := c.Flags().GetString("c")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			retcode, _, _, err := ClientSession.SSH.Run(args[0], cmd, outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh run", false).Error())))
 			}
+
 			if retcode != 0 {
-				return cli.Exit("", retcode)
+				global.AppCtrl.Exit(retcode, "")
 			}
+
 			return nil
 		},
 	}
 
 	flags := out.Flags()
 	flags.String("c", "", "Command to execute")
-	flags.Uint("timeout", "5", "timeout in minutes")
+	flags.Uint("timeout", 5, "timeout in minutes")
 
 	return out
 }
@@ -118,19 +131,26 @@ func sshCopyCommand() *cobra.Command {
 			}
 
 			var timeout time.Duration
-			if c.Flags().Lookup("timeout") {
-				timeout = time.Duration(c.Float64("timeout")) * time.Minute
+			if c.Flags().Lookup("timeout") != nil {
+				timeoutP, err := c.Flags().GetUint("timeout")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
+
+				timeout = time.Duration(timeoutP) * time.Minute
 			} else {
 				timeout = temporal.HostOperationTimeout()
 			}
-			retcode, _, _, err := ClientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
+			retcode, _, _, err := ClientSession.SSH.Copy(normalizeFileName(args[0]), normalizeFileName(args[1]), temporal.ConnectionTimeout(), timeout)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh copy", true).Error())))
 			}
+
 			if retcode != 0 {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("copy failed: retcode=%d", retcode)))
 			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}
@@ -155,30 +175,38 @@ func sshConnectCommand() *cobra.Command {
 			}
 
 			// Check host status 1st
-			resp, err := ClientSession.Host.GetStatus(c.Args().Get(0), 0)
+			resp, err := ClientSession.Host.GetStatus(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "status of host", false).Error())))
 			}
+
 			converted := converters.HostStateFromProtocolToEnum(resp.Status)
 			if converted != hoststate.Started {
-				return cli.FailureResponse(cli.ExitOnRPC(fmt.Sprintf("Host %s is not in 'Started' state, it's '%s'", c.Args().Get(0), converted.String())))
+				return cli.FailureResponse(cli.ExitOnRPC(fmt.Sprintf("Host %s is not in 'Started' state, it's '%s'", args[0], converted.String())))
 			}
 
 			var (
 				username, shell string
 			)
-			if c.Flags().Lookup("username") {
-				username = c.Flags().GetString("username")
+			if c.Flags().Lookup("username") != nil {
+				username, err = c.Flags().GetString("username")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
 			}
-			if c.Flags().Lookup("shell") {
-				shell = c.Flags().GetString("shell")
+			if c.Flags().Lookup("shell") != nil {
+				shell, err = c.Flags().GetString("shell")
+				if err != nil {
+					return cli.FailureResponse(err)
+				}
 			}
-			err = clientSession.SSH.Connect(c.Args().Get(0), username, shell, 0)
+			err = ClientSession.SSH.Connect(args[0], username, shell, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh connect", false).Error()))
 			}
+
 			return nil
 		},
 	}
@@ -203,24 +231,38 @@ func sshTunnelCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 			}
 
-			localPort := c.Flags().GetInt("local")
+			localPort, err := c.Flags().GetInt("local")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
 			if 0 > localPort || localPort > 65535 {
 				return cli.FailureResponse(cli.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port", localPort)))
 			}
 
-			remotePort := c.Flags().GetInt("remote")
+			remotePort, err := c.Flags().GetInt("remote")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
 			if 0 > localPort || localPort > 65535 {
 				return cli.FailureResponse(cli.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port", remotePort)))
 			}
 
-			timeout := time.Duration(c.Float64("timeout")) * time.Minute
+			timeoutP, err := c.Flags().GetUint("timeout")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			timeout := time.Duration(timeoutP) * time.Minute
 
 			// c.GlobalInt("port") is the grpc port aka. 50051
-			err := ClientSession.SSH.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
+			err = ClientSession.SSH.CreateTunnel(args[0], localPort, remotePort, timeout)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh tunnel", false).Error())))
 			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}
@@ -246,27 +288,28 @@ func sshCloseCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 			}
 
-			strLocalPort := c.Flags().GetString("local")
-			if c.Flags().Lookup("local") {
-				localPort, err := strconv.Atoi(strLocalPort)
-				if err != nil || 0 > localPort || localPort > 65535 {
-					return cli.FailureResponse(cli.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port", localPort)))
-				}
-			}
-			strRemotePort := c.Flags().GetString("remote")
-			if c.Flags().Lookup("remote") {
-				remotePort, err := strconv.Atoi(strRemotePort)
-				if err != nil || 0 > remotePort || remotePort > 65535 {
-					return cli.FailureResponse(cli.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port", remotePort)))
-				}
+			localPort, err := c.Flags().GetUint16("local")
+			if err != nil {
+				return cli.FailureResponse(err)
 			}
 
-			timeout := time.Duration(c.Float64("timeout")) * time.Minute
-			err := ClientSession.SSH.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
+			remotePort, err := c.Flags().GetUint16("remote")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			timeoutP, err := c.Flags().GetUint("timeout")
+			if err != nil {
+				return cli.FailureResponse(err)
+			}
+
+			timeout := time.Duration(timeoutP) * time.Minute
+			err = ClientSession.SSH.CloseTunnels(args[0], localPort, remotePort, timeout)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "ssh close", false).Error())))
 			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}

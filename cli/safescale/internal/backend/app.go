@@ -30,8 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 )
 
-// SetCommands initializes
-func SetCommands(rootCmd *cobra.Command) *cobra.Command {
+// SetCommands adds commands in global.AppCtrl
+func SetCommands() {
 	out := &cobra.Command{
 		Use:     global.BackendCmdLabel,
 		Aliases: []string{"daemon"},
@@ -45,12 +45,7 @@ func SetCommands(rootCmd *cobra.Command) *cobra.Command {
 
 	addPersistentPreRunE(out)
 
-	if rootCmd != nil {
-		rootCmd.AddCommand(out)
-		return rootCmd
-	}
-
-	return out
+	global.AppCtrl.AddCommand(out)
 }
 
 var cleanupOnce sync.Once

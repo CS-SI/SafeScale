@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package config
+package externals
 
 import (
 	"context"
@@ -45,9 +45,9 @@ func installConsul() (string, error) {
 	installer := hcinstall.NewInstaller()
 	release := &releases.ExactVersion{
 		Product:    product.Consul,
-		Version:    consulv1_2_6,
+		Version:    consulv1_13_1,
 		InstallDir: global.Config.Folders.ShareDir + "/consul/bin",
 	}
-	logrus.Infof("installing consul release %s", consulv1_2_6)
+	logrus.Infof("installing consul release %s", consulv1_13_1)
 	return installer.Install(context.Background(), []src.Installable{release})
 }

@@ -24,10 +24,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // var sshCfgCache = cache.NewMapCache()

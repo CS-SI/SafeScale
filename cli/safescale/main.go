@@ -28,7 +28,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/backend"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client"
-	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/webui"
 	// Autoload embedded provider drivers
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
@@ -52,16 +51,16 @@ func main() {
 	// }...)
 
 	// Finally, try the remaining possibilities
-	rootCmd, err := global.NewApp()
+	err := global.InitApp()
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
 	// 1st try to see if command is daemon
-	backend.SetCommands(app)
-	webui.SetCommands(app)
-	client.SetCommands(app)
+	backend.SetCommands()
+	webui.SetCommands()
+	client.SetCommands()
 
 	// if last argument has "--" or "-" and is NOT help we are probably writing a wrong command
 	/*
@@ -80,7 +79,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err = common.RunApp(ctx, app, cleanup)
+	err = global.RunApp(ctx, cleanup)
 	if err != nil {
 		logrus.Error("Error running cli: " + err.Error())
 		os.Exit(1)
@@ -89,16 +88,17 @@ func main() {
 }
 
 func cleanup(cmd *cobra.Command) {
+	// identify the first argument of the command
 	last, _, _ := cmd.Find(os.Args[1:])
 	prev := last
 	for ; prev.HasParent() && prev.Parent() != cmd; prev = prev.Parent() {
 	}
 
-	fmt.Printf("cleanup(): cmd.Name() = %s, prev.Name() = %s\n", cmd.Name(), prev.Name())
+	// cleans up accordingly with the first argument
 	switch prev.Name() {
-	case common.BackendCmdLabel:
+	case global.BackendCmdLabel:
 		backend.Cleanup()
-	case common.WebUICmdLabel:
+	case global.WebUICmdLabel:
 		webui.Cleanup()
 	default:
 		client.Cleanup()

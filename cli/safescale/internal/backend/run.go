@@ -27,17 +27,16 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/config"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/external"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/heartbeat"
@@ -51,7 +50,7 @@ const (
 // startBackend starts the gRPC server of SafeScale (the daemon)
 func startBackend(cmd *cobra.Command) error {
 	global.BuildFolderTree()
-	suffix, err := config.Check(cmd)
+	suffix, err := externals.Check(cmd)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -63,7 +62,7 @@ func startBackend(cmd *cobra.Command) error {
 	if global.Config.Backend.Terraform.StateInConsul {
 		// If we use "internal" consul, starts consul
 		if global.Config.Backend.Consul.Internal {
-			xerr := external.StartConsulServer(ctx)
+			xerr := externals.StartConsulServer(ctx)
 			if xerr != nil {
 				return xerr
 			}
@@ -114,7 +113,7 @@ func startBackend(cmd *cobra.Command) error {
 
 	operations.StartFeatureFileWatcher()
 
-	fmt.Printf("safescale daemon version: %s\nReady to start backend on '%s' :-)\n", common.VersionString(), global.Config.Backend.Listen)
+	fmt.Printf("safescale daemon version: %s\nReady to start backend on '%s' :-)\n", global.VersionString(), global.Config.Backend.Listen)
 	err = s.Serve(lis)
 	if err != nil {
 		return fail.Wrap(err, "failed to start backend")
@@ -131,6 +130,7 @@ func startConsulAgent(ctx context.Context) (ferr fail.Error) {
 		// creates configuration if not present
 		consulRootDir := global.Config.Folders.ShareDir + "consul"
 		consulEtcDir := consulRootDir + "/etc"
+		// FIXME: decide what file name to use
 		consulConfigFile := consulEtcDir + "/config.?"
 		st, err := os.Stat(consulConfigFile)
 		if err != nil {
@@ -199,7 +199,7 @@ connect {
 
 			ws, ok := ps.Sys().(syscall.WaitStatus)
 			if ok {
-				doneCh <- ps
+				doneCh <- ws
 				return
 			}
 

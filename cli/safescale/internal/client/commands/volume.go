@@ -21,14 +21,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 )
 
 const volumeCmdLabel = "volume"

@@ -48,13 +48,13 @@ var (
 	handlerOnce sync.Once
 )
 
-func NewApp() (ferr error) {
+func InitApp() (ferr error) {
 	ferr = nil
 	handlerOnce.Do(func() {
 		rootCmd := &cobra.Command{
 			Use:              "safescale",
 			Short:            "safescale COMMAND",
-			Version:          versionString(),
+			Version:          VersionString(),
 			TraverseChildren: true,
 		}
 
@@ -130,7 +130,8 @@ func RunApp(ctx context.Context, cleanup func(*cobra.Command)) error {
 	return AppCtrl.App.Run(ctx, cleanup)
 }
 
-func versionString() string {
+// VersionString returns the string corresponding to the release of the binary
+func VersionString() string {
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	//goland:noinspection GoBoolExpressions
 	if len(Tags) > 1 { // nolint

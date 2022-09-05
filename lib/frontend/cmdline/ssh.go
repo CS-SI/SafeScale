@@ -539,7 +539,7 @@ func (s sshConsumer) CreateTunnel(name string, localPort int, remotePort int, ti
 }
 
 // CloseTunnels closes a tunnel created in the machine 'name'
-func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
+func (s sshConsumer) CloseTunnels(name string, localPort uint16, remotePort uint16, timeout time.Duration) error {
 	acfg, xerr := s.getSSHConfigFromName(name, timeout)
 	if xerr != nil {
 		return xerr
@@ -553,7 +553,7 @@ func (s sshConsumer) CloseTunnels(name string, localPort string, remotePort stri
 
 	ngu, _ := ncfg.GatewayConfig.GetUser()
 	ngi, _ := ncfg.GatewayConfig.GetIPAddress()
-	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, ncfg.IPAddress, remotePort, ngu, ngi)
+	cmdString := fmt.Sprintf("ssh .* %d:%s:%d %s@%s .*", localPort, ncfg.IPAddress, remotePort, ngu, ngi)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err != nil {
