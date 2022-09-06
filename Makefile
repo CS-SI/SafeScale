@@ -231,7 +231,7 @@ ground: begin
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n"; \
-		$(GO) install $(GOJQ)@v0.12.6 &>/dev/null || true; \
+		$(GO) install $(GOJQ)@v0.12.9 &>/dev/null || true; \
 	fi
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n";
