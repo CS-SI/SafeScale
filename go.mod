@@ -48,7 +48,7 @@ require (
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.94.0
+	google.golang.org/api v0.95.0
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/fsnotify.v1 v1.4.7
