@@ -804,6 +804,8 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 			return xerr
 		}
 
+		// FIXME: OPP Disable VIP SG and port security
+
 		// Starting from here, remove Subnet from Network metadata if exiting with error
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
@@ -1149,80 +1151,116 @@ func (instance *Subnet) unsafeCreateGateways(
 		}
 
 		// handle primary gateway
+
+		var content concurrency.TaskResult
+		var ok bool
+
+		if content, ok = results[id]; !ok {
+			xerr := fail.InconsistentError("task results does not contain %s", id)
+			chRes <- result{xerr}
+			return xerr
+		}
+		if content == nil {
+			xerr := fail.InconsistentError("task result with %s should not be nil", id)
+			chRes <- result{xerr}
+			return xerr
+		}
+
+		aresult, ok := results[id].(data.Map)
+		if !ok {
+			xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+			chRes <- result{xerr}
+			return xerr
+		}
+
 		{
-			var content concurrency.TaskResult
-			var ok bool
-
-			if content, ok = results[id]; !ok {
-				xerr := fail.InconsistentError("task results does not contain %s", id)
-				chRes <- result{xerr}
-				return xerr
-			}
-			if content == nil {
-				xerr := fail.InconsistentError("task result with %s should not be nil", id)
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			aresult, ok := results[id].(data.Map)
+			primaryGateway, ok = aresult["host"].(*Host)
 			if !ok {
-				xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+				xerr := fail.InconsistentError("result[host] should be a *Host")
 				chRes <- result{xerr}
 				return xerr
 			}
+			primaryUserdata, ok = aresult["userdata"].(*userdata.Content)
+			if !ok {
+				xerr := fail.InconsistentError("result[userdata] should be a *userdata.Content")
+				chRes <- result{xerr}
+				return xerr
+			}
+			primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
+			// apply SG to primary gateway
 			{
-				primaryGateway, ok = aresult["host"].(*Host)
-				if !ok {
-					xerr := fail.InconsistentError("result[host] should be a *Host")
-					chRes <- result{xerr}
-					return xerr
-				}
-				primaryUserdata, ok = aresult["userdata"].(*userdata.Content)
-				if !ok {
-					xerr := fail.InconsistentError("result[userdata] should be a *userdata.Content")
-					chRes <- result{xerr}
-					return xerr
-				}
-				primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-
-				// delete primary gateway if something fails
-				{
-					// Starting from here, deletes the primary gateway if exiting with error
-					defer func() {
-						ferr = debug.InjectPlannedFail(ferr)
-						if ferr != nil && !req.KeepOnFailure {
-							logrus.WithContext(ctx).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
-							derr := primaryGateway.RelaxedDeleteHost(context.Background())
-							derr = debug.InjectPlannedFail(derr)
-							if derr != nil {
-								switch derr.(type) {
-								case *fail.ErrTimeout:
-									logrus.WithContext(ctx).Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
-								default:
-								}
-								_ = ferr.AddConsequence(derr)
-							} else {
-								logrus.WithContext(ctx).Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
-							}
-							if req.HA {
-								if derr := instance.unbindHostFromVIP(context.Background(), as.VIP, primaryGateway); derr != nil {
-									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
-								}
-							}
-						}
-					}()
-
-					defer func() {
-						derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
+				// Starting from here, deletes the primary gateway if exiting with error
+				defer func() {
+					ferr = debug.InjectPlannedFail(ferr)
+					if ferr != nil && !req.KeepOnFailure {
+						logrus.WithContext(ctx).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
+						derr := primaryGateway.RelaxedDeleteHost(context.Background())
+						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
-							logrus.WithContext(ctx).Warnf(derr.Error())
+							switch derr.(type) {
+							case *fail.ErrTimeout:
+								logrus.WithContext(ctx).Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+							default:
+							}
+							_ = ferr.AddConsequence(derr)
+						} else {
+							logrus.WithContext(ctx).Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 						}
-					}()
+						if req.HA {
+							if derr := instance.unbindHostFromVIP(context.Background(), as.VIP, primaryGateway); derr != nil {
+								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
+							}
+						}
+					}
+				}()
 
-					// Bind Internal Security Group to gateway
-					xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
-					xerr = debug.InjectPlannedFail(xerr)
+				// FIXME: OPP Enable the SG AGAIN
+
+				safe := false
+
+				// FIXME: OPP After Stein, no failover
+				{
+					st, xerr := svc.GetProviderName()
+					if xerr != nil {
+						return xerr
+					}
+					if st != "ovh" {
+						safe = true
+					}
+				}
+
+				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
+					if val, ok := tpar["Safe"].(bool); ok {
+						safe = val
+					}
+				}
+
+				if !safe {
+					xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, req.NetworkID, "")
+					if xerr != nil {
+						chRes <- result{xerr}
+						return xerr
+					}
+				}
+
+				defer func() {
+					derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
+					if derr != nil {
+						logrus.WithContext(ctx).Warnf(derr.Error())
+					}
+				}()
+
+				// Bind Internal Security Group to gateway
+				xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{xerr}
+					return xerr
+				}
+
+				if !safe {
+					xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, req.NetworkID, "")
 					if xerr != nil {
 						chRes <- result{xerr}
 						return xerr
@@ -1259,8 +1297,27 @@ func (instance *Subnet) unsafeCreateGateways(
 				return xerr
 			}
 
-			// else is toxic
+			// apply SG to secondary gateway
 			{
+				safe := false
+
+				// FIXME: OPP After Stein, no failover
+				{
+					st, xerr := svc.GetProviderName()
+					if xerr != nil {
+						return xerr
+					}
+					if st != "ovh" {
+						safe = true
+					}
+				}
+
+				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
+					if val, ok := tpar["Safe"].(bool); ok {
+						safe = val
+					}
+				}
+
 				var ok bool
 				secondaryGateway, ok = aresult["host"].(*Host)
 				if !ok {
@@ -1307,11 +1364,27 @@ func (instance *Subnet) unsafeCreateGateways(
 
 				// Bind Internal Security Group to gateway
 
+				if !safe {
+					xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, req.NetworkID, "")
+					if xerr != nil {
+						chRes <- result{xerr}
+						return xerr
+					}
+				}
+
 				xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{xerr}
 					return xerr
+				}
+
+				if !safe {
+					xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, req.NetworkID, "")
+					if xerr != nil {
+						chRes <- result{xerr}
+						return xerr
+					}
 				}
 			}
 		}

@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
@@ -39,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------
@@ -485,6 +485,10 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	defer fail.OnPanic(&ferr)
 
 	return s.rpcResetStartupScriptOfInstance(ctx, ahfid)
+}
+
+func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	return nil
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id

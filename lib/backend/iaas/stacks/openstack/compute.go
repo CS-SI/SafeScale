@@ -1003,6 +1003,76 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	return nil
 }
 
+func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, enabledPort bool, net string, machine string) fail.Error {
+	// list ports to be able to remove them
+	req := ports.ListOpts{
+		NetworkID:   net,
+		DeviceOwner: "compute:nova",
+	}
+	portList, xerr := s.rpcListPorts(ctx, req)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	}
+
+	var collected []error
+	goodEnough := false
+	if cleanSG {
+		for _, p := range portList {
+			check := (machine == "") || (machine != "" && strings.Contains(p.Name, machine))
+			if check {
+				_, xerr = s.rpcRemoveSGFromPort(ctx, p.ID)
+				if xerr != nil {
+					debug.IgnoreError(xerr)
+					collected = append(collected, xerr)
+				} else {
+					goodEnough = true
+				}
+			}
+		}
+	}
+
+	if !goodEnough && len(collected) > 0 {
+		return fail.NewErrorList(collected)
+	}
+
+	portList, xerr = s.rpcListPorts(ctx, req)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	}
+
+	goodEnough = false
+	for _, p := range portList {
+		check := (machine == "") || (machine != "" && strings.Contains(p.Name, machine))
+		if check {
+			_, xerr = s.rpcChangePortSecurity(ctx, p.ID, enabledPort)
+			if xerr != nil {
+				debug.IgnoreError(xerr)
+				collected = append(collected, xerr)
+			} else {
+				goodEnough = true
+			}
+		}
+	}
+
+	if !goodEnough && len(collected) > 0 {
+		return fail.NewErrorList(collected)
+	}
+
+	return nil
+}
+
 func (s stack) GetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
 	return s.rpcGetMetadataOfInstance(ctx, id)
 }
@@ -1035,7 +1105,8 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			Description: fmt.Sprintf(
 				"nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork,
 			),
-			AdminStateUp: &adminState,
+			AdminStateUp:   &adminState,
+			SecurityGroups: &[]string{},
 		}
 		port, xerr := s.rpcCreatePort(ctx, req)
 		if xerr != nil {
@@ -1043,6 +1114,14 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 				xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork,
 			)
 		}
+
+		/*port, xerr = s.rpcChangePortSecurity(ctx, port.ID)
+		if xerr != nil {
+			return nets, netPorts, createdPorts, fail.Wrap(
+				xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork,
+			)
+		}*/
+
 		createdPorts = append(createdPorts, port.ID)
 
 		nets = append(nets, servers.Network{Port: port.ID})
@@ -1052,15 +1131,23 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 	// private networks
 	for _, n := range request.Subnets {
 		req := ports.CreateOpts{
-			NetworkID:   n.Network,
-			Name:        fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
-			Description: fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
-			FixedIPs:    []ports.IP{{SubnetID: n.ID}},
+			NetworkID:      n.Network,
+			Name:           fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
+			Description:    fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
+			FixedIPs:       []ports.IP{{SubnetID: n.ID}},
+			SecurityGroups: &[]string{},
 		}
 		port, xerr := s.rpcCreatePort(ctx, req)
 		if xerr != nil {
-			return nets, netPorts /*, sgs */, createdPorts, fail.Wrap(
+			return nets, netPorts, createdPorts, fail.Wrap(
 				xerr, "failed to create port on subnet '%s'", n.Name,
+			)
+		}
+
+		port, xerr = s.rpcRemoveSGFromPort(ctx, port.ID)
+		if xerr != nil {
+			return nets, netPorts, createdPorts, fail.Wrap(
+				xerr, "failed to disable port on subnet '%s'", n.Name,
 			)
 		}
 
@@ -1672,6 +1759,34 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
+			// FIXME: OPP Make sure SG are enabled before trying to attach SG
+
+			// list ports to be able to remove them
+			req := ports.ListOpts{
+				DeviceID: ahf.Core.ID,
+			}
+			portList, xerr := s.rpcListPorts(ctx, req)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreError(xerr)
+				default:
+					return xerr
+				}
+			}
+
+			for _, p := range portList {
+				_, xerr = s.rpcChangePortSecurity(ctx, p.ID, true)
+				if xerr != nil {
+					if strings.Contains(xerr.Error(), "policy") {
+						debug.IgnoreError(xerr)
+					} else {
+						return xerr
+					}
+				}
+			}
+
 			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,

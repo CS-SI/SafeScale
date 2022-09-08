@@ -17,6 +17,8 @@
 package fail
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	grpcstatus "google.golang.org/grpc/status"
@@ -33,7 +35,10 @@ type ErrorList struct {
 // NewErrorList creates a ErrorList
 func NewErrorList(errors []error) Error {
 	if len(errors) == 0 {
-		return &ErrorList{}
+		return &ErrorList{ // TODO: This is a problem, the constructor should return (Error, Error)
+			errorCore: newError(nil, nil, ""),
+			errors:    []error{},
+		}
 	}
 
 	return &ErrorList{
@@ -58,6 +63,20 @@ func NewErrorListComplete(errors []error, cause error, consequences []error, msg
 // ToGRPCStatus returns a grpcstatus struct from ErrorList
 func (el ErrorList) ToGRPCStatus() error {
 	return grpcstatus.Errorf(el.getGRPCCode(), el.Error())
+}
+
+func (el *ErrorList) WithCtx(ctx context.Context) *ErrorList {
+	el.errorCore.WithContext(ctx)
+	return el
+}
+
+func (el *ErrorList) WithContext(ctx context.Context) {
+	el.errorCore.lock.Lock()
+	defer el.errorCore.lock.Unlock()
+
+	if ctx != nil && el.errorCore.context == nil {
+		el.errorCore.context = ctx
+	}
 }
 
 // AddConsequence ...

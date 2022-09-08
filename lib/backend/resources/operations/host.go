@@ -671,11 +671,6 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 		} else if _, ok := thing.(*Host); !ok {
 			return fail.NewError("cache stored the wrong type")
-			/* else {
-				dumped, _ := casted.Sdump(ctx)
-				logrus.Warningf("In the cache we got: %s", dumped)
-			}
-			*/
 		}
 	}
 
@@ -688,7 +683,6 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 
 		changed := false
 		if ahc.LastState != ahf.CurrentState {
-			// logrus.Warningf("Owerwriting current state %s with last state %s", ahf.CurrentState.String(), ahc.LastState.String())
 			ahf.CurrentState = ahc.LastState
 			changed = true
 		}
@@ -1258,6 +1252,33 @@ func (instance *Host) implCreate(
 
 		logrus.WithContext(ctx).Infof("Compute resource '%s' created", instance.GetName())
 
+		safe := false
+
+		// FIXME: OPP After Stein, no failover
+		{
+			st, xerr := svc.GetProviderName()
+			if xerr != nil {
+				return xerr
+			}
+			if st != "ovh" {
+				safe = true
+			}
+		}
+
+		if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
+			if val, ok := tpar["Safe"].(bool); ok {
+				safe = val
+			}
+		}
+
+		// FIXME: OPP Now trying to disable ports before it's too late
+		if !safe {
+			xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, hostReq.Subnets[0].Network, "")
+			if xerr != nil {
+				return xerr
+			}
+		}
+
 		// A Host claimed ready by a Cloud provider is not necessarily ready
 		// to be used until ssh service is up and running. So we wait for it before
 		// claiming Host is created
@@ -1472,6 +1493,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
+				logrus.Warningf("Binding security group with id %s to host %s", k, hostID)
 				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1557,7 +1579,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				innerXErr = pubipsg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 				if innerXErr != nil {
-					return fail.Wrap(innerXErr, "failed to apply Subnet's Security Group for gateway '%s' on Host '%s'", pubipsg.GetName(), req.ResourceName)
+					return fail.Wrap(innerXErr, "failed to apply Subnet's Public Security Group for gateway '%s' on Host '%s'", pubipsg.GetName(), req.ResourceName)
 				}
 
 				defer func() {
@@ -1664,15 +1686,51 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					return innerXErr
 				}
 
+				_ = otherAbstractSubnet
+				// FIXME: OPP This is the last fragment that needs fixing
+
+				safe := false
+
+				// FIXME: OPP After Stein, no failover
+				{
+					st, xerr := svc.GetProviderName()
+					if xerr != nil {
+						return xerr
+					}
+					if st != "ovh" {
+						safe = true
+					}
+				}
+
+				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
+					if val, ok := tpar["Safe"].(bool); ok {
+						safe = val
+					}
+				}
+
 				if otherAbstractSubnet.InternalSecurityGroupID != "" {
 					lansg, innerXErr = LoadSecurityGroup(ctx, svc, otherAbstractSubnet.InternalSecurityGroupID)
 					if innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
 					}
 
+					if !safe {
+						innerXErr = svc.ChangeSecurityGroupSecurity(ctx, false, true, otherAbstractSubnet.Network, "")
+						if innerXErr != nil {
+							return fail.Wrap(innerXErr, "failed to change security group")
+						}
+					}
+
 					innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 					if innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
+					}
+
+					if !safe {
+						innerXErr = svc.ChangeSecurityGroupSecurity(ctx, true, false, otherAbstractSubnet.Network, "")
+						if innerXErr != nil {
+							return fail.Wrap(innerXErr, "failed to change security group")
+						}
 					}
 
 					langID, err := lansg.GetID()

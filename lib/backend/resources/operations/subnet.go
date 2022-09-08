@@ -62,7 +62,7 @@ const (
 	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip.%s.%s"
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 
-	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s"
+	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s" // FIXME: OPP The ports of this thing also need disabling
 )
 
 // Subnet links Object Storage MetadataFolder and Subnet

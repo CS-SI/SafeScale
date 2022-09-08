@@ -450,6 +450,14 @@ func (s StackProxy) ClearHostStartupScript(ctx context.Context, parameter stacks
 	return xerr
 }
 
+func (s StackProxy) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+	xerr := s.FullStack.ChangeSecurityGroupSecurity(ctx, b, b2, net, "")
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+	return xerr
+}
+
 func (s StackProxy) InspectHost(ctx context.Context, parameter stacks.HostParameter) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

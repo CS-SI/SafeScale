@@ -17,8 +17,9 @@
 package cli
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/spf13/cobra"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // RootOfCommand returns the root *cobra.Command corresponding to the command tree from which the parameter is part of

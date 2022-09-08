@@ -43,7 +43,7 @@ force_sdk_python: prepare_python sdk_python
 sdk_js: sdk
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Creating javascript protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
 	@mkdir -p ./javascript
-	@protoc -I. -I$(GOMODPATH)/pkg/mod --js_out=import_style=commonjs,binary:./javascript --grpc-web_out=import_style=commonjs,mode=grpcweb:./javascript safescale.proto
+	@protoc -I. -I$(GOMODPATH)/pkg/mod --js_out=import_style=commonjs,binary:./javascript --grpc-web_out=import_style=commonjs,mode=grpcwebtext:./javascript safescale.proto
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Finished creating javascript protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
 
 force_sdk_js: sdk_js

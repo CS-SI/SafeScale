@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
@@ -529,6 +531,9 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 			chRes <- result{fail.ConvertError(err)}
 			return
 		}
+
+		hn := hostInstance.GetName()
+		logrus.Warningf("Binding security group %s to host %s", sgid, hn)
 
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {

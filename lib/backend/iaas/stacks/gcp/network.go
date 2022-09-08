@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -33,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (
@@ -290,6 +290,8 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Erro
 
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
+
+// ------ SecurityGroup methods ------
 
 // ------ Subnet methods ------
 
