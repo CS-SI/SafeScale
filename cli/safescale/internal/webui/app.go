@@ -34,7 +34,7 @@ func SetCommands() {
 		runCommand(),
 		stopCommand(),
 	)
-	addPersistentPreRunE(out)
+	addPreRunE(out)
 
 	global.AddCommand(out)
 }
@@ -45,8 +45,8 @@ func Cleanup() {
 	defer fail.SilentOnPanic(&crash) // nolint
 }
 
-// addPersistentPreRunE completes PreRunE of the command with the necessary for webui
-func addPersistentPreRunE(cmd *cobra.Command) error {
+// addPreRunE completes PreRunE of the command with the necessary for webui
+func addPreRunE(cmd *cobra.Command) error {
 	previousCB := cmd.PreRunE
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
 		if previousCB != nil {

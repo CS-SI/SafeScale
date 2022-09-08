@@ -61,7 +61,12 @@ const (
 
 // startBackend starts the gRPC server of SafeScale (the daemon)
 func startBackend(cmd *cobra.Command) error {
-	global.BuildFolderTree()
+	err := global.BuildFolderTree()
+	if err != nil {
+		logrus.Fatal(err.Error())
+		return err
+	}
+
 	suffix, err := externals.Check(cmd)
 	if err != nil {
 		return fail.Wrap(err)
