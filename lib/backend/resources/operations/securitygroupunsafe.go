@@ -532,7 +532,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 		}
 
 		hn := hostInstance.GetName()
-		logrus.Warningf("Binding security group %s to host %s", sgid, hn)
+		logrus.WithContext(ctx).Warningf("Binding security group %s to host %s", sgid, hn)
 
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {

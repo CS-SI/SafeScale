@@ -161,11 +161,13 @@ type Stack interface {
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(ctx context.Context, serverID, id string) fail.Error
 
-	// Migrate runs custom code without breaking Interfaces
-	Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error
-
 	// Timings ...
 	Timings() (temporal.Timings, fail.Error)
+
+	// FIXME: OPP not anymore
+
+	UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error
+	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally

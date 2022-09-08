@@ -1397,6 +1397,141 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 	return resp, nil
 }
 
+func (s stack) rpcCreateLabels(ctx context.Context, id string, kv map[string]string) fail.Error {
+	inst, xerr := s.getInstance(ctx, id)
+	if xerr != nil {
+		return xerr
+	}
+
+	labels := inst.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	for k, v := range kv {
+		labels[k] = v
+	}
+
+	resp, err := s.ComputeService.Instances.SetLabels(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id, &compute.InstancesSetLabelsRequest{
+		LabelFingerprint: inst.LabelFingerprint,
+		Labels:           labels,
+	}).Do()
+
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	xerr = s.checkStatusCode(resp)
+	if xerr != nil {
+		return xerr
+	}
+
+	return s.checkStatusCode(resp)
+}
+
+func (s stack) rpcRemoveLabels(ctx context.Context, id string, kv []string) fail.Error {
+	inst, xerr := s.getInstance(ctx, id)
+	if xerr != nil {
+		return xerr
+	}
+
+	labels := inst.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	for _, k := range kv {
+		delete(labels, k)
+	}
+
+	resp, err := s.ComputeService.Instances.SetLabels(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id, &compute.InstancesSetLabelsRequest{
+		LabelFingerprint: inst.LabelFingerprint,
+		Labels:           labels,
+	}).Do()
+
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	xerr = s.checkStatusCode(resp)
+	if xerr != nil {
+		return xerr
+	}
+
+	return s.checkStatusCode(resp)
+}
+
+func (s stack) rpcCreateTags(ctx context.Context, id string, kv map[string]string) fail.Error {
+	inst, xerr := s.getInstance(ctx, id)
+	if xerr != nil {
+		return xerr
+	}
+
+	metadatas := inst.Metadata
+	for k, v := range kv {
+		metadatas.Items = append(metadatas.Items, &compute.MetadataItems{
+			Key:   k,
+			Value: &v,
+		})
+	}
+
+	resp, err := s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id, metadatas).Do()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	return s.checkStatusCode(resp)
+}
+
+func (s stack) rpcListTags(ctx context.Context, id string) (map[string]string, fail.Error) {
+	inst, xerr := s.getInstance(ctx, id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	labels := inst.Labels
+	return labels, nil
+}
+
+func (s stack) checkStatusCode(resp *compute.Operation) fail.Error {
+	if resp != nil {
+		if resp.HTTPStatusCode != 200 {
+			return fail.NewError("received http error code %d", resp.HTTPStatusCode)
+		}
+	}
+
+	return nil
+}
+
+func (s stack) getInstance(ctx context.Context, id string) (*compute.Instance, fail.Error) {
+	var resp *compute.Instance
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() (err error) {
+			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
+	}
+
+	return resp, nil
+}
+
 func (s stack) rpcResetStartupScriptOfInstance(ctx context.Context, id string) fail.Error {
 	var resp *compute.Instance
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -2072,6 +2207,8 @@ func (s stack) rpcRemoveTagsFromInstance(ctx context.Context, hostID string, tag
 	if len(newTags.Items) == len(resp.Tags.Items) {
 		return nil
 	}
+
+	// FIXME: OPP Missing Labels, GCP has all 3, metadata, tags and labels
 
 	var opp *compute.Operation
 	xerr = stacks.RetryableRemoteCall(ctx,

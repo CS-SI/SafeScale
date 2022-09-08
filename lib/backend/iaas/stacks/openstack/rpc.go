@@ -141,6 +141,94 @@ func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[str
 	return out, nil
 }
 
+// rpcSetMetadataOfInstance changes the metadata associated with the instance
+func (s stack) rpcSetMetadataOfInstance(ctx context.Context, id string, tags map[string]string) fail.Error {
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	var out map[string]string
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() (innerErr error) {
+			res := servers.Metadata(s.ComputeClient, id)
+			out, innerErr = res.Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
+		}
+	}
+
+	for k, v := range tags {
+		out[k] = v
+	}
+
+	mop := make(servers.MetadataOpts)
+	for k, v := range out {
+		mop[k] = v
+	}
+
+	xerr = stacks.RetryableRemoteCall(ctx,
+		func() (innerErr error) {
+			res := servers.UpdateMetadata(s.ComputeClient, id, mop)
+			_, innerErr = res.Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
+		}
+	}
+
+	return nil
+}
+
+// rpcDeleteMetadataOfInstance changes the metadata associated with the instance
+func (s stack) rpcDeleteMetadataOfInstance(ctx context.Context, id string, tags map[string]string) fail.Error {
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() (innerErr error) {
+			for k := range tags {
+				res := servers.DeleteMetadatum(s.ComputeClient, id, k)
+				innerErr = res.ExtractErr()
+				return innerErr
+			}
+			return nil
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
+		}
+	}
+
+	return nil
+}
+
 // rpcListServers lists servers
 func (s stack) rpcListServers(ctx context.Context) ([]*servers.Server, fail.Error) {
 	var resp []*servers.Server
@@ -218,6 +306,7 @@ func (s stack) rpcCreateServer(ctx context.Context, name string, networks []serv
 	if xerr != nil {
 		return &servers.Server{}, xerr
 	}
+
 	return server, nil
 }
 
@@ -313,7 +402,7 @@ func (s stack) rpcChangePortSecurity(ctx context.Context, portID string, state b
 
 			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
 			if innerErr != nil {
-				logrus.Warningf(innerErr.Error())
+				logrus.WithContext(ctx).Warningf(innerErr.Error())
 				return innerErr
 			}
 
@@ -350,7 +439,7 @@ func (s stack) rpcRemoveSGFromPort(ctx context.Context, portID string) (_ *ports
 
 			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
 			if innerErr != nil {
-				logrus.Warningf(innerErr.Error())
+				logrus.WithContext(ctx).Warningf(innerErr.Error())
 				return innerErr
 			}
 

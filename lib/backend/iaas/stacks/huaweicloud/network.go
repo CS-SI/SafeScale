@@ -92,9 +92,6 @@ type vpcCreateResult struct {
 type vpcGetResult struct {
 	vpcCommonResult
 }
-type vpcDeleteResult struct { // nolint
-	gophercloud.ErrResult
-}
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 func (s stack) HasDefaultNetwork(context.Context) (bool, fail.Error) {
@@ -745,9 +742,6 @@ type subnetCreateResult struct {
 }
 type subnetGetResult struct {
 	subnetCommonResult
-}
-type subnetDeleteResult struct { // nolint
-	gophercloud.ErrResult
 }
 
 // createSubnet creates a subnet using native FlexibleEngine API

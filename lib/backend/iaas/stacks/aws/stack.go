@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -149,4 +150,38 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	tags := []*ec2.Tag{}
+	for k, v := range lmap {
+		tags = append(tags, &ec2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+
+	xerr := s.rpcCreateTags(ctx, []*string{&id}, tags)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	tags := []*ec2.Tag{}
+	for _, k := range keys {
+		tags = append(tags, &ec2.Tag{
+			Key:   aws.String(k),
+			Value: nil, // FIXME: OPP, Maybe we need a value match
+		})
+	}
+
+	xerr := s.rpcDeleteTags(ctx, []*string{&id}, tags)
+	return xerr
 }

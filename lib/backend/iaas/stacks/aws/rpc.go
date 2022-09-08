@@ -265,6 +265,27 @@ func (s stack) rpcCreateTags(ctx context.Context, resources []*string, tags []*e
 	)
 }
 
+func (s stack) rpcDeleteTags(ctx context.Context, resources []*string, tags []*ec2.Tag) fail.Error {
+	if len(resources) == 0 {
+		return fail.InvalidParameterError("resources", "cannot be an empty slice")
+	}
+	if len(tags) == 0 {
+		return nil
+	}
+
+	req := ec2.DeleteTagsInput{
+		Resources: resources,
+		Tags:      tags,
+	}
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			_, err := s.EC2Service.DeleteTags(&req)
+			return err
+		},
+		normalizeError,
+	)
+}
+
 func (s stack) rpcDeleteVpc(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
@@ -1137,34 +1158,6 @@ func (s stack) rpcDescribeKeyPairByID(ctx context.Context, id *string) (*ec2.Key
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeKeyPairByName(ctx context.Context, name *string) (*ec2.KeyPairInfo, fail.Error) {
-	if xerr := validateAWSString(name, "name", true); xerr != nil {
-		return &ec2.KeyPairInfo{}, xerr
-	}
-
-	req := ec2.DescribeKeyPairsInput{
-		KeyNames: []*string{name},
-	}
-	var resp *ec2.DescribeKeyPairsOutput
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (err error) {
-			resp, err = s.EC2Service.DescribeKeyPairs(&req)
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return &ec2.KeyPairInfo{}, xerr
-	}
-	if len(resp.KeyPairs) == 0 {
-		return &ec2.KeyPairInfo{}, fail.NotFoundError("failed to find a KeyPair named '%s'", aws.StringValue(name))
-	}
-	if len(resp.KeyPairs) > 1 {
-		return &ec2.KeyPairInfo{}, fail.InconsistentError("found more than 1 KeyPair named '%s'", aws.StringValue(name))
-	}
-	return resp.KeyPairs[0], nil
-}
-
 func (s stack) rpcDeleteKeyPair(ctx context.Context, name *string) fail.Error {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return xerr
@@ -1619,7 +1612,7 @@ func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nil, xerr
 	}

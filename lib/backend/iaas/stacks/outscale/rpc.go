@@ -396,6 +396,67 @@ func (s stack) rpcCreateTags(ctx context.Context, id string, tags map[string]str
 	return tagList, nil
 }
 
+func (s stack) rpcDeleteTags(ctx context.Context, id string, tags map[string]string) fail.Error {
+	var tagList []osc.ResourceTag
+	for k, v := range tags {
+		tagList = append(tagList, osc.ResourceTag{
+			Key:   k,
+			Value: v,
+		})
+	}
+	opts := osc.DeleteTagsOpts{
+		DeleteTagsRequest: optional.NewInterface(osc.DeleteTagsRequest{
+			ResourceIds: []string{id},
+			Tags:        tagList,
+		}),
+	}
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() error {
+			_, hr, innerErr := s.client.TagApi.DeleteTags(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			return nil
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+func (s stack) rpcListTags(ctx context.Context, id string) (map[string]string, fail.Error) {
+	tagList := make(map[string]string)
+	opts := osc.ReadTagsOpts{
+		ReadTagsRequest: optional.NewInterface(osc.ReadTagsRequest{
+			Filters: osc.FiltersTag{
+				ResourceIds: []string{id},
+			},
+		}),
+	}
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() error {
+			rtr, hr, innerErr := s.client.TagApi.ReadTags(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+
+			for _, val := range rtr.Tags {
+				tagList[val.Key] = val.Value
+			}
+			return nil
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return tagList, nil
+}
+
 func (s stack) rpcDeleteSubnet(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
@@ -1853,6 +1914,7 @@ func (s stack) rpcCreateVMs(ctx context.Context, request osc.CreateVmsRequest) (
 	if len(resp.Vms) == 0 {
 		return []osc.Vm{}, nil
 	}
+
 	return resp.Vms, nil
 }
 
