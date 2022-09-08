@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -97,7 +98,7 @@ type settings struct {
 }
 
 var (
-	Config                  settings                                               // Store global settings of the app
+	Settings                settings                                               // Store global settings of the app
 	ValidConfigFilenameExts = []string{"json", "js", "yaml", "yml", "toml", "tml"} // contains list of accepted extension for configuration files
 
 	once sync.Once
@@ -122,43 +123,43 @@ func LoadSettings(cmd *cobra.Command, args []string) (ferr error) {
 		if configFile != "" {
 			dirname, basename = filepath.Split(configFile)
 			reader.AddConfigPath(dirname)
-			Config.ReadConfigFile = configFile
-			Config.ReadConfigFileExt = filepath.Ext(configFile)
+			Settings.ReadConfigFile = configFile
+			Settings.ReadConfigFileExt = filepath.Ext(configFile)
 		} else {
-			Config.Folders.RootDir, ferr = cmd.Flags().GetString("root-dir")
+			Settings.Folders.RootDir, ferr = cmd.Flags().GetString("root-dir")
 			if ferr != nil {
 				return
 			}
-			if Config.Folders.RootDir == "" && env.Lookup("SAFESCALE_ROOT_DIR") {
-				Config.Folders.RootDir, _ = env.Value("SAFESCALE_ROOT_DIR")
+			if Settings.Folders.RootDir == "" && env.Lookup("SAFESCALE_ROOT_DIR") {
+				Settings.Folders.RootDir, _ = env.Value("SAFESCALE_ROOT_DIR")
 			}
-			if Config.Folders.RootDir == "" { // nolint
-				Config.Folders.RootDir = reader.GetString("safescale.root_dir")
+			if Settings.Folders.RootDir == "" { // nolint
+				Settings.Folders.RootDir = reader.GetString("safescale.root_dir")
 			}
-			if Config.Folders.RootDir == "" {
-				Config.Folders.RootDir = defaultRootDir
+			if Settings.Folders.RootDir == "" {
+				Settings.Folders.RootDir = defaultRootDir
 			}
-			Config.Folders.EtcDir, ferr = cmd.Flags().GetString("etc-dir")
+			Settings.Folders.EtcDir, ferr = cmd.Flags().GetString("etc-dir")
 			if ferr != nil {
 				return
 			}
-			if Config.Folders.EtcDir == "" && env.Lookup("SAFESCALE_ETC_DIR") {
-				Config.Folders.EtcDir, _ = env.Value("SAFESCALE_ETC_DIR")
+			if Settings.Folders.EtcDir == "" && env.Lookup("SAFESCALE_ETC_DIR") {
+				Settings.Folders.EtcDir, _ = env.Value("SAFESCALE_ETC_DIR")
 			}
-			if Config.Folders.EtcDir == "" { // nolint
-				Config.Folders.EtcDir = reader.GetString("safescale.etc_dir")
+			if Settings.Folders.EtcDir == "" { // nolint
+				Settings.Folders.EtcDir = reader.GetString("safescale.etc_dir")
 			}
-			if Config.Folders.EtcDir == "" && Config.Folders.RootDir != "" {
-				Config.Folders.EtcDir = Config.Folders.RootDir + "/etc"
+			if Settings.Folders.EtcDir == "" && Settings.Folders.RootDir != "" {
+				Settings.Folders.EtcDir = Settings.Folders.RootDir + "/etc"
 			}
-			if Config.Folders.EtcDir == "" {
+			if Settings.Folders.EtcDir == "" {
 				ferr = fail.NotFoundError("failed to find where the configuration is stored. Please use --config, --root-dir or --etc-dir.")
 				return
 			}
 
-			reader.AddConfigPath(Config.Folders.EtcDir)
+			reader.AddConfigPath(Settings.Folders.EtcDir)
 			basename = "settings"
-			Config.ReadConfigFile = Config.Folders.EtcDir + "/" + basename
+			Settings.ReadConfigFile = Settings.Folders.EtcDir + "/" + basename
 		}
 		reader.SetConfigName(basename)
 
@@ -183,72 +184,72 @@ func LoadSettings(cmd *cobra.Command, args []string) (ferr error) {
 func loadGlobalSettings(cmd *cobra.Command, reader *viper.Viper) error {
 	var err error
 	// --bin-dir
-	Config.Folders.BinDir, err = cmd.Flags().GetString("bin-dir")
+	Settings.Folders.BinDir, err = cmd.Flags().GetString("bin-dir")
 	if err != nil {
 		return err
 	}
 
-	if Config.Folders.BinDir == "" && env.Lookup("SAFESCALE_BIN_DIR") {
-		Config.Folders.BinDir, _ = env.Value("SAFESCALE_BIN_DIR")
+	if Settings.Folders.BinDir == "" && env.Lookup("SAFESCALE_BIN_DIR") {
+		Settings.Folders.BinDir, _ = env.Value("SAFESCALE_BIN_DIR")
 	}
-	if Config.Folders.BinDir == "" { // nolint
-		Config.Folders.BinDir = reader.GetString("safescale.bin_dir")
+	if Settings.Folders.BinDir == "" { // nolint
+		Settings.Folders.BinDir = reader.GetString("safescale.bin_dir")
 	}
-	if Config.Folders.BinDir == "" {
-		Config.Folders.BinDir = Config.Folders.RootDir + "/bin"
+	if Settings.Folders.BinDir == "" {
+		Settings.Folders.BinDir = Settings.Folders.RootDir + "/bin"
 	}
 
 	// --var-dir
-	Config.Folders.VarDir, err = cmd.Flags().GetString("var-dir")
+	Settings.Folders.VarDir, err = cmd.Flags().GetString("var-dir")
 	if err != nil {
 		return err
 	}
 
-	if Config.Folders.VarDir == "" && env.Lookup("SAFESCALE_VAR_DIR") {
-		Config.Folders.VarDir, _ = env.Value("SAFESCALE_VAR_DIR")
+	if Settings.Folders.VarDir == "" && env.Lookup("SAFESCALE_VAR_DIR") {
+		Settings.Folders.VarDir, _ = env.Value("SAFESCALE_VAR_DIR")
 	}
-	if Config.Folders.VarDir == "" { // nolint
-		Config.Folders.VarDir = reader.GetString("safescale.var_dir")
+	if Settings.Folders.VarDir == "" { // nolint
+		Settings.Folders.VarDir = reader.GetString("safescale.var_dir")
 	}
-	if Config.Folders.VarDir == "" {
-		Config.Folders.VarDir = Config.Folders.RootDir + "/var"
+	if Settings.Folders.VarDir == "" {
+		Settings.Folders.VarDir = Settings.Folders.RootDir + "/var"
 	}
 
 	// --tmp-dir
-	Config.Folders.TmpDir, err = cmd.Flags().GetString("tmp-dir")
+	Settings.Folders.TmpDir, err = cmd.Flags().GetString("tmp-dir")
 	if err != nil {
 		return err
 	}
 
-	if Config.Folders.TmpDir == "" && env.Lookup("SAFESCALE_TMP_DIR") {
-		Config.Folders.TmpDir, _ = env.Value("SAFESCALE_TMP_DIR")
+	if Settings.Folders.TmpDir == "" && env.Lookup("SAFESCALE_TMP_DIR") {
+		Settings.Folders.TmpDir, _ = env.Value("SAFESCALE_TMP_DIR")
 	}
-	if Config.Folders.TmpDir == "" { // nolint
-		Config.Folders.EtcDir = reader.GetString("safescale.tmp_dir")
+	if Settings.Folders.TmpDir == "" { // nolint
+		Settings.Folders.EtcDir = reader.GetString("safescale.tmp_dir")
 	}
-	if Config.Folders.TmpDir == "" {
-		Config.Folders.TmpDir = Config.Folders.VarDir + "/tmp"
+	if Settings.Folders.TmpDir == "" {
+		Settings.Folders.TmpDir = Settings.Folders.VarDir + "/tmp"
 	}
 
 	// --log-dir
-	Config.Folders.LogDir, err = cmd.Flags().GetString("log-dir")
+	Settings.Folders.LogDir, err = cmd.Flags().GetString("log-dir")
 	if err != nil {
 		return err
 	}
 
-	if Config.Folders.LogDir == "" && env.Lookup("SAFESCALE_LOG_DIR") {
-		Config.Folders.LogDir, _ = env.Value("SAFESCALE_LOG_DIR")
+	if Settings.Folders.LogDir == "" && env.Lookup("SAFESCALE_LOG_DIR") {
+		Settings.Folders.LogDir, _ = env.Value("SAFESCALE_LOG_DIR")
 	}
-	if Config.Folders.LogDir == "" { // nolint
-		Config.Folders.LogDir = reader.GetString("safescale.log_dir")
+	if Settings.Folders.LogDir == "" { // nolint
+		Settings.Folders.LogDir = reader.GetString("safescale.log_dir")
 	}
-	if Config.Folders.LogDir == "" {
-		Config.Folders.LogDir = Config.Folders.VarDir + "/log"
+	if Settings.Folders.LogDir == "" {
+		Settings.Folders.LogDir = Settings.Folders.VarDir + "/log"
 	}
 
 	// settings.Folders.ShareDir = reader.GetString("safescale.share_dir")
 	// if settings.Folders.ShareDir == "" {
-	Config.Folders.ShareDir = Config.Folders.VarDir + "/share"
+	Settings.Folders.ShareDir = Settings.Folders.VarDir + "/share"
 	// }
 
 	// --owner
@@ -276,8 +277,8 @@ func loadGlobalSettings(cmd *cobra.Command, reader *viper.Viper) error {
 		}
 	}
 
-	Config.Access.Owner = *ownerObject
-	Config.Access.UID, err = strconv.Atoi(ownerObject.Uid)
+	Settings.Access.Owner = *ownerObject
+	Settings.Access.UID, err = strconv.Atoi(ownerObject.Uid)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -307,21 +308,21 @@ func loadGlobalSettings(cmd *cobra.Command, reader *viper.Viper) error {
 		}
 	}
 
-	Config.Access.Group = *groupObject
-	Config.Access.GID, err = strconv.Atoi(groupObject.Gid)
+	Settings.Access.Group = *groupObject
+	Settings.Access.GID, err = strconv.Atoi(groupObject.Gid)
 	if err != nil {
 		return fail.Wrap(err)
 	}
 
 	// --debug
-	Config.Debug, err = cmd.Flags().GetBool("debug")
+	Settings.Debug, err = cmd.Flags().GetBool("debug")
 	if err != nil && reader.IsSet("safescale.debug") {
-		Config.Debug = reader.GetBool("safescale.debug")
+		Settings.Debug = reader.GetBool("safescale.debug")
 	}
 
-	Config.Verbose, err = cmd.Flags().GetBool("verbose")
+	Settings.Verbose, err = cmd.Flags().GetBool("verbose")
 	if err != nil && reader.IsSet("safescale.verbose") {
-		Config.Verbose = reader.GetBool("safescale.verbose")
+		Settings.Verbose = reader.GetBool("safescale.verbose")
 	}
 
 	return nil
@@ -333,72 +334,72 @@ func loadBackendSettings(cmd *cobra.Command, reader *viper.Viper) error {
 	var err error
 	// FIXME: add validation of backend format (<host|ip>:<port>)
 	if cmd.Name() == "backend" {
-		Config.Backend.Listen, err = cmd.Flags().GetString("listen")
+		Settings.Backend.Listen, err = cmd.Flags().GetString("listen")
 		if err != nil {
 			return err
 		}
 	}
-	if Config.Backend.Listen == "" { // nolint
-		Config.Backend.Listen, _, _ = env.FirstValue("SAFESCALE_DAEMON_LISTEN", "SAFESCALE_BACKEND_LISTEN")
+	if Settings.Backend.Listen == "" { // nolint
+		Settings.Backend.Listen, _, _ = env.FirstValue("SAFESCALE_DAEMON_LISTEN", "SAFESCALE_BACKEND_LISTEN")
 	}
-	if Config.Backend.Listen == "" { // nolint
-		Config.Backend.Listen = reader.GetString("safescale.backend.listen")
+	if Settings.Backend.Listen == "" { // nolint
+		Settings.Backend.Listen = reader.GetString("safescale.backend.listen")
 	}
-	if Config.Backend.Listen == "" {
-		Config.Backend.Listen = ":" + defaultBackendPort
+	if Settings.Backend.Listen == "" {
+		Settings.Backend.Listen = ":" + defaultBackendPort
 	}
 
-	Config.Backend.UseTls = false
-	Config.Backend.UseTls, err = cmd.Flags().GetBool("backend-use-tls")
+	Settings.Backend.UseTls = false
+	Settings.Backend.UseTls, err = cmd.Flags().GetBool("backend-use-tls")
 	if err != nil {
-		Config.Backend.UseTls, err = cmd.Flags().GetBool("daemon-use-tls")
+		Settings.Backend.UseTls, err = cmd.Flags().GetBool("daemon-use-tls")
 		if err != nil {
 			value, _, ok := env.FirstValue("SAFESCALE_DAEMON_USE_TLS", "SAFESCALE_BACKEND_USE_TLS")
 			if ok {
-				Config.Backend.UseTls = translateStringToBool(value, true)
+				Settings.Backend.UseTls = translateStringToBool(value, true)
 			} else if reader.IsSet("safescale.backend.use_tls") {
-				Config.Backend.UseTls = reader.GetBool("safescale.backen.use_tls")
+				Settings.Backend.UseTls = reader.GetBool("safescale.backen.use_tls")
 			}
 		}
 	}
 
-	Config.Backend.Tls.NoVerify = true
+	Settings.Backend.Tls.NoVerify = true
 	value, err := cmd.Flags().GetBool("backend-tls-noverify")
 	if err != nil {
 		value, _, ok := env.FirstValue("SAFESCALE_BACKEND_TLS_NOVERIFY", "SAFESCALE_DAEMON_TLS_NOVERIFY")
 		if ok {
-			Config.Backend.Tls.NoVerify = translateStringToBool(value, true)
+			Settings.Backend.Tls.NoVerify = translateStringToBool(value, true)
 		} else if reader.IsSet("safescale.backend.tls.noverify") {
-			Config.Backend.Tls.NoVerify = reader.GetBool("safescale.backend.tls.noverify")
+			Settings.Backend.Tls.NoVerify = reader.GetBool("safescale.backend.tls.noverify")
 		}
 	} else {
-		Config.Backend.Tls.NoVerify = value
+		Settings.Backend.Tls.NoVerify = value
 	}
 
-	// Config.Backend.DefaultAuthority, err = cmd.Flags().GetString("backend-default-authority")
+	// Settings.Backend.DefaultAuthority, err = cmd.Flags().GetString("backend-default-authority")
 	// if err != nil {
 	// 	return err
 	// }
-	if Config.Backend.DefaultAuthority == "" {
-		Config.Backend.DefaultAuthority, _, _ = env.FirstValue("SAFESCALE_BACKEND_DEFAULT_AUTHORITY", "SAFESCALE_DAEMON_DEFAULT_AUTHORITY")
+	if Settings.Backend.DefaultAuthority == "" {
+		Settings.Backend.DefaultAuthority, _, _ = env.FirstValue("SAFESCALE_BACKEND_DEFAULT_AUTHORITY", "SAFESCALE_DAEMON_DEFAULT_AUTHORITY")
 	}
-	if Config.Backend.DefaultAuthority == "" && reader.IsSet("safescale.backend.tls.default_authority") {
-		Config.Backend.DefaultAuthority = reader.GetString("safescale.backend.tls.default_authority")
+	if Settings.Backend.DefaultAuthority == "" && reader.IsSet("safescale.backend.tls.default_authority") {
+		Settings.Backend.DefaultAuthority = reader.GetString("safescale.backend.tls.default_authority")
 	}
 
-	// Config.Backend.Tls.CAs, err = cmd.Flags().GetStringSlice("backend-tls-ca-files")
+	// Settings.Backend.Tls.CAs, err = cmd.Flags().GetStringSlice("backend-tls-ca-files")
 	// if err != nil {
 	// 	return err
 	// }
-	if len(Config.Backend.Tls.CAs) == 0 && env.Lookup("SAFESCALE_BACKEND_TLS_CA_FILES") {
+	if len(Settings.Backend.Tls.CAs) == 0 && env.Lookup("SAFESCALE_BACKEND_TLS_CA_FILES") {
 		value, _ := env.Value("SAFESCALE_BACKEND_TLS_CA_FILES")
 		list := strings.Split(value, ",")
 		if len(list) > 0 {
-			Config.Backend.Tls.CAs = list
+			Settings.Backend.Tls.CAs = list
 		}
 	}
-	if len(Config.Backend.Tls.CAs) == 0 && reader.IsSet("safescale.backend.tls.ca_files") {
-		Config.Backend.Tls.CAs = reader.GetStringSlice("safescale.backend.tls.ca_files")
+	if len(Settings.Backend.Tls.CAs) == 0 && reader.IsSet("safescale.backend.tls.ca_files") {
+		Settings.Backend.Tls.CAs = reader.GetStringSlice("safescale.backend.tls.ca_files")
 	}
 
 	return nil
@@ -407,80 +408,85 @@ func loadBackendSettings(cmd *cobra.Command, reader *viper.Viper) error {
 const defaultWebUIPort = "50080"
 
 func loadWebUISettings(cmd *cobra.Command, reader *viper.Viper) error {
-	if cmd.Name() != WebUICmdLabel {
+	elder, xerr := cli.ElderOfCommand(cmd)
+	if xerr != nil {
+		return xerr
+	}
+
+	if elder.Name() != WebUICmdLabel {
 		return nil
 	}
 
 	var err error
 	// FIXME: add validation of listen format (<host|ip>:<port>)
-	Config.WebUI.Listen, err = cmd.Flags().GetString("listen")
+	Settings.WebUI.Listen, err = cmd.Flags().GetString("listen")
 	if err != nil {
 		return err
 	}
-	if Config.WebUI.Listen == "" && env.Lookup("SAFESCALE_WEBUI_LISTEN") {
-		Config.WebUI.Listen, _ = env.Value("SAFESCALE_WEBUI_LISTEN")
+	if Settings.WebUI.Listen == "" && env.Lookup("SAFESCALE_WEBUI_LISTEN") {
+		Settings.WebUI.Listen, _ = env.Value("SAFESCALE_WEBUI_LISTEN")
 	}
-	if Config.WebUI.Listen == "" { // nolint
-		Config.WebUI.Listen = reader.GetString("safescale.webui.listen")
+	if Settings.WebUI.Listen == "" { // nolint
+		Settings.WebUI.Listen = reader.GetString("safescale.webui.listen")
 	}
-	if Config.WebUI.Listen == "" {
-		Config.WebUI.Listen = ":" + defaultWebUIPort
+	if Settings.WebUI.Listen == "" {
+		Settings.WebUI.Listen = ":" + defaultWebUIPort
 	}
 
-	if Config.Backend.Listen == "" {
-		Config.Backend.Listen, err = cmd.Flags().GetString("backend")
+	if Settings.Backend.Listen == "" {
+		Settings.Backend.Listen, err = cmd.Flags().GetString("backend")
 		if err != nil {
 			return err
 		}
-		if Config.Backend.Listen == "" && env.Lookup("SAFESCALE_WEBUI_BACKEND") {
-			Config.Backend.Listen, _ = env.Value("SAFESCALE_WEBUI_BACKEND")
+		if Settings.Backend.Listen == "" && env.Lookup("SAFESCALE_WEBUI_BACKEND") {
+			Settings.Backend.Listen, _ = env.Value("SAFESCALE_WEBUI_BACKEND")
 		}
-		if Config.Backend.Listen == "" {
-			Config.WebUI.Listen = ":" + defaultBackendPort
+		if Settings.Backend.Listen == "" {
+			Settings.WebUI.Listen = ":" + defaultBackendPort
 		}
 	}
 
-	// Config.WebUI.Tls.BackendClientCertFile, err = cmd.Flags().GetString("backend-client-cert-file")
+	// Settings.WebUI.Tls.BackendClientCertFile, err = cmd.Flags().GetString("backend-client-cert-file")
 	// if err != nil {
 	// 	return err
 	// }
-	if Config.WebUI.Tls.BackendClientCertFile == "" { // nolint
-		Config.WebUI.Tls.BackendClientCertFile, _ = env.Value("SAFESCALE_WEBUI_TLS_BACKEND_CLIENT_CERT_FILE")
+	if Settings.WebUI.Tls.BackendClientCertFile == "" { // nolint
+		Settings.WebUI.Tls.BackendClientCertFile, _ = env.Value("SAFESCALE_WEBUI_TLS_BACKEND_CLIENT_CERT_FILE")
 	}
-	if Config.WebUI.Tls.BackendClientCertFile == "" { // nolint
-		Config.WebUI.Tls.BackendClientCertFile = reader.GetString("safescale.webui.tls.backend_client_cert_file")
+	if Settings.WebUI.Tls.BackendClientCertFile == "" { // nolint
+		Settings.WebUI.Tls.BackendClientCertFile = reader.GetString("safescale.webui.tls.backend_client_cert_file")
 	}
 
-	// Config.WebUI.Tls.BackendClientKeyFile, err = cmd.Flags().GetString("backend-client-key-file")
+	// Settings.WebUI.Tls.BackendClientKeyFile, err = cmd.Flags().GetString("backend-client-key-file")
 	// if err != nil {
 	// 	return err
 	// }
-	if Config.WebUI.Tls.BackendClientKeyFile == "" { // nolint
-		Config.WebUI.Tls.BackendClientKeyFile, _ = env.Value("SAFESCALE_WEBUI_TLS_BACKEND_CLIENT_KEY_FILE")
+	if Settings.WebUI.Tls.BackendClientKeyFile == "" { // nolint
+		Settings.WebUI.Tls.BackendClientKeyFile, _ = env.Value("SAFESCALE_WEBUI_TLS_BACKEND_CLIENT_KEY_FILE")
 	}
-	if Config.WebUI.Tls.BackendClientKeyFile == "" { // nolint
-		Config.WebUI.Tls.BackendClientKeyFile = reader.GetString("safescale.webui.tls.backend_client_key_file")
+	if Settings.WebUI.Tls.BackendClientKeyFile == "" { // nolint
+		Settings.WebUI.Tls.BackendClientKeyFile = reader.GetString("safescale.webui.tls.backend_client_key_file")
 	}
 
-	if Config.WebUI.Tls.BackendClientCertFile != "" || Config.WebUI.Tls.BackendClientKeyFile != "" {
-		if Config.WebUI.Tls.BackendClientCertFile == "" {
+	if Settings.WebUI.Tls.BackendClientCertFile != "" || Settings.WebUI.Tls.BackendClientKeyFile != "" {
+		if Settings.WebUI.Tls.BackendClientCertFile == "" {
 			return fail.NewError("flag 'safescale.webui.tls.backend_client_cert_file' must be set when 'safescale.webui.tls.backend_client_key_file' is set")
 		}
 
-		if Config.WebUI.Tls.BackendClientKeyFile == "" {
+		if Settings.WebUI.Tls.BackendClientKeyFile == "" {
 			return fail.NewError("flag 'safescale.webui.tls_backend_client_key_file' must be set when 'safescale.webui.tls.backend_client_cert_file' is set")
 		}
 	}
 
-	Config.WebUI.WebRoot, err = cmd.Flags().GetString("webroot")
+	Settings.WebUI.WebRoot, err = cmd.Flags().GetString("webroot")
 	if err != nil {
 		return err
 	}
-	if Config.WebUI.WebRoot == "" && env.Lookup("SAFESCALE_WEBUI_WEBROOT") {
-		Config.WebUI.WebRoot, _ = env.Value("SAFESCALE_WEBUI_WEBROOT")
+	if Settings.WebUI.WebRoot == "" && env.Lookup("SAFESCALE_WEBUI_WEBROOT") {
+		Settings.WebUI.WebRoot, _ = env.Value("SAFESCALE_WEBUI_WEBROOT")
 	}
-	if Config.WebUI.Listen == "" { // nolint
-		Config.WebUI.Listen = reader.GetString("safescale.webui.webroot")
+	if Settings.WebUI.Listen == "" { // nolint
+		Settings.WebUI.Listen = reader.GetString("safescale.webui.webroot")
 	}
 
 	return nil
@@ -492,16 +498,16 @@ func BuildFolderTree() error {
 		path   string
 		rights os.FileMode
 	}{
-		{Config.Folders.RootDir, 0750},
+		{Settings.Folders.RootDir, 0750},
 		// {settings.Folders.EtcDir, 0750},
-		{Config.Folders.VarDir, 0770},
-		{Config.Folders.TmpDir, 0770},
-		{Config.Folders.LogDir, 0770},
-		{Config.Folders.ShareDir + "/terraform/bin", 0700}, // used terraform binary will be stored here
+		{Settings.Folders.VarDir, 0770},
+		{Settings.Folders.TmpDir, 0770},
+		{Settings.Folders.LogDir, 0770},
+		{Settings.Folders.ShareDir + "/terraform/bin", 0700}, // used terraform binary will be stored here
 	}
 
 	for _, v := range dirList {
-		xerr := mkdir(v.path, v.rights, Config.Access.UID, Config.Access.GID)
+		xerr := mkdir(v.path, v.rights, Settings.Access.UID, Settings.Access.GID)
 		if xerr != nil {
 			return xerr
 		}
@@ -511,8 +517,8 @@ func BuildFolderTree() error {
 	if err != nil {
 		return fail.Wrap(err, "failed to get path of binary")
 	}
-	if Config.Folders.BinDir != "" && path.Dir(e) != Config.Folders.BinDir {
-		fmt.Printf("For consistency, you should move safescale binary in '%s'\n", Config.Folders.BinDir)
+	if Settings.Folders.BinDir != "" && path.Dir(e) != Settings.Folders.BinDir {
+		fmt.Printf("For consistency, you should move safescale binary in '%s'\n", Settings.Folders.BinDir)
 	}
 
 	return nil

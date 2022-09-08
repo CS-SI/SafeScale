@@ -118,14 +118,14 @@ func clusterListCommand() *cobra.Command {
 			var formatted []interface{}
 			for _, value := range list.Clusters {
 				// c, _ := value.(api.Cluster)
-				converted, err := convertToMap(value)
-				if err != nil {
-					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
+				converted, xerr := convertToMap(value)
+				if xerr != nil {
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fail.Wrap(xerr, "failed to extract data about cluster '%s'", clusterName).Error()))
 				}
 
-				fconfig, err := formatClusterConfig(converted, false)
-				if err != nil {
-					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
+				fconfig, xerr := formatClusterConfig(converted, false)
+				if xerr != nil {
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fail.Wrap(xerr, "failed to extract data about cluster '%s'", clusterName).Error()))
 				}
 				formatted = append(formatted, fconfig)
 			}
@@ -299,7 +299,7 @@ func clusterCreateCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
 			}
 
-			if !global.Config.Debug {
+			if !global.Settings.Debug {
 				delete(formatted, "defaults")
 			}
 			return cli.SuccessResponse(formatted)
@@ -1820,7 +1820,7 @@ func executeCommand(command string, files *cmdline.RemoteFilesHandler, outs outp
 	}
 
 	if files != nil && files.Count() > 0 {
-		if !global.Config.Debug {
+		if !global.Settings.Debug {
 			defer files.Cleanup(ClientSession, master.GetId())
 		}
 		xerr := files.Upload(ClientSession, master.GetId())

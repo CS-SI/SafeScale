@@ -77,7 +77,7 @@ func Check(cmd *cobra.Command) (suffix string, ferr error) {
 func checkTerraform() error {
 	installer := hcinstall.NewInstaller()
 	source := &fs.AnyVersion{
-		ExactBinPath: global.Config.Folders.ShareDir + "/terraform/bin/terraform",
+		ExactBinPath: global.Settings.Folders.ShareDir + "/terraform/bin/terraform",
 	}
 	execPath, err := installer.Ensure(context.Background(), []src.Source{source})
 	if err != nil {
@@ -86,7 +86,7 @@ func checkTerraform() error {
 			logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
 		}
 	} else {
-		tf, err := tfexec.NewTerraform(global.Config.Folders.TmpDir, execPath)
+		tf, err := tfexec.NewTerraform(global.Settings.Folders.TmpDir, execPath)
 		if err != nil {
 			logrus.Fatalf("error creating terraform exec instance: %s", err)
 		}
@@ -102,7 +102,7 @@ func checkTerraform() error {
 		}
 	}
 
-	global.Config.Backend.Terraform.ExecPath = execPath
+	global.Settings.Backend.Terraform.ExecPath = execPath
 	// workingDir := settings.Folders.ShareDir+"/terraform/bin"
 	// tf, err := tfexec.NewTerraform(workingDir, execPath)
 	// if err != nil {
@@ -127,7 +127,7 @@ func checkConsul() error {
 	installer := hcinstall.NewInstaller()
 	source := &fs.AnyVersion{
 		Product:      &product.Consul,
-		ExactBinPath: global.Config.Folders.ShareDir + "/consul/bin/consul",
+		ExactBinPath: global.Settings.Folders.ShareDir + "/consul/bin/consul",
 	}
 	execPath, err := installer.Ensure(context.Background(), []src.Source{source})
 	if err != nil {
@@ -136,7 +136,7 @@ func checkConsul() error {
 			logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
 		}
 	} else {
-		tf, err := tfexec.NewTerraform(global.Config.Folders.TmpDir, execPath)
+		tf, err := tfexec.NewTerraform(global.Settings.Folders.TmpDir, execPath)
 		if err != nil {
 			logrus.Fatalf("error creating terraform exec instance: %s", err)
 		}
@@ -152,7 +152,7 @@ func checkConsul() error {
 		}
 	}
 
-	global.Config.Backend.Consul.ExecPath = execPath
+	global.Settings.Backend.Consul.ExecPath = execPath
 	// workingDir := settings.Folders.ShareDir+"/terraform/bin"
 	// tf, err := tfexec.NewTerraform(workingDir, execPath)
 	// if err != nil {

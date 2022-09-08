@@ -88,18 +88,18 @@ func InitApp() (ferr error) {
 			logrus.SetLevel(logrus.InfoLevel)
 
 			// Defines trace level wanted by user
-			if Config.Verbose || Config.Debug {
+			if Settings.Verbose || Settings.Debug {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
 
-			if Config.Verbose && Config.Debug {
+			if Settings.Verbose && Settings.Debug {
 				logrus.SetLevel(logrus.TraceLevel)
 			}
 
 			if strings.Contains(path.Base(os.Args[0]), "-cover") {
 				logrus.SetLevel(logrus.TraceLevel)
-				Config.Verbose = true
-				Config.Debug = true
+				Settings.Verbose = true
+				Settings.Debug = true
 			}
 
 			return nil
@@ -127,7 +127,7 @@ func AddCommand(cmd *cobra.Command) {
 // RunApp starts the AppCtrl of the app
 func RunApp(ctx context.Context, cleanup func(*cobra.Command)) error {
 	if AppCtrl.App == nil {
-		return fail.InvalidInstanceContentError("AppCtrl.AppCtrl", "cannot be nil")
+		return fail.InvalidInstanceContentError("AppCtrl.App", "cannot be nil")
 	}
 
 	return AppCtrl.App.Run(ctx, cleanup)

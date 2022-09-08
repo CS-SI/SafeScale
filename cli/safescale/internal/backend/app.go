@@ -68,14 +68,14 @@ func addPersistentPreRunE(cmd *cobra.Command) {
 			}
 		}
 
-		if global.Config.ReadConfigFile != "" && global.Config.Folders.EtcDir != "" {
-			if filepath.Dir(global.Config.ReadConfigFile) != global.Config.Folders.EtcDir {
-				logrus.Infof("For consistency, you should move '%s' file in folder '%s'", global.Config.ReadConfigFile+"."+global.Config.ReadConfigFileExt, global.Config.Folders.EtcDir)
+		if global.Settings.ReadConfigFile != "" && global.Settings.Folders.EtcDir != "" {
+			if filepath.Dir(global.Settings.ReadConfigFile) != global.Settings.Folders.EtcDir {
+				logrus.Infof("For consistency, you should move '%s' file in folder '%s'", global.Settings.ReadConfigFile+"."+global.Settings.ReadConfigFileExt, global.Settings.Folders.EtcDir)
 			}
 		} else {
-			_, err := os.Stat(global.Config.Folders.EtcDir + "/settings.yml")
+			_, err := os.Stat(global.Settings.Folders.EtcDir + "/settings.yml")
 			if err != nil {
-				// create settings files from current Config
+				// create settings files from current Settings
 
 			}
 		}

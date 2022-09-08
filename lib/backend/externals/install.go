@@ -35,7 +35,7 @@ func installTerraform() (string, error) {
 	release := &releases.ExactVersion{
 		Product:    product.Terraform,
 		Version:    terraformv1_2_6,
-		InstallDir: global.Config.Folders.ShareDir + "/terraform/bin",
+		InstallDir: global.Settings.Folders.ShareDir + "/terraform/bin",
 	}
 	logrus.Infof("installing terraform release %s", terraformv1_2_6)
 	return installer.Install(context.Background(), []src.Installable{release})
@@ -46,7 +46,7 @@ func installConsul() (string, error) {
 	release := &releases.ExactVersion{
 		Product:    product.Consul,
 		Version:    consulv1_13_1,
-		InstallDir: global.Config.Folders.ShareDir + "/consul/bin",
+		InstallDir: global.Settings.Folders.ShareDir + "/consul/bin",
 	}
 	logrus.Infof("installing consul release %s", consulv1_13_1)
 	return installer.Install(context.Background(), []src.Installable{release})

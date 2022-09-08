@@ -20,9 +20,11 @@
 package common
 
 import (
+	"net/http"
+
 	"github.com/sirupsen/logrus"
 )
 
-func ExposeRuntimeMetrics() {
+func ExposeRuntimeMetrics(_ *http.ServeMux) {
 	logrus.Debugf("Called expose function - release")
 }

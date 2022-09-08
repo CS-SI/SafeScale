@@ -21,32 +21,28 @@ package common
 
 import (
 	"expvar"
-	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/exportstats"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/felixge/fgprof"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 )
 
-func ExposeRuntimeMetrics() {
+func ExposeRuntimeMetrics(mux *http.ServeMux) {
 	logrus.Debugf("Exposing debug server")
 	defer func() {
 		logrus.Debugf("Exposed debug server")
 	}()
 
-	// DEV VAR
-	expvarPort := 9191
-	if port := os.Getenv("SAFESCALE_EXPVAR_PORT"); port != "" {
-		num, err := strconv.Atoi(port)
-		if err != nil {
-			expvarPort = num
-		}
-	}
+	// // DEV VAR
+	// expvarPort := 9191
+	// if port := os.Getenv("SAFESCALE_EXPVAR_PORT"); port != "" {
+	// 	num, err := strconv.Atoi(port)
+	// 	if err != nil {
+	// 		expvarPort = num
+	// 	}
+	// }
 
 	// Track using expvar
 	expvar.NewInt("tenant.set")
@@ -61,17 +57,18 @@ func ExposeRuntimeMetrics() {
 	expvar.NewInt("newhost.cache.read")
 
 	exportstats.NewStatCount("stats")
-	http.Handle("/debug/metrics", metric.Handler(metric.Exposed))
+	mux.Handle("/debug/metrics", metric.Handler(metric.Exposed))
 
 	// Debug using fgprof
-	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
-	go func() {
-		var crash error
-		defer fail.SilentOnPanic(&crash)
+	mux.Handle("/debug/fgprof", fgprof.Handler())
 
-		err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux)
-		if err != nil {
-			logrus.Fatalf("Failed to start expvar: %v", err)
-		}
-	}()
+	// go func() {
+	// 	var crash error
+	// 	defer fail.SilentOnPanic(&crash)
+	//
+	// 	err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux)
+	// 	if err != nil {
+	// 		logrus.Fatalf("Failed to start expvar: %v", err)
+	// 	}
+	// }()
 }

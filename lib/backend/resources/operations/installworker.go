@@ -994,7 +994,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 					if cuk != nil {
 						if !cuk.Successful() && !cuk.Completed() {
 							var msg error
-							if global.Config.Verbose && global.Config.Debug { // log more details if in trace mode
+							if global.Settings.Verbose && global.Settings.Debug { // log more details if in trace mode
 								msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with result: [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
 							} else {
 								msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v", w.action.String(), p.stepName, cuk.Error())
@@ -1023,7 +1023,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 				if cuk != nil {
 					if !cuk.Successful() && cuk.Completed() {
 						var msg error
-						if global.Config.Verbose && global.Config.Debug { // log more details if in trace mode
+						if global.Settings.Verbose && global.Settings.Debug { // log more details if in trace mode
 							msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with result: [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
 						} else {
 							msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s", w.action.String(), p.stepName, key)

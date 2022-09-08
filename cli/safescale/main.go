@@ -23,6 +23,7 @@ import (
 	"runtime"
 
 	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -35,8 +36,6 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	// mainCtx, cancelfunc := context.WithCancel(context.Background())
 
 	// app.Flags = append(app.Flags, []cli.Flag{
 	// 	&cli.StringFlag{
@@ -89,13 +88,13 @@ func main() {
 
 func cleanup(cmd *cobra.Command) {
 	// identify the first argument of the command
-	last, _, _ := cmd.Find(os.Args[1:])
-	prev := last
-	for ; prev.HasParent() && prev.Parent() != cmd; prev = prev.Parent() {
+	precursor, xerr := cli.ElderOfCommand(cmd)
+	if xerr != nil {
+		logrus.Errorf(xerr.Error())
 	}
 
 	// cleans up accordingly with the first argument
-	switch prev.Name() {
+	switch precursor.Name() {
 	case global.BackendCmdLabel:
 		backend.Cleanup()
 	case global.WebUICmdLabel:

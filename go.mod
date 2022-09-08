@@ -19,8 +19,6 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gofuzz v1.2.0
 	github.com/gophercloud/gophercloud v1.0.0
-	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.4.0
 	github.com/hashicorp/terraform-exec v0.17.2
@@ -30,7 +28,6 @@ require (
 	github.com/magiconair/properties v1.8.6
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
-	github.com/mwitkow/grpc-proxy v0.0.0-20220126150247-db34e7bfee32
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
 	github.com/oscarpicas/go-dsp v0.1.0

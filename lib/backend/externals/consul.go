@@ -46,7 +46,7 @@ func StartConsulServer(ctx context.Context) (ferr fail.Error) {
 	ferr = nil
 	consulLauncher.Do(func() {
 		// creates configuration if not present
-		consulRootDir := global.Config.Folders.ShareDir + "consul"
+		consulRootDir := global.Settings.Folders.ShareDir + "consul"
 		consulEtcDir := consulRootDir + "/etc"
 		consulConfigFile := consulEtcDir + "/config.?"
 		st, err := os.Stat(consulConfigFile)
@@ -82,10 +82,10 @@ func StartConsulServer(ctx context.Context) (ferr fail.Error) {
 		args := []string{"agent", "-config-dir=etc", "-server", "-datacenter=safescale"}
 		attr := &os.ProcAttr{
 			Sys: &syscall.SysProcAttr{
-				Chroot: global.Config.Folders.ShareDir + "consul",
+				Chroot: global.Settings.Folders.ShareDir + "consul",
 			},
 		}
-		proc, err := os.StartProcess(global.Config.Backend.Consul.ExecPath, args, attr)
+		proc, err := os.StartProcess(global.Settings.Backend.Consul.ExecPath, args, attr)
 		if err != nil {
 			ferr = fail.Wrap(err, "failed to start consul server")
 			return

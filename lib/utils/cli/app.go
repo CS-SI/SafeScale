@@ -46,7 +46,7 @@ func NewApp(cobraRootCmd *cobra.Command) (*App, error) {
 
 	out := &App{
 		rootCmd: cobraRootCmd,
-		doneCh:  make(chan struct{}),
+		doneCh:  make(chan struct{}, 1),
 	}
 
 	// app.Authors = []cli.Author{
