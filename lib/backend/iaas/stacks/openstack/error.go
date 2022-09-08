@@ -22,15 +22,12 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"reflect"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/gophercloud/gophercloud"
-	"github.com/sirupsen/logrus"
 )
 
 // NormalizeError translates gophercloud or openstack error to SafeScale error
@@ -141,14 +138,7 @@ func NormalizeError(err error) fail.Error {
 			tracer.Trace("received 'net.Error', normalized to 'fail.Error' with cause")
 			return fail.NewErrorWithCause(e)
 		default:
-			switch err.Error() {
-			case "EOF":
-				tracer.Trace("received 'EOF', normalized to '*fail.ErrNotFound'")
-				return fail.NotFoundError("EOF")
-			default:
-				logrus.WithContext(context.Background()).Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
-				return fail.NewError("unhandled error received from provider: %s", err.Error())
-			}
+			return fail.ConvertError(defaultErrorInterpreter(err))
 		}
 	}
 	return nil

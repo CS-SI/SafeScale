@@ -9,6 +9,7 @@ all: generate
 generate:
 	@(mkdir -p ./mocks) || true
 	@(cd enums && $(MAKE) $(@))
+	@(cd abstract && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))
 
 vet:

@@ -279,7 +279,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 						_ = ferr.AddConsequence(tgerr)
 					}
 				} else {
-					logrus.Warningf("relying on metadata here was a mistake...")
+					logrus.WithContext(ctx).Warningf("relying on metadata here was a mistake...")
 				}
 			}
 		}()

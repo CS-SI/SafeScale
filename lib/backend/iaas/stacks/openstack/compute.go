@@ -893,6 +893,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 					return innerXErr
 				}
 			}
+
 			return nil
 		},
 		timings.NormalDelay(),

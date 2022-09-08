@@ -2797,16 +2797,22 @@ func (e *ServiceTest) DeleteVolumeAttachment(ctx context.Context, serverID, id s
 	e._survey("ServiceTest::DeleteVolumeAttachment (not implemented)")
 	return nil
 }
-func (e *ServiceTest) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
-	e._log("ServiceTest::Migrate (not implemented)")
-	return nil
-}
 func (e *ServiceTest) Timings() (temporal.Timings, fail.Error) {
 	if e.options.timingsErr != nil {
 		e._warnf("ServiceTest::Timings forced error \"%s\"\n", e.options.timingsErr.Error())
 		return nil, e.options.timingsErr
 	}
 	return e.options.timings, nil
+}
+
+func (e *ServiceTest) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	e._survey("ServiceTest::UpdateTags (not implemented)")
+	return nil
+}
+
+func (e *ServiceTest) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	e._survey("ServiceTest::DeleteTags (not implemented)")
+	return nil
 }
 
 // providers.Provider

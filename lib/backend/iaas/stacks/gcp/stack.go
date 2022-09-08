@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -120,4 +121,36 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcCreateTags(ctx, id, lmap)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = s.rpcCreateLabels(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcRemoveTagsFromInstance(ctx, id, keys)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = s.rpcRemoveLabels(ctx, id, keys)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }

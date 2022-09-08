@@ -719,13 +719,3 @@ func (s ProviderProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id 
 	}
 	return xerr
 }
-
-func (s ProviderProxy) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.Provider.Migrate(ctx, operation, params)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}

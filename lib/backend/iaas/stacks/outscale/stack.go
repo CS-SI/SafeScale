@@ -280,3 +280,34 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	}
 	return s.MutableTimings, nil
 }
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	_, xerr := s.rpcCreateTags(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	report := make(map[string]string)
+	for _, k := range keys {
+		report[k] = ""
+	}
+
+	xerr := s.rpcDeleteTags(ctx, id, report)
+	return xerr
+}

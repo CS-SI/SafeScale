@@ -17,6 +17,7 @@
 package openstack // Package openstack contains the implemenation of a stack for OpenStack providers
 
 import (
+	context2 "context"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
@@ -272,4 +273,27 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	report := make(map[string]string)
+	for _, k := range keys {
+		report[k] = ""
+	}
+
+	xerr := s.rpcDeleteMetadataOfInstance(ctx, id, report)
+	return xerr
 }

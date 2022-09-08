@@ -1493,7 +1493,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
-				logrus.Warningf("Binding security group with id %s to host %s", k, hostID)
+				logrus.WithContext(ctx).Warningf("Binding security group with id %s to host %s", k, hostID)
 				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -2200,7 +2200,7 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.HostRequest, errorPtr *fail.Error) {
 	ctx := inctx
 	if ctx != context.Background() {
-		logrus.Warningf("This should NOT happen")
+		logrus.WithContext(ctx).Warningf("This should NOT happen")
 	}
 
 	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && !req.KeepOnFailure {
@@ -4593,13 +4593,19 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	}
 
 	labelName := labelInstance.GetName()
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	labelID, err := labelInstance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
-	defer tracer.Exiting()
+	instanceID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 
 	// Inform Label we want it bound to Host (updates its metadata)
 	xerr := labelInstance.BindToHost(ctx, instance, value)
@@ -4645,7 +4651,30 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return xerr
 	}
 
+	lmap, err := labelToMap(labelInstance)
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	svc := instance.Service()
+	xerr = svc.UpdateTags(ctx, abstract.HostResource, instanceID, lmap)
+	if xerr != nil {
+		return xerr
+	}
+
 	return nil
+}
+
+func labelToMap(labelInstance resources.Label) (map[string]string, error) {
+	sad := make(map[string]string)
+	k := labelInstance.GetName()
+	v, err := labelInstance.DefaultValue(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	sad[k] = v
+
+	return sad, nil
 }
 
 // UnbindLabel removes a Label from Host
@@ -4666,6 +4695,11 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
+
+	instanceID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
@@ -4694,6 +4728,12 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 
 	xerr = labelInstance.UnbindFromHost(ctx, instance)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	svc := instance.Service()
+	xerr = svc.DeleteTags(ctx, abstract.HostResource, instanceID, []string{labelInstance.GetName()})
 	if xerr != nil {
 		return xerr
 	}

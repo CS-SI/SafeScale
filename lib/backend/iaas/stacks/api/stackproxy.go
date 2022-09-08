@@ -647,13 +647,3 @@ func (s StackProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 	}
 	return xerr
 }
-
-func (s StackProxy) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.Migrate(ctx, operation, params)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}

@@ -797,7 +797,7 @@ func (s stack) buildAwsMachine(
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
-	instance, xerr := s.rpcRunInstance(ctx,
+	instance, xerr := s.rpcCreateInstance(ctx,
 		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), diskSize,
 		aws.String(keypairName), aws.Bool(publicIP), []byte(data),
 	)
