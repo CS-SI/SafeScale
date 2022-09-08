@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -55,7 +54,7 @@ func convertToSSHClientConfig(toConvert *SSHJump, timeout time.Duration) (_ *ssh
 func AuthMethodFromPrivateKeyFile(file string, passphrase []byte) (_ ssh.AuthMethod, err error) {
 	defer OnPanic(&err)
 
-	buffer, err := ioutil.ReadFile(file)
+	buffer, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

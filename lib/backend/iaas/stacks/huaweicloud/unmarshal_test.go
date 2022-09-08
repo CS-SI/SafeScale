@@ -2,7 +2,7 @@ package huaweicloud
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
@@ -12,7 +12,7 @@ import (
 func Test_recoverImageInfo(t *testing.T) {
 	var img images.Image
 
-	data, err := ioutil.ReadFile("./dump-img.json")
+	data, err := os.ReadFile("./dump-img.json")
 	if err != nil {
 		t.Error(err)
 	}

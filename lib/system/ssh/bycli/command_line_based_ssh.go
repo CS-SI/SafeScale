@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -807,11 +806,11 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	}
 
 	if params.collectOutputs {
-		if msgOut, err = ioutil.ReadAll(stdoutPipe); err != nil {
+		if msgOut, err = io.ReadAll(stdoutPipe); err != nil {
 			return result, fail.ConvertError(err)
 		}
 
-		if msgErr, err = ioutil.ReadAll(stderrPipe); err != nil {
+		if msgErr, err = io.ReadAll(stderrPipe); err != nil {
 			return result, fail.ConvertError(err)
 		}
 	}

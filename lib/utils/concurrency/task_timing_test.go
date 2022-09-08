@@ -22,7 +22,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -97,7 +97,7 @@ func TestLikeBeforeWithoutAbortButContextWF(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
+	_, _ = io.ReadAll(r)
 	os.Stdout = rescueStdout
 }
 
@@ -163,7 +163,7 @@ func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
+	_, _ = io.ReadAll(r)
 	os.Stdout = rescueStdout
 }
 
@@ -236,7 +236,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	funk(5, 40, 20, 10, true) // canceled
 	funk(
 		6, 40, 20, 30, false,
-	) // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	)                                   // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
 	funk(7, 140, 20, 240 /*40*/, false) // same thing here
 	funk(8, 140, 20, 100, false)        // same thing here
 	funk(9, 140, 20, 120, false)        // same thing here
@@ -313,7 +313,7 @@ func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 	funk(5, 40, 20, 10, true) // canceled
 	funk(
 		6, 40, 20, 30, false,
-	) // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	)                                   // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
 	funk(7, 140, 20, 240 /*40*/, false) // same thing here
 	funk(8, 140, 20, 100, false)        // same thing here
 	funk(9, 140, 20, 120, false)        // same thing here

@@ -18,7 +18,7 @@ package fail
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -108,7 +108,7 @@ func TestExitLogError(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -145,7 +145,7 @@ func TestOnExit(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -168,7 +168,7 @@ func TestOnExitAndLog(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -191,7 +191,7 @@ func TestOnExitAndLogWithWarning(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)

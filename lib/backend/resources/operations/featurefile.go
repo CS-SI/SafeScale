@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -313,7 +312,7 @@ func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (dat
 		// if we can log the sha256 of the feature, do it
 		filename := v.ConfigFileUsed()
 		if filename != "" {
-			content, err := ioutil.ReadFile(filename)
+			content, err := os.ReadFile(filename)
 			if err != nil {
 				return nil, fail.ConvertError(err)
 			}

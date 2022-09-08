@@ -21,7 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -229,7 +229,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	md5hash := ""
 	uploadSize := 0
 	if source != "" {
-		content, err := ioutil.ReadFile(source)
+		content, err := os.ReadFile(source)
 		if err != nil {
 			return invalid, "", "", fail.AbortedError(err, "aborted")
 		}

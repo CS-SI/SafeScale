@@ -20,7 +20,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -640,7 +639,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				// take local md5...
 				md5hash := ""
 				if localPath != "" {
-					content, err := ioutil.ReadFile(localPath)
+					content, err := os.ReadFile(localPath)
 					if err != nil {
 						return fail.WarningError(err, "couldn't open local file")
 					}

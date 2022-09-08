@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -288,7 +287,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", ud.HostName)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata.%s.sh", ud.HostName, phase))
-		err = ioutil.WriteFile(dumpName, result, 0644)
+		err = os.WriteFile(dumpName, result, 0644)
 		if err != nil { // No need to act on err
 			logrus.Warnf("[TRACE] Failure writing step info into %s", dumpName)
 		}

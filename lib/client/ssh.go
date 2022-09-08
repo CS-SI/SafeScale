@@ -21,7 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -367,7 +367,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 				crcCheck := func() fail.Error {
 					md5hash := ""
 					if localPath != "" {
-						content, err := ioutil.ReadFile(localPath)
+						content, err := os.ReadFile(localPath)
 						if err != nil {
 							return fail.WarningError(err, "unable ro read file %s", localPath)
 						}

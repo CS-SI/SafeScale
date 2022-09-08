@@ -18,7 +18,7 @@ package serialize
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -310,7 +310,7 @@ func TestLockForReadDoesLock(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	outString := string(out)
@@ -393,7 +393,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	outString := string(out)
@@ -474,7 +474,7 @@ func TestEternalReaderLocks(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	outString := string(out)
@@ -557,7 +557,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	outString := string(out)

@@ -3199,7 +3199,7 @@ func (e *SSHConnectorTest) CopyWithTimeout(ctx context.Context, remotePath strin
 		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
 	if isUpload {
-		b, err := ioutil.ReadFile(localPath)
+		b, err := os.ReadFile(localPath)
 		if err != nil {
 			return -1, "", "", fail.Wrap(err)
 		}
