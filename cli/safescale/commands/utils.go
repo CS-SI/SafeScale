@@ -57,26 +57,29 @@ func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, e
 			sizing += "gpu = -1"
 		}
 	} else {
+		var fragments []string
 		if c.IsSet("cpu") {
-			sizing = fmt.Sprintf("cpu ~ %d,", c.Int("cpu"))
+			fragments = append(fragments, fmt.Sprintf("cpu ~ %d", c.Int("cpu")))
 		}
 		if c.IsSet("cpufreq") {
-			sizing += fmt.Sprintf("cpufreq >= %.01f,", c.Float64("cpufreq"))
+			fragments = append(fragments, fmt.Sprintf("cpufreq >= %.01f", c.Float64("cpufreq")))
 		}
 		if c.IsSet("gpu") {
-			sizing += fmt.Sprintf("gpu = %d,", c.Int("gpu"))
+			fragments = append(fragments, fmt.Sprintf("gpu = %d", c.Int("gpu")))
 		} else {
-			sizing += "gpu = -1"
+			fragments = append(fragments, "gpu = -1")
 		}
 		if c.IsSet("ram") {
-			sizing += fmt.Sprintf("ram ~ %.01f,", c.Float64("ram"))
+			fragments = append(fragments, fmt.Sprintf("ram ~ %.01f", c.Float64("ram")))
 		}
 		if c.IsSet("disk") {
-			sizing += fmt.Sprintf("disk >= %.01f,", c.Float64("disk"))
+			fragments = append(fragments, fmt.Sprintf("disk >= %.01f", c.Float64("disk")))
 		}
 		if c.IsSet("count") {
-			sizing += fmt.Sprintf("count = %d", c.Int("count"))
+			fragments = append(fragments, fmt.Sprintf("count = %d", c.Int("count")))
 		}
+
+		sizing = strings.Join(fragments, ",")
 	}
 	return sizing, nil
 }
