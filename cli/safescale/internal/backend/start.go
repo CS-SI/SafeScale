@@ -41,22 +41,15 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/heartbeat"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/net/grpcweb"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	improbablegrpcweb "github.com/improbable-eng/grpc-web/go/grpcweb"
-	"github.com/mwitkow/go-conntrack"
 	"github.com/mwitkow/go-conntrack/connhelpers"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
-	"golang.org/x/net/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-)
-
-const (
-	defaultHost string = "localhost" // By default, safescale daemon only listen on localhost
-	defaultPort string = "50051"
 )
 
 // startBackend starts the gRPC server of SafeScale (the daemon)
@@ -85,7 +78,7 @@ func startBackend(cmd *cobra.Command) error {
 			}
 		}
 
-		// check consul is working
+		// FIXME: check consul is working
 	}
 
 	logrus.Infof("Starting backend, listening on '%s', using metadata suffix '%s'", global.Settings.Backend.Listen, suffix)
@@ -113,6 +106,118 @@ func startBackend(cmd *cobra.Command) error {
 	return nil
 }
 
+func serve(errChan chan error) error {
+	defer fmt.Printf("safescale backend version: %s\nReady to serve on '%s' :-)\n", global.VersionString(), global.Settings.Backend.Listen)
+
+	var (
+		name     string
+		listener net.Listener
+		err      error
+	)
+	if global.Settings.Backend.UseTls {
+		name = "http_tls"
+		listener, err = common.BuildListener(name, global.Settings.Backend.Listen)
+		if err != nil {
+			logrus.Fatal(err.Error())
+		}
+
+		tlsConf, err := buildServerTlsConfig(global.Settings.Backend.Tls.CertFile, global.Settings.Backend.Tls.KeyFile)
+		if err != nil {
+			logrus.Fatal(err.Error())
+		}
+
+		listener = tls.NewListener(listener, tlsConf)
+	} else {
+		name = "http"
+		listener, err = common.BuildListener(name, global.Settings.Backend.Listen)
+		if err != nil {
+			logrus.Fatal(err.Error())
+		}
+	}
+
+	go func() {
+		logrus.Infof("listening for %s on %v", name, listener.Addr().String())
+
+		server := buildServer()
+		err := server.Serve(listener)
+		if err != nil {
+			errChan <- fmt.Errorf("%s server error: %v", name, err)
+			return
+		}
+
+		errChan <- nil
+	}()
+
+	return nil
+}
+
+// buildServerTlsConfig creates the needed *tls.Config based on app Settings
+func buildServerTlsConfig(certFile, keyFile string) (*tls.Config, error) {
+	if global.Settings.Backend.Tls.CertFile == "" || global.Settings.Backend.Tls.KeyFile == "" {
+		return nil, fail.InvalidRequestError("flags backend.tls.cert_file and backend.tls.key_file must be set")
+	}
+
+	tlsConfig, err := connhelpers.TlsConfigForServerCerts(certFile, keyFile)
+	if err != nil {
+		return nil, fail.Wrap(err, "failed reading TLS server keys")
+	}
+
+	tlsConfig.MinVersion = tls.VersionTLS12
+	if global.Settings.Backend.Tls.NoVerify {
+		tlsConfig.InsecureSkipVerify = true
+	} else if len(global.Settings.Backend.Tls.CAs) > 0 {
+		tlsConfig.RootCAs = x509.NewCertPool()
+		if len(global.Settings.Backend.Tls.CAs) > 0 {
+			for _, path := range global.Settings.Backend.Tls.CAs {
+				data, err := ioutil.ReadFile(path)
+				if err != nil {
+					return nil, fail.Wrap(err, "failed reading CA file %v: %v", path)
+				}
+
+				ok := tlsConfig.RootCAs.AppendCertsFromPEM(data)
+				if !ok {
+					return nil, fail.NewError("failed processing CA file %v", path)
+				}
+			}
+		} else {
+			var err error
+			tlsConfig.RootCAs, err = x509.SystemCertPool()
+			if err != nil {
+				return nil, fail.Wrap(err, "no CA files specified, fallback to system CA chain failed")
+			}
+		}
+	}
+
+	tlsConfig, err = connhelpers.TlsConfigWithHttp2Enabled(tlsConfig)
+	if err != nil {
+		return nil, fail.Wrap(err, "cannot configure http2 handling")
+	}
+
+	return tlsConfig, nil
+}
+
+// buildServer configures the http server to use
+func buildServer() *http.Server {
+	grpcServer := buildGRPCServer()
+	grpcwebWrapper, xerr := buildGRPCWebServer(grpcServer)
+	if xerr != nil {
+		logrus.Fatal(xerr.Error())
+	}
+
+	router, xerr := common.BuildHttpRouter()
+	if xerr != nil {
+		logrus.Fatal(xerr.Error())
+	}
+
+	httpServer := &http.Server{
+		Handler:      h2c.NewHandler(grpcwebWrapper.Handler(router), &http2.Server{}),
+		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  10 * time.Second,
+	}
+	return httpServer
+}
+
+// buildGRPCServer buils the grpc.Server instance and register gRPC listeners
 func buildGRPCServer() *grpc.Server {
 	logrus.Infoln("Registering gRPC services")
 	grpcServer := grpc.NewServer()
@@ -136,6 +241,65 @@ func buildGRPCServer() *grpc.Server {
 	reflection.Register(grpcServer)
 
 	return grpcServer
+}
+
+// buildGRPCWebServer wraps a *grpc.Server to handle grpcweb
+func buildGRPCWebServer(grpcServer *grpc.Server) (*grpcweb.Mux, fail.Error) {
+	if valid.IsNil(grpcServer) {
+		return nil, fail.InvalidParameterCannotBeNilError("grpcServer")
+	}
+
+	options := []improbablegrpcweb.Option{
+		improbablegrpcweb.WithCorsForRegisteredEndpointsOnly(false),
+	}
+
+	// VPL: still need to figure out if I want to be able to limit origins...
+	// allowedOrigins := makeAllowedOrigins(*flagAllowedOrigins)
+	//	options = append(options, grpcweb.WithOriginFunc(makeHttpOriginFunc(common.Settings.Backend.AllowedOrigins)))
+
+	// VPL: still need to figure out why I would want to use WebSockets...
+	// if *useWebsockets {
+	// 	logrus.Println("using websockets")
+	// 	options = append(
+	// 		options,
+	// 		grpcweb.WithWebsockets(true),
+	// 		grpcweb.WithWebsocketOriginFunc(makeWebsocketOriginFunc(allowedOrigins)),
+	// 	)
+	// 	if *websocketPingInterval >= time.Second {
+	// 		logrus.Infof("websocket keepalive pinging enabled, the timeout interval is %s", websocketPingInterval.String())
+	// 	}
+	// 	if *websocketReadLimit > 0 {
+	// 		options = append(options, grpcweb.WithWebsocketsMessageReadLimit(*websocketReadLimit))
+	// 	}
+	//
+	// 	options = append(
+	// 		options,
+	// 		grpcweb.WithWebsocketPingInterval(*websocketPingInterval),
+	// 	)
+	//
+	// 	var compressionMode websocket.CompressionMode
+	// 	switch *websocketCompressionMode {
+	// 	case "no_context_takeover":
+	// 		compressionMode = websocket.CompressionNoContextTakeover
+	// 	case "context_takeover":
+	// 		compressionMode = websocket.CompressionContextTakeover
+	// 	case "disabled":
+	// 		compressionMode = websocket.CompressionDisabled
+	// 	default:
+	// 		logrus.Fatalf("unknown param for websocket compression mode: %s", *websocketCompressionMode)
+	// 	}
+	//
+	// 	options = append(
+	// 		options,
+	// 		grpcweb.WithWebsocketCompressionMode(compressionMode),
+	// 	)
+	// }
+
+	// if len(*flagAllowedHeaders) > 0 {
+	// 	options = append(options, grpcweb.WithAllowedRequestHeaders(*flagAllowedHeaders))
+	// }
+
+	return grpcweb.NewHandler(grpcServer, options...)
 }
 
 var consulLauncher sync.Once
@@ -242,208 +406,4 @@ connect {
 	})
 
 	return ferr
-}
-
-func buildHttpRouter() (*http.ServeMux, fail.Error) {
-	mux := http.NewServeMux()
-
-	// frontendHandler, xerr := buildFrontendHttpHandler()
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
-	common.ExposeRuntimeMetrics(mux)
-	addDebugHttpHandler(mux)
-	// addGRPCHandler(mux, grpcServer, nil)
-	return mux, nil
-}
-
-// buildServer configures the http server to use
-func buildServer() *http.Server {
-	grpcServer := buildGRPCServer()
-
-	options := []improbablegrpcweb.Option{
-		improbablegrpcweb.WithCorsForRegisteredEndpointsOnly(false),
-	}
-
-	// VPL: still need to figure out if I want to be able to limit origins...
-	// allowedOrigins := makeAllowedOrigins(*flagAllowedOrigins)
-	//	options = append(options, grpcweb.WithOriginFunc(makeHttpOriginFunc(common.Settings.Backend.AllowedOrigins)))
-
-	// VPL: still need to figure out why I would want to use WebSockets...
-	// if *useWebsockets {
-	// 	logrus.Println("using websockets")
-	// 	options = append(
-	// 		options,
-	// 		grpcweb.WithWebsockets(true),
-	// 		grpcweb.WithWebsocketOriginFunc(makeWebsocketOriginFunc(allowedOrigins)),
-	// 	)
-	// 	if *websocketPingInterval >= time.Second {
-	// 		logrus.Infof("websocket keepalive pinging enabled, the timeout interval is %s", websocketPingInterval.String())
-	// 	}
-	// 	if *websocketReadLimit > 0 {
-	// 		options = append(options, grpcweb.WithWebsocketsMessageReadLimit(*websocketReadLimit))
-	// 	}
-	//
-	// 	options = append(
-	// 		options,
-	// 		grpcweb.WithWebsocketPingInterval(*websocketPingInterval),
-	// 	)
-	//
-	// 	var compressionMode websocket.CompressionMode
-	// 	switch *websocketCompressionMode {
-	// 	case "no_context_takeover":
-	// 		compressionMode = websocket.CompressionNoContextTakeover
-	// 	case "context_takeover":
-	// 		compressionMode = websocket.CompressionContextTakeover
-	// 	case "disabled":
-	// 		compressionMode = websocket.CompressionDisabled
-	// 	default:
-	// 		logrus.Fatalf("unknown param for websocket compression mode: %s", *websocketCompressionMode)
-	// 	}
-	//
-	// 	options = append(
-	// 		options,
-	// 		grpcweb.WithWebsocketCompressionMode(compressionMode),
-	// 	)
-	// }
-
-	// if len(*flagAllowedHeaders) > 0 {
-	// 	options = append(options, grpcweb.WithAllowedRequestHeaders(*flagAllowedHeaders))
-	// }
-
-	grpcwebWrapper, xerr := grpcweb.NewHandler(grpcServer, options...)
-	if xerr != nil {
-		logrus.Fatal(xerr.Error())
-	}
-
-	router, xerr := buildHttpRouter()
-	if xerr != nil {
-		logrus.Fatal(xerr.Error())
-	}
-
-	httpServer := &http.Server{
-		Handler:      h2c.NewHandler(grpcwebWrapper.Handler(router), &http2.Server{}),
-		WriteTimeout: 10 * time.Second,
-		ReadTimeout:  10 * time.Second,
-	}
-	return httpServer
-}
-
-func serve(errChan chan error) error {
-	defer fmt.Printf("safescale backend version: %s\nReady to serve on '%s' :-)\n", global.VersionString(), global.Settings.Backend.Listen)
-
-	var (
-		name     string
-		listener net.Listener
-		err      error
-	)
-	if global.Settings.Backend.UseTls {
-		name = "http_tls"
-		listener, err = buildListener(name)
-		if err != nil {
-			logrus.Fatal(err.Error())
-		}
-
-		tlsConf, err := buildServerTlsConfig()
-		if err != nil {
-			logrus.Fatal(err.Error())
-		}
-
-		listener = tls.NewListener(listener, tlsConf)
-	} else {
-		name = "http"
-		listener, err = buildListener(name)
-		if err != nil {
-			logrus.Fatal(err.Error())
-		}
-	}
-
-	go func() {
-		logrus.Infof("listening for %s on %v", name, listener.Addr().String())
-
-		server := buildServer()
-		err := server.Serve(listener)
-		if err != nil {
-			errChan <- fmt.Errorf("%s server error: %v", name, err)
-			return
-		}
-
-		errChan <- nil
-	}()
-
-	return nil
-}
-
-func buildListener(name string) (net.Listener, error) {
-	listener, err := net.Listen("tcp", global.Settings.Backend.Listen)
-	if err != nil {
-		return nil, fail.Wrap(err, "failed listening on %s for '%s'", global.Settings.Backend.Listen, name)
-	}
-
-	out := conntrack.NewListener(listener,
-		conntrack.TrackWithName(name),
-		conntrack.TrackWithTcpKeepAlive(20*time.Second),
-		conntrack.TrackWithTracing(),
-	)
-	return out, nil
-}
-
-func buildServerTlsConfig() (*tls.Config, error) {
-	if global.Settings.Backend.Tls.CertFile == "" || global.Settings.Backend.Tls.KeyFile == "" {
-		return nil, fail.InvalidRequestError("flags backend.tls.cert_file and backend.tls.key_file must be set")
-	}
-
-	tlsConfig, err := connhelpers.TlsConfigForServerCerts(global.Settings.Backend.Tls.CertFile, global.Settings.Backend.Tls.KeyFile)
-	if err != nil {
-		return nil, fail.Wrap(err, "failed reading TLS server keys")
-	}
-
-	tlsConfig.MinVersion = tls.VersionTLS12
-	if global.Settings.Backend.Tls.NoVerify {
-		tlsConfig.InsecureSkipVerify = true
-	} else if len(global.Settings.Backend.Tls.CAs) > 0 {
-		tlsConfig.RootCAs = x509.NewCertPool()
-		if len(global.Settings.Backend.Tls.CAs) > 0 {
-			for _, path := range global.Settings.Backend.Tls.CAs {
-				data, err := ioutil.ReadFile(path)
-				if err != nil {
-					return nil, fail.Wrap(err, "failed reading CA file %v: %v", path)
-				}
-
-				ok := tlsConfig.RootCAs.AppendCertsFromPEM(data)
-				if !ok {
-					return nil, fail.NewError("failed processing CA file %v", path)
-				}
-			}
-		} else {
-			var err error
-			tlsConfig.RootCAs, err = x509.SystemCertPool()
-			if err != nil {
-				return nil, fail.Wrap(err, "no CA files specified, fallback to system CA chain failed")
-			}
-		}
-	}
-
-	tlsConfig, err = connhelpers.TlsConfigWithHttp2Enabled(tlsConfig)
-	if err != nil {
-		return nil, fail.Wrap(err, "cannot configure http2 handling")
-	}
-
-	return tlsConfig, nil
-}
-
-func addDebugHttpHandler(mux *http.ServeMux) fail.Error {
-	// Serving debugging helpers:
-	mux.Handle("/metrics", promhttp.Handler())
-	if global.Settings.Debug {
-		mux.HandleFunc("/debug/http/requests", func(resp http.ResponseWriter, req *http.Request) {
-			trace.Traces(resp, req)
-		})
-		mux.HandleFunc("/debug/http/events", func(resp http.ResponseWriter, req *http.Request) {
-			trace.Events(resp, req)
-		})
-	}
-
-	return nil
 }

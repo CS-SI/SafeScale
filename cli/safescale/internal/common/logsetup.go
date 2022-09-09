@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/commonlog"
 )
 
+// LogSetup sets up the log engine
 func LogSetup(logDir, suffix string) {
 	logrus.SetFormatter(commonlog.GetDefaultFormatter())
 	logrus.SetLevel(logrus.DebugLevel)

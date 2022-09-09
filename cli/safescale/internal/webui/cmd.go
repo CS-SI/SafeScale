@@ -35,7 +35,7 @@ func runCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", global.WebUICmdLabel, runCmdLabel, strings.Join(args, ", "))
 
-			return run(cmd)
+			return startWebUI(cmd)
 		},
 	}
 
