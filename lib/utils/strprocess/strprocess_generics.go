@@ -22,6 +22,9 @@ package strprocess
 import (
 	"fmt"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Plural returns 's' if value > 1, "" otherwise
