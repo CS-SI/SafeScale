@@ -19,6 +19,7 @@ package bucketfs
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -93,7 +94,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 
 // FilePath returns the absolute path of the rclone configuration file on the remote server
 func (desc Description) FilePath() string {
-	return utils.EtcFolder + "/rclone/" + desc.BucketName + ".conf"
+	return filepath.Join(utils.EtcFolder, "rclone", desc.BucketName+".conf")
 }
 
 // createConfigurationFile creates the content of the needed rclone configuration file and put it in a

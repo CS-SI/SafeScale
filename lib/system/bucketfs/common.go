@@ -22,6 +22,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/system"
@@ -183,7 +184,7 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 		return "", xerr
 	}
 
-	filename := utils.TempFolder + "/" + name
+	filename := filepath.Join(utils.TempFolder, name)
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			select {
