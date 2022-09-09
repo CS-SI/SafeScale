@@ -19,7 +19,7 @@ package temporal
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -195,7 +195,7 @@ func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
 	printSomething(&stowa)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	if !strings.Contains(string(out), "Foo") {

@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -700,7 +699,7 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 	_ = zipwriter.Close()
 	_ = zippedBucket.Close()
 
-	ct, err := ioutil.ReadFile(zippedBucket.Name())
+	ct, err := os.ReadFile(zippedBucket.Name())
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}

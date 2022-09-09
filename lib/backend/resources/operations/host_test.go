@@ -19,7 +19,6 @@ package operations
 import (
 	"context" // nolint
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -1005,7 +1004,7 @@ func TestHost_Push(t *testing.T) {
 		require.EqualValues(t, stderr, "")
 		require.Nil(t, xerr)
 
-		b, err := ioutil.ReadFile(src)
+		b, err := os.ReadFile(src)
 		if err != nil {
 			t.Error(err)
 		}

@@ -22,6 +22,9 @@ package strprocess
 import (
 	"fmt"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Plural returns 's' if value > 1, "" otherwise
@@ -36,13 +39,13 @@ func Plural(value uint) string {
 func Capitalize(value string) string {
 	fields := strings.Fields(value)
 	if len(fields) > 0 {
-		// WORKAROUND: strings.Title consider ' as the beginning of a new word, so "can't" becomes "Can'T"...
+		// WORKAROUND: cases.Title(language.Und, cases.NoLower).String consider ' as the beginning of a new word, so "can't" becomes "Can'T"...
 		quoted := strings.Split(fields[0], "'")
 		if len(quoted) > 1 {
-			quoted[0] = strings.Title(quoted[0])
+			quoted[0] = cases.Title(language.Und, cases.NoLower).String(quoted[0])
 			fields[0] = strings.Join(quoted, "'")
 		} else {
-			fields[0] = strings.Title(fields[0])
+			fields[0] = cases.Title(language.Und, cases.NoLower).String(fields[0])
 		}
 	}
 	return strings.Join(fields, " ")

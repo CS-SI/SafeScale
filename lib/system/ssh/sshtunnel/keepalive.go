@@ -18,7 +18,7 @@ package sshtunnel
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
@@ -56,7 +56,7 @@ func (k keepAliveCfg) Dump() string {
 }
 
 func readIntFromFile(name string) (uint, error) {
-	content, err := ioutil.ReadFile(name)
+	content, err := os.ReadFile(name)
 	if err != nil {
 		return 0, err
 	}

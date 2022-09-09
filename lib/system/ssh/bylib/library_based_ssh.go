@@ -329,7 +329,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				logrus.WithContext(ctx).Tracef(spew.Sdump(err))
 			}
 			if ne, ok := err.(net.Error); ok {
-				if ne.Timeout() || ne.Temporary() {
+				if ne.Timeout() {
 					results <- result{
 						errorcode: 255,
 						stdout:    "",

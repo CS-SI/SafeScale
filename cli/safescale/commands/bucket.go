@@ -17,7 +17,6 @@
 package commands
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -155,7 +154,7 @@ var bucketDownload = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bucket download", true).Error())))
 		}
 
-		err = ioutil.WriteFile(filename, dr.Content, 0644)
+		err = os.WriteFile(filename, dr.Content, 0644)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}

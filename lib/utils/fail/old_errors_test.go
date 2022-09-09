@@ -18,7 +18,7 @@ package fail
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -493,7 +493,7 @@ func TestUncategorizedError(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -550,7 +550,7 @@ func TestNotUncategorizedError(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -883,7 +883,7 @@ func TestPanicLogsBisPlayed(t *testing.T) {
 	}
 
 	_ = w.Close()
-	mehBytes, err := ioutil.ReadAll(r)
+	mehBytes, err := io.ReadAll(r)
 	if err != nil {
 		t.FailNow()
 	}
@@ -919,7 +919,7 @@ func TestPanicBizarro(t *testing.T) {
 	}
 
 	_ = w.Close()
-	mehBytes, err := ioutil.ReadAll(r)
+	mehBytes, err := io.ReadAll(r)
 	if err != nil {
 		t.FailNow()
 	}
@@ -957,7 +957,7 @@ func TestPanicBizarroButCleaner(t *testing.T) {
 	}
 
 	_ = w.Close()
-	mehBytes, err := ioutil.ReadAll(r)
+	mehBytes, err := io.ReadAll(r)
 	if err != nil {
 		t.FailNow()
 	}

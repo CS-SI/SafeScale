@@ -19,7 +19,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -1453,7 +1453,7 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	// Here, last 2 lines of the output should be:
@@ -1646,7 +1646,7 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	require.NotNil(t, xerr)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	// Here, last 3 lines of the output should be:

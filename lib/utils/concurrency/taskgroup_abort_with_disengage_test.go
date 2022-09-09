@@ -18,7 +18,7 @@ package concurrency
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -241,7 +241,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 
 	_ = w.Close()
 
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 	_ = out
 
