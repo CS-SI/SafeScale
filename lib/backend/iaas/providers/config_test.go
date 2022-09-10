@@ -57,20 +57,22 @@ func TestConfigMap_GetSliceOfStrings(t *testing.T) {
 	c.Set("value2", v)
 
 	result := c.GetSliceOfStrings("value3")
-	var emptySliceOfString []string
+	var emptySliceOfString []string = []string{}
+
 	areEqual := reflect.DeepEqual(result, emptySliceOfString)
 	if !areEqual {
 		t.Error("Wrong GetString value restitution when no key")
 		t.Fail()
 	}
-
-	defer func() {
-		if q := recover(); q == nil {
-			t.Error("GetSliceOfStrings on non map[string]string value expect panic")
-			t.Fail()
-		}
+	func() {
+		defer func() {
+			if q := recover(); q == nil {
+				t.Error("GetSliceOfStrings on non map[string]string value expect panic")
+				t.Fail()
+			}
+		}()
+		_ = c.GetSliceOfStrings("value1")
 	}()
-	_ = c.GetSliceOfStrings("value1")
 
 	result = c.GetSliceOfStrings("value2")
 	areEqual = reflect.DeepEqual(result, v)

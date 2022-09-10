@@ -398,16 +398,112 @@ func Test_OnPanic(t *testing.T) {
 
 	for i := range testlist {
 		t.Run(testlist[i].name, func(t *testing.T) {
-
 			log = tests.LogrusCapture(func() {
 				_ = func() (err Error) {
-					err = testlist[i].err
-					defer OnPanic(&err)
+					defer OnPanic(testlist[i].err)
 					panic("mayday")
 				}()
 			})
 			require.Contains(t, log, "fail.OnPanic")
 		})
 	}
+
+}
+
+func Test_SilentOnPanic(t *testing.T) {
+
+	err := func() (err error) {
+		spew.Dump(&err)
+		defer SilentOnPanic(&err)
+		panic("mayday")
+	}()
+	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrRuntimePanic")
+
+	log := tests.LogrusCapture(func() {
+		_ = func() (err *Error) {
+			err = nil
+			defer SilentOnPanic(err)
+			panic("mayday")
+		}()
+	})
+	require.Contains(t, log, "intercepted panic but '*err' is nil")
+
+	log = tests.LogrusCapture(func() {
+		_ = func() (err *error) {
+			err = nil
+			defer SilentOnPanic(err)
+			panic("mayday")
+		}()
+	})
+	require.Contains(t, log, "intercepted panic but '*err' is nil")
+
+	log = tests.LogrusCapture(func() {
+		_ = func() (err error) {
+			defer SilentOnPanic(struct{}{})
+			panic("mayday")
+		}()
+	})
+	require.Contains(t, log, "intercepted panic but parameter 'err' is invalid")
+
+	log = tests.LogrusCapture(func() {
+		_ = func() (err error) {
+			err = errors.New("Any message")
+			defer SilentOnPanic(&err)
+			panic("mayday")
+		}()
+	})
+	require.Contains(t, log, "fail.SilentOnPanic")
+
+	testlist := []struct {
+		name     string
+		err      Error
+		contains string
+	}{
+		{name: "ErrorList", err: NewErrorList([]error{errors.New("Any message")})},
+		{name: "NotFoundError", err: NotFoundError("Any message")},
+		{name: "ErrUnqualified", err: NewError("Any message")},
+		{name: "ErrWarning", err: &ErrWarning{errorCore: createErrorCore("Any message")}},
+		{name: "ErrTimeout", err: &ErrTimeout{errorCore: createErrorCore("Any message")}},
+		{name: "ErrAborted", err: &ErrAborted{errorCore: createErrorCore("Any message")}},
+		{name: "ErrRuntimePanic", err: &ErrRuntimePanic{errorCore: createErrorCore("Any message")}},
+		{name: "ErrNotAvailable", err: &ErrNotAvailable{errorCore: createErrorCore("Any message")}},
+		{name: "ErrDuplicate", err: &ErrDuplicate{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidRequest", err: &ErrInvalidRequest{errorCore: createErrorCore("Any message")}},
+		{name: "ErrSyntax", err: &ErrSyntax{errorCore: createErrorCore("Any message")}},
+		{name: "ErrNotAuthenticated", err: &ErrNotAuthenticated{errorCore: createErrorCore("Any message")}},
+		{name: "ErrForbidden", err: &ErrForbidden{errorCore: createErrorCore("Any message")}},
+		{name: "ErrOverflow", err: &ErrOverflow{errorCore: createErrorCore("Any message")}},
+		{name: "ErrOverload", err: &ErrOverload{errorCore: createErrorCore("Any message")}},
+		{name: "ErrNotImplemented", err: &ErrNotImplemented{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidInstance", err: &ErrInvalidInstance{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidParameter", err: &ErrInvalidParameter{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInvalidInstanceContent", err: &ErrInvalidInstanceContent{errorCore: createErrorCore("Any message")}},
+		{name: "ErrInconsistent", err: &ErrInconsistent{errorCore: createErrorCore("Any message")}},
+		{name: "ErrExecution", err: &ErrExecution{errorCore: createErrorCore("Any message")}},
+		{name: "ErrAlteredNothing", err: &ErrAlteredNothing{errorCore: createErrorCore("Any message")}},
+		{name: "ErrUnknown", err: &ErrUnknown{errorCore: createErrorCore("Any message")}},
+	}
+
+	for i := range testlist {
+		t.Run(testlist[i].name, func(t *testing.T) {
+			log = tests.LogrusCapture(func() {
+				_ = func() (err Error) {
+					defer SilentOnPanic(testlist[i].err)
+					panic("mayday")
+				}()
+			})
+			require.Contains(t, log, "fail.SilentOnPanic")
+		})
+	}
+
+}
+
+func Test_IgnoreProblems(t *testing.T) {
+
+	err := func() (err Error) {
+		defer IgnoreProblems(&err)
+		panic("mayday")
+	}()
+	require.Nil(t, err)
 
 }

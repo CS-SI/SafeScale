@@ -277,6 +277,7 @@ func TestMetadataCore_Inspect(t *testing.T) {
 }
 
 func TestMetadataCore_Review(t *testing.T) {
+
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	require.Nil(t, xerr)
@@ -311,6 +312,7 @@ func TestMetadataCore_Review(t *testing.T) {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
 			an, ok := clonable.(*abstract.Network)
+
 			require.EqualValues(t, ok, true)
 			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
@@ -392,14 +394,6 @@ func TestMetadataCore_Alter(t *testing.T) {
 }
 
 func TestMetadataCore_Carry(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Panic is expected")
-		} else {
-			t.Error("It should have panicked", r)
-			t.Fail()
-		}
-	}()
 
 	ctx := context.Background()
 
@@ -409,10 +403,11 @@ func TestMetadataCore_Carry(t *testing.T) {
 
 	var amc *MetadataCore = nil
 	xerr := amc.Carry(ctx, network)
-	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
+	require.Contains(t, xerr.Error(), "invalid instance: in")
+
 	amc = &MetadataCore{}
 	xerr = amc.Carry(ctx, network)
-	require.Contains(t, xerr.Error(), "invalid instance content")
+	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -421,23 +416,17 @@ func TestMetadataCore_Carry(t *testing.T) {
 
 		mc, err := NewCore(svc, "network", "networks", network)
 		require.Nil(t, err)
-
 		xerr = mc.Carry(ctx, network)
 		require.Nil(t, xerr)
+
+		xerr = mc.Carry(ctx, network)
+		require.Contains(t, xerr.Error(), "cannot carry, already carries something")
 
 	})
 	require.Nil(t, err)
 }
 
 func TestMetadataCore_Read(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Panic is expected")
-		} else {
-			t.Error("It should have panicked", r)
-			t.Fail()
-		}
-	}()
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -473,14 +462,6 @@ func TestMetadataCore_Read(t *testing.T) {
 }
 
 func TestMetadataCore_ReadByID(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Log("Panic is expected")
-		} else {
-			t.Error("It should have panicked", r)
-			t.Fail()
-		}
-	}()
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -680,6 +661,7 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 
 	var amc *MetadataCore = nil
 	_, xerr = amc.unsafeSerialize(ctx)
+
 	// require.Contains(t, xerr.Error(), "calling method from a nil pointer"), true)
 	require.Contains(t, xerr.Error(), "runtime error: invalid memory address or nil pointer dereference") // FIXME: aw, runtime error -__-
 

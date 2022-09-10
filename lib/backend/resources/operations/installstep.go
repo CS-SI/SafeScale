@@ -298,16 +298,16 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 				tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-					temporal.FormatDuration(time.Since(is.Worker.startTime)))
+					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 			} else { // other steps are expected to succeed
 				tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-					temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
+					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())), outcomes.ErrorMessages())
 			}
 		} else {
 			tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
 				is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-				temporal.FormatDuration(time.Since(is.Worker.startTime)))
+				temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 		}
 	}
 
@@ -423,7 +423,7 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
 func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v data.Map) (clonedV data.Map, ferr fail.Error) {
-	is.Worker.startTime = time.Now()
+	is.Worker.SetStartTime(time.Now())
 
 	var xerr fail.Error
 	var cerr error

@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	txttmpl "text/template"
 	"time"
@@ -103,6 +104,7 @@ var featureScriptTemplate atomic.Value
 type alterCommandCB func(string) string
 
 type worker struct {
+	mu        *sync.RWMutex
 	service   iaas.Service
 	feature   *Feature
 	target    resources.Targetable
@@ -142,6 +144,7 @@ func newWorker(
 	action installaction.Enum, cb alterCommandCB,
 ) (*worker, fail.Error) {
 	w := worker{
+		mu:        &sync.RWMutex{},
 		feature:   f.(*Feature),
 		target:    target,
 		method:    method,
@@ -178,6 +181,20 @@ func newWorker(
 	}
 
 	return &w, nil
+}
+
+// SetStartTime Updates startTime
+func (w *worker) SetStartTime(at time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.startTime = at
+}
+
+// GetStartTime return startTime
+func (w *worker) GetStartTime() time.Time {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.startTime
 }
 
 // ConcernsCluster returns true if the target of the worker is a cluster

@@ -40,6 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
@@ -51,6 +52,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
@@ -63,9 +65,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/eko/gocache/v2/cache"
+	"github.com/eko/gocache/v2/store"
 
-	// "github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/taskqueue"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -98,9 +101,20 @@ var SHORTEN_TIMINGS = &temporal.MutableTimings{
 
 type ServiceTest struct {
 	iaas.Service
+	Name      string
 	internals ServiceTestInternals
 	memory    ServiceTestMemory
 	options   ServiceTestOptions
+}
+
+type ServiceTestLogger struct {
+	mu *sync.RWMutex
+	t  *testing.T
+}
+
+type ServiceTestMountPoint struct {
+	mu    *sync.RWMutex
+	value string
 }
 
 type ServiceTestBucketData struct {
@@ -108,10 +122,116 @@ type ServiceTestBucketData struct {
 	mu   sync.Mutex
 }
 
-type ServiceTestCacheData struct {
-	// data map[string]cache.Store
+type ServiceTestCacheDataMap struct {
 	data map[string]interface{}
-	mu   sync.Mutex
+	mu   *sync.RWMutex
+}
+
+type ServiceTestCacheData struct {
+	svc  *ServiceTest
+	data ServiceTestCacheDataMap
+	tq   *taskqueue.TaskQueue
+}
+
+func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interface{}, error) {
+	skey, ok := key.(string)
+	if !ok {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
+	}
+	e.svc._surveyf("ServiceTestCacheData::Get { key: \"%s\" }", skey)
+	e.data.mu.RLock()
+	defer e.data.mu.RUnlock()
+	value, ok := e.data.data[skey]
+	if !ok {
+		return nil, fail.NotFoundError()
+	}
+	return value, nil
+
+	//return e.tq.Push(func() (interface{}, fail.Error) {
+	//	e.data.mu.RLock()
+	//	defer e.data.mu.RUnlock()
+	//	value, ok := e.data.data[skey]
+	//	if !ok {
+	//		return nil, fail.NotFoundError()
+	//	}
+	//	return value, nil
+	//}, 10*time.Second)
+}
+func (e *ServiceTestCacheData) Set(ctx context.Context, key interface{}, object interface{}, options *store.Options) error {
+	skey, ok := key.(string)
+	if !ok {
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
+	}
+	e.svc._surveyf("ServiceTestCacheData::Set { key: \"%s\" }", skey)
+	_, err := e.tq.Push(func() (interface{}, fail.Error) {
+		e.data.mu.Lock()
+		defer e.data.mu.Unlock()
+		e.data.data[skey] = object
+		return nil, nil
+	}, 10*time.Second)
+	return err
+}
+func (e *ServiceTestCacheData) Delete(ctx context.Context, key interface{}) error {
+	skey, ok := key.(string)
+	if !ok {
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
+	}
+	e.svc._surveyf("ServiceTestCacheData::Delete { key: \"%s\" }", skey)
+	_, err := e.tq.Push(func() (interface{}, fail.Error) {
+		e.data.mu.Lock()
+		defer e.data.mu.Unlock()
+		_, ok := e.data.data[skey]
+		if ok {
+			delete(e.data.data, skey)
+		}
+		return nil, nil
+	}, 10*time.Second)
+	return err
+}
+func (e *ServiceTestCacheData) Invalidate(ctx context.Context, options store.InvalidateOptions) error {
+	e.svc._survey("ServiceTestCacheData::Invalidate (not implemented)")
+	return nil
+}
+func (e *ServiceTestCacheData) Clear(ctx context.Context) error {
+	e.svc._survey("ServiceTestCacheData::Clear")
+	_, err := e.tq.Push(func() (interface{}, fail.Error) {
+		e.data.mu.Lock()
+		defer e.data.mu.Unlock()
+		e.data.data = make(map[string]interface{})
+		return nil, nil
+	}, 10*time.Second)
+	return err
+}
+func (e *ServiceTestCacheData) GetType() string {
+	return "ServiceTestCacheData"
+}
+
+type ServiceTestNoCacheData struct {
+	svc *ServiceTest
+}
+
+func (e *ServiceTestNoCacheData) Get(ctx context.Context, key interface{}) (interface{}, error) {
+	e.svc._surveyf("ServiceTestNoCacheData::Get { key: \"%s\" }", key)
+	return nil, fail.NotFoundError()
+}
+func (e *ServiceTestNoCacheData) Set(ctx context.Context, key, object interface{}, options *store.Options) error {
+	e.svc._surveyf("ServiceTestNoCacheData::Set { key: \"%s\" }", key)
+	return nil
+}
+func (e *ServiceTestNoCacheData) Delete(ctx context.Context, key interface{}) error {
+	e.svc._surveyf("ServiceTestNoCacheData::Delete { key: \"%s\" }", key)
+	return nil
+}
+func (e *ServiceTestNoCacheData) Invalidate(ctx context.Context, options store.InvalidateOptions) error {
+	e.svc._survey("ServiceTestNoCacheData::Invalidate")
+	return nil
+}
+func (e *ServiceTestNoCacheData) Clear(ctx context.Context) error {
+	e.svc._survey("ServiceTestNoCacheData::Clear")
+	return nil
+}
+func (e *ServiceTestNoCacheData) GetType() string {
+	return "ServiceTestNoCacheData"
 }
 
 type ServiceTestFsData struct {
@@ -119,19 +239,27 @@ type ServiceTestFsData struct {
 	mu   sync.Mutex
 }
 
+type ServiceLogLevel struct {
+	mu    *sync.RWMutex
+	value uint
+}
+
 type ServiceTestInternals struct {
-	t          *testing.T
-	tmpdir     string                // Temporary directory
-	bucketData ServiceTestBucketData // Contains bucket data (emulated local)
-	cache      ServiceTestCacheData  // Contains cache data (emulated local)
-	fsCache    ServiceTestFsData     // Contains file data (emulated local)
-	loglevel   uint                  // 0: none, 1: no data details, 2: full data vision
+	logger     ServiceTestLogger
+	tmpdir     ServiceTestMountPoint   // Temporary directory
+	bucketData ServiceTestBucketData   // Contains bucket data (emulated local)
+	cache      *ServiceTestCacheData   // Contains cache data (emulated local)
+	nocache    *ServiceTestNoCacheData // Contains cache data (emulated local)
+	fsCache    ServiceTestFsData       // Contains file data (emulated local)
+	loglevel   ServiceLogLevel         // 0: none, 1: no data details, 2: full data vision
 }
 type ServiceTestMemory struct {
+	mu       *sync.RWMutex
 	keypairs map[string]*abstract.KeyPair
 }
 
 type ServiceTestOptions struct {
+	mu                      *sync.RWMutex
 	candisablesecuritygroup bool                         // Set GetCapabilities().CanDisableSecurityGroup
 	enablecache             bool                         // Enable use cache
 	metadatakey             string                       // Response of .GetMetaData(). Used to cypher bucket data,
@@ -421,31 +549,50 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 	if err != nil {
 		return err
 	}
-
 	svc := &ServiceTest{
 		internals: ServiceTestInternals{
-			t:      t,
-			tmpdir: dir,
+			logger: ServiceTestLogger{
+				t:  t,
+				mu: &sync.RWMutex{},
+			},
+			tmpdir: ServiceTestMountPoint{
+				mu:    &sync.RWMutex{},
+				value: dir,
+			},
 			bucketData: ServiceTestBucketData{
 				data: make(map[string]string),
 				mu:   sync.Mutex{},
 			},
-			cache: ServiceTestCacheData{
-				// data: make(map[string]cache.Store),
-				data: make(map[string]interface{}),
-				mu:   sync.Mutex{},
+			cache: &ServiceTestCacheData{
+				svc: nil,
+				tq:  taskqueue.CreateTaskQueue(32),
+				data: ServiceTestCacheDataMap{
+					data: make(map[string]interface{}),
+					mu:   &sync.RWMutex{},
+				},
+			},
+			nocache: &ServiceTestNoCacheData{
+				svc: nil,
 			},
 			fsCache: ServiceTestFsData{
 				data: make(map[string][]byte),
 				mu:   sync.Mutex{},
 			},
-			loglevel: 2,
+			loglevel: ServiceLogLevel{
+				mu:    &sync.RWMutex{},
+				value: 2,
+			},
 		},
 		memory: ServiceTestMemory{
+			mu:       &sync.RWMutex{},
 			keypairs: make(map[string]*abstract.KeyPair),
 		},
-		options: ServiceTestOptions{},
+		options: ServiceTestOptions{
+			mu: &sync.RWMutex{},
+		},
 	}
+	svc.internals.cache.svc = svc
+	svc.internals.nocache.svc = svc
 	svc._reset()
 
 	xerr := svc._shortenTimings(func() fail.Error {
@@ -464,15 +611,13 @@ func (e *ServiceTest) _reset() {
 	e.internals.bucketData.data = make(map[string]string) // Empty bucket data
 	e.internals.bucketData.mu.Unlock()
 
-	e.internals.cache.mu.Lock()
-	// e.internals.cache.data = make(map[string]cache.Store)
-	e.internals.cache.data = make(map[string]interface{})
-	e.internals.cache.mu.Unlock()
+	e.internals.cache.Clear(context.Background())
 
 	e.internals.fsCache.mu.Lock()
 	e.internals.fsCache.data = make(map[string][]byte)
 	e.internals.fsCache.mu.Unlock()
 
+	e.options.mu.Lock()
 	e.options.candisablesecuritygroup = true
 	e.options.enablecache = false
 	e.options.timings = temporal.NewTimings()
@@ -483,7 +628,7 @@ func (e *ServiceTest) _reset() {
 		ID:         "ServiceTestBucket",
 		Name:       "ServiceTestBucket",
 		Host:       "localhost",
-		MountPoint: e.internals.tmpdir,
+		MountPoint: e._getMountPoint(),
 	}
 	e.options.metadatabucketErr = nil
 	e.options.listobjectsErr = nil
@@ -504,17 +649,35 @@ func (e *ServiceTest) _reset() {
 	}
 	e.options.protocol = "rclone-s3.conf"
 	e.options.protocolErr = nil
+	e.options.mu.Unlock()
 
+	e.memory.mu.Lock()
 	e.memory.keypairs = make(map[string]*abstract.KeyPair)
+	e.memory.mu.Unlock()
+
 }
+func (e *ServiceTest) _getLogLevel() uint {
+	e.internals.loglevel.mu.RLock()
+	defer e.internals.loglevel.mu.RUnlock()
+	level := e.internals.loglevel.value
+	//e._logf("ServiceTest::_getLogLevel { value: %d }", level)
+	return level
+}
+
 func (e *ServiceTest) _setLogLevel(level uint) {
-	e.internals.loglevel = 2
-	e._logf("ServiceTest::_setLogLevel { value: %d }", level)
-	e.internals.loglevel = level
-	if e.internals.loglevel > 2 {
-		e.internals.loglevel = 2
+	formattedlevel := level
+	if formattedlevel < 0 {
+		formattedlevel = 0
 	}
+	if formattedlevel > 2 {
+		formattedlevel = 2
+	}
+	e._logf("ServiceTest::_setLogLevel { value: %d > %d }", level, formattedlevel)
+	e.internals.loglevel.mu.Lock()
+	defer e.internals.loglevel.mu.Unlock()
+	e.internals.loglevel.value = formattedlevel
 }
+
 func (e *ServiceTest) _sshCommand(in string) string {
 
 	if len(in) > 16 && in[0:16] == "/usr/bin/md5sum " {
@@ -523,8 +686,10 @@ func (e *ServiceTest) _sshCommand(in string) string {
 			return fmt.Sprintf("echo \"%s\"", hash)
 		}
 	}
-
-	return e.options.onsshcommand(in)
+	e.options.mu.RLock()
+	onsshcommand := e.options.onsshcommand
+	e.options.mu.RUnlock()
+	return onsshcommand(in)
 }
 func (e *ServiceTest) _updateOption(name string, value interface{}) {
 	v, ok := ServiveOptionsSetMap[name]
@@ -552,7 +717,12 @@ func (e *ServiceTest) _getRawInternalData(path string) (string, error) {
 	return serial, nil
 }
 func (e *ServiceTest) _getInternalData(path string) (string, error) {
-	key, err := crypt.NewEncryptionKey([]byte(e.options.metadatakey))
+
+	e.options.mu.RLock()
+	metadatakey := e.options.metadatakey
+	e.options.mu.RUnlock()
+
+	key, err := crypt.NewEncryptionKey([]byte(metadatakey))
 	if err != nil {
 		return "", err
 	}
@@ -588,7 +758,7 @@ func (e *ServiceTest) _setInternalData(path string, v interface{}) error {
 	// Chunk fields
 	obj, _ := v.(interface{ Serialize() ([]byte, fail.Error) })
 	dataValue := "[Serial]"
-	if e.internals.loglevel > 1 {
+	if e._getLogLevel() > 1 {
 		d, _ := obj.Serialize()
 		dataValue = string(d)
 	}
@@ -605,6 +775,16 @@ func (e *ServiceTest) _hasInternalData(path string) bool {
 	e.internals.bucketData.mu.Unlock()
 	return ok
 }
+func (e *ServiceTest) _listInternalDataKeys() []string {
+	e.internals.bucketData.mu.Lock()
+	keys := make([]string, 0, len(e.internals.bucketData.data))
+	for key := range e.internals.bucketData.data {
+		keys = append(keys, key)
+	}
+	e.internals.bucketData.mu.Unlock()
+	return keys
+}
+
 func (e *ServiceTest) _deleteInternalData(path string) error {
 	e._logf("ServiceTest::_deleteInternalData { path: \"%s\" }", path)
 	e.internals.bucketData.mu.Lock()
@@ -619,7 +799,12 @@ func (e *ServiceTest) _deleteInternalData(path string) error {
 	return nil
 }
 func (e *ServiceTest) _encodeItem(v interface{}) (string, error) {
-	key, err := crypt.NewEncryptionKey([]byte(e.options.metadatakey))
+
+	e.options.mu.RLock()
+	metadatakey := e.options.metadatakey
+	e.options.mu.RUnlock()
+
+	key, err := crypt.NewEncryptionKey([]byte(metadatakey))
 	if err != nil {
 		return "", err
 	}
@@ -639,7 +824,12 @@ func (e *ServiceTest) _encodeItem(v interface{}) (string, error) {
 	return string(encoded), nil
 }
 func (e *ServiceTest) _decodeItem(serial string) (string, error) {
-	key, err := crypt.NewEncryptionKey([]byte(e.options.metadatakey))
+
+	e.options.mu.RLock()
+	metadatakey := e.options.metadatakey
+	e.options.mu.RUnlock()
+
+	key, err := crypt.NewEncryptionKey([]byte(metadatakey))
 	if err != nil {
 		return "", err
 	}
@@ -679,7 +869,7 @@ func (e *ServiceTest) _getFsCacheMD5(path string) (string, fail.Error) {
 	return hash, nil
 }
 func (e *ServiceTest) _setFsCache(path string, data []byte) fail.Error {
-	if e.internals.loglevel == 2 {
+	if e._getLogLevel() == 2 {
 		e._logf("ServiceTest::_setFsCache {path: \"%s\", data: \"%s\"} ", path, string(data))
 	} else {
 		e._logf("ServiceTest::_setFsCache {path: \"%s\", data: \"bytes(%d)\"} ", path, len(string(data)))
@@ -693,6 +883,12 @@ func (e *ServiceTest) _setFsCache(path string, data []byte) fail.Error {
 	e.internals.fsCache.mu.Unlock()
 	return nil
 }
+func (e *ServiceTest) _getMountPoint() string {
+	e.internals.tmpdir.mu.RLock()
+	defer e.internals.tmpdir.mu.RUnlock()
+	return e.internals.tmpdir.value
+}
+
 func (e *ServiceTest) _shortenTimings(routine func() fail.Error) (ferr fail.Error) {
 
 	defer func() {
@@ -706,22 +902,25 @@ func (e *ServiceTest) _shortenTimings(routine func() fail.Error) (ferr fail.Erro
 			}
 			// FIXME: Due from timeout shortcuts, but strange behaviour, should check for deadlocks
 			if strings.Contains(msg, "race detected during execution of test") {
-				e.internals.t.Log("race detected during execution of test")
-				e.internals.t.Skip()
+				e._log("race detected during execution of test")
 			} else {
 				ferr = fail.NewError(msg)
 			}
 		}
 	}()
 
+	e.options.mu.Lock()
 	err := e.options.timings.Update(SHORTEN_TIMINGS)
+	e.options.mu.Unlock()
 	if err != nil {
 		ferr = fail.Wrap(err)
 	} else {
 		ferr = routine()
 	}
 	defer func() {
+		e.options.mu.Lock()
 		err = e.options.timings.Update(temporal.NewTimings())
+		e.options.mu.Unlock()
 		if err != nil {
 			ferr = fail.Wrap(err)
 		}
@@ -737,12 +936,14 @@ func (e *ServiceTest) _cramp(msg string, length int) string { // nolint
 	return output
 }
 func (e *ServiceTest) _tracef(color string, msg string, args ...interface{}) {
-	if e.internals.loglevel > 0 {
+	if e._getLogLevel() > 0 {
 		txt := fmt.Sprintf("\033[%sm%s\033[0m", color, msg)
+		e.internals.logger.mu.RLock()
+		e.internals.logger.mu.RUnlock()
 		if len(args) == 0 {
-			e.internals.t.Log(txt) // nodebug
+			e.internals.logger.t.Log(txt) // nodebug
 		} else {
-			e.internals.t.Logf(txt, args...) // nodebug
+			e.internals.logger.t.Logf(txt, args...) // nodebug
 		}
 	}
 }
@@ -798,18 +999,30 @@ func (e *ServiceTest) FindTemplateByName(ctx context.Context, name string) (*abs
 	return nil, nil
 }
 func (e *ServiceTest) GetProviderName() (string, fail.Error) {
-	if e.options.providernameErr != nil {
-		e._warnf("ServiceTest::GetProviderName forced error \"%s\"", e.options.providernameErr.Error())
-		return "", e.options.providernameErr
+
+	e.options.mu.RLock()
+	providernameErr := e.options.providernameErr
+	providername := e.options.providername
+	e.options.mu.RUnlock()
+
+	if providernameErr != nil {
+		e._warnf("ServiceTest::GetProviderName forced error \"%s\"", providernameErr.Error())
+		return "", providernameErr
 	}
-	return e.options.providername, nil
+	return providername, nil
 }
 func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
-	if e.options.metadatabucketErr != nil {
-		e._warnf("ServiceTest::GetMetadataBucket forced error \"%s\"", e.options.metadatabucketErr.Error())
-		return abstract.ObjectStorageBucket{}, e.options.metadatabucketErr
+
+	e.options.mu.RLock()
+	metadatabucketErr := e.options.metadatabucketErr
+	metadatabucket := e.options.metadatabucket
+	e.options.mu.RUnlock()
+
+	if metadatabucketErr != nil {
+		e._warnf("ServiceTest::GetMetadataBucket forced error \"%s\"", metadatabucketErr.Error())
+		return abstract.ObjectStorageBucket{}, metadatabucketErr
 	}
-	return e.options.metadatabucket, nil
+	return metadatabucket, nil
 }
 
 func (e *ServiceTest) ListHostsByName(ctx context.Context, value bool) (map[string]*abstract.HostFull, fail.Error) {
@@ -869,88 +1082,31 @@ func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum,
 }
 
 func (e *ServiceTest) GetCache(ctx context.Context) (cache.CacheInterface, fail.Error) {
-	e._surveyf("ServiceTest::GetCache { name: \"%s\", enabled: %t } (DEPRECATED)", "none", e.options.enablecache)
-	/*
-		if name == "" {
-			return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
-		}
-		if e.options.enablecache {
-			return NewCacheTest(name, e), nil
-		}
-		var c cache.Cache = NewCacheTest("name", e)
-	*/
-	// return nil, fail.NotAvailableError("No cache available !")
-	return nil, nil
+
+	e.options.mu.RLock()
+	enablecache := e.options.enablecache
+	e.options.mu.RUnlock()
+
+	e._logf("ServiceTest::GetCache { enabled: %t }", enablecache)
+	if e.options.enablecache {
+		return e.internals.cache, nil
+	}
+	return e.internals.nocache, nil
 }
 
-/*
-func (e *ServiceTest) _cache_Get(ctx context.Context, cachename string, key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) { // nolint
-	e._surveyf("ServiceTest::_cache_Get { cache: \"%s\", key: \"%s\" } (not implemented)", cachename, key)
-
-	e.internals.cache.mu.Lock()
-	store, ok := e.internals.cache.data[cachename]
-	e.internals.cache.mu.Unlock()
-	if !ok {
-		store, xerr = cache.NewMapStore(cachename)
-		if xerr != nil {
-			return nil, xerr
-		}
-		e.internals.cache.mu.Lock()
-		e.internals.cache.data[cachename] = store
-		e.internals.cache.mu.Unlock()
-	}
-	e.internals.cache.mu.Unlock()
-	return store.Entry(ctx, key)
-}
-func (e *ServiceTest) _cache_ReserveEntry(ctx context.Context, cachename string, key string, timeout time.Duration) fail.Error {
-	e._surveyf("ServiceTest::_cache_ReserveEntry { cache: \"%s\", key: \"%s\" }(not implemented)", cachename, key)
-	e.internals.cache.mu.Lock()
-	store, ok := e.internals.cache.data[cachename]
-	e.internals.cache.mu.Unlock()
-	if !ok {
-		return fail.NotFoundError("Cache \"%s\" not found", cachename)
-	}
-	return store.Reserve(ctx, key, timeout)
-}
-func (e *ServiceTest) _cache_CommitEntry(ctx context.Context, cachename string, key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	e._surveyf("ServiceTest::_cache_CommitEntry { cache: \"%s\", key: \"%s\", content: \"%s\" } (not implemented)", cachename, key, reflect.TypeOf(content).String())
-	e.internals.cache.mu.Lock()
-	store, ok := e.internals.cache.data[cachename]
-	e.internals.cache.mu.Unlock()
-	if !ok {
-		return nil, fail.NotFoundError("Cache \"%s\" not found", cachename)
-	}
-	return store.Commit(ctx, key, content)
-}
-func (e *ServiceTest) _cache_FreeEntry(ctx context.Context, cachename string, key string) fail.Error {
-	e._surveyf("ServiceTest::_cache_FreeEntry { cache: \"%s\", key: \"%s\" } (not implemented)", cachename, key)
-	e.internals.cache.mu.Lock()
-	store, ok := e.internals.cache.data[cachename]
-	e.internals.cache.mu.Unlock()
-	if !ok {
-		return fail.NotFoundError("Cache \"%s\" not found", cachename)
-	}
-	return store.Free(ctx, key)
-}
-
-func (e *ServiceTest) _cache_AddEntry(ctx context.Context, cachename string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	e._surveyf("ServiceTest::_cache_AddEntry { cache: \"%s\" } (not implemented)", cachename)
-	e.internals.cache.mu.Lock()
-	store, ok := e.internals.cache.data[cachename]
-	e.internals.cache.mu.Unlock()
-	if !ok {
-		return nil, fail.NotFoundError("Cache \"%s\" not found", cachename)
-	}
-	return store.Add(ctx, content)
-}
-*/
 // api.Stack
 func (e *ServiceTest) GetStackName() (string, fail.Error) {
-	if e.options.stacknameErr != nil {
-		e._warnf("ServiceTest::GetStackName forced error \"%s\"", e.options.stacknameErr.Error())
-		return "", e.options.stacknameErr
+
+	e.options.mu.RLock()
+	stacknameErr := e.options.stacknameErr
+	stackname := e.options.stackname
+	e.options.mu.RUnlock()
+
+	if stacknameErr != nil {
+		e._warnf("ServiceTest::GetStackName forced error \"%s\"", stacknameErr.Error())
+		return "", stacknameErr
 	}
-	return e.options.stackname, nil
+	return stackname, nil
 }
 func (e *ServiceTest) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
 	e._survey("ServiceTest::ListAvailabilityZones (not implemented)")
@@ -973,6 +1129,8 @@ func (e *ServiceTest) InspectTemplate(ctx context.Context, id string) (*abstract
 
 func (e *ServiceTest) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
 	e._logf("ServiceTest::CreateKeyPair { name: \"%s\"}", name)
+	e.memory.mu.Lock()
+	defer e.memory.mu.Unlock()
 	_, ok := e.memory.keypairs[name]
 	if !ok {
 		kp, xerr := abstract.NewKeyPair(name)
@@ -985,6 +1143,8 @@ func (e *ServiceTest) CreateKeyPair(ctx context.Context, name string) (*abstract
 }
 func (e *ServiceTest) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
 	e._logf("ServiceTest::InspectKeyPair { name: \"%s\"}", id)
+	e.memory.mu.RLock()
+	defer e.memory.mu.RUnlock()
 	_, ok := e.memory.keypairs[id]
 	if !ok {
 		return nil, fail.NotFoundError("KeyPair not found")
@@ -992,6 +1152,8 @@ func (e *ServiceTest) InspectKeyPair(ctx context.Context, id string) (*abstract.
 	return e.memory.keypairs[id], nil
 }
 func (e *ServiceTest) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error) {
+	e.memory.mu.RLock()
+	defer e.memory.mu.RUnlock()
 	e._log("ServiceTest::ListKeyPairs")
 	list := make([]*abstract.KeyPair, 0)
 	for _, v := range e.memory.keypairs {
@@ -1000,6 +1162,8 @@ func (e *ServiceTest) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fa
 	return list, nil
 }
 func (e *ServiceTest) DeleteKeyPair(ctx context.Context, id string) fail.Error {
+	e.memory.mu.Lock()
+	defer e.memory.mu.Unlock()
 	e._logf("ServiceTest::DeleteKeyPair { name: \"%s\"}", id)
 	_, ok := e.memory.keypairs[id]
 	if !ok {
@@ -1178,11 +1342,17 @@ func (e *ServiceTest) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam s
 
 }
 func (e *ServiceTest) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
-	if e.options.defaultsgnameErr != nil {
-		e._logf("ServiceTest::GetDefaultSecurityGroupName forced error \"%s\"", e.options.defaultsgnameErr.Error())
-		return "", e.options.defaultsgnameErr
+
+	e.options.mu.RLock()
+	defaultsgnameErr := e.options.defaultsgnameErr
+	defaultsgname := e.options.defaultsgname
+	e.options.mu.RUnlock()
+
+	if defaultsgnameErr != nil {
+		e._logf("ServiceTest::GetDefaultSecurityGroupName forced error \"%s\"", defaultsgnameErr.Error())
+		return "", defaultsgnameErr
 	}
-	return e.options.defaultsgname, nil
+	return defaultsgname, nil
 }
 func (e *ServiceTest) LookupRuleInSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, asgr *abstract.SecurityGroupRule) (bool, fail.Error) {
 	e._survey("ServiceTest::LookupRuleInSecurityGroup (not implemented)")
@@ -1213,10 +1383,15 @@ func (e *ServiceTest) EnableSecurityGroup(ctx context.Context, asg *abstract.Sec
 	})
 }
 func (e *ServiceTest) DisableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
+
+	e.options.mu.RLock()
+	candisablesecuritygroup := e.options.candisablesecuritygroup
+	e.options.mu.RUnlock()
+
 	name := asg.GetName()
 	e._surveyf("ServiceTest::DisableSecurityGroup { name: \"%s\" }", name)
 
-	if !e.options.candisablesecuritygroup {
+	if !candisablesecuritygroup {
 		return fail.NotFoundError("Not able to disable securityGroup \"%s\", check GetCapabilities()", name)
 	}
 
@@ -1267,29 +1442,30 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 	}
 
 	e._logf("ServiceTest::BindSecurityGroupToHost { sgName: \"%s\", host: \"%s\" }", asgName, hostName)
+	return nil
 
-	sgb := &propertiesv1.SecurityGroupBond{
-		ID:       hostName,
-		Name:     hostName,
-		Disabled: true,
-	}
+	//sgb := &propertiesv1.SecurityGroupBond{
+	//	ID:       hostName,
+	//	Name:     hostName,
+	//	Disabled: true,
+	//}
+	//
+	//sg, xerr := LoadSecurityGroup(ctx, e, asgName)
+	//if xerr != nil {
+	//	return xerr
+	//}
+	//return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	//	return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	//		sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+	//		if !ok {
+	//			return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	//		}
+	//		sghV1.ByID[hostName] = sgb
+	//		sghV1.ByName[hostName] = hostName
+	//		return nil
+	//	})
+	//})
 
-	// sg > host
-	sg, xerr := LoadSecurityGroup(ctx, e, asgName)
-	if xerr != nil {
-		return xerr
-	}
-	return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			sghV1.ByID[hostName] = sgb
-			sghV1.ByName[hostName] = hostName
-			return nil
-		})
-	})
 }
 func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
 
@@ -1321,32 +1497,33 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 	}
 
 	e._logf("ServiceTest::UnbindSecurityGroupFromHost { sgName: \"%s\", host: \"%s\" }", asgName, hostName)
+	return nil
 
-	sg, xerr := LoadSecurityGroup(ctx, e, asgName)
-	if xerr != nil {
-		return xerr
-	}
-	return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if len(sghV1.ByID) > 0 {
-				_, ok = sghV1.ByID[hostName]
-				if ok {
-					delete(sghV1.ByID, hostName)
-				}
-			}
-			if len(sghV1.ByName) > 0 {
-				_, ok = sghV1.ByName[hostName]
-				if ok {
-					delete(sghV1.ByName, hostName)
-				}
-			}
-			return nil
-		})
-	})
+	//sg, xerr := LoadSecurityGroup(ctx, e, asgName)
+	//if xerr != nil {
+	//	return xerr
+	//}
+	//return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	//	return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	//		sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+	//		if !ok {
+	//			return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	//		}
+	//		if len(sghV1.ByID) > 0 {
+	//			_, ok = sghV1.ByID[hostName]
+	//			if ok {
+	//				delete(sghV1.ByID, hostName)
+	//			}
+	//		}
+	//		if len(sghV1.ByName) > 0 {
+	//			_, ok = sghV1.ByName[hostName]
+	//			if ok {
+	//				delete(sghV1.ByName, hostName)
+	//			}
+	//		}
+	//		return nil
+	//	})
+	//})
 
 }
 
@@ -1446,7 +1623,7 @@ func (e *ServiceTest) InspectNetworkByName(ctx context.Context, name string) (an
 
 	data, err := e._getInternalData(fmt.Sprintf("networks/byName/%s", name))
 	if err != nil {
-		e.internals.t.Error(err)
+		e._error(err.Error())
 		return nil, fail.NotFoundError(err.Error())
 	}
 
@@ -1667,8 +1844,32 @@ func (e *ServiceTest) InspectSubnetByName(ctx context.Context, networkID string,
 
 }
 func (e *ServiceTest) ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error) {
-	e._survey("ServiceTest::ListSubnets (not implemented)")
-	return []*abstract.Subnet{}, nil
+	e._logf("ServiceTest::ListSubnets { network: %s }", networkID)
+	var as *abstract.Subnet
+	keys := e._listInternalDataKeys()
+	nmap := make(map[string]*abstract.Subnet)
+	for _, key := range keys {
+		if len(key) >= 8 && key[0:8] == "subnets/" {
+			data, err := e._getInternalData(key)
+			if err == nil {
+				as = &abstract.Subnet{}
+				err = json.Unmarshal([]byte(data), as)
+				if err == nil {
+					if as.Network == networkID {
+						id, err := as.GetID()
+						if err == nil {
+							nmap[id] = as
+						}
+					}
+				}
+			}
+		}
+	}
+	list := make([]*abstract.Subnet, 0)
+	for _, v := range nmap {
+		list = append(list, v)
+	}
+	return list, nil
 }
 func (e *ServiceTest) DeleteSubnet(ctx context.Context, id string) fail.Error {
 
@@ -1691,7 +1892,7 @@ func (e *ServiceTest) CreateVIP(_ context.Context, networkID string, subnetID st
 	e._survey("ServiceTest::CreateVIP (not implemented)")
 	return nil, nil
 }
-func (e *ServiceTest) AddPublicIPToVIP(_ context.Context, vip *abstract.VirtualIP) fail.Error {
+func (e *ServiceTest) Ad0dPublicIPToVIP(_ context.Context, vip *abstract.VirtualIP) fail.Error {
 	e._survey("ServiceTest::AddPublicIPToVIP (not implemented)")
 	return nil
 }
@@ -1807,6 +2008,11 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			})
 			if xerr != nil {
 				return nil, uc, fail.Wrap(xerr)
+			}
+			if !request.IsGateway {
+				as.GatewayIDs = []string{fmt.Sprintf("gw-%s", name), fmt.Sprintf("gw2-%s", name)}
+				_ = e._setInternalData(fmt.Sprintf("subnets/byID/%s", as.ID), as)
+				_ = e._setInternalData(fmt.Sprintf("subnets/byName/%s", as.Name), as)
 			}
 			request.Subnets = []*abstract.Subnet{as}
 		}
@@ -1969,8 +2175,8 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			network.PublicIPv6 = ahf.Networking.PublicIPv6
 			network.SubnetsByID = ahf.Networking.SubnetsByID
 			network.SubnetsByName = ahf.Networking.SubnetsByName
-			network.IPv4Addresses = ahf.Networking.IPv4Addresses
-			network.IPv6Addresses = ahf.Networking.IPv6Addresses
+			network.IPv4Addresses[network.DefaultSubnetID] = ip4
+			network.IPv6Addresses[network.DefaultSubnetID] = ip6
 			network.IsGateway = ahf.Networking.IsGateway
 			network.Single = request.Single
 			return nil
@@ -2001,7 +2207,6 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 	if xerr != nil {
 		return ahf, uc, xerr
 	}
-	// _ = host.Reload(ctx)
 
 	return ahf, uc, nil
 }
@@ -2136,9 +2341,29 @@ func (e *ServiceTest) GetHostState(context.Context, stacks.HostParameter) (hosts
 	e._survey("ServiceTest::GetHostState (not implemented)")
 	return hoststate.Enum(0), nil
 }
-func (e *ServiceTest) ListHosts(context.Context, bool) (abstract.HostList, fail.Error) {
-	e._survey("ServiceTest::ListHosts (not implemented)")
-	return abstract.HostList{}, nil
+func (e *ServiceTest) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
+	e._log("ServiceTest::ListHosts")
+	list := make([]*abstract.HostFull, 0)
+	keys := e._getInternalDataKeys("hosts/")
+	var ahf abstract.HostFull
+	if len(keys) > 0 {
+		for _, key := range keys {
+			if len(key) > 11 && key[0:11] == "hosts/byID/" {
+				serial, err := e._getInternalData(key)
+				if err == nil {
+					hc := &abstract.HostCore{LastState: hoststate.Unknown}
+					err = json.Unmarshal([]byte(serial), &hc)
+					if err == nil {
+						fmt.Println(hc)
+						ahf.Core = hc
+						list = append(list, &ahf)
+					}
+				}
+			}
+		}
+	}
+	fmt.Println(list)
+	return list, nil
 }
 func (e *ServiceTest) DeleteHost(ctx context.Context, params stacks.HostParameter) fail.Error {
 
@@ -2418,16 +2643,18 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-
 			innerXErr := props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-
 				hnV2.PublicIPv4 = "192.168.11.11"
-				hnV2.PublicIPv6 = ""
-
+				hnV2.PublicIPv6 = "::ffff:c0a8:b0b"
+				hnV2.DefaultSubnetID = name
+				hnV2.SubnetsByID = map[string]string{name: name}
+				hnV2.SubnetsByName = map[string]string{name: name}
+				hnV2.IPv4Addresses = map[string]string{name: "192.168.11.11"}
+				hnV2.IPv6Addresses = map[string]string{name: "::ffff:c0a8:b0b"}
 				return nil
 			})
 			if innerXErr != nil {
@@ -2480,9 +2707,13 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-
 				hnV2.PublicIPv4 = "192.168.11.12"
-				hnV2.PublicIPv6 = ""
+				hnV2.PublicIPv6 = "::ffff:c0a8:b0c"
+				hnV2.DefaultSubnetID = name
+				hnV2.SubnetsByID = map[string]string{name: name}
+				hnV2.SubnetsByName = map[string]string{name: name}
+				hnV2.IPv4Addresses = map[string]string{name: "192.168.11.12"}
+				hnV2.IPv6Addresses = map[string]string{name: "::ffff:c0a8:b0c"}
 
 				return nil
 			})
@@ -2678,6 +2909,30 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				return xerr
 			}
 
+			xerr = props.Alter(clusterproperty.DefaultsV3, func(clonable data.Clonable) fail.Error {
+				defaultsV3, ok := clonable.(*propertiesv3.ClusterDefaults)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
+				defaultsV3.NodeSizing = propertiesv2.HostSizingRequirements{
+					MinCores:    1,
+					MaxCores:    4,
+					MinRAMSize:  1,
+					MaxRAMSize:  4096,
+					MinDiskSize: 1,
+					MinGPU:      0,
+					MinCPUFreq:  4033,
+					Replaceable: true,
+				}
+				defaultsV3.Image = ""
+				return nil
+			})
+			if xerr != nil {
+				return xerr
+			}
+
 			xerr = props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
 				if !ok {
@@ -2765,9 +3020,45 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 
 /* Volume */
 
-func (e *ServiceTest) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	e._survey("ServiceTest::CreateVolume (not implemented)")
-	return nil, nil
+func (e *ServiceTest) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+	e._surveyf("ServiceTest::CreateVolume (not implemented) { name: \"%s\" }", request.Name)
+
+	defer fail.OnPanic(&ferr)
+
+	avolume := &abstract.Volume{
+		ID:    request.Name,
+		Name:  request.Name,
+		Size:  request.Size,
+		Speed: request.Speed,
+		State: volumestate.Unknown,
+		Tags: map[string]string{
+			"CreationDate": time.Now().Format(time.RFC3339),
+			"ManagedBy":    "safescale",
+		},
+	}
+
+	// Pre-save network
+	err := e._setInternalData(fmt.Sprintf("volumes/byID/%s", request.Name), avolume)
+	if err != nil {
+		return nil, fail.DuplicateErrorWithCause(err, []error{}, fmt.Sprintf("Volume %s already exists", request.Name))
+	}
+	err = e._setInternalData(fmt.Sprintf("volumes/byName/%s", request.Name), avolume)
+	if err != nil {
+		return nil, fail.DuplicateErrorWithCause(err, []error{}, fmt.Sprintf("Volume %s already exists", request.Name))
+	}
+
+	// abstract.CreateNetwork to resources.CreateNetwork
+	volume, xerr := NewCore(e, "volume", "volumes", avolume)
+	if xerr != nil {
+		return avolume, xerr
+	}
+	xerr = volume.Carry(ctx, avolume)
+	if xerr != nil {
+		return avolume, xerr
+	}
+
+	return avolume, nil
+
 }
 func (e *ServiceTest) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
 	e._survey("ServiceTest::InspectVolume (not implemented)")
@@ -2798,11 +3089,17 @@ func (e *ServiceTest) DeleteVolumeAttachment(ctx context.Context, serverID, id s
 	return nil
 }
 func (e *ServiceTest) Timings() (temporal.Timings, fail.Error) {
-	if e.options.timingsErr != nil {
-		e._warnf("ServiceTest::Timings forced error \"%s\"\n", e.options.timingsErr.Error())
-		return nil, e.options.timingsErr
+
+	e.options.mu.RLock()
+	timingsErr := e.options.timingsErr
+	timings := e.options.timings
+	e.options.mu.RUnlock()
+
+	if timingsErr != nil {
+		e._warnf("ServiceTest::Timings forced error \"%s\"\n", timingsErr.Error())
+		return nil, timingsErr
 	}
-	return e.options.timings, nil
+	return timings, nil
 }
 
 func (e *ServiceTest) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
@@ -2831,13 +3128,46 @@ func (e *ServiceTest) GetAuthenticationOptions(ctx context.Context) (providers.C
 	e._survey("ServiceTest::GetAuthenticationOptions (not implemented)")
 	return providers.ConfigMap{}, nil
 }
+func (e *ServiceTest) GetRawAuthenticationOptions(ctx context.Context) (stacks.AuthenticationOptions, fail.Error) {
+	e._survey("ServiceTest::GetRawAuthenticationOptions (not implemented)")
+	return stacks.AuthenticationOptions{
+		IdentityEndpoint: "",
+		Username:         "",
+		UserID:           "",
+		AccessKeyID:      "",
+		Password:         "",
+		APIKey:           "",
+		SecretAccessKey:  "",
+		DomainID:         "",
+		DomainName:       "",
+		TenantID:         "",
+		TenantName:       "",
+		ProjectName:      "",
+		ProjectID:        "",
+		AllowReauth:      false,
+		TokenID:          "",
+		Region:           "GRA",
+		AvailabilityZone: "",
+		FloatingIPPool:   "",
+		AK:               "",
+		AS:               "",
+		CK:               "",
+	}, nil
+}
+
 func (e *ServiceTest) GetOperatorUsername(ctx context.Context) (string, fail.Error) {
-	if e.options.operatorusernameErr != nil {
+
+	e.options.mu.RLock()
+	operatorusernameErr := e.options.operatorusernameErr
+	operatorusername := e.options.operatorusername
+	e.options.mu.RUnlock()
+
+	if operatorusernameErr != nil {
 		e._warn("ServiceTest::GetOperatorUsername (forced error)")
-		return "", e.options.operatorusernameErr
+		return "", operatorusernameErr
 	}
-	e._logf("ServiceTest::GetOperatorUsername { value: \"%s\" } ", e.options.operatorusername)
-	return e.options.operatorusername, nil
+	e._logf("ServiceTest::GetOperatorUsername { value: \"%s\" } ", operatorusername)
+	return operatorusername, nil
 }
 func (e *ServiceTest) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	e._log("ServiceTest::GetConfigurationOptions")
@@ -2868,32 +3198,123 @@ func (e *ServiceTest) GetConfigurationOptions(ctx context.Context) (providers.Co
 	cfg.Set("MaxLifeTimeInHours", 1)
 	return cfg, nil
 }
+func (e *ServiceTest) GetRawConfigurationOptions(ctx context.Context) (stacks.ConfigurationOptions, fail.Error) {
+	e._log("ServiceTest::GetRawConfigurationOptions")
+	cfg, xerr := e.GetConfigurationOptions(ctx)
+	if xerr != nil {
+		return stacks.ConfigurationOptions{}, xerr
+	}
+	var dnslist []string = []string{}
+	buffer, ok := cfg.Get("DNSList")
+	if ok {
+		dnslist = buffer.([]string)
+	}
+	var UseLayer3Networking bool = false
+	buffer, ok = cfg.Get("UseLayer3Networking")
+	if ok {
+		UseLayer3Networking = buffer.(bool)
+	}
+	var UseNATService bool = false
+	buffer, ok = cfg.Get("UseNATService")
+	if ok {
+		UseNATService = buffer.(bool)
+	}
+	providerName, _ := e.GetProviderName()
+	var AutoHostNetworkInterfaces bool = false
+	buffer, ok = cfg.Get("AutoHostNetworkInterfaces")
+	if ok {
+		AutoHostNetworkInterfaces = buffer.(bool)
+	}
+	var DefaultImage string = ""
+	buffer, ok = cfg.Get("DefaultImage")
+	if ok {
+		DefaultImage = buffer.(string)
+	}
+	var MetadataBucketName string = ""
+	buffer, ok = cfg.Get("MetadataBucketName")
+	if ok {
+		MetadataBucketName = buffer.(string)
+	}
+	var OperatorUsername string = ""
+	buffer, ok = cfg.Get("OperatorUsername")
+	if ok {
+		OperatorUsername = buffer.(string)
+	}
+	var MaxLifeTimeInHours int = 0
+	buffer, ok = cfg.Get("MaxLifeTimeInHours")
+	if ok {
+		MaxLifeTimeInHours = buffer.(int)
+	}
+	rawcfg := stacks.ConfigurationOptions{
+		ProviderNetwork:           "",
+		DNSList:                   dnslist,
+		UseFloatingIP:             true,
+		UseLayer3Networking:       UseLayer3Networking,
+		UseNATService:             UseNATService,
+		ProviderName:              providerName,
+		BuildSubnets:              true,
+		AutoHostNetworkInterfaces: AutoHostNetworkInterfaces,
+		VolumeSpeeds:              make(map[string]volumespeed.Enum),
+		DefaultImage:              DefaultImage,
+		MetadataBucket:            MetadataBucketName,
+		OperatorUsername:          OperatorUsername,
+		DefaultSecurityGroupName:  "securitygroup-default",
+		DefaultNetworkName:        "network-default",
+		DefaultNetworkCIDR:        "192.168.0.1/24",
+		WhitelistTemplateRegexp:   nil,
+		BlacklistTemplateRegexp:   nil,
+		WhitelistImageRegexp:      nil,
+		BlacklistImageRegexp:      nil,
+		MaxLifeTime:               MaxLifeTimeInHours,
+		Timings:                   SHORTEN_TIMINGS,
+	}
+	return rawcfg, nil
+}
 
 func (e *ServiceTest) GetName() (string, fail.Error) {
-	if e.options.nameErr != nil {
-		e._warnf("ServiceTest::GetName forced error \"%s\"\n", e.options.nameErr.Error())
-		return "", e.options.nameErr
+
+	e.options.mu.RLock()
+	nameErr := e.options.nameErr
+	name := e.options.name
+	e.options.mu.RUnlock()
+
+	if nameErr != nil {
+		e._warnf("ServiceTest::GetName forced error \"%s\"\n", nameErr.Error())
+		return "", nameErr
 	}
-	return e.options.name, nil
+	return name, nil
 }
 func (e *ServiceTest) GetStack() (api.Stack, fail.Error) {
-	if e.options.stacknameErr != nil {
-		e._warnf("ServiceTest::GetStack forced error \"%s\"\n", e.options.stacknameErr.Error())
-		return api.StackProxy{}, e.options.stacknameErr
+
+	e.options.mu.RLock()
+	stacknameErr := e.options.stacknameErr
+	stackname := e.options.stackname
+	e.options.mu.RUnlock()
+	e.Name = stackname
+
+	if stacknameErr != nil {
+		e._warnf("ServiceTest::GetStack forced error \"%s\"\n", stacknameErr.Error())
+		return e, stacknameErr
 	}
-	return api.StackProxy{Name: e.options.stackname}, nil
+	return e, nil
 }
+
 func (e *ServiceTest) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	e._survey("ServiceTest::GetRegexpsOfTemplatesWithGPU (not implemented)")
 	return []*regexp.Regexp{}, nil
 }
 func (e *ServiceTest) GetCapabilities(ctx context.Context) (providers.Capabilities, fail.Error) {
-	e._logf("ServiceTest::GetCapabilities { PublicVirtualIP: false, PrivateVirtualIP: false, Layer3Networking: false, CanDisableSecurityGroup: %t }", e.options.candisablesecuritygroup)
+
+	e.options.mu.RLock()
+	candisablesecuritygroup := e.options.candisablesecuritygroup
+	e.options.mu.RUnlock()
+
+	e._logf("ServiceTest::GetCapabilities { PublicVirtualIP: false, PrivateVirtualIP: false, Layer3Networking: false, CanDisableSecurityGroup: %t }", candisablesecuritygroup)
 	return providers.Capabilities{
 		PublicVirtualIP:         false,
 		PrivateVirtualIP:        false,
 		Layer3Networking:        false,
-		CanDisableSecurityGroup: e.options.candisablesecuritygroup,
+		CanDisableSecurityGroup: candisablesecuritygroup,
 	}, nil
 }
 func (e *ServiceTest) GetTenantParameters() (map[string]interface{}, fail.Error) {
@@ -2903,11 +3324,17 @@ func (e *ServiceTest) GetTenantParameters() (map[string]interface{}, fail.Error)
 
 // objectstorage.Location
 func (e *ServiceTest) Protocol() (string, fail.Error) {
-	if e.options.protocolErr != nil {
-		e._logf("ServiceTest::Protocol forced error \"%s\"\n", e.options.protocolErr.Error())
-		return "", e.options.protocolErr
+
+	e.options.mu.RLock()
+	protocolErr := e.options.protocolErr
+	protocol := e.options.protocol
+	e.options.mu.RUnlock()
+
+	if protocolErr != nil {
+		e._logf("ServiceTest::Protocol forced error \"%s\"\n", protocolErr.Error())
+		return "", protocolErr
 	}
-	return e.options.protocol, nil
+	return protocol, nil
 }
 func (e *ServiceTest) Configuration() (objectstorage.Config, fail.Error) {
 	e._survey("ServiceTest::Configuration (not implemented)")
@@ -2928,8 +3355,23 @@ func (e *ServiceTest) FindBucket(ctx context.Context, name string) (bool, fail.E
 	return ok, nil
 }
 func (e *ServiceTest) InspectBucket(ctx context.Context, name string) (abstract.ObjectStorageBucket, fail.Error) {
-	e._surveyf("ServiceTest::InspectBucket { name: \"%s\"} (not implemented)", name)
-	return abstract.ObjectStorageBucket{}, nil
+	e._logf("ServiceTest::InspectBucket { name: \"%s\"}", name)
+	aosb := abstract.ObjectStorageBucket{}
+	if valid.IsNil(e) {
+		return aosb, fail.InvalidInstanceError()
+	}
+	data, err := e._getInternalData(fmt.Sprintf("buckets/byID/%s", name))
+	if err != nil {
+		data, err = e._getInternalData(fmt.Sprintf("buckets/byName/%s", name))
+		if err != nil {
+			return aosb, fail.NotFoundError(fmt.Sprintf("Bucket \"%s\" not found", name))
+		}
+	}
+	err = json.Unmarshal([]byte(data), &aosb)
+	if err != nil {
+		return aosb, fail.Wrap(err)
+	}
+	return aosb, nil
 }
 func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.ObjectStorageBucket, fail.Error) {
 	e._logf("ServiceTest::CreateBucket { name: \"%s\"}", name)
@@ -2937,7 +3379,7 @@ func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.O
 		ID:         name,
 		Name:       name,
 		Host:       "localhost",
-		MountPoint: e.internals.tmpdir,
+		MountPoint: e._getMountPoint(),
 	}
 
 	// Pre-save bucket
@@ -2991,10 +3433,33 @@ func (e *ServiceTest) ClearBucket(ctx context.Context, bucketname string, path s
 	e._logf("ServiceTest::ClearBucket { bucketname: \"%s\", path: \"%s\", prefix: \"%s\"}\n", bucketname, path, prefix)
 	return nil
 }
+
+func (e *ServiceTest) _CreateShare(ctx context.Context, data *ShareIdentity) (resources.Share, fail.Error) {
+	e._logf("ServiceTest::_CreateShare { id: \"%s\"}\n", data.ShareID)
+	share, err := NewShare(e)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+	oshare, ok := share.(*Share)
+	if !ok {
+		return nil, fail.InconsistentError("*ressource.Share not castable to *operation.Share")
+	}
+	xerr := oshare.carry(ctx, data)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return LoadShare(ctx, e, data.ShareID)
+}
+
 func (e *ServiceTest) ListObjects(ctx context.Context, bucketname string, path string, prefix string) ([]string, fail.Error) {
-	if e.options.listobjectsErr != nil {
-		e._logf("ServiceTest::ListObjects { bucketname: \"%s\", path: \"%s\", prefix: \"%s\"} forced error \"%s\"\n", bucketname, path, prefix, e.options.listobjectsErr.Error())
-		return []string{}, e.options.listobjectsErr
+
+	e.options.mu.RLock()
+	listobjectsErr := e.options.listobjectsErr
+	e.options.mu.RUnlock()
+
+	if listobjectsErr != nil {
+		e._logf("ServiceTest::ListObjects { bucketname: \"%s\", path: \"%s\", prefix: \"%s\"} forced error \"%s\"\n", bucketname, path, prefix, listobjectsErr.Error())
+		return []string{}, listobjectsErr
 	}
 	keys := e._getInternalDataKeys(path)
 	if len(keys) > 0 {
@@ -3035,23 +3500,28 @@ func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path st
 
 	defer fail.OnPanic(&ferr)
 
+	e.options.mu.RLock()
+	versionErr := e.options.versionErr
+	version := e.options.version
+	e.options.mu.RUnlock()
+
 	switch path {
 	case "version":
-		e._logf("ServiceTest::ReadObject { bucketname: \"%s\", path: \"%s\", value: \"%s\"}\n", bucketname, path, e.options.version)
-		if e.options.versionErr != nil {
-			return e.options.versionErr
+		e._logf("ServiceTest::ReadObject { bucketname: \"%s\", path: \"%s\", value: \"%s\"}\n", bucketname, path, version)
+		if versionErr != nil {
+			return versionErr
 		}
-		_, err := buffer.Write([]byte(e.options.version))
+		_, err := buffer.Write([]byte(version))
 		if err != nil {
 			return fail.Wrap(err)
 		}
-		length = int64(len(e.options.version)) // nolint
+		length = int64(len(version)) // nolint
 	default:
 
 		val, err := e._getRawInternalData(path)
 		if err == nil {
 			dataValue := "[Serial]"
-			if e.internals.loglevel > 1 {
+			if e._getLogLevel() > 1 {
 				dataValue, _ = e._getInternalData(path)
 			}
 			e._logf("ServiceTest::ReadObject { bucketname: \"%s\", path: \"%s\", value: %s }\n", bucketname, path, dataValue)
@@ -3078,7 +3548,7 @@ func (e *ServiceTest) WriteObject(ctx context.Context, bucketname string, path s
 		return abstract.ObjectStorageItem{}, fail.NewError(err)
 	}
 	dataValue := "[Serial]"
-	if e.internals.loglevel > 1 {
+	if e._getLogLevel() > 1 {
 		dataValue, _ = e._decodeItem(string(tmp))
 	}
 	e._logf("ServiceTest::WriteObject { bucketname: \"%s\", path: \"%s\", value: \"%s\"}\n", bucketname, path, dataValue)
@@ -3103,57 +3573,26 @@ func (e *ServiceTest) DeleteObject(ctx context.Context, bucketname string, path 
 
 // extra
 func (e *ServiceTest) GetMetadataKey() (*crypt.Key, fail.Error) {
-	if e.options.metadatakeyErr != nil {
-		e._warnf("ServiceTest::GetMetadataKey forced error \"%s\"", e.options.metadatakeyErr.Error())
-		return nil, e.options.metadatakeyErr
+
+	e.options.mu.RLock()
+	metadatakeyErr := e.options.metadatakeyErr
+	metadatakey := e.options.metadatakey
+	e.options.mu.RUnlock()
+
+	if metadatakeyErr != nil {
+		e._warnf("ServiceTest::GetMetadataKey forced error \"%s\"", metadatakeyErr.Error())
+		return nil, metadatakeyErr
 	}
-	key, err := crypt.NewEncryptionKey([]byte(e.options.metadatakey))
+	key, err := crypt.NewEncryptionKey([]byte(metadatakey))
 	if err == nil {
 		return key, nil
 	}
 	return nil, fail.Wrap(err)
 }
 
-// ------------------------------------------------------------------------------------------------------
-/*
-type CacheTest struct {
-	name  string
-	svc   *ServiceTest
-	cache map[string]*cache.Entry // nolint
-}
-
-func NewCacheTest(name string, svc *ServiceTest) *CacheTest {
-	return &CacheTest{
-		name: name,
-		svc:  svc,
-	}
-}
-func (e *CacheTest) Get(ctx context.Context, key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
-	e.svc._logf("CacheTest::Get { key: \"%s\" }", key)
-	return e.svc._cache_Get(ctx, e.name, key, options...)
-}
-func (e *CacheTest) ReserveEntry(ctx context.Context, key string, timeout time.Duration) fail.Error {
-	e.svc._logf("CacheTest::ReserveEntry { key: \"%s\" }", key)
-	return e.svc._cache_ReserveEntry(ctx, e.name, key, timeout)
-}
-func (e *CacheTest) CommitEntry(ctx context.Context, key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	e.svc._logf("CacheTest::CommitEntry { key: \"%s\" }", key)
-	return e.svc._cache_CommitEntry(ctx, e.name, key, content)
-}
-func (e *CacheTest) FreeEntry(ctx context.Context, key string) fail.Error {
-	e.svc._logf("CacheTest::FreeEntry { key: \"%s\" }", key)
-	return e.svc._cache_FreeEntry(ctx, e.name, key)
-
-}
-func (e *CacheTest) AddEntry(ctx context.Context, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	e.svc._logf("CacheTest::AddEntry")
-	return e.svc._cache_AddEntry(ctx, e.name, content)
-}
-*/
-// ------------------------------------------------------------------------------------------------------
-
 type SSHConnectorTest struct {
 	sshapi.Connector
+	mu     *sync.RWMutex
 	svc    *ServiceTest
 	config sshapi.Config
 }
@@ -3171,6 +3610,7 @@ func SSHConnectorTest_Overload(svc *ServiceTest, routine func(svc *ServiceTest))
 
 func SSHConnectorTestFactory(config sshapi.Config) (sshapi.Connector, fail.Error) {
 	conn := &SSHConnectorTest{
+		mu:     &sync.RWMutex{},
 		svc:    currentSVCSSHConnectorTest,
 		config: config,
 	}
@@ -3178,8 +3618,13 @@ func SSHConnectorTestFactory(config sshapi.Config) (sshapi.Connector, fail.Error
 }
 
 func (e *SSHConnectorTest) Config() (sshapi.Config, fail.Error) {
-	e.svc._survey("SSHConnectorTest::Config")
-	return e.config, nil
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	config := e.config
+	hostname, _ := config.GetHostname()
+	port, _ := config.GetPort()
+	e.svc._logf("SSHConnectorTest::Config { dsn: %s:%d}", hostname, port)
+	return config, nil
 }
 func (e *SSHConnectorTest) CopyWithTimeout(ctx context.Context, remotePath string, localPath string, isUpload bool, delay time.Duration) (retcode int, stdout string, stderr string, ferr fail.Error) {
 
@@ -3250,7 +3695,11 @@ func (e *SSHConnectorTest) Enter(ctx2 context.Context, username string, shell st
 func (e *SSHConnectorTest) NewCommand(ctx context.Context, cmdString string) (sshapi.Command, fail.Error) {
 	e.svc._logf("SSHConnectorTest::NewCommand { cmd: \"%s\"} (emulated)", e.svc._cramp(cmdString, 64))
 
-	hostname, xerr := e.config.GetHostname()
+	e.mu.RLock()
+	config := e.config
+	e.mu.RUnlock()
+
+	hostname, xerr := config.GetHostname()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -3298,7 +3747,11 @@ func (e *SSHConnectorTest) WaitServerReady(ctx context.Context, phase string, de
 
 	stdout = "23:59:59 up 0 days, 23:59, 1 user, load average: 0,99"
 
-	hostname, xerr := e.config.GetHostname()
+	e.mu.RLock()
+	config := e.config
+	e.mu.RUnlock()
+
+	hostname, xerr := config.GetHostname()
 	if xerr != nil {
 		hostname = "<???>"
 	}
@@ -3330,3 +3783,5 @@ func (e *SSHCommandTest) RunWithTimeout(ctx context.Context, outs outputs.Enum, 
 	e.svc._logf("SSHCommandTest::RunWithTimeout { hostname: \"%s\", cmd: \"%s\", output: \"%s\" }", e.hostname, e.svc._cramp(e.runCmdString, 64), e.svc._cramp(e.output, 64))
 	return 0, e.output, "", nil
 }
+
+// ------------------------------------------------------------------------------------------------------

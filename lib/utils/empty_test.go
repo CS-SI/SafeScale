@@ -24,6 +24,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type NillableInterface interface {
+	IsNil() bool
+}
+type Nillable struct {
+	NillableInterface
+	isnil bool
+}
+
+func (e Nillable) IsNil() bool {
+	return e.isnil
+}
+
 func Test_IsEmpty(t *testing.T) {
 
 	var emptyPtrInt error = nil
@@ -119,6 +131,10 @@ func Test_IsEmpty(t *testing.T) {
 				any: "one",
 			},
 			expect: false,
+		},
+		{
+			value:  &Nillable{isnil: false},
+			expect: true,
 		},
 	}
 

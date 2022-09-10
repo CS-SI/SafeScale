@@ -352,12 +352,11 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	defer instance.localCache.Unlock()
 
 	var primaryGatewayID, secondaryGatewayID string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-
 		if len(as.GatewayIDs) > 0 {
 			primaryGatewayID = as.GatewayIDs[0]
 		}
