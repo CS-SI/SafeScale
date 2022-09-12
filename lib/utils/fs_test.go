@@ -1,3 +1,6 @@
+//go:build alltests
+// +build alltests
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -58,6 +61,11 @@ func Test_LazyRemove(t *testing.T) {
 }
 
 func Test_CreateTempFileFromString(t *testing.T) {
+	if _, err := os.Stat("/tmp"); os.IsNotExist(err) {
+		t.Log("Directory /tmp not found, check is u are on Linux OS")
+		t.Skip()
+		return
+	}
 
 	buffer := make([]byte, 255)
 

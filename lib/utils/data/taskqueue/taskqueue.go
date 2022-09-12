@@ -71,7 +71,7 @@ func (e *TaskQueue) Push(f func() (interface{}, fail.Error), timeout time.Durati
 			e.mu.Unlock() // nolint
 			task.callback <- TaskResult{
 				data: nil,
-				err:  fail.OverflowError(fmt.Errorf("Task queue overflow (limit at %d)", e.size), e.size, ""),
+				err:  fail.OverflowError(fmt.Errorf("task queue overflow (limit at %d)", e.size), e.size, ""),
 			}
 		} else {
 			e.queue = append(e.queue, task)
@@ -102,8 +102,8 @@ func (e *TaskQueue) Size() uint {
 func (e *TaskQueue) Length() uint {
 	// queue updated by slice trunk, Rlock does not lock slice read,
 	// but queue replace => makes late update with deprecated data
-	e.mu.Lock() // FIXME: Why write ?
-	defer e.mu.Unlock()
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return uint(len(e.queue))
 }
 
@@ -123,7 +123,6 @@ func (e *TaskQueue) Drain() {
 		}(e, ch)
 		<-ch
 	}
-	return
 }
 
 // Called when queue is empty
@@ -178,7 +177,7 @@ func (e *TaskQueue) processLoop() {
 		}(done)
 		select {
 		case <-time.After(task.timeout):
-			return TaskResult{data: nil, err: fail.TimeoutError(errors.New("Task timeout"), task.timeout, "")}
+			return TaskResult{data: nil, err: fail.TimeoutError(errors.New("task timeout"), task.timeout, "")}
 		case result := <-done:
 			return result
 		}

@@ -27,9 +27,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 )
 
-/* TODO
-func TestNewHostNetworkingFromProperty(t *testing.T) {
+/*
+	TODO
 
+func TestNewHostNetworkingFromProperty(t *testing.T) {
 
 }
 */

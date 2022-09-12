@@ -47,9 +47,12 @@ func TestTaskQueue_PushDrain(t *testing.T) {
 		list: make([]error, 0),
 	}
 
+	wg := sync.WaitGroup{}
 	for i := 0; i < TEST_ITERATIONS; i++ {
 		t.Logf("[Routine %d] Start", i)
 		go func(i int) {
+			wg.Add(1)
+			defer wg.Done()
 			_, err := tq.Push(func() (interface{}, fail.Error) {
 				time.Sleep((1 + time.Duration(rand.Intn(50))) * time.Millisecond) // Do not keep order
 				return i, nil
@@ -69,5 +72,5 @@ func TestTaskQueue_PushDrain(t *testing.T) {
 		t.Error(err)
 	}
 	errors.mu.Unlock()
-
+	wg.Wait()
 }
