@@ -1,3 +1,6 @@
+//go:build alltests
+// +build alltests
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -54,5 +57,38 @@ func Test_LazyRemove(t *testing.T) {
 		}
 	})
 	require.EqualValues(t, log, "")
+
+}
+
+func Test_CreateTempFileFromString(t *testing.T) {
+	if _, err := os.Stat("/tmp"); os.IsNotExist(err) {
+		t.Log("Directory /tmp not found, check is u are on Linux OS")
+		t.Skip()
+		return
+	}
+
+	buffer := make([]byte, 255)
+
+	fd, xerr := CreateTempFileFromString("", 0777)
+	require.Nil(t, xerr)
+	rbytes, err := fd.Read(buffer)
+	require.EqualValues(t, rbytes, 0)
+	require.Contains(t, err.Error(), fd.Name())
+	require.Contains(t, err.Error(), "file already closed")
+
+	fd, xerr = CreateTempFileFromString("this is a test", 0766)
+	require.Nil(t, xerr)
+	rbytes, err = fd.Read(buffer)
+	require.EqualValues(t, rbytes, 0)
+	require.Contains(t, err.Error(), fd.Name())
+	require.Contains(t, err.Error(), "file already closed")
+
+	dat, err := os.ReadFile(fd.Name())
+	require.Contains(t, string(dat), "this is a test")
+	require.Nil(t, err)
+
+	fd, xerr = CreateTempFileFromString("this is a test", 0000)
+	_, err = os.ReadFile(fd.Name())
+	require.Contains(t, err.Error(), "permission denied")
 
 }

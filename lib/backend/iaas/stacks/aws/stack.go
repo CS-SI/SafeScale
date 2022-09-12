@@ -178,7 +178,7 @@ func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, k
 	for _, k := range keys {
 		tags = append(tags, &ec2.Tag{
 			Key:   aws.String(k),
-			Value: nil, // FIXME: OPP, Maybe we need a value match
+			Value: nil,
 		})
 	}
 

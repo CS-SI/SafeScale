@@ -101,7 +101,7 @@ func Test_LoadBucket(t *testing.T) {
 
 		svc._reset()
 
-		_, err = svc.CreateBucket(nil, "mybucket")
+		_, err = svc.CreateBucket(ctx, "mybucket")
 		require.Nil(t, err)
 
 		svc._updateOption("timingsErr", fail.NotFoundError("no timings !"))
@@ -112,7 +112,16 @@ func Test_LoadBucket(t *testing.T) {
 
 		svc._reset()
 
-		_, err = svc.CreateBucket(nil, "mybucket")
+		_, err = svc.CreateBucket(ctx, "mybucket")
+		require.Nil(t, err)
+
+		bucket, err = LoadBucket(ctx, svc, "mybucket")
+		require.Nil(t, err)
+		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
+
+		svc._reset()
+
+		_, err = svc.CreateBucket(ctx, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err = LoadBucket(ctx, svc, "mybucket")
@@ -120,6 +129,32 @@ func Test_LoadBucket(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 
 	})
+	require.Nil(t, xerr)
+
+}
+
+func TestBucket_Exists(t *testing.T) {
+
+	ctx := context.Background()
+
+	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		_, err := svc.CreateBucket(nil, "mybucket")
+		require.Nil(t, err)
+
+		bucket, err := LoadBucket(ctx, svc, "mybucket")
+		require.Nil(t, err)
+		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
+		require.False(t, bucket.IsNull())
+
+		exists, err := bucket.Exists(ctx)
+		require.True(t, exists)
+		require.Nil(t, err)
+
+	})
+	if xerr != nil {
+		t.Error(xerr.Error())
+	}
 	require.Nil(t, xerr)
 
 }
@@ -197,8 +232,80 @@ func TestBucket_Browse(t *testing.T) {
 }
 
 // func TestBucket_GetHost(t *testing.T) {} // Private, unreachable
+func TestBucket_GetHost(t *testing.T) {
+
+	ctx := context.Background()
+	task, err := concurrency.NewTaskWithContext(ctx)
+	ctx = context.WithValue(ctx, "task", task)
+	require.Nil(t, err)
+
+	// FIXME: should not panic here
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				require.Contains(t, fmt.Sprintf("%s", r), "invalid memory address or nil pointer dereference")
+			}
+		}()
+		var b *bucket
+		_, _ = b.GetHost(ctx)
+	}()
+
+	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		_, err := svc.CreateBucket(nil, "mybucket")
+		require.Nil(t, err)
+
+		b, err := LoadBucket(ctx, svc, "mybucket")
+		require.Nil(t, err)
+		ob, ok := b.(*bucket)
+		if !ok {
+			t.Error("ressource.Bucket not castable to *operations.bucket")
+		}
+		strhost, xerr := ob.GetHost(ctx)
+		require.EqualValues(t, strhost, "localhost")
+		require.Nil(t, xerr)
+	})
+	require.Nil(t, xerr)
+
+}
 
 // func TestBucket_GetMountPoint(t *testing.T) {} // Private, unreachable
+func TestBucket_GetMountPoint(t *testing.T) {
+
+	ctx := context.Background()
+	task, err := concurrency.NewTaskWithContext(ctx)
+	ctx = context.WithValue(ctx, "task", task)
+	require.Nil(t, err)
+
+	// FIXME: should not panic here
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				require.Contains(t, fmt.Sprintf("%s", r), "invalid memory address or nil pointer dereference")
+			}
+		}()
+		var b *bucket
+		_, _ = b.GetMountPoint(ctx)
+	}()
+
+	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		_, err := svc.CreateBucket(nil, "mybucket")
+		require.Nil(t, err)
+
+		b, err := LoadBucket(ctx, svc, "mybucket")
+		require.Nil(t, err)
+		ob, ok := b.(*bucket)
+		if !ok {
+			t.Error("ressource.Bucket not castable to *operations.bucket")
+		}
+		strmount, xerr := ob.GetMountPoint(ctx)
+		require.Contains(t, strmount, "/tmp/safescale_NewServiceTest")
+		require.Nil(t, xerr)
+	})
+	require.Nil(t, xerr)
+
+}
 
 func TestBucket_Create(t *testing.T) {
 
@@ -206,7 +313,7 @@ func TestBucket_Create(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket(nil, "mybucket")
+		_, err := svc.CreateBucket(ctx, "mybucket")
 		require.Nil(t, err)
 
 		bucket, err := LoadBucket(ctx, svc, "mybucket")
@@ -215,6 +322,13 @@ func TestBucket_Create(t *testing.T) {
 		require.False(t, bucket.IsNull())
 
 		xerr := bucket.Create(ctx, "any")
+		require.Contains(t, xerr.Error(), "already carrying information")
+
+		bucket, err = NewBucket(svc)
+		require.Nil(t, err)
+		xerr = bucket.Create(ctx, "any")
+		require.Nil(t, err)
+		xerr = bucket.Create(ctx, "any")
 		require.Contains(t, xerr.Error(), "already carrying information")
 
 	})
@@ -254,17 +368,19 @@ func TestBucket_Mount(t *testing.T) {
 
 	ctx := context.Background()
 
-	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+	err := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, err := svc.CreateBucket(nil, "mybucket")
-		require.Nil(t, err)
+		svc._setLogLevel(0)
 
-		bucket, err := LoadBucket(ctx, svc, "mybucket")
-		require.Nil(t, err)
+		_, xerr := svc.CreateBucket(nil, "mybucket")
+		require.Nil(t, xerr)
+
+		bucket, xerr := LoadBucket(ctx, svc, "mybucket")
+		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 		require.False(t, bucket.IsNull())
 
-		xerr := bucket.Mount(nil, "localhost", "buckets/byID/sample") // nolint
+		xerr = bucket.Mount(nil, "localhost", "buckets/byID/sample") // nolint
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
 		xerr = bucket.Mount(ctx, "", "buckets/byID/sample")
@@ -290,19 +406,35 @@ func TestBucket_Mount(t *testing.T) {
 		})
 		require.Nil(t, xerr)
 
-		// xerr = bucket.Mount(ctx, "localhost", "buckets/byId/sample")
-		// require.EqualValues(t, err.Error(), "unsupported Object Storage protocol 'MyServiceTest-Protocol'")
-
-		// svc._updateOption("protocol", "s3")
-
-		// xerr = bucket.Mount(ctx, "localhost", "buckets/byId/sample")
-		// fmt.Println(xerr.Error())
+		svc._setLogLevel(1)
+		xerr = bucket.Mount(ctx, "localhost", "buckets/byId/sample")
+		require.EqualValues(t, xerr.Error(), "unsupported Object Storage protocol 'rclone-s3.conf'")
 
 	})
-	require.Nil(t, xerr)
+	require.Nil(t, err)
 
 }
 
 // func TestBucket_Unmount(t *testing.T) {}
 
-// func TestBucket_ToProtocol(t *testing.T) {} // Private, unreachable
+func TestBucket_ToProtocol(t *testing.T) {
+
+	ctx := context.Background()
+
+	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		_, err := svc.CreateBucket(nil, "mybucket")
+		require.Nil(t, err)
+
+		bucket, err := LoadBucket(ctx, svc, "mybucket")
+		require.Nil(t, err)
+		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
+		require.False(t, bucket.IsNull())
+
+		response, xerr := bucket.ToProtocol(ctx)
+		require.EqualValues(t, response.Name, "mybucket")
+		require.Nil(t, xerr)
+	})
+	require.Nil(t, xerr)
+
+}

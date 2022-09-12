@@ -427,6 +427,11 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the MetadataCore instance already carries a data
 func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable) (_ fail.Error) {
+
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -538,11 +543,16 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 
 // Read gets the data from Object Storage
 func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
+	}
 
 	myself.RLock()
 	defer myself.RUnlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rErr fail.Error
@@ -641,11 +651,16 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 
 // ReadByID reads a metadata identified by ID from Object Storage
 func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
+	}
 
 	myself.RLock()
 	defer myself.RUnlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rErr fail.Error
@@ -975,15 +990,16 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	myself.Lock()
 	defer myself.Unlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rErr fail.Error
@@ -1140,15 +1156,16 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
 func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	myself.RLock()
 	defer myself.RUnlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rErr fail.Error
@@ -1186,22 +1203,23 @@ func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(bu
 
 // Delete deletes the metadata
 func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	myself.Lock()
 	defer myself.Unlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rErr fail.Error
 	}
 	chRes := make(chan result)
+	defer close(chRes)
 	go func() {
-		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
@@ -1320,15 +1338,16 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 }
 
 func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
+
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	myself.RLock()
 	defer myself.RUnlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rTr  string
@@ -1437,15 +1456,20 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 
 // Deserialize reads json code and reinstantiates
 func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.Error {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+	if inctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
 
 	myself.Lock()
 	defer myself.Unlock()
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		rErr fail.Error

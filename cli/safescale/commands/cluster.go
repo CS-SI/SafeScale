@@ -1239,7 +1239,8 @@ var clusterNodeListCommand = cli.Command{
 
 		var formatted []map[string]interface{}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		beta := os.Getenv("SAFESCALE_BETA")
+		if beta != "" {
 			pb := progressbar.Default(-1, "Listing cluster nodes")
 			go func() {
 				for {

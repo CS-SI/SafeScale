@@ -164,9 +164,10 @@ type Stack interface {
 	// Timings ...
 	Timings() (temporal.Timings, fail.Error)
 
-	// FIXME: OPP not anymore
-
+	// UpdateTags updates provider's tags
 	UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error
+
+	// DeleteTags removes provider's tags
 	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error
 }
 

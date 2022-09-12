@@ -1,6 +1,7 @@
 package iaas
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -16,14 +17,19 @@ func Test_getTenantsFromCfg(t *testing.T) {
 	v.SetConfigName("faketenant")
 
 	r, _, xerr := getTenantsFromViperCfg(v)
-	require.Nil(t, xerr)
+	if xerr != nil && strings.Contains(xerr.Error(), "Config File \"faketenant\" Not Found") {
+		t.Log("Config File \"faketenant\" Not Found")
+		t.SkipNow()
+		return
+	}
 
+	require.Nil(t, xerr)
 	theRecoveredTiming := r[0]["timings"].(map[string]interface{})
 
 	s := temporal.MutableTimings{}
 	err := mapstructure.Decode(theRecoveredTiming, &s)
 	if err != nil {
-		t.Error(err)
+		t.Error(err.Error())
 	}
 
 	require.EqualValues(t, 30*time.Second, s.BigDelay())
