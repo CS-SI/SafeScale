@@ -155,7 +155,6 @@ func addPersistentPreRunE(in *cobra.Command) {
 
 func addCommonFlags(cmd *cobra.Command) {
 	flags := cmd.PersistentFlags()
-	flags.StringP("server", "S", "localhost:50051", "Connect to daemon on server SERVER (default: localhost:50051)")
+	flags.StringP("server", "L", "localhost:50051", "Connect to daemon on server SERVER (default: localhost:50051)")
 	flags.StringP("tenant", "T", "", "Use tenant TENANT (default: none)")
-
 }
